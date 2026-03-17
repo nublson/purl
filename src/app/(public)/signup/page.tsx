@@ -1,7 +1,6 @@
 "use client";
 
 import { useForm } from "@tanstack/react-form";
-import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUp } from "@/lib/auth-client";
@@ -20,7 +19,6 @@ import {
 
 export default function Signup() {
   const router = useRouter();
-  const [serverError, setServerError] = useState<string | null>(null);
 
   const form = useForm({
     defaultValues: {
@@ -30,8 +28,6 @@ export default function Signup() {
       confirmPassword: "",
     },
     onSubmit: async ({ value }) => {
-      setServerError(null);
-
       const res = await signUp.email({
         name: value.name?.trim() || value.email,
         email: value.email,
@@ -39,9 +35,7 @@ export default function Signup() {
       });
 
       if (res.error) {
-        const message = res.error.message ?? "Something went wrong.";
-        setServerError(message);
-        toast.error(message);
+        toast.error(res.error.message ?? "Something went wrong.");
         return;
       }
 
@@ -71,11 +65,6 @@ export default function Signup() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {serverError && (
-              <p className="text-sm text-destructive" role="alert">
-                {serverError}
-              </p>
-            )}
             <form.Field name="name">
               {(field) => (
                 <div className="space-y-2">

@@ -15,12 +15,10 @@ import { Label } from "@/components/ui/label";
 import { signIn } from "@/lib/auth-client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { toast } from "sonner";
 
 export default function Login() {
   const router = useRouter();
-  const [serverError, setServerError] = useState<string | null>(null);
 
   const form = useForm({
     defaultValues: {
@@ -28,16 +26,13 @@ export default function Login() {
       password: "",
     },
     onSubmit: async ({ value }) => {
-      setServerError(null);
       const res = await signIn.email({
         email: value.email,
         password: value.password,
       });
 
       if (res.error) {
-        const message = res.error.message ?? "Something went wrong.";
-        setServerError(message);
-        toast.error(message);
+        toast.error(res.error.message ?? "Something went wrong.");
         return;
       }
 
@@ -65,11 +60,6 @@ export default function Login() {
           </CardHeader>
 
           <CardContent className="space-y-4">
-            {serverError && (
-              <p className="text-sm text-destructive" role="alert">
-                {serverError}
-              </p>
-            )}
             <form.Field
               name="email"
               validators={{
