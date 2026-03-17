@@ -1,4 +1,5 @@
 import { Typography } from "@/components/typography";
+import { Button } from "@/components/ui/button";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -16,12 +17,13 @@ export default function Home() {
       </Typography>
       <Typography size="small" className="max-w-sm text-center">
         Purl is an AI-powered read-it-later app. Save any link, and Purl
-        understands and remembers it — so you can ask questions and get
-        answers with sources, weeks later.
+        understands and remembers it — so you can ask questions and get answers
+        with sources, weeks later.
       </Typography>
       <Typography size="small" className="text-muted-foreground">
-        <Link href="/signup">Start for free</Link> or{" "}
-        <Link href="/login">Sign in</Link>
+        <Button asChild>
+          <Link href="/login">Start for free</Link>
+        </Button>
       </Typography>
     </div>
   );
