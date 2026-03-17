@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/hooks/use-auth";
 import { useSession } from "@/lib/auth-client";
 import {
   BadgeCheck,
@@ -19,7 +20,7 @@ import {
 
 export function User() {
   const { data: session } = useSession();
-
+  const { signOut } = useAuth();
   const user = session?.user ?? null;
 
   return (
@@ -51,7 +52,7 @@ export function User() {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={() => signOut()}>
           <LogOut />
           Sign out
         </DropdownMenuItem>
