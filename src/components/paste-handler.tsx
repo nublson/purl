@@ -18,7 +18,7 @@ export function PasteHandler({
   onSaveError,
 }: {
   onPasteStart?: (url: string) => void;
-  onSaveSuccess?: () => void;
+  onSaveSuccess?: (newLinkId: string) => void;
   onSaveError?: () => void;
 }) {
   const handlePaste = useCallback(
@@ -49,7 +49,7 @@ export function PasteHandler({
           return;
         }
 
-        onSaveSuccess?.();
+        if (data?.id) onSaveSuccess?.(data.id);
       } catch {
         toast.error("Failed to save link");
         onSaveError?.();

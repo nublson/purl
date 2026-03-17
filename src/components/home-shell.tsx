@@ -13,16 +13,21 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
   const [isPending, startTransition] = useTransition();
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [prevTodayCount, setPrevTodayCount] = useState(0);
+  const [newLinkId, setNewLinkId] = useState<string | null>(null);
 
   const onPasteStart = useCallback((url: string) => {
     setPendingUrl(url);
   }, []);
 
-  const onSaveSuccess = useCallback(() => {
-    startTransition(() => {
-      router.refresh();
-    });
-  }, [router]);
+  const onSaveSuccess = useCallback(
+    (id: string) => {
+      setNewLinkId(id);
+      startTransition(() => {
+        router.refresh();
+      });
+    },
+    [router],
+  );
 
   const onSaveError = useCallback(() => {
     setPendingUrl(null);
@@ -32,8 +37,7 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
   const todayLinksCount = todayGroup?.links.length ?? 0;
   const newDataArrived = !isPending && todayLinksCount > prevTodayCount;
 
-  const showSkeleton =
-    (pendingUrl !== null || isPending) && !newDataArrived;
+  const showSkeleton = (pendingUrl !== null || isPending) && !newDataArrived;
   const skeletonUrl = pendingUrl ?? "";
   const showSyntheticToday = showSkeleton && !groups.length;
 
@@ -41,6 +45,7 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
     if (!isPending) {
       queueMicrotask(() => {
         setPendingUrl(null);
+        setNewLinkId(null);
         setPrevTodayCount(todayLinksCount);
       });
     }
@@ -71,6 +76,7 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
               key={group.label}
               label={group.label}
               links={group.links}
+              newLinkId={group.label === "Today" ? newLinkId : undefined}
               prependItems={
                 group.label === "Today" && showSkeleton ? (
                   <LinkItemSkeleton url={skeletonUrl} />
