@@ -1,32 +1,12 @@
 import { LinkGroup } from "@/components/link-group";
 import { PasteHandler } from "@/components/paste-handler";
 import { auth } from "@/lib/auth";
-import prisma from "@/lib/prisma";
 import {
   groupLinksByDate,
-  Link,
   LinkGroup as LinkGroupType,
 } from "@/utils/links";
 import { PackageOpen } from "lucide-react";
 import { headers } from "next/headers";
-
-function mapRowToLink(row: {
-  id: string;
-  url: string;
-  title: string;
-  favicon: string;
-  domain: string;
-  createdAt: Date;
-}): Link {
-  return {
-    id: row.id,
-    url: row.url,
-    title: row.title,
-    favicon: row.favicon,
-    domain: row.domain,
-    createdAt: row.createdAt,
-  };
-}
 
 export default async function Home() {
   const session = await auth.api.getSession({
@@ -43,12 +23,8 @@ export default async function Home() {
     );
   }
 
-  const rows = await prisma.link.findMany({
-    where: { userId: session.user.id },
-    orderBy: { createdAt: "desc" },
-  });
-  const links: Link[] = rows.map(mapRowToLink);
-  const groups: LinkGroupType[] = groupLinksByDate(links);
+  // TODO: Load links from your database when Prisma is set up.
+  const groups: LinkGroupType[] = groupLinksByDate([]);
 
   return (
     <div className="wrapper flex-1 flex flex-col gap-8 pb-32">
