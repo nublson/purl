@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "@tanstack/react-form";
+import { Typography } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
 
 export default function Login() {
@@ -42,9 +43,13 @@ export default function Login() {
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-sm">
           <CardHeader>
-            <CardTitle>Log in</CardTitle>
+            <CardTitle>
+              <Typography className="text-foreground">Log in</Typography>
+            </CardTitle>
             <CardDescription>
-              Enter your email and password to access your account.
+              <Typography size="small" className="text-muted-foreground">
+                Enter your email and password to access your account.
+              </Typography>
             </CardDescription>
           </CardHeader>
 
@@ -115,7 +120,7 @@ export default function Login() {
             >
               {form.state.isSubmitting ? "Signing in…" : "Sign in"}
             </Button>
-            <p className="text-center text-sm text-muted-foreground">
+            <Typography size="small" className="text-muted-foreground">
               Don&apos;t have an account?{" "}
               <Link
                 href="/signup"
@@ -123,7 +128,7 @@ export default function Login() {
               >
                 Sign up
               </Link>
-            </p>
+            </Typography>
           </CardFooter>
         </Card>
       </div>

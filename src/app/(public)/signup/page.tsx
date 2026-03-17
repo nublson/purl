@@ -1,11 +1,7 @@
 "use client";
 
-import { useForm } from "@tanstack/react-form";
-import Link from "next/link";
-import { useAuth } from "@/hooks/use-auth";
+import { Typography } from "@/components/typography";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -14,6 +10,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/use-auth";
+import { useForm } from "@tanstack/react-form";
+import Link from "next/link";
 
 export default function Signup() {
   const { signUpWithEmail } = useAuth();
@@ -46,10 +47,16 @@ export default function Signup() {
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-sm">
           <CardHeader>
-            <CardTitle>Create an account</CardTitle>
+            <CardTitle>
+              <Typography className="text-foreground">
+                Create an account
+              </Typography>
+            </CardTitle>
             <CardDescription>
-              Enter your email and choose a password. We&apos;ll send a
-              verification link to your email.
+              <Typography size="small" className="text-muted-foreground">
+                Enter your email and choose a password. We&apos;ll send a
+                verification link to your email.
+              </Typography>
             </CardDescription>
           </CardHeader>
 
@@ -175,7 +182,7 @@ export default function Signup() {
             >
               {form.state.isSubmitting ? "Creating account…" : "Sign up"}
             </Button>
-            <p className="text-center text-sm text-muted-foreground">
+            <Typography size="small" className="text-muted-foreground">
               Already have an account?{" "}
               <Link
                 href="/login"
@@ -183,7 +190,7 @@ export default function Signup() {
               >
                 Log in
               </Link>
-            </p>
+            </Typography>
           </CardFooter>
         </Card>
       </div>

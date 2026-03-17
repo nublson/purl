@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { Typography } from "@/components/typography";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -9,22 +10,30 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function VerifyEmail() {
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Check your email</CardTitle>
+          <CardTitle>
+            <Typography className="text-foreground">
+              Check your email
+            </Typography>
+          </CardTitle>
           <CardDescription>
-            We&apos;ve sent you a verification link. Click the link in the email to verify your account and sign in.
+            <Typography size="small" className="text-muted-foreground">
+              We&apos;ve sent you a verification link. Click the link in the
+              email to verify your account and sign in.
+            </Typography>
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            If you don&apos;t see the email, check your spam folder or try signing up again.
-          </p>
+          <Typography size="small" className="text-muted-foreground">
+            If you don&apos;t see the email, check your spam folder or try
+            signing up again.
+          </Typography>
         </CardContent>
         <CardFooter>
           <Button asChild variant="outline" className="w-full">
