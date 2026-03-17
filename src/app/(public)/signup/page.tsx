@@ -1,5 +1,6 @@
 "use client";
 
+import { useForm } from "@tanstack/react-form";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -18,118 +19,193 @@ import {
 
 export default function Signup() {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError(null);
-    setIsLoading(true);
+  const form = useForm({
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+    onSubmit: async ({ value }) => {
+      setServerError(null);
 
-    const formData = new FormData(e.currentTarget);
-    const password = formData.get("password") as string;
-    const confirmPassword = formData.get("confirmPassword") as string;
+      const res = await signUp.email({
+        name: value.name?.trim() || value.email,
+        email: value.email,
+        password: value.password,
+      });
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      setIsLoading(false);
-      return;
-    }
+      if (res.error) {
+        setServerError(res.error.message ?? "Something went wrong.");
+        return;
+      }
 
-    const res = await signUp.email({
-      name: (formData.get("name") as string) || (formData.get("email") as string),
-      email: formData.get("email") as string,
-      password,
-    });
-
-    setIsLoading(false);
-
-    if (res.error) {
-      setError(res.error.message ?? "Something went wrong.");
-      return;
-    }
-
-    router.push("/verify-email");
-    router.refresh();
-  }
+      router.push("/verify-email");
+      router.refresh();
+    },
+  });
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Create an account</CardTitle>
-          <CardDescription>
-            Enter your email and choose a password. We&apos;ll send a verification link to your email.
-          </CardDescription>
-        </CardHeader>
-        <form onSubmit={handleSubmit}>
+    <form
+      className="w-full"
+      onSubmit={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        form.handleSubmit();
+      }}
+    >
+      <div className="flex min-h-screen items-center justify-center p-4">
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle>Create an account</CardTitle>
+            <CardDescription>
+              Enter your email and choose a password. We&apos;ll send a
+              verification link to your email.
+            </CardDescription>
+          </CardHeader>
+
           <CardContent className="space-y-4">
-            {error && (
+            {serverError && (
               <p className="text-sm text-destructive" role="alert">
-                {error}
+                {serverError}
               </p>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                name="name"
-                type="text"
-                placeholder="Your name"
-                autoComplete="name"
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="you@example.com"
-                required
-                autoComplete="email"
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-                minLength={8}
-                autoComplete="new-password"
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm password</Label>
-              <Input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                minLength={8}
-                autoComplete="new-password"
-                disabled={isLoading}
-              />
-            </div>
+            <form.Field name="name">
+              {(field) => (
+                <div className="space-y-2">
+                  <Label htmlFor={field.name}>Name</Label>
+                  <Input
+                    id={field.name}
+                    name={field.name}
+                    type="text"
+                    placeholder="Your name"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    autoComplete="name"
+                    disabled={form.state.isSubmitting}
+                  />
+                </div>
+              )}
+            </form.Field>
+            <form.Field
+              name="email"
+              validators={{
+                onChange: ({ value }) =>
+                  !value?.trim() ? "Email is required." : undefined,
+              }}
+            >
+              {(field) => (
+                <div className="space-y-2">
+                  <Label htmlFor={field.name}>Email</Label>
+                  <Input
+                    id={field.name}
+                    name={field.name}
+                    type="email"
+                    placeholder="you@example.com"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    autoComplete="email"
+                    disabled={form.state.isSubmitting}
+                  />
+                  {field.state.meta.errors?.length ? (
+                    <p className="text-sm text-destructive" role="alert">
+                      {field.state.meta.errors.join(", ")}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </form.Field>
+            <form.Field
+              name="password"
+              validators={{
+                onChange: ({ value }) =>
+                  !value?.trim()
+                    ? "Password is required."
+                    : (value as string).length < 8
+                      ? "Password must be at least 8 characters."
+                      : undefined,
+              }}
+            >
+              {(field) => (
+                <div className="space-y-2">
+                  <Label htmlFor={field.name}>Password</Label>
+                  <Input
+                    id={field.name}
+                    name={field.name}
+                    type="password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    autoComplete="new-password"
+                    disabled={form.state.isSubmitting}
+                  />
+                  {field.state.meta.errors?.length ? (
+                    <p className="text-sm text-destructive" role="alert">
+                      {field.state.meta.errors.join(", ")}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </form.Field>
+            <form.Field
+              name="confirmPassword"
+              validators={{
+                onChangeListenTo: ["password"],
+                onChange: ({ value, fieldApi }) => {
+                  if (!value?.trim()) return "Confirm password is required.";
+                  if (value !== fieldApi.form.getFieldValue("password")) {
+                    return "Passwords do not match.";
+                  }
+                  return undefined;
+                },
+              }}
+            >
+              {(field) => (
+                <div className="space-y-2">
+                  <Label htmlFor={field.name}>Confirm password</Label>
+                  <Input
+                    id={field.name}
+                    name={field.name}
+                    type="password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    autoComplete="new-password"
+                    disabled={form.state.isSubmitting}
+                  />
+                  {field.state.meta.errors?.length ? (
+                    <p className="text-sm text-destructive" role="alert">
+                      {field.state.meta.errors.join(", ")}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </form.Field>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Creating account…" : "Sign up"}
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={form.state.isSubmitting}
+            >
+              {form.state.isSubmitting ? "Creating account…" : "Sign up"}
             </Button>
             <p className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}
-              <Link href="/login" className="text-primary underline-offset-4 hover:underline">
+              <Link
+                href="/login"
+                className="text-primary underline-offset-4 hover:underline"
+              >
                 Log in
               </Link>
             </p>
           </CardFooter>
-        </form>
-      </Card>
-    </div>
+        </Card>
+      </div>
+    </form>
   );
 }
