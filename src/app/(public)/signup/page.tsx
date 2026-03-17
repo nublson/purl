@@ -48,7 +48,7 @@ export default function Signup() {
         <Card className="w-full max-w-sm">
           <CardHeader>
             <CardTitle>
-              <Typography className="text-foreground">
+              <Typography component="h1" className="text-foreground">
                 Create an account
               </Typography>
             </CardTitle>

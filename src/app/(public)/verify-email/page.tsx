@@ -18,7 +18,7 @@ export default function VerifyEmail() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>
-            <Typography className="text-foreground">
+            <Typography component="h1" className="text-foreground">
               Check your email
             </Typography>
           </CardTitle>
