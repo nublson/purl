@@ -1,0 +1,10 @@
+{
+  "name": "Purl",
+  "short_name": "Purl",
+  "description": "Save links. Ask questions. Get answers.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#09090b",
+  "icons": []
+}

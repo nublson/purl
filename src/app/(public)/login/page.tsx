@@ -44,7 +44,9 @@ export default function Login() {
         <Card className="w-full max-w-sm">
           <CardHeader>
             <CardTitle>
-              <Typography className="text-foreground">Log in</Typography>
+              <Typography component="h1" className="text-foreground">
+                Log in
+              </Typography>
             </CardTitle>
             <CardDescription>
               <Typography size="small" className="text-muted-foreground">
