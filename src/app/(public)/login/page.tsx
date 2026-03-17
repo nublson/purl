@@ -73,7 +73,7 @@ export default function Login() {
             <form.Field
               name="email"
               validators={{
-                onChange: ({ value }) =>
+                onSubmit: ({ value }) =>
                   !value?.trim() ? "Email is required." : undefined,
               }}
             >
@@ -102,7 +102,7 @@ export default function Login() {
             <form.Field
               name="password"
               validators={{
-                onChange: ({ value }) =>
+                onSubmit: ({ value }) =>
                   !value?.trim() ? "Password is required." : undefined,
               }}
             >

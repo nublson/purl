@@ -97,7 +97,7 @@ export default function Signup() {
             <form.Field
               name="email"
               validators={{
-                onChange: ({ value }) =>
+                onSubmit: ({ value }) =>
                   !value?.trim() ? "Email is required." : undefined,
               }}
             >
@@ -126,7 +126,7 @@ export default function Signup() {
             <form.Field
               name="password"
               validators={{
-                onChange: ({ value }) =>
+                onSubmit: ({ value }) =>
                   !value?.trim()
                     ? "Password is required."
                     : (value as string).length < 8
@@ -158,8 +158,7 @@ export default function Signup() {
             <form.Field
               name="confirmPassword"
               validators={{
-                onChangeListenTo: ["password"],
-                onChange: ({ value, fieldApi }) => {
+                onSubmit: ({ value, fieldApi }) => {
                   if (!value?.trim()) return "Confirm password is required.";
                   if (value !== fieldApi.form.getFieldValue("password")) {
                     return "Passwords do not match.";
