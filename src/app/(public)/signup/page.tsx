@@ -2,9 +2,7 @@
 
 import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { signUp } from "@/lib/auth-client";
-import { toast } from "sonner";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +16,7 @@ import {
 } from "@/components/ui/card";
 
 export default function Signup() {
-  const router = useRouter();
+  const { signUpWithEmail } = useAuth();
 
   const form = useForm({
     defaultValues: {
@@ -28,20 +26,11 @@ export default function Signup() {
       confirmPassword: "",
     },
     onSubmit: async ({ value }) => {
-      const res = await signUp.email({
-        name: value.name?.trim() || value.email,
+      await signUpWithEmail({
+        name: value.name?.trim() || undefined,
         email: value.email,
         password: value.password,
       });
-
-      if (res.error) {
-        toast.error(res.error.message ?? "Something went wrong.");
-        return;
-      }
-
-      toast.success("Account created. Please check your email to verify.");
-      router.push("/verify-email");
-      router.refresh();
     },
   });
 

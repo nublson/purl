@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useSession, signOut } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,6 +14,7 @@ import {
 
 export default function Home() {
   const { data: session, isPending } = useSession();
+  const { signOut } = useAuth();
 
   if (isPending) {
     return (
@@ -55,7 +57,7 @@ export default function Home() {
           <div className="flex flex-col gap-2">
             <Button
               variant="outline"
-              onClick={() => signOut()}
+              onClick={() => void signOut()}
               className="w-full"
             >
               Sign out

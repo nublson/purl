@@ -12,13 +12,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { signIn } from "@/lib/auth-client";
+import { useAuth } from "@/hooks/use-auth";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 
 export default function Login() {
-  const router = useRouter();
+  const { signInWithEmail } = useAuth();
 
   const form = useForm({
     defaultValues: {
@@ -26,19 +24,10 @@ export default function Login() {
       password: "",
     },
     onSubmit: async ({ value }) => {
-      const res = await signIn.email({
+      await signInWithEmail({
         email: value.email,
         password: value.password,
       });
-
-      if (res.error) {
-        toast.error(res.error.message ?? "Something went wrong.");
-        return;
-      }
-
-      toast.success("Signed in successfully.");
-      router.push("/home");
-      router.refresh();
     },
   });
 
