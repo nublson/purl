@@ -1,3 +1,4 @@
+import { Link } from "@/utils/links";
 import { LinkItem } from "./link-item";
 import { Typography } from "./typography";
 import { ItemGroup } from "./ui/item";
@@ -7,12 +8,7 @@ export const LinkGroup = ({
   links,
 }: {
   label: string;
-  links: {
-    favicon: string;
-    title: string;
-    url: string;
-    createdAt: Date;
-  }[];
+  links: Link[];
 }) => {
   return (
     <div className="w-full flex flex-col justify-start items-start gap-4">

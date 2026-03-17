@@ -1,4 +1,5 @@
 import { getUrlDomain } from "@/utils/formatter";
+import { Link as LinkType } from "@/utils/links";
 import { Link, MessageCircle, Pencil, Trash } from "lucide-react";
 import Image from "next/image";
 import { Typography } from "./typography";
@@ -11,15 +12,7 @@ import {
   ItemTitle,
 } from "./ui/item";
 
-export function LinkItem({
-  link,
-}: {
-  link: {
-    favicon: string;
-    title: string;
-    url: string;
-  };
-}) {
+export function LinkItem({ link }: { link: LinkType }) {
   return (
     <Item
       key={link.url}
