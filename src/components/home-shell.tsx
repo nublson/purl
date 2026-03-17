@@ -12,6 +12,7 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  const [prevTodayCount, setPrevTodayCount] = useState(0);
 
   const onPasteStart = useCallback((url: string) => {
     setPendingUrl(url);
@@ -27,13 +28,23 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
     setPendingUrl(null);
   }, []);
 
-  useEffect(() => {
-    if (!isPending) queueMicrotask(() => setPendingUrl(null));
-  }, [isPending]);
+  const todayGroup = groups.find((g) => g.label === "Today");
+  const todayLinksCount = todayGroup?.links.length ?? 0;
+  const newDataArrived = !isPending && todayLinksCount > prevTodayCount;
 
-  const showSkeleton = pendingUrl !== null || isPending;
+  const showSkeleton =
+    (pendingUrl !== null || isPending) && !newDataArrived;
   const skeletonUrl = pendingUrl ?? "";
   const showSyntheticToday = showSkeleton && !groups.length;
+
+  useEffect(() => {
+    if (!isPending) {
+      queueMicrotask(() => {
+        setPendingUrl(null);
+        setPrevTodayCount(todayLinksCount);
+      });
+    }
+  }, [isPending, todayLinksCount]);
 
   return (
     <>
