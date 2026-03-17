@@ -1,0 +1,210 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    name: 🚀 Setup & Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate lockfile
+        run: pnpm install --frozen-lockfile
+
+  prisma-setup:
+    name: 🗄️ Prisma Setup
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
+        run: pnpm exec prisma generate
+
+      - name: Fix Prisma generated types
+        run: pnpm run fix:prisma-types
+
+  lint:
+    name: 🔍 Lint
+    runs-on: ubuntu-latest
+    needs: [setup, prisma-setup]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
+        run: pnpm exec prisma generate
+
+      - name: Fix Prisma generated types
+        run: pnpm run fix:prisma-types
+
+      - name: Run linter
+        run: pnpm lint
+
+  type-check:
+    name: 📝 Type Check
+    runs-on: ubuntu-latest
+    needs: [setup, prisma-setup]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
+        run: pnpm exec prisma generate
+
+      - name: Fix Prisma generated types
+        run: pnpm run fix:prisma-types
+
+      - name: Run type check
+        run: pnpm exec tsc --noEmit
+
+  test:
+    name: 🧪 Test
+    runs-on: ubuntu-latest
+    needs: [lint, type-check, prisma-setup]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
+        run: pnpm exec prisma generate
+
+      - name: Fix Prisma generated types
+        run: pnpm run fix:prisma-types
+
+      - name: Run tests
+        run: pnpm test
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
+
+  build:
+    name: 🏗️ Build
+    runs-on: ubuntu-latest
+    needs: [lint, type-check, prisma-setup]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
+        run: pnpm exec prisma generate
+
+      - name: Fix Prisma generated types
+        run: pnpm run fix:prisma-types
+
+      - name: Build application
+        run: pnpm build
+        env:
+          DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
+          BETTER_AUTH_SECRET: "ci-build-placeholder-min-32-chars-do-not-use"
+          BETTER_AUTH_URL: "http://localhost:3000"
+          RESEND_API_KEY: "ci-placeholder"

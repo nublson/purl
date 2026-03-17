@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Purl
 
-## Getting Started
+**Save links. Ask questions. Get answers.**
 
-First, run the development server:
+Purl is an AI-powered read-it-later app. Save any link from the web, and Purl extracts, understands, and remembers the content for you. Weeks later, just ask — Purl searches your saved knowledge and gives you answers with sources.
+
+- **Product context**: see `ABOUT.md`
+
+## Tech stack
+
+- **Web**: Next.js (App Router), React, TypeScript
+- **UI**: Tailwind + shadcn/ui
+- **Auth**: Better Auth
+- **Database**: Postgres + Prisma
+- **Email** (optional for local dev): Resend (verification emails)
+
+## Setup (local development)
+
+### Prerequisites
+
+- **Node.js**: install a recent LTS
+- **Package manager**: `pnpm` (this repo includes `pnpm-lock.yaml`)
+- **Postgres**: local or hosted
+
+### 1) Install dependencies
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2) Configure environment variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Create a `.env` file in the repo root.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME"
 
-## Learn More
+# Optional (used for email verification on signup)
+RESEND_API_KEY="re_..."
+RESEND_FROM="Purl <onboarding@resend.dev>"
+```
 
-To learn more about Next.js, take a look at the following resources:
+Notes:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **`DATABASE_URL` is required** (Prisma + Better Auth)
+- **Resend is optional** for local dev: if `RESEND_API_KEY` is not set, signup still works but verification emails won’t send
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 3) Run database migrations
 
-## Deploy on Vercel
+```bash
+pnpm prisma migrate dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 4) Start the dev server
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+pnpm dev
+```
+
+Open `http://localhost:3000`.
+
+## Testing
+
+Tests use [Vitest](https://vitest.dev/) and cover critical logic: formatter utils, link grouping, and auth middleware routing. No UI (shadcn) or trivial wrappers are tested.
+
+```bash
+pnpm test        # run once
+pnpm test:watch  # watch mode
+```
+
+## Useful commands
+
+```bash
+pnpm lint
+pnpm build
+pnpm start
+pnpm test
+```
