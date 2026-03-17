@@ -24,7 +24,7 @@ export function LinkItem({ link }: { link: LinkType }) {
         rel="noopener noreferrer"
         className="absolute inset-0 z-0"
       />
-      <ItemMedia variant="image" className="size-5 rounded-none">
+      <ItemMedia variant="image" className="size-5 rounded">
         <Image
           src={link.favicon}
           alt={link.title}

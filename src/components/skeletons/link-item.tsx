@@ -7,16 +7,16 @@ export function LinkItemSkeleton({ url }: { url: string }) {
     <Item
       role="listitem"
       aria-busy
-      className="p-2 gap-4 grid grid-cols-[20px_1fr] relative pointer-events-none"
+      className="p-2 gap-4 grid h-12 grid-cols-[20px_1fr] relative pointer-events-none"
     >
-      <ItemMedia variant="image" className="size-5 rounded-none">
-        <Spinner className="text-muted-foreground" />
+      <ItemMedia variant="image" className="size-5 rounded">
+        <Spinner className="size-5 text-muted-foreground" />
       </ItemMedia>
       <ItemContent>
         <ItemTitle className="flex flex-col gap-1">
           <Typography
             size="small"
-            className="font-normal text-muted-foreground animate-pulse"
+            className="font-normal text-muted-foreground animate-pulse line-clamp-1 break-all"
           >
             {url}
           </Typography>

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect } from "react";
 import { toast } from "sonner";
 
@@ -15,13 +14,13 @@ function isValidUrl(str: string): boolean {
 
 export function PasteHandler({
   onPasteStart,
-  onPasteEnd,
+  onSaveSuccess,
+  onSaveError,
 }: {
   onPasteStart?: (url: string) => void;
-  onPasteEnd?: () => void;
+  onSaveSuccess?: () => void;
+  onSaveError?: () => void;
 }) {
-  const router = useRouter();
-
   const handlePaste = useCallback(
     async (e: ClipboardEvent) => {
       const text = e.clipboardData?.getData("text")?.trim();
@@ -46,17 +45,17 @@ export function PasteHandler({
 
         if (!res.ok) {
           toast.error(data?.error ?? "Failed to save link");
+          onSaveError?.();
           return;
         }
 
-        router.refresh();
+        onSaveSuccess?.();
       } catch {
         toast.error("Failed to save link");
-      } finally {
-        onPasteEnd?.();
+        onSaveError?.();
       }
     },
-    [router, onPasteStart, onPasteEnd]
+    [onPasteStart, onSaveSuccess, onSaveError]
   );
 
   useEffect(() => {
