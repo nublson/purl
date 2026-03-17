@@ -130,3 +130,7 @@ body {
     @apply font-sans;
   }
 }
+
+.wrapper {
+  @apply max-w-2xl w-full mx-auto;
+}
