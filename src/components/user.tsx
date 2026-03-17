@@ -37,15 +37,15 @@ export function User() {
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-44" align="end">
         <DropdownMenuGroup>
-          <DropdownMenuItem>
+          <DropdownMenuItem disabled>
             <MessageCircleHeart />
             Share feedback
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem disabled>
             <SettingsIcon />
             Settings
           </DropdownMenuItem>
-          <DropdownMenuItem>
+          <DropdownMenuItem disabled>
             <BadgeCheck />
             Upgrade
           </DropdownMenuItem>

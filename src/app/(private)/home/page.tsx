@@ -1,5 +1,4 @@
-import { LinkItem } from "@/components/link-item";
-import { ItemGroup } from "@/components/ui/item";
+import { LinkGroup } from "@/components/link-group";
 
 const links = [
   {
@@ -32,11 +31,7 @@ const links = [
 export default async function Home() {
   return (
     <div className="wrapper flex flex-col items-center justify-start">
-      <ItemGroup className="w-full gap-0">
-        {links.map((link) => (
-          <LinkItem key={link.url} link={link} />
-        ))}
-      </ItemGroup>
+      <LinkGroup label="Today" links={links} />
     </div>
   );
 }

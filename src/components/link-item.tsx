@@ -21,7 +21,12 @@ export function LinkItem({
   };
 }) {
   return (
-    <Item key={link.url} asChild role="listitem" className="p-2 gap-4">
+    <Item
+      key={link.url}
+      asChild
+      role="listitem"
+      className="p-2 gap-4 grid grid-cols-[20px_1fr_auto]"
+    >
       <a href={link.url} target="_blank" rel="noopener noreferrer">
         <ItemMedia variant="image" className="size-5 rounded-none">
           <Image
@@ -48,7 +53,7 @@ export function LinkItem({
             </Typography>
           </ItemTitle>
         </ItemContent>
-        <ItemActions>
+        <ItemActions className="opacity-0 group-hover/item:opacity-100 transition-opacity duration-200">
           <Button variant="ghost" size="icon-sm">
             <MessageCircle />
           </Button>
