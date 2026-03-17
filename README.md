@@ -59,10 +59,20 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
+## Testing
+
+Tests use [Vitest](https://vitest.dev/) and cover critical logic: formatter utils, link grouping, and auth middleware routing. No UI (shadcn) or trivial wrappers are tested.
+
+```bash
+pnpm test        # run once
+pnpm test:watch  # watch mode
+```
+
 ## Useful commands
 
 ```bash
 pnpm lint
 pnpm build
 pnpm start
+pnpm test
 ```
