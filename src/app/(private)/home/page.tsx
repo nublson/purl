@@ -1,73 +1,26 @@
-"use client";
+const links = [
+  {
+    favicon: "https://www.youtube.com/favicon.ico",
+    title:
+      "How I Live in a Small Home - organising storage, coffee bar and space saving tips",
+    url: "https://youtu.be/ZjZYufMLwQY?si=ySxEA-kT44IG_he5",
+  },
+  {
+    favicon: "https://www.instagram.com/favicon.ico",
+    title: "@nublson's Instagram",
+    url: "https://www.instagram.com/nublson",
+  },
+  {
+    favicon: "https://omou.app/img/stamp_05.png",
+    title: "Omou",
+    url: "https://omou.app/",
+  },
+];
 
-import Link from "next/link";
-import { useSession } from "@/lib/auth-client";
-import { useAuth } from "@/hooks/use-auth";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-
-export default function Home() {
-  const { data: session, isPending } = useSession();
-  const { signOut } = useAuth();
-
-  if (isPending) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">Loading…</p>
-      </div>
-    );
-  }
-
-  if (!session?.user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">Not signed in.</p>
-      </div>
-    );
-  }
-
-  const user = session.user;
-
+export default async function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Welcome</CardTitle>
-          <CardDescription>
-            You&apos;re signed in. This is a protected page.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <dl className="space-y-1 text-sm">
-            <div>
-              <dt className="text-muted-foreground">Name</dt>
-              <dd className="font-medium">{user.name ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Email</dt>
-              <dd className="font-medium">{user.email ?? "—"}</dd>
-            </div>
-          </dl>
-          <div className="flex flex-col gap-2">
-            <Button
-              variant="outline"
-              onClick={() => void signOut()}
-              className="w-full"
-            >
-              Sign out
-            </Button>
-            <Button asChild variant="secondary" className="w-full">
-              <Link href="/">Home</Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="wrapper">
+      <h1>Home page</h1>
     </div>
   );
 }
