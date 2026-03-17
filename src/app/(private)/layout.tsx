@@ -9,7 +9,7 @@ export default function PrivateLayout({
   return (
     <Fragment>
       <Header />
-      <main className="flex-1 flex flex-col items-center justify-start">
+      <main className="flex-1 flex flex-col items-center justify-start mt-6">
         {children}
       </main>
     </Fragment>

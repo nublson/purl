@@ -16,7 +16,10 @@ export const LinkGroup = ({
 }) => {
   return (
     <div className="w-full flex flex-col justify-start items-start gap-4">
-      <Typography size="mini" className="text-muted-foreground font-medium">
+      <Typography
+        size="mini"
+        className="text-muted-foreground font-medium ml-2"
+      >
         {label}
       </Typography>
       <ItemGroup className="w-full gap-0">
