@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@tanstack/react-form": "^0.40.0",
-    "@vercel/speed-insights": "^2.0.0",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "better-auth": "^1.5.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -39,6 +39,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "prisma": "^7.5.0",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
