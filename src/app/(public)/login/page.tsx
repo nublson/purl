@@ -16,6 +16,7 @@ import { signIn } from "@/lib/auth-client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 export default function Login() {
   const router = useRouter();
@@ -34,10 +35,13 @@ export default function Login() {
       });
 
       if (res.error) {
-        setServerError(res.error.message ?? "Something went wrong.");
+        const message = res.error.message ?? "Something went wrong.";
+        setServerError(message);
+        toast.error(message);
         return;
       }
 
+      toast.success("Signed in successfully.");
       router.push("/home");
       router.refresh();
     },

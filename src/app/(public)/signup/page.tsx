@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUp } from "@/lib/auth-client";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,10 +39,13 @@ export default function Signup() {
       });
 
       if (res.error) {
-        setServerError(res.error.message ?? "Something went wrong.");
+        const message = res.error.message ?? "Something went wrong.";
+        setServerError(message);
+        toast.error(message);
         return;
       }
 
+      toast.success("Account created. Please check your email to verify.");
       router.push("/verify-email");
       router.refresh();
     },
