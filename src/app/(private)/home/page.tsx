@@ -1,5 +1,10 @@
 import { LinkGroup } from "@/components/link-group";
-import { Link, groupLinksByDate } from "@/utils/links";
+import {
+  groupLinksByDate,
+  Link,
+  LinkGroup as LinkGroupType,
+} from "@/utils/links";
+import { PackageOpen } from "lucide-react";
 
 const links: Link[] = [
   {
@@ -54,12 +59,23 @@ const links: Link[] = [
 ];
 
 export default async function Home() {
-  const groups = groupLinksByDate(links);
+  const groups: LinkGroupType[] = groupLinksByDate(links);
+
   return (
-    <div className="wrapper flex flex-col items-center justify-start gap-8">
-      {groups.map((group) => (
-        <LinkGroup key={group.label} label={group.label} links={group.links} />
-      ))}
+    <div className="wrapper flex-1 flex flex-col gap-8 pb-32">
+      {!groups.length ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-4">
+          <PackageOpen className="text-neutral-800 size-16" />
+        </div>
+      ) : (
+        groups.map((group) => (
+          <LinkGroup
+            key={group.label}
+            label={group.label}
+            links={group.links}
+          />
+        ))
+      )}
     </div>
   );
 }
