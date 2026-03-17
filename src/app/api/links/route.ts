@@ -1,19 +1,11 @@
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { getUrlDomain } from "@/utils/formatter";
+import { isValidUrl } from "@/utils/url";
 import { NextRequest, NextResponse } from "next/server";
 
 const FAVICON_BASE = "https://www.google.com/s2/favicons?domain=";
 const FAVICON_SIZE = "64";
-
-function isValidUrl(str: string): boolean {
-  try {
-    const u = new URL(str);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 async function scrapeTitleAndFavicon(url: string): Promise<{
   title: string;
