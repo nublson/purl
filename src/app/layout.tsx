@@ -15,21 +15,21 @@ const description =
 
 export const metadata: Metadata = {
   title: {
-    default: "Purl – Save links. Ask questions. Get answers.",
-    template: "%s | Purl",
+    default: "Purl",
+    template: "%s · Purl",
   },
   description,
   metadataBase: new URL("https://getpurl.vercel.app"),
   openGraph: {
     type: "website",
     siteName: "Purl",
-    title: "Purl – Save links. Ask questions. Get answers.",
+    title: "Purl",
     description,
     url: "https://getpurl.vercel.app",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Purl – Save links. Ask questions. Get answers.",
+    title: "Purl",
     description,
   },
   robots: { index: true, follow: true },
