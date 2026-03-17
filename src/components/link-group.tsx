@@ -20,7 +20,7 @@ export const LinkGroup = ({
       </Typography>
       <ItemGroup className="w-full gap-0">
         {links.map((link) => (
-          <LinkItem key={link.url} link={link} />
+          <LinkItem key={link.id} link={link} />
         ))}
       </ItemGroup>
     </div>

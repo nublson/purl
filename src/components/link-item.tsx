@@ -1,4 +1,3 @@
-import { getUrlDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
 import { Link, MessageCircle, Pencil, Trash } from "lucide-react";
 import Image from "next/image";
@@ -46,7 +45,7 @@ export function LinkItem({ link }: { link: LinkType }) {
             size="small"
             className="font-normal text-muted-foreground"
           >
-            {getUrlDomain(link.url)}
+            {link.domain}
           </Typography>
         </ItemTitle>
       </ItemContent>
