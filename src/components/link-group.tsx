@@ -6,9 +6,11 @@ import { ItemGroup } from "./ui/item";
 export const LinkGroup = ({
   label,
   links,
+  prependItems,
 }: {
   label: string;
   links: Link[];
+  prependItems?: React.ReactNode;
 }) => {
   return (
     <div className="w-full flex flex-col justify-start items-start gap-4">
@@ -19,6 +21,7 @@ export const LinkGroup = ({
         {label}
       </Typography>
       <ItemGroup className="w-full gap-0">
+        {prependItems}
         {links.map((link) => (
           <LinkItem key={link.id} link={link} />
         ))}

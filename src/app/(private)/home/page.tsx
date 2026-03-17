@@ -1,5 +1,4 @@
-import { LinkGroup } from "@/components/link-group";
-import { PasteHandler } from "@/components/paste-handler";
+import { HomeShell } from "@/components/home-shell";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import {
@@ -52,20 +51,7 @@ export default async function Home() {
 
   return (
     <div className="wrapper flex-1 flex flex-col gap-8 pb-32">
-      <PasteHandler />
-      {!groups.length ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4">
-          <PackageOpen className="text-neutral-800 size-16" />
-        </div>
-      ) : (
-        groups.map((group) => (
-          <LinkGroup
-            key={group.label}
-            label={group.label}
-            links={group.links}
-          />
-        ))
-      )}
+      <HomeShell groups={groups} />
     </div>
   );
 }

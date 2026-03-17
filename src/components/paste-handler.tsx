@@ -13,7 +13,13 @@ function isValidUrl(str: string): boolean {
   }
 }
 
-export function PasteHandler() {
+export function PasteHandler({
+  onPasteStart,
+  onPasteEnd,
+}: {
+  onPasteStart?: (url: string) => void;
+  onPasteEnd?: () => void;
+}) {
   const router = useRouter();
 
   const handlePaste = useCallback(
@@ -27,7 +33,7 @@ export function PasteHandler() {
       }
 
       e.preventDefault();
-      const toastId = toast.loading("Saving link…");
+      onPasteStart?.(text);
 
       try {
         const res = await fetch("/api/links", {
@@ -39,17 +45,18 @@ export function PasteHandler() {
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          toast.error(data?.error ?? "Failed to save link", { id: toastId });
+          toast.error(data?.error ?? "Failed to save link");
           return;
         }
 
-        toast.success("Link saved", { id: toastId });
         router.refresh();
       } catch {
-        toast.error("Failed to save link", { id: toastId });
+        toast.error("Failed to save link");
+      } finally {
+        onPasteEnd?.();
       }
     },
-    [router]
+    [router, onPasteStart, onPasteEnd]
   );
 
   useEffect(() => {
