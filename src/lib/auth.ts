@@ -1,5 +1,7 @@
 import { betterAuth } from "better-auth";
+import { prismaAdapter } from "better-auth/adapters/prisma";
 import { Resend } from "resend";
+import prisma from "@/lib/prisma";
 
 function getResend() {
   const apiKey = process.env.RESEND_API_KEY;
@@ -7,9 +9,10 @@ function getResend() {
   return new Resend(apiKey);
 }
 
-// TODO: Add your database adapter (e.g. prismaAdapter) when Prisma is set up.
 export const auth = betterAuth({
-  database: undefined as unknown as Parameters<typeof betterAuth>[0]["database"],
+  database: prismaAdapter(prisma, {
+    provider: "postgresql",
+  }),
   emailAndPassword: {
     enabled: true,
   },

@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 import { getUrlDomain } from "@/utils/formatter";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -66,14 +67,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // TODO: Persist link with your database when Prisma is set up.
   const domain = getUrlDomain(url);
   const { title, favicon } = await scrapeTitleAndFavicon(url);
 
+  const link = await prisma.link.create({
+    data: {
+      url,
+      title,
+      favicon,
+      domain,
+      userId: session.user.id,
+    },
+  });
+
   return NextResponse.json(
     {
-      error: "Database not configured. Add your Prisma adapter to save links.",
+      id: link.id,
+      url: link.url,
+      title: link.title,
+      favicon: link.favicon,
+      domain: link.domain,
+      createdAt: link.createdAt.toISOString(),
     },
-    { status: 503 }
+    { status: 201 }
   );
 }
