@@ -32,7 +32,7 @@ export const auth = betterAuth({
           subject: "Verify your email address",
           html: `<p>Click the link to verify your email: <a href="${url}">${url}</a></p>`,
         },
-        { idempotencyKey: `verification-email/${user.id}` }
+        { idempotencyKey: `verification-email/${user.id}/${Date.now()}` }
       );
       if (error) {
         console.error("Failed to send verification email:", error.message);
