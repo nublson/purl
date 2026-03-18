@@ -5,13 +5,14 @@ const publicRoutes = [
   { path: "/", whenAuthenticated: "next" },
   { path: "/login", whenAuthenticated: "redirect" as const },
   { path: "/signup", whenAuthenticated: "redirect" as const },
-  { path: "/verify-email", whenAuthenticated: "next" },
   { path: "/privacy", whenAuthenticated: "next" },
   { path: "/terms", whenAuthenticated: "next" },
 ] as const;
 
+const VERIFY_EMAIL_PATH = "/verify-email";
 const REDIRECT_WHEN_NOT_AUTHENTICATED = "/login";
 const REDIRECT_WHEN_AUTHENTICATED_ON_AUTH_PAGE = "/home";
+const REDIRECT_WHEN_NOT_VERIFIED = "/verify-email";
 
 function isPublicRoute(pathname: string) {
   if (pathname.startsWith("/api/auth")) {
@@ -45,6 +46,22 @@ export async function proxy(request: NextRequest) {
   if (!publicRoute && !session) {
     const url = request.nextUrl.clone();
     url.pathname = REDIRECT_WHEN_NOT_AUTHENTICATED;
+    return NextResponse.redirect(url);
+  }
+
+  if (currentPath === VERIFY_EMAIL_PATH && session?.user?.emailVerified) {
+    const url = request.nextUrl.clone();
+    url.pathname = REDIRECT_WHEN_AUTHENTICATED_ON_AUTH_PAGE;
+    return NextResponse.redirect(url);
+  }
+
+  if (currentPath === VERIFY_EMAIL_PATH && session) {
+    return NextResponse.next();
+  }
+
+  if (!publicRoute && session && !session.user.emailVerified) {
+    const url = request.nextUrl.clone();
+    url.pathname = REDIRECT_WHEN_NOT_VERIFIED;
     return NextResponse.redirect(url);
   }
 

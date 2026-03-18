@@ -60,4 +60,56 @@ describe("proxy", () => {
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toContain("/login");
   });
+
+  it("redirects to /verify-email for private route when session exists but user is not verified", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+      user: { emailVerified: false },
+      session: {},
+    } as never);
+    const req = createRequest("/home");
+    const res = await proxy(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/verify-email");
+  });
+
+  it("returns next for private route when session exists and user is verified", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+      user: { emailVerified: true },
+      session: {},
+    } as never);
+    const req = createRequest("/home");
+    const res = await proxy(req);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("redirects to /login for /verify-email when no session", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+    const req = createRequest("/verify-email");
+    const res = await proxy(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/login");
+  });
+
+  it("returns next for /verify-email when session exists (unverified)", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+      user: { emailVerified: false },
+      session: {},
+    } as never);
+    const req = createRequest("/verify-email");
+    const res = await proxy(req);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("redirects to /home for /verify-email when session exists (verified)", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+      user: { emailVerified: true },
+      session: {},
+    } as never);
+    const req = createRequest("/verify-email");
+    const res = await proxy(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/home");
+  });
 });
