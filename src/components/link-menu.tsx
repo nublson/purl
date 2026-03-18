@@ -1,7 +1,11 @@
-import { Ellipsis, Link, Pencil, Trash } from "lucide-react";
+import { Ellipsis, Link, MessageCircle, Pencil, Trash } from "lucide-react";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Button } from "./ui/button";
-import { DropdownMenuGroup, DropdownMenuItem } from "./ui/dropdown-menu";
+import {
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "./ui/dropdown-menu";
 
 export function LinkMenu() {
   return (
@@ -20,8 +24,13 @@ export function LinkMenu() {
     >
       <DropdownMenuGroup>
         <DropdownMenuItem disabled>
+          <MessageCircle /> Add to chat
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled>
           <Link /> Copy link
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem disabled>
           <Pencil /> Edit
         </DropdownMenuItem>
