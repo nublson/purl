@@ -1,5 +1,11 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -16,9 +22,23 @@ model User {
   updatedAt     DateTime
   sessions      Session[]
   accounts      Account[]
+  links         Link[]
 
   @@unique([email])
-  @@map("user")
+  @@map("users")
+}
+
+model Link {
+  id        String   @id @default(cuid())
+  url       String
+  title     String
+  favicon   String
+  domain    String
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("links")
 }
 
 model Session {
@@ -33,7 +53,7 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([token])
-  @@map("session")
+  @@map("sessions")
 }
 
 model Account {
@@ -52,7 +72,7 @@ model Account {
   createdAt             DateTime
   updatedAt             DateTime
 
-  @@map("account")
+  @@map("accounts")
 }
 
 model Verification {
@@ -63,5 +83,5 @@ model Verification {
   createdAt  DateTime?
   updatedAt  DateTime?
 
-  @@map("verification")
+  @@map("verifications")
 }

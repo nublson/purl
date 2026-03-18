@@ -1,9 +1,7 @@
-import { getUrlDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
 import { Link, MessageCircle, Pencil, Trash } from "lucide-react";
 import Image from "next/image";
 import { ActionButton } from "./link-action-button";
-import { Typography } from "./typography";
 import {
   Item,
   ItemActions,
@@ -25,7 +23,7 @@ export function LinkItem({ link }: { link: LinkType }) {
         rel="noopener noreferrer"
         className="absolute inset-0 z-0"
       />
-      <ItemMedia variant="image" className="size-5 rounded-none">
+      <ItemMedia variant="image" className="size-5 rounded">
         <Image
           src={link.favicon}
           alt={link.title}
@@ -36,18 +34,12 @@ export function LinkItem({ link }: { link: LinkType }) {
       </ItemMedia>
       <ItemContent>
         <ItemTitle>
-          <Typography
-            size="small"
-            className="text-accent-foreground font-medium line-clamp-1 break-all"
-          >
+          <p className="text-accent-foreground text-sm font-medium line-clamp-1 break-all">
             {link.title}
-          </Typography>
-          <Typography
-            size="small"
-            className="font-normal text-muted-foreground"
-          >
-            {getUrlDomain(link.url)}
-          </Typography>
+          </p>
+          <p className="text-muted-foreground text-sm font-normal hidden md:block">
+            {link.domain}
+          </p>
         </ItemTitle>
       </ItemContent>
       <ItemActions className="z-10 opacity-0 group-hover/item:opacity-100 transition-opacity duration-200">

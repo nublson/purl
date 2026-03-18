@@ -14,7 +14,7 @@ export default function PrivateLayout({
   return (
     <Fragment>
       <Header />
-      <main className="flex-1 flex flex-col items-center justify-start pt-6 overflow-y-auto">
+      <main className="flex-1 flex flex-col items-center justify-start pt-6 overflow-y-auto px-4 md:px-0">
         {children}
       </main>
     </Fragment>

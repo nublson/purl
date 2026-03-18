@@ -1,9 +1,11 @@
 import { getRelativeDateLabel } from "./formatter";
 
 export type Link = {
+  id: string;
   favicon: string;
   title: string;
   url: string;
+  domain: string;
   createdAt: Date;
 };
 

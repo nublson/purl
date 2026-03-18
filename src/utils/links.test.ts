@@ -3,9 +3,11 @@ import { groupLinksByDate, type Link } from "./links";
 
 function link(createdAt: Date, title: string): Link {
   return {
+    id: `id-${title}`,
     favicon: "",
     title,
     url: "https://example.com",
+    domain: "example.com",
     createdAt,
   };
 }
