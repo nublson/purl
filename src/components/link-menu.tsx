@@ -19,7 +19,7 @@ export function LinkMenu() {
           <Ellipsis />
         </Button>
       }
-      align="center"
+      align="end"
       className="w-full"
     >
       <DropdownMenuGroup>
