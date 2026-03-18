@@ -1,7 +1,8 @@
 import { Link as LinkType } from "@/utils/links";
-import { Link, MessageCircle, Pencil, Trash } from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import Image from "next/image";
-import { ActionButton } from "./link-action-button";
+import { LinkMenu } from "./link-menu";
+import { Button } from "./ui/button";
 import {
   Item,
   ItemActions,
@@ -15,7 +16,7 @@ export function LinkItem({ link }: { link: LinkType }) {
     <Item
       key={link.url}
       role="listitem"
-      className="p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative hover:bg-accent"
+      className="p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative hover:bg-accent/40 has-data-[state=open]:bg-accent/40"
     >
       <a
         href={link.url}
@@ -42,15 +43,15 @@ export function LinkItem({ link }: { link: LinkType }) {
           </p>
         </ItemTitle>
       </ItemContent>
-      <ItemActions className="z-10 opacity-0 group-hover/item:opacity-100 transition-opacity duration-200">
-        <ActionButton
-          icon={<MessageCircle />}
-          tooltipText="Chat about this"
-          disabled
-        />
-        <ActionButton icon={<Link />} tooltipText="Copy link" disabled />
-        <ActionButton icon={<Pencil />} tooltipText="Edit" disabled />
-        <ActionButton icon={<Trash />} tooltipText="Delete" disabled />
+      <ItemActions className="z-10 opacity-100 group-hover/item:opacity-100 transition-opacity duration-200">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="cursor-pointer text-muted-foreground"
+        >
+          <MessageCircle />
+        </Button>
+        <LinkMenu />
       </ItemActions>
     </Item>
   );
