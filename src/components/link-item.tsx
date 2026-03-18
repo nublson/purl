@@ -43,11 +43,11 @@ export function LinkItem({ link }: { link: LinkType }) {
           </p>
         </ItemTitle>
       </ItemContent>
-      <ItemActions className="z-10 opacity-100 group-hover/item:opacity-100 transition-opacity duration-200">
+      <ItemActions className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 transition-opacity duration-200">
         <Button
           variant="ghost"
           size="icon-sm"
-          className="cursor-pointer text-muted-foreground"
+          className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
         >
           <MessageCircle />
         </Button>
