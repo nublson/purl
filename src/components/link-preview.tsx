@@ -30,7 +30,7 @@ export function LinkPreview({ children, link }: LinkPreviewProps) {
           />
         )}
         <div className="p-4 flex flex-col gap-2">
-          <p className="text-accent-foreground text-sm font-medium">
+          <p className="text-accent-foreground text-sm font-medium line-clamp-2">
             {link.title}
           </p>
           {link.description && (
