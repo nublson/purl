@@ -8,14 +8,12 @@ import {
   MessageCircleHeart,
   SettingsIcon,
 } from "lucide-react";
+import { DropdownWrapper } from "./dropdown-wrapper";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
 export function User() {
@@ -24,8 +22,10 @@ export function User() {
   const user = session?.user ?? null;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className="cursor-pointer" asChild>
+    <DropdownWrapper
+      className="w-44"
+      align="end"
+      trigger={
         <Avatar>
           <AvatarImage
             className="rounded-full"
@@ -34,29 +34,28 @@ export function User() {
           />
           <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
         </Avatar>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-44" align="end">
-        <DropdownMenuGroup>
-          <DropdownMenuItem disabled>
-            <MessageCircleHeart />
-            Share feedback
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled>
-            <SettingsIcon />
-            Settings
-          </DropdownMenuItem>
-          <DropdownMenuItem disabled>
-            <BadgeCheck />
-            Upgrade
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-
-        <DropdownMenuItem onClick={() => signOut()}>
-          <LogOut />
-          Sign out
+      }
+    >
+      <DropdownMenuGroup>
+        <DropdownMenuItem disabled>
+          <MessageCircleHeart />
+          Share feedback
         </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        <DropdownMenuItem disabled>
+          <SettingsIcon />
+          Settings
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>
+          <BadgeCheck />
+          Upgrade
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+
+      <DropdownMenuItem onClick={() => signOut()}>
+        <LogOut />
+        Sign out
+      </DropdownMenuItem>
+    </DropdownWrapper>
   );
 }
