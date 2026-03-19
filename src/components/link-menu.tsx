@@ -1,6 +1,7 @@
 import type { Link as LinkType } from "@/utils/links";
 import { Ellipsis, Link, MessageCircle, Pencil, Trash } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Button } from "./ui/button";
 import {
@@ -14,7 +15,12 @@ export function LinkMenu({ link }: { link: LinkType }) {
 
   async function handleDelete() {
     const res = await fetch(`/api/links/${link.id}`, { method: "DELETE" });
-    if (res.ok) router.refresh();
+    if (res.ok) {
+      toast.success("Link deleted");
+      router.refresh();
+    } else {
+      toast.error("Failed to delete link");
+    }
   }
 
   return (
