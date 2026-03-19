@@ -14,6 +14,8 @@ vi.mock("@/lib/prisma", () => ({
   default: {
     link: {
       create: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
     },
   },
 }));
@@ -82,6 +84,8 @@ describe("POST /api/links", () => {
   beforeEach(() => {
     vi.mocked(auth.api.getSession).mockReset();
     vi.mocked(prisma.link.create).mockReset();
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.link.update).mockReset();
     mockOgsSuccess();
   });
 
@@ -222,6 +226,30 @@ describe("POST /api/links", () => {
       const json = await res.json();
 
       expect(json.createdAt).toBe(CREATED_AT.toISOString());
+    });
+
+    it("when link already exists, updates createdAt and returns 201 without creating duplicate", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      const bumpedAt = new Date("2025-06-20T12:00:00Z");
+      vi.mocked(prisma.link.findFirst).mockResolvedValue(MOCK_LINK as never);
+      vi.mocked(prisma.link.update).mockResolvedValue({
+        ...MOCK_LINK,
+        createdAt: bumpedAt,
+      } as never);
+
+      const res = await POST(postRequest({ url: "https://example.com" }));
+
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({
+        id: "link-1",
+        url: "https://example.com",
+        createdAt: bumpedAt.toISOString(),
+      });
+      expect(prisma.link.create).not.toHaveBeenCalled();
+      expect(prisma.link.update).toHaveBeenCalledWith({
+        where: { id: "link-1" },
+        data: { createdAt: expect.any(Date) },
+      });
     });
   });
 
