@@ -17,16 +17,16 @@ vi.mock("@/lib/links", () => {
 });
 
 const links = await import("@/lib/links");
-const { readLink, updateLink, deleteLink, UnauthorizedError } = links as {
-  readLink: ReturnType<typeof vi.fn>;
-  updateLink: ReturnType<typeof vi.fn>;
-  deleteLink: ReturnType<typeof vi.fn>;
-  UnauthorizedError: typeof UnauthorizedError;
-};
+const { readLink, updateLink, deleteLink, UnauthorizedError } = links;
 
 const { GET, PATCH, DELETE: DELETE_HANDLER } = await import("./route");
 
-function createRequest(pathname: string, init?: RequestInit): NextRequest {
+type NextRequestInit = ConstructorParameters<typeof NextRequest>[1];
+
+function createRequest(
+  pathname: string,
+  init?: NextRequestInit,
+): NextRequest {
   return new NextRequest(`http://localhost${pathname}`, init);
 }
 
@@ -157,6 +157,7 @@ describe("links/[id] API route", () => {
         thumbnail: null,
         domain: "example.com",
         createdAt,
+        userId: "user-123",
       });
 
       const res = await PATCH(
@@ -182,6 +183,7 @@ describe("links/[id] API route", () => {
         thumbnail: null,
         domain: "example.com",
         createdAt: new Date("2025-06-15T10:00:00Z"),
+        userId: "user-123",
       });
 
       await PATCH(
