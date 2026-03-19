@@ -45,17 +45,14 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json(
-      { error: "Invalid JSON body" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   const url = typeof body?.url === "string" ? body.url.trim() : "";
   if (!url || !isValidUrl(url)) {
     return NextResponse.json(
       { error: "Invalid or missing URL" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -81,6 +78,6 @@ export async function POST(request: NextRequest) {
       domain: link.domain,
       createdAt: link.createdAt.toISOString(),
     },
-    { status: 201 }
+    { status: 201 },
   );
 }
