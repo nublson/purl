@@ -1,3 +1,5 @@
+ "use client";
+
 import { cn } from "@/lib/utils";
 import { Link as LinkType } from "@/utils/links";
 import { MessageCircle } from "lucide-react";
@@ -17,9 +19,58 @@ import {
 export const LinkItem = React.forwardRef<
   HTMLDivElement,
   { link: LinkType } & React.ComponentPropsWithoutRef<typeof Item>
->(function LinkItem({ link, className, ...rest }, ref) {
+>(function LinkItem(
+  { link, className, onMouseEnter, onMouseLeave, ...rest },
+  ref,
+) {
+  const [previewOpen, setPreviewOpen] = React.useState(false);
+  const hoveringActionsRef = React.useRef(false);
+  const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearOpenTimer = React.useCallback(() => {
+    if (openTimerRef.current) clearTimeout(openTimerRef.current);
+    openTimerRef.current = null;
+  }, []);
+
+  const clearCloseTimer = React.useCallback(() => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+  }, []);
+
+  const scheduleOpen = React.useCallback(() => {
+    clearCloseTimer();
+    clearOpenTimer();
+
+    openTimerRef.current = setTimeout(() => {
+      if (!hoveringActionsRef.current) setPreviewOpen(true);
+    }, 10);
+  }, [clearCloseTimer, clearOpenTimer]);
+
+  const scheduleClose = React.useCallback(() => {
+    clearOpenTimer();
+    clearCloseTimer();
+
+    closeTimerRef.current = setTimeout(() => {
+      setPreviewOpen(false);
+    }, 100);
+  }, [clearCloseTimer, clearOpenTimer]);
+
+  React.useEffect(() => {
+    return () => {
+      clearOpenTimer();
+      clearCloseTimer();
+    };
+  }, [clearCloseTimer, clearOpenTimer]);
+
   return (
-    <LinkPreview link={link}>
+    <LinkPreview
+      link={link}
+      open={previewOpen}
+      onOpenChange={() => {
+        // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.
+      }}
+    >
       <Item
         ref={ref}
         role="listitem"
@@ -27,6 +78,16 @@ export const LinkItem = React.forwardRef<
           "p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
           className,
         )}
+        onMouseEnter={(event) => {
+          onMouseEnter?.(event);
+          hoveringActionsRef.current = false;
+          scheduleOpen();
+        }}
+        onMouseLeave={(event) => {
+          onMouseLeave?.(event);
+          hoveringActionsRef.current = false;
+          scheduleClose();
+        }}
         {...rest}
       >
         <a
@@ -54,7 +115,19 @@ export const LinkItem = React.forwardRef<
             </p>
           </ItemTitle>
         </ItemContent>
-        <ItemActions className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100 transition-opacity duration-200">
+        <ItemActions
+          className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100 transition-opacity duration-200"
+          onMouseEnter={(event) => {
+            hoveringActionsRef.current = true;
+            clearOpenTimer();
+            clearCloseTimer();
+            setPreviewOpen(false);
+          }}
+          onMouseLeave={(event) => {
+            hoveringActionsRef.current = false;
+            scheduleOpen();
+          }}
+        >
           <Button
             variant="ghost"
             size="icon-sm"
