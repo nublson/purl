@@ -4,6 +4,8 @@ export type Link = {
   id: string;
   favicon: string;
   title: string;
+  description: string | null;
+  thumbnail: string | null;
   url: string;
   domain: string;
   createdAt: Date;

@@ -9,6 +9,8 @@ type LinkRow = {
   title: string;
   favicon: string;
   domain: string;
+  description: string | null;
+  thumbnail: string | null;
   createdAt: Date;
 };
 
@@ -18,6 +20,8 @@ function mapRowToLink(row: LinkRow): Link {
     url: row.url,
     title: row.title,
     favicon: row.favicon,
+    description: row.description,
+    thumbnail: row.thumbnail,
     domain: row.domain,
     createdAt: row.createdAt,
   };
