@@ -1,14 +1,52 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { copyToClipboard } from "./clipboard";
 
 describe("copyToClipboard", () => {
+  const originalNavigator = globalThis.navigator;
+  const originalDocument = globalThis.document;
+
+  function setNavigatorClipboard(
+    clipboard: { writeText?: (value: string) => Promise<void> } | Record<string, never>,
+  ) {
+    Object.defineProperty(globalThis, "navigator", {
+      value: { clipboard },
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  function setDocumentMock(documentMock: {
+    createElement: (tagName: string) => unknown;
+    body: {
+      appendChild: (node: unknown) => void;
+      removeChild: (node: unknown) => void;
+    };
+    execCommand: (commandId: string) => boolean;
+  }) {
+    Object.defineProperty(globalThis, "document", {
+      value: documentMock,
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Object.defineProperty(globalThis, "navigator", {
+      value: originalNavigator,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(globalThis, "document", {
+      value: originalDocument,
+      configurable: true,
+      writable: true,
+    });
+  });
+
   it("uses navigator.clipboard.writeText when available", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
-    (
-      globalThis as unknown as {
-        navigator: { clipboard: { writeText: typeof writeText } };
-      }
-    ).navigator.clipboard = { writeText };
+    setNavigatorClipboard({ writeText });
 
     await expect(copyToClipboard("hello")).resolves.toBeUndefined();
     expect(writeText).toHaveBeenCalledWith("hello");
@@ -29,35 +67,12 @@ describe("copyToClipboard", () => {
 
     const execCommand = vi.fn().mockReturnValue(true);
 
-    (
-      globalThis as unknown as {
-        navigator: { clipboard: Record<string, unknown> };
-        document: {
-          createElement: (tagName: string) => typeof textarea;
-          body: {
-            appendChild: (node: typeof textarea) => void;
-            removeChild: (node: typeof textarea) => void;
-          };
-          execCommand: (commandId: string) => boolean;
-        };
-      }
-    ).navigator.clipboard = {};
-    (
-      globalThis as unknown as {
-        document: {
-          createElement: (tagName: string) => typeof textarea;
-          body: {
-            appendChild: (node: typeof textarea) => void;
-            removeChild: (node: typeof textarea) => void;
-          };
-          execCommand: (commandId: string) => boolean;
-        };
-      }
-    ).document = {
+    setNavigatorClipboard({});
+    setDocumentMock({
       createElement: vi.fn().mockReturnValue(textarea),
       body,
       execCommand,
-    };
+    });
 
     await expect(copyToClipboard("fallback")).resolves.toBeUndefined();
 
@@ -83,35 +98,12 @@ describe("copyToClipboard", () => {
 
     const execCommand = vi.fn().mockReturnValue(false);
 
-    (
-      globalThis as unknown as {
-        navigator: { clipboard: Record<string, unknown> };
-        document: {
-          createElement: (tagName: string) => typeof textarea;
-          body: {
-            appendChild: (node: typeof textarea) => void;
-            removeChild: (node: typeof textarea) => void;
-          };
-          execCommand: (commandId: string) => boolean;
-        };
-      }
-    ).navigator.clipboard = {};
-    (
-      globalThis as unknown as {
-        document: {
-          createElement: (tagName: string) => typeof textarea;
-          body: {
-            appendChild: (node: typeof textarea) => void;
-            removeChild: (node: typeof textarea) => void;
-          };
-          execCommand: (commandId: string) => boolean;
-        };
-      }
-    ).document = {
+    setNavigatorClipboard({});
+    setDocumentMock({
       createElement: vi.fn().mockReturnValue(textarea),
       body,
       execCommand,
-    };
+    });
 
     await expect(copyToClipboard("fail")).rejects.toThrow(
       "execCommand copy failed",
