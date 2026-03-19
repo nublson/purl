@@ -1,7 +1,6 @@
 import { Link } from "@/utils/links";
 import { AnimatePresence, motion } from "motion/react";
 import { LinkItem } from "./link-item";
-import { LinkPreview } from "./link-preview";
 import { ItemGroup } from "./ui/item";
 
 export const LinkGroup = ({
@@ -28,9 +27,7 @@ export const LinkGroup = ({
               initial={false}
               animate={{ opacity: 1, y: 0 }}
             >
-              <LinkPreview link={link}>
-                <LinkItem link={link} />
-              </LinkPreview>
+              <LinkItem link={link} />
             </motion.div>
           ))}
         </AnimatePresence>

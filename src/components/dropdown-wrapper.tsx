@@ -23,7 +23,15 @@ export function DropdownWrapper({
       <DropdownMenuTrigger className="cursor-pointer" asChild>
         {trigger}
       </DropdownMenuTrigger>
-      <DropdownMenuContent {...props}>{children}</DropdownMenuContent>
+      <DropdownMenuContent
+        {...props}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          props.onCloseAutoFocus?.(event);
+        }}
+      >
+        {children}
+      </DropdownMenuContent>
     </DropdownMenu>
   );
 }
