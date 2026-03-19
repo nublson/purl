@@ -1,3 +1,6 @@
+"use client";
+
+import { copyToClipboard } from "@/lib/clipboard";
 import type { Link as LinkType } from "@/utils/links";
 import { Ellipsis, Link, MessageCircle, Pencil, Trash } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -13,6 +16,15 @@ import {
 
 export function LinkMenu({ link }: { link: LinkType }) {
   const router = useRouter();
+
+  async function handleCopyLink() {
+    try {
+      await copyToClipboard(link.url);
+      toast.success("Link copied");
+    } catch {
+      toast.error("Failed to copy link");
+    }
+  }
 
   async function handleDelete() {
     const res = await fetch(`/api/links/${link.id}`, { method: "DELETE" });
@@ -43,7 +55,11 @@ export function LinkMenu({ link }: { link: LinkType }) {
           <MessageCircle /> Add to chat
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>
+        <DropdownMenuItem
+          onSelect={() => {
+            void handleCopyLink();
+          }}
+        >
           <Link /> Copy link
         </DropdownMenuItem>
         <DropdownMenuSeparator />
