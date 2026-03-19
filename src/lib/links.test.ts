@@ -95,4 +95,19 @@ describe("getLinksForCurrentUser", () => {
     expect(result[0].id).toBe("link-2");
     expect(result[1].id).toBe("link-1");
   });
+
+  it("passes undefined as userId to the query when there is no active session", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+    vi.mocked(prisma.link.findMany).mockResolvedValue([]);
+
+    await getLinksForCurrentUser();
+
+    // When session is null, session?.user.id resolves to undefined.
+    // Prisma treats { where: { userId: undefined } } as no filter, returning
+    // all rows. This test documents that behaviour so any change is intentional.
+    expect(vi.mocked(prisma.link.findMany)).toHaveBeenCalledWith({
+      where: { userId: undefined },
+      orderBy: { createdAt: "desc" },
+    });
+  });
 });
