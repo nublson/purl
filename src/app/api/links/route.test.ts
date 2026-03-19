@@ -308,5 +308,48 @@ describe("POST /api/links", () => {
         })
       );
     });
+
+    it("truncates scraped titles longer than 500 characters to exactly 500", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      const longTitle = "A".repeat(600);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        text: async () => `<title>${longTitle}</title>`,
+      });
+      const truncatedTitle = "A".repeat(500);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        title: truncatedTitle,
+      } as never);
+
+      await POST(postRequest({ url: "https://example.com" }));
+
+      expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ title: truncatedTitle }),
+        })
+      );
+    });
+
+    it("sends the correct User-Agent header when scraping the target URL", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        text: async () => "<title>Example</title>",
+      });
+      vi.mocked(prisma.link.create).mockResolvedValue(MOCK_LINK as never);
+
+      await POST(postRequest({ url: "https://example.com" }));
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://example.com",
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            "User-Agent":
+              "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
+          }),
+        })
+      );
+    });
   });
 });
