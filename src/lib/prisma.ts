@@ -9,7 +9,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
  * @param databaseUrl - The original DATABASE_URL (can be direct or pooler URL)
  * @returns The connection pooler URL if it's a Supabase direct connection, otherwise returns as-is
  */
-function ensureConnectionPooler(databaseUrl: string): string {
+export function ensureConnectionPooler(databaseUrl: string): string {
   // If already using pooler or not a Supabase URL, return as-is
   if (
     databaseUrl.includes("pgbouncer=true") ||
