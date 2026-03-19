@@ -3,6 +3,7 @@ import { Ellipsis, Link, MessageCircle, Pencil, Trash } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DropdownWrapper } from "./dropdown-wrapper";
+import { EditDialog } from "./edit-dialog";
 import { Button } from "./ui/button";
 import {
   DropdownMenuGroup,
@@ -46,13 +47,17 @@ export function LinkMenu({ link }: { link: LinkType }) {
           <Link /> Copy link
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>
-          <Pencil /> Edit
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          variant="destructive"
-          onClick={handleDelete}
-        >
+        <EditDialog>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              // Prevent Radix DropdownMenu from closing immediately, which unmounts EditDialog.
+              event.preventDefault();
+            }}
+          >
+            <Pencil /> Edit
+          </DropdownMenuItem>
+        </EditDialog>
+        <DropdownMenuItem variant="destructive" onClick={handleDelete}>
           <Trash /> Delete
         </DropdownMenuItem>
       </DropdownMenuGroup>
