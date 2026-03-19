@@ -9,11 +9,23 @@ import Image from "next/image";
 type LinkPreviewProps = {
   children: React.ReactNode;
   link: Link;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
-export function LinkPreview({ children, link }: LinkPreviewProps) {
+export function LinkPreview({
+  children,
+  link,
+  open,
+  onOpenChange,
+}: LinkPreviewProps) {
   return (
-    <HoverCard openDelay={10} closeDelay={100}>
+    <HoverCard
+      open={open}
+      onOpenChange={onOpenChange}
+      openDelay={10}
+      closeDelay={100}
+    >
       <HoverCardTrigger asChild>{children}</HoverCardTrigger>
       <HoverCardContent
         side="right"

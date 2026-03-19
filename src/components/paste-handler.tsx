@@ -1,16 +1,7 @@
 "use client";
 
 import { useCallback, useEffect } from "react";
-import { toast } from "sonner";
-
-function isValidUrl(str: string): boolean {
-  try {
-    const u = new URL(str);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
+import { saveLink } from "@/lib/save-link";
 
 export function PasteHandler({
   onPasteStart,
@@ -26,36 +17,18 @@ export function PasteHandler({
       const text = e.clipboardData?.getData("text")?.trim();
       if (!text) return;
 
-      if (!isValidUrl(text)) {
-        toast.error("Not a valid URL");
-        return;
-      }
-
       e.preventDefault();
       onPasteStart?.(text);
 
-      try {
-        const res = await fetch("/api/links", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: text }),
-        });
-
-        const data = await res.json().catch(() => ({}));
-
-        if (!res.ok) {
-          toast.error(data?.error ?? "Failed to save link");
-          onSaveError?.();
-          return;
-        }
-
-        if (data?.id) onSaveSuccess?.(data.id);
-      } catch {
-        toast.error("Failed to save link");
+      const result = await saveLink(text);
+      if (!result) {
         onSaveError?.();
+        return;
       }
+
+      if (result.id) onSaveSuccess?.(result.id);
     },
-    [onPasteStart, onSaveSuccess, onSaveError]
+    [onPasteStart, onSaveSuccess, onSaveError],
   );
 
   useEffect(() => {
