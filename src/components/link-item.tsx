@@ -43,7 +43,7 @@ export function LinkItem({ link }: { link: LinkType }) {
           </p>
         </ItemTitle>
       </ItemContent>
-      <ItemActions className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 transition-opacity duration-200">
+      <ItemActions className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 has-data-[state=open]:opacity-100 transition-opacity duration-200">
         <Button
           variant="ghost"
           size="icon-sm"

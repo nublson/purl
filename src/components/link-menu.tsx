@@ -34,7 +34,7 @@ export function LinkMenu() {
         <DropdownMenuItem disabled>
           <Pencil /> Edit
         </DropdownMenuItem>
-        <DropdownMenuItem disabled>
+        <DropdownMenuItem variant="destructive" disabled>
           <Trash /> Delete
         </DropdownMenuItem>
       </DropdownMenuGroup>
