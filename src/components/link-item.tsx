@@ -117,13 +117,13 @@ export const LinkItem = React.forwardRef<
         </ItemContent>
         <ItemActions
           className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100 transition-opacity duration-200"
-          onMouseEnter={(event) => {
+          onMouseEnter={() => {
             hoveringActionsRef.current = true;
             clearOpenTimer();
             clearCloseTimer();
             setPreviewOpen(false);
           }}
-          onMouseLeave={(event) => {
+          onMouseLeave={() => {
             hoveringActionsRef.current = false;
             scheduleOpen();
           }}
