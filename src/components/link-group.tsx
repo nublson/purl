@@ -1,13 +1,11 @@
 import { Link } from "@/utils/links";
 import { AnimatePresence, motion } from "motion/react";
 import { LinkItem } from "./link-item";
-import { Typography } from "./typography";
 import { ItemGroup } from "./ui/item";
 
 export const LinkGroup = ({
   label,
   links,
-  newLinkId,
   prependItems,
 }: {
   label: string;

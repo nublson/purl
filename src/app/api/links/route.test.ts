@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
 
 vi.mock("@/lib/auth", () => ({
@@ -18,8 +18,13 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
+vi.mock("open-graph-scraper", () => ({
+  default: vi.fn(),
+}));
+
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
+const ogs = (await import("open-graph-scraper")).default;
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 const CREATED_AT = new Date("2025-06-15T10:00:00Z");
@@ -27,7 +32,9 @@ const MOCK_LINK = {
   id: "link-1",
   url: "https://example.com",
   title: "Example Domain",
+  description: null as string | null,
   favicon: "https://www.google.com/s2/favicons?domain=example.com&sz=64",
+  thumbnail: null as string | null,
   domain: "example.com",
   createdAt: CREATED_AT,
 };
@@ -40,18 +47,42 @@ function postRequest(body: unknown): NextRequest {
   });
 }
 
-describe("POST /api/links", () => {
-  let mockFetch: ReturnType<typeof vi.fn>;
+function mockOgsSuccess(
+  overrides: {
+    ogTitle?: string;
+    ogDescription?: string | null;
+    ogImage?: Array<{ url: string }> | null;
+    favicon?: string | null;
+  } = {},
+) {
+  vi.mocked(ogs).mockResolvedValue({
+    error: false,
+    result: {
+      ogTitle: "Example Domain",
+      ogDescription: undefined,
+      ogImage: undefined,
+      favicon: undefined,
+      ...overrides,
+    },
+    html: "",
+    response: {} as Response,
+  } as Awaited<ReturnType<typeof ogs>>);
+}
 
+function mockOgsFailure() {
+  vi.mocked(ogs).mockResolvedValue({
+    error: true,
+    result: undefined,
+    html: "",
+    response: {} as Response,
+  } as unknown as Awaited<ReturnType<typeof ogs>>);
+}
+
+describe("POST /api/links", () => {
   beforeEach(() => {
     vi.mocked(auth.api.getSession).mockReset();
     vi.mocked(prisma.link.create).mockReset();
-    mockFetch = vi.fn();
-    vi.stubGlobal("fetch", mockFetch);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
+    mockOgsSuccess();
   });
 
   describe("authentication", () => {
@@ -122,10 +153,6 @@ describe("POST /api/links", () => {
 
     it("accepts a url padded with whitespace and trims it before processing", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      mockFetch.mockResolvedValue({
-        ok: true,
-        text: async () => "<title>Example</title>",
-      });
       vi.mocked(prisma.link.create).mockResolvedValue(MOCK_LINK as never);
 
       await POST(postRequest({ url: "  https://example.com  " }));
@@ -133,7 +160,7 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ url: "https://example.com" }),
-        })
+        }),
       );
     });
   });
@@ -141,11 +168,6 @@ describe("POST /api/links", () => {
   describe("successful link creation", () => {
     it("returns 201 with the saved link data including scraped title", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      mockFetch.mockResolvedValue({
-        ok: true,
-        text: async () =>
-          "<html><head><title>Example Domain</title></head></html>",
-      });
       vi.mocked(prisma.link.create).mockResolvedValue(MOCK_LINK as never);
 
       const res = await POST(postRequest({ url: "https://example.com" }));
@@ -155,7 +177,9 @@ describe("POST /api/links", () => {
         id: "link-1",
         url: "https://example.com",
         title: "Example Domain",
+        description: null,
         favicon: "https://www.google.com/s2/favicons?domain=example.com&sz=64",
+        thumbnail: null,
         domain: "example.com",
         createdAt: CREATED_AT.toISOString(),
       });
@@ -163,10 +187,6 @@ describe("POST /api/links", () => {
 
     it("writes the authenticated user id to the database record", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      mockFetch.mockResolvedValue({
-        ok: true,
-        text: async () => "<title>Example</title>",
-      });
       vi.mocked(prisma.link.create).mockResolvedValue(MOCK_LINK as never);
 
       await POST(postRequest({ url: "https://example.com" }));
@@ -174,16 +194,12 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ userId: "user-123" }),
-        })
+        }),
       );
     });
 
     it("constructs Google favicon URL from the stripped domain", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      mockFetch.mockResolvedValue({
-        ok: true,
-        text: async () => "<title>Example</title>",
-      });
       vi.mocked(prisma.link.create).mockResolvedValue(MOCK_LINK as never);
 
       await POST(postRequest({ url: "https://www.example.com" }));
@@ -194,16 +210,12 @@ describe("POST /api/links", () => {
             favicon:
               "https://www.google.com/s2/favicons?domain=example.com&sz=64",
           }),
-        })
+        }),
       );
     });
 
     it("serialises createdAt as ISO string in the response", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      mockFetch.mockResolvedValue({
-        ok: true,
-        text: async () => "<title>Example</title>",
-      });
       vi.mocked(prisma.link.create).mockResolvedValue(MOCK_LINK as never);
 
       const res = await POST(postRequest({ url: "https://example.com" }));
@@ -213,10 +225,10 @@ describe("POST /api/links", () => {
     });
   });
 
-  describe("title scraping fallback", () => {
-    it("falls back to domain as title when fetch throws a network error", async () => {
+  describe("metadata scraping fallback", () => {
+    it("falls back to domain as title when ogs throws", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      mockFetch.mockRejectedValue(new Error("Network error"));
+      vi.mocked(ogs).mockRejectedValue(new Error("Network error"));
       vi.mocked(prisma.link.create).mockResolvedValue({
         ...MOCK_LINK,
         title: "example.com",
@@ -227,14 +239,18 @@ describe("POST /api/links", () => {
       expect(res.status).toBe(201);
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ title: "example.com" }),
-        })
+          data: expect.objectContaining({
+            title: "example.com",
+            description: null,
+            thumbnail: null,
+          }),
+        }),
       );
     });
 
-    it("falls back to domain as title when fetch response is not ok (404)", async () => {
+    it("falls back to domain as title when ogs returns error", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      mockFetch.mockResolvedValue({ ok: false, status: 404 });
+      mockOgsFailure();
       vi.mocked(prisma.link.create).mockResolvedValue({
         ...MOCK_LINK,
         title: "example.com",
@@ -245,16 +261,18 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ title: "example.com" }),
-        })
+        }),
       );
     });
 
-    it("falls back to domain as title when HTML has no <title> tag", async () => {
+    it("falls back to domain when ogs result is null", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      mockFetch.mockResolvedValue({
-        ok: true,
-        text: async () => "<html><body>No title here</body></html>",
-      });
+      vi.mocked(ogs).mockResolvedValue({
+        error: false,
+        result: null,
+        html: "",
+        response: {} as Response,
+      } as unknown as Awaited<ReturnType<typeof ogs>>);
       vi.mocked(prisma.link.create).mockResolvedValue({
         ...MOCK_LINK,
         title: "example.com",
@@ -265,16 +283,13 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ title: "example.com" }),
-        })
+        }),
       );
     });
 
     it("falls back to domain when scraped title is only whitespace", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      mockFetch.mockResolvedValue({
-        ok: true,
-        text: async () => "<title>   </title>",
-      });
+      mockOgsSuccess({ ogTitle: "   " });
       vi.mocked(prisma.link.create).mockResolvedValue({
         ...MOCK_LINK,
         title: "example.com",
@@ -285,16 +300,13 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ title: "example.com" }),
-        })
+        }),
       );
     });
 
     it("normalises internal whitespace in the scraped title", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      mockFetch.mockResolvedValue({
-        ok: true,
-        text: async () => "<title>  My   Noisy\n  Title  </title>",
-      });
+      mockOgsSuccess({ ogTitle: "  My   Noisy\n  Title  " });
       vi.mocked(prisma.link.create).mockResolvedValue({
         ...MOCK_LINK,
         title: "My Noisy Title",
@@ -305,17 +317,14 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ title: "My Noisy Title" }),
-        })
+        }),
       );
     });
 
     it("truncates scraped titles longer than 500 characters to exactly 500", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
       const longTitle = "A".repeat(600);
-      mockFetch.mockResolvedValue({
-        ok: true,
-        text: async () => `<title>${longTitle}</title>`,
-      });
+      mockOgsSuccess({ ogTitle: longTitle });
       const truncatedTitle = "A".repeat(500);
       vi.mocked(prisma.link.create).mockResolvedValue({
         ...MOCK_LINK,
@@ -327,28 +336,26 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ title: truncatedTitle }),
-        })
+        }),
       );
     });
 
-    it("sends the correct User-Agent header when scraping the target URL", async () => {
+    it("passes fetchOptions with User-Agent when calling ogs", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      mockFetch.mockResolvedValue({
-        ok: true,
-        text: async () => "<title>Example</title>",
-      });
       vi.mocked(prisma.link.create).mockResolvedValue(MOCK_LINK as never);
 
       await POST(postRequest({ url: "https://example.com" }));
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://example.com",
+      expect(ogs).toHaveBeenCalledWith(
         expect.objectContaining({
-          headers: expect.objectContaining({
-            "User-Agent":
-              "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
+          url: "https://example.com",
+          fetchOptions: expect.objectContaining({
+            headers: expect.objectContaining({
+              "User-Agent":
+                "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
+            }),
           }),
-        })
+        }),
       );
     });
   });

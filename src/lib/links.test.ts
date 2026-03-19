@@ -26,13 +26,23 @@ const { getLinksForCurrentUser } = await import("./links");
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 
-function makeRow(overrides: Partial<{ id: string; title: string; createdAt: Date }> = {}) {
+function makeRow(
+  overrides: Partial<{
+    id: string;
+    title: string;
+    description: string | null;
+    thumbnail: string | null;
+    createdAt: Date;
+  }> = {}
+) {
   return {
     id: overrides.id ?? "link-1",
     url: "https://example.com",
     title: overrides.title ?? "Example",
     favicon: "https://www.google.com/s2/favicons?domain=example.com&sz=64",
     domain: "example.com",
+    description: overrides.description ?? null,
+    thumbnail: overrides.thumbnail ?? null,
     createdAt: overrides.createdAt ?? new Date("2025-06-15T10:00:00Z"),
   };
 }
@@ -77,6 +87,8 @@ describe("getLinksForCurrentUser", () => {
     expect(link.url).toBe(row.url);
     expect(link.title).toBe(row.title);
     expect(link.favicon).toBe(row.favicon);
+    expect(link.description).toBe(row.description);
+    expect(link.thumbnail).toBe(row.thumbnail);
     expect(link.domain).toBe(row.domain);
     expect(link.createdAt).toBe(row.createdAt);
   });

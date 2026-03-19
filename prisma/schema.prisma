@@ -29,14 +29,16 @@ model User {
 }
 
 model Link {
-  id        String   @id @default(cuid())
-  url       String
-  title     String
-  favicon   String
-  domain    String
-  createdAt DateTime @default(now())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  url         String
+  title       String
+  favicon     String
+  domain      String
+  description String?
+  thumbnail   String?
+  createdAt   DateTime @default(now())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("links")
 }
