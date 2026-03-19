@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
 
 vi.mock("@/lib/auth", () => ({
@@ -47,24 +47,26 @@ function postRequest(body: unknown): NextRequest {
   });
 }
 
-function mockOgsSuccess(overrides: {
-  ogTitle?: string;
-  ogDescription?: string | null;
-  ogImage?: Array<{ url: string }> | null;
-  favicon?: string | null;
-} = {}) {
+function mockOgsSuccess(
+  overrides: {
+    ogTitle?: string;
+    ogDescription?: string | null;
+    ogImage?: Array<{ url: string }> | null;
+    favicon?: string | null;
+  } = {},
+) {
   vi.mocked(ogs).mockResolvedValue({
     error: false,
     result: {
       ogTitle: "Example Domain",
-      ogDescription: null,
-      ogImage: null,
-      favicon: null,
+      ogDescription: undefined,
+      ogImage: undefined,
+      favicon: undefined,
       ...overrides,
     },
     html: "",
     response: {} as Response,
-  });
+  } as Awaited<ReturnType<typeof ogs>>);
 }
 
 function mockOgsFailure() {
@@ -73,7 +75,7 @@ function mockOgsFailure() {
     result: undefined,
     html: "",
     response: {} as Response,
-  });
+  } as unknown as Awaited<ReturnType<typeof ogs>>);
 }
 
 describe("POST /api/links", () => {
@@ -158,7 +160,7 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ url: "https://example.com" }),
-        })
+        }),
       );
     });
   });
@@ -192,7 +194,7 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ userId: "user-123" }),
-        })
+        }),
       );
     });
 
@@ -208,7 +210,7 @@ describe("POST /api/links", () => {
             favicon:
               "https://www.google.com/s2/favicons?domain=example.com&sz=64",
           }),
-        })
+        }),
       );
     });
 
@@ -242,7 +244,7 @@ describe("POST /api/links", () => {
             description: null,
             thumbnail: null,
           }),
-        })
+        }),
       );
     });
 
@@ -259,7 +261,7 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ title: "example.com" }),
-        })
+        }),
       );
     });
 
@@ -270,7 +272,7 @@ describe("POST /api/links", () => {
         result: null,
         html: "",
         response: {} as Response,
-      });
+      } as unknown as Awaited<ReturnType<typeof ogs>>);
       vi.mocked(prisma.link.create).mockResolvedValue({
         ...MOCK_LINK,
         title: "example.com",
@@ -281,7 +283,7 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ title: "example.com" }),
-        })
+        }),
       );
     });
 
@@ -298,7 +300,7 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ title: "example.com" }),
-        })
+        }),
       );
     });
 
@@ -315,7 +317,7 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ title: "My Noisy Title" }),
-        })
+        }),
       );
     });
 
@@ -334,7 +336,7 @@ describe("POST /api/links", () => {
       expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ title: truncatedTitle }),
-        })
+        }),
       );
     });
 
@@ -353,7 +355,7 @@ describe("POST /api/links", () => {
                 "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
             }),
           }),
-        })
+        }),
       );
     });
   });

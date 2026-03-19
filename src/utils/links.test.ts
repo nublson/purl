@@ -8,6 +8,8 @@ function link(createdAt: Date, title: string): Link {
     title,
     url: "https://example.com",
     domain: "example.com",
+    description: null,
+    thumbnail: null,
     createdAt,
   };
 }
