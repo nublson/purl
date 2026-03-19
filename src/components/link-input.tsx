@@ -31,6 +31,7 @@ export function LinkInput() {
 
   return (
     <form
+      className="[@media(hover:hover)]:hidden"
       onSubmit={async (event) => {
         event.preventDefault();
         event.stopPropagation();
