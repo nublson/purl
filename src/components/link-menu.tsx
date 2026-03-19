@@ -1,4 +1,6 @@
+import type { Link as LinkType } from "@/utils/links";
 import { Ellipsis, Link, MessageCircle, Pencil, Trash } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Button } from "./ui/button";
 import {
@@ -7,7 +9,14 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 
-export function LinkMenu() {
+export function LinkMenu({ link }: { link: LinkType }) {
+  const router = useRouter();
+
+  async function handleDelete() {
+    const res = await fetch(`/api/links/${link.id}`, { method: "DELETE" });
+    if (res.ok) router.refresh();
+  }
+
   return (
     <DropdownWrapper
       trigger={
@@ -34,7 +43,10 @@ export function LinkMenu() {
         <DropdownMenuItem disabled>
           <Pencil /> Edit
         </DropdownMenuItem>
-        <DropdownMenuItem variant="destructive" disabled>
+        <DropdownMenuItem
+          variant="destructive"
+          onClick={handleDelete}
+        >
           <Trash /> Delete
         </DropdownMenuItem>
       </DropdownMenuGroup>

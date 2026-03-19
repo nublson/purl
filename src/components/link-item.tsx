@@ -62,7 +62,7 @@ export const LinkItem = React.forwardRef<
           >
             <MessageCircle />
           </Button>
-          <LinkMenu />
+          <LinkMenu link={link} />
         </ItemActions>
       </Item>
     </LinkPreview>

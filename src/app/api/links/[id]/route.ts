@@ -3,8 +3,8 @@ import {
   updateLink,
   deleteLink,
   type UpdateLinkData,
+  UnauthorizedError,
 } from "@/lib/links";
-import { auth } from "@/lib/auth";
 import { isValidUrl } from "@/utils/url";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -34,33 +34,25 @@ export async function GET(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth.api.getSession({
-    headers: _request.headers,
-  });
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const { id } = await context.params;
+    const link = await readLink(id);
+    if (!link) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json(serializeLink(link));
+  } catch (e) {
+    if (e instanceof UnauthorizedError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    throw e;
   }
-
-  const { id } = await context.params;
-  const link = await readLink(id, session.user.id);
-  if (!link) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  return NextResponse.json(serializeLink(link));
 }
 
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth.api.getSession({
-    headers: request.headers,
-  });
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   let body: UpdateLinkData;
   try {
     body = await request.json();
@@ -91,31 +83,36 @@ export async function PATCH(
   if (hasTitle) data.title = body.title as string;
   if (hasDescription) data.description = body.description;
 
-  const { id } = await context.params;
-  const updated = await updateLink(id, session.user.id, data);
-  if (!updated) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  try {
+    const { id } = await context.params;
+    const updated = await updateLink(id, data);
+    if (!updated) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json(serializeLink(updated));
+  } catch (e) {
+    if (e instanceof UnauthorizedError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    throw e;
   }
-
-  return NextResponse.json(serializeLink(updated));
 }
 
 export async function DELETE(
   _request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth.api.getSession({
-    headers: _request.headers,
-  });
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const { id } = await context.params;
+    const deleted = await deleteLink(id);
+    if (!deleted) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return new NextResponse(null, { status: 204 });
+  } catch (e) {
+    if (e instanceof UnauthorizedError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    throw e;
   }
-
-  const { id } = await context.params;
-  const deleted = await deleteLink(id, session.user.id);
-  if (!deleted) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  return new NextResponse(null, { status: 204 });
 }

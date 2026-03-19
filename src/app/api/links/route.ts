@@ -1,5 +1,4 @@
-import { createLink } from "@/lib/links";
-import { auth } from "@/lib/auth";
+import { createLink, UnauthorizedError } from "@/lib/links";
 import { isValidUrl } from "@/utils/url";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -26,11 +25,6 @@ function serializeLink(link: {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({ headers: request.headers });
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   let body: { url?: string };
   try {
     body = await request.json();
@@ -46,6 +40,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const link = await createLink(session.user.id, url);
-  return NextResponse.json(serializeLink(link), { status: 201 });
+  try {
+    const link = await createLink(url);
+    return NextResponse.json(serializeLink(link), { status: 201 });
+  } catch (e) {
+    if (e instanceof UnauthorizedError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    throw e;
+  }
 }

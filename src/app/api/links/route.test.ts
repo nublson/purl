@@ -24,6 +24,10 @@ vi.mock("open-graph-scraper", () => ({
   default: vi.fn(),
 }));
 
+vi.mock("next/headers", () => ({
+  headers: vi.fn().mockResolvedValue(new Headers()),
+}));
+
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
 const ogs = (await import("open-graph-scraper")).default;

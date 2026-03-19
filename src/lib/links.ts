@@ -5,6 +5,11 @@ import { getUrlDomain } from "@/utils/formatter";
 import { headers } from "next/headers";
 import ogs from "open-graph-scraper";
 
+/** Thrown when link helpers are called without an authenticated user. */
+export class UnauthorizedError extends Error {
+  readonly name = "UnauthorizedError";
+}
+
 const FAVICON_BASE = "https://www.google.com/s2/favicons?domain=";
 const FAVICON_SIZE = "64";
 
@@ -87,6 +92,15 @@ export async function scrapeLinkMetadata(url: string): Promise<{
   }
 }
 
+/** Resolves the current user id from request context. Throws UnauthorizedError if not authenticated. */
+async function getCurrentUserId(): Promise<string> {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+  if (!session?.user?.id) throw new UnauthorizedError();
+  return session.user.id;
+}
+
 /** Fetches links for the currently authenticated user (server-only). */
 export async function getLinksForCurrentUser(): Promise<Link[]> {
   const session = await auth.api.getSession({
@@ -103,11 +117,9 @@ export async function getLinksForCurrentUser(): Promise<Link[]> {
 
 export type CreateLinkResult = Awaited<ReturnType<typeof prisma.link.create>>;
 
-/** Creates a link for the user after scraping metadata. If a link with the same URL already exists for the user, updates its createdAt and returns it. */
-export async function createLink(
-  userId: string,
-  url: string,
-): Promise<CreateLinkResult> {
+/** Creates a link for the current user after scraping metadata. If a link with the same URL already exists, updates its createdAt and returns it. Throws UnauthorizedError if not authenticated. */
+export async function createLink(url: string): Promise<CreateLinkResult> {
+  const userId = await getCurrentUserId();
   const existing = await prisma.link.findFirst({
     where: { userId, url },
   });
@@ -135,11 +147,9 @@ export async function createLink(
   });
 }
 
-/** Fetches a single link if it belongs to the user; otherwise null. */
-export async function readLink(
-  id: string,
-  userId: string,
-): Promise<Link | null> {
+/** Fetches a single link if it belongs to the current user; otherwise null. Throws UnauthorizedError if not authenticated. */
+export async function readLink(id: string): Promise<Link | null> {
+  const userId = await getCurrentUserId();
   const row = await prisma.link.findFirst({
     where: { id, userId },
   });
@@ -154,12 +164,12 @@ export type UpdateLinkData = {
 
 export type UpdateLinkResult = Awaited<ReturnType<typeof prisma.link.update>>;
 
-/** Updates a link if it belongs to the user. Re-scrapes metadata if url changes. Returns null if not found or not owned. */
+/** Updates a link if it belongs to the current user. Re-scrapes metadata if url changes. Returns null if not found or not owned. Throws UnauthorizedError if not authenticated. */
 export async function updateLink(
   id: string,
-  userId: string,
   data: UpdateLinkData,
 ): Promise<UpdateLinkResult | null> {
+  const userId = await getCurrentUserId();
   const existing = await prisma.link.findFirst({
     where: { id, userId },
   });
@@ -167,7 +177,9 @@ export async function updateLink(
 
   const nextUrl = data.url?.trim();
   const urlChanged =
-    typeof nextUrl === "string" && nextUrl.length > 0 && nextUrl !== existing.url;
+    typeof nextUrl === "string" &&
+    nextUrl.length > 0 &&
+    nextUrl !== existing.url;
 
   let updatePayload: Parameters<typeof prisma.link.update>[0]["data"] = {};
 
@@ -185,7 +197,8 @@ export async function updateLink(
     };
   } else {
     if (typeof data.title === "string") updatePayload.title = data.title;
-    if (data.description !== undefined) updatePayload.description = data.description;
+    if (data.description !== undefined)
+      updatePayload.description = data.description;
   }
 
   if (Object.keys(updatePayload).length === 0) return existing;
@@ -196,11 +209,9 @@ export async function updateLink(
   });
 }
 
-/** Deletes a link if it belongs to the user. Returns true if deleted, false if not found or not owned. */
-export async function deleteLink(
-  id: string,
-  userId: string,
-): Promise<boolean> {
+/** Deletes a link if it belongs to the current user. Returns true if deleted, false if not found or not owned. Throws UnauthorizedError if not authenticated. */
+export async function deleteLink(id: string): Promise<boolean> {
+  const userId = await getCurrentUserId();
   const existing = await prisma.link.findFirst({
     where: { id, userId },
   });
