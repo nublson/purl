@@ -47,7 +47,7 @@ export function LinkMenu({ link }: { link: LinkType }) {
           <Link /> Copy link
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <EditDialog>
+        <EditDialog link={link}>
           <DropdownMenuItem
             onSelect={(event) => {
               // Prevent Radix DropdownMenu from closing immediately, which unmounts EditDialog.
