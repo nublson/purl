@@ -1,6 +1,7 @@
 import { Link as LinkType } from "@/utils/links";
 import { MessageCircle } from "lucide-react";
 import Image from "next/image";
+import * as React from "react";
 import { LinkMenu } from "./link-menu";
 import { Button } from "./ui/button";
 import {
@@ -10,13 +11,21 @@ import {
   ItemMedia,
   ItemTitle,
 } from "./ui/item";
+import { cn } from "@/lib/utils";
 
-export function LinkItem({ link }: { link: LinkType }) {
+export const LinkItem = React.forwardRef<
+  HTMLDivElement,
+  { link: LinkType } & React.ComponentPropsWithoutRef<typeof Item>
+>(function LinkItem({ link, className, ...rest }, ref) {
   return (
     <Item
-      key={link.url}
+      ref={ref}
       role="listitem"
-      className="p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative hover:bg-accent/40 has-data-[state=open]:bg-accent/40"
+      className={cn(
+        "p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative hover:bg-accent/40 has-data-[state=open]:bg-accent/40",
+        className
+      )}
+      {...rest}
     >
       <a
         href={link.url}
@@ -55,4 +64,4 @@ export function LinkItem({ link }: { link: LinkType }) {
       </ItemActions>
     </Item>
   );
-}
+});

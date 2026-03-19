@@ -1,13 +1,12 @@
 import { Link } from "@/utils/links";
 import { AnimatePresence, motion } from "motion/react";
 import { LinkItem } from "./link-item";
-import { Typography } from "./typography";
+import { LinkPreview } from "./link-preview";
 import { ItemGroup } from "./ui/item";
 
 export const LinkGroup = ({
   label,
   links,
-  newLinkId,
   prependItems,
 }: {
   label: string;
@@ -29,7 +28,9 @@ export const LinkGroup = ({
               initial={false}
               animate={{ opacity: 1, y: 0 }}
             >
-              <LinkItem link={link} />
+              <LinkPreview link={link}>
+                <LinkItem link={link} />
+              </LinkPreview>
             </motion.div>
           ))}
         </AnimatePresence>
