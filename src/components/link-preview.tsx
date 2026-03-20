@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/hover-card";
 import type { Link } from "@/utils/links";
 import Image from "next/image";
+import { PdfThumbnail } from "./pdf-thumbnail";
 
 type LinkPreviewProps = {
   children: React.ReactNode;
@@ -32,7 +33,9 @@ export function LinkPreview({
         align="start"
         className="p-0 flex flex-col "
       >
-        {link.thumbnail && (
+        {link.contentType === "PDF" ? (
+          <PdfThumbnail url={link.url} />
+        ) : link.thumbnail ? (
           <Image
             src={link.thumbnail}
             alt={link.title}
@@ -40,7 +43,7 @@ export function LinkPreview({
             height={200}
             className="w-full h-full object-fill aspect-video rounded-t-md"
           />
-        )}
+        ) : null}
         <div className="p-4 flex flex-col gap-2">
           <p className="text-accent-foreground text-sm font-medium line-clamp-2">
             {link.title}
