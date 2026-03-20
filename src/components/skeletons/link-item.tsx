@@ -1,5 +1,4 @@
 import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
-import { Typography } from "../typography";
 import { Spinner } from "../ui/spinner";
 
 interface LinkItemSkeletonProps {
@@ -22,12 +21,9 @@ export function LinkItemSkeleton({ icon, url }: LinkItemSkeletonProps) {
       </ItemMedia>
       <ItemContent>
         <ItemTitle className="flex flex-col gap-1">
-          <Typography
-            size="small"
-            className="font-normal text-muted-foreground animate-pulse line-clamp-1 break-all"
-          >
+          <p className="text-sm font-normal text-muted-foreground animate-pulse line-clamp-1 break-all">
             {url}
-          </Typography>
+          </p>
         </ItemTitle>
       </ItemContent>
     </Item>
