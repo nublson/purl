@@ -1,7 +1,11 @@
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import type { Link } from "@/utils/links";
+import type { ContentType } from "@/generated/prisma/enums";
+import { isAudioUrl } from "@/utils/audio";
 import { getUrlDomain } from "@/utils/formatter";
+import type { Link } from "@/utils/links";
+import { isPdfUrl } from "@/utils/pdf";
+import { isYouTubeUrl } from "@/utils/youtube";
 import { headers } from "next/headers";
 import ogs from "open-graph-scraper";
 
@@ -13,16 +17,93 @@ export class UnauthorizedError extends Error {
 const FAVICON_BASE = "https://www.google.com/s2/favicons?domain=";
 const FAVICON_SIZE = "64";
 
+function formatFileSize(bytes: number | null): string | null {
+  if (bytes === null || !Number.isFinite(bytes) || bytes <= 0) return null;
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${Math.round(kb)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(1)} MB`;
+}
+
+function derivePdfTitleFromUrl(url: string, domain: string): string {
+  try {
+    const parsed = new URL(url);
+    const fileName = parsed.pathname.split("/").pop() ?? "";
+    const withoutPdf = decodeURIComponent(fileName).replace(/\.pdf$/i, "");
+    const normalized = withoutPdf.replace(/[-_]+/g, " ").trim();
+    return normalized || domain;
+  } catch {
+    return domain;
+  }
+}
+
+async function scrapePdfMetadata(
+  url: string,
+  domain: string,
+): Promise<{
+  title: string;
+  description: string | null;
+  thumbnail: string | null;
+}> {
+  let contentLengthBytes: number | null = null;
+  let contentDisposition: string | null = null;
+
+  try {
+    const headResponse = await fetch(url, {
+      method: "HEAD",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    contentLengthBytes = Number(
+      headResponse.headers.get("content-length") ?? "",
+    );
+    if (!Number.isFinite(contentLengthBytes) || contentLengthBytes <= 0) {
+      contentLengthBytes = null;
+    }
+    contentDisposition = headResponse.headers.get("content-disposition");
+  } catch {}
+
+  const dispositionTitle =
+    contentDisposition
+      ?.match(/filename\*?=(?:UTF-8''|")?([^";\n]+)/i)?.[1]
+      ?.replace(/"/g, "") ?? null;
+
+  const title = (
+    dispositionTitle
+      ? decodeURIComponent(dispositionTitle).replace(/\.pdf$/i, "")
+      : derivePdfTitleFromUrl(url, domain)
+  ).slice(0, 500);
+  const formattedSize = formatFileSize(contentLengthBytes);
+  const description = formattedSize
+    ? `PDF Document - ${formattedSize}`
+    : "PDF Document";
+  const thumbnail = null;
+
+  return { title, description, thumbnail };
+}
+
 type LinkRow = {
   id: string;
   url: string;
   title: string;
   favicon: string;
   domain: string;
+  contentType: ContentType;
   description: string | null;
   thumbnail: string | null;
   createdAt: Date;
 };
+
+function detectContentType(url: string): ContentType {
+  if (isYouTubeUrl(url)) return "YOUTUBE";
+  if (isPdfUrl(url)) return "PDF";
+  if (isAudioUrl(url)) return "AUDIO";
+  return "WEB";
+}
 
 function mapRowToLink(row: LinkRow): Link {
   return {
@@ -33,6 +114,7 @@ function mapRowToLink(row: LinkRow): Link {
     description: row.description,
     thumbnail: row.thumbnail,
     domain: row.domain,
+    contentType: row.contentType,
     createdAt: row.createdAt,
   };
 }
@@ -45,6 +127,15 @@ export async function scrapeLinkMetadata(url: string): Promise<{
 }> {
   const domain = getUrlDomain(url);
   const defaultFavicon = `${FAVICON_BASE}${encodeURIComponent(domain)}&sz=${FAVICON_SIZE}`;
+  if (isPdfUrl(url)) {
+    const pdfMetadata = await scrapePdfMetadata(url, domain);
+    return {
+      title: pdfMetadata.title,
+      description: pdfMetadata.description,
+      favicon: defaultFavicon,
+      thumbnail: pdfMetadata.thumbnail,
+    };
+  }
 
   try {
     const { error, result } = await ogs({
@@ -130,6 +221,7 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
     });
   }
 
+  const contentType = detectContentType(url);
   const domain = getUrlDomain(url);
   const { title, description, favicon, thumbnail } =
     await scrapeLinkMetadata(url);
@@ -142,6 +234,7 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
       favicon,
       thumbnail,
       domain,
+      contentType,
       userId,
     },
   });
@@ -184,6 +277,7 @@ export async function updateLink(
   let updatePayload: Parameters<typeof prisma.link.update>[0]["data"] = {};
 
   if (urlChanged && nextUrl) {
+    const contentType = detectContentType(nextUrl);
     const domain = getUrlDomain(nextUrl);
     const { title, description, favicon, thumbnail } =
       await scrapeLinkMetadata(nextUrl);
@@ -194,6 +288,7 @@ export async function updateLink(
       description,
       favicon,
       thumbnail,
+      contentType,
     };
   } else {
     if (typeof data.title === "string") updatePayload.title = data.title;

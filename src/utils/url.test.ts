@@ -17,9 +17,9 @@ describe("isValidUrl", () => {
     expect(isValidUrl("ftp://example.com")).toBe(false);
   });
 
-  it("returns false for empty or invalid strings", () => {
+  it("returns false for empty or invalid strings, and true for bare domains", () => {
     expect(isValidUrl("")).toBe(false);
     expect(isValidUrl("not a url")).toBe(false);
-    expect(isValidUrl("example.com")).toBe(false);
+    expect(isValidUrl("example.com")).toBe(true);
   });
 });

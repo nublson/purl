@@ -1,0 +1,46 @@
+---
+alwaysApply: true
+---
+
+# Purl
+
+**Save anything. Ask questions. Get answers.**
+
+Purl is an AI-powered read-it-later app. Paste any URL — web page, PDF, audio, or YouTube video — and Purl extracts, understands, and remembers the content for you. Weeks later, just ask — Purl searches your saved knowledge and gives you answers with sources.
+
+---
+
+## What is Purl?
+
+Purl is a personal knowledge base disguised as a bookmarking tool. The core loop:
+
+1. **Paste a URL** — any web page, PDF, audio file, or YouTube video
+2. **Purl ingests it** — detects the content type, extracts the text, generates a summary, creates embeddings, and auto-tags it
+3. **Forget about it** — the item sits in your stash
+4. **Ask anything later** — "What was that article about React Server Components?" → Purl finds the relevant items and answers with citations
+
+The AI chat supports `@mentions` — type `@` to reference a specific item and ask targeted questions about it.
+
+---
+
+## How it works
+
+One screen. A minimal list of saved items grouped by time, with an AI chat bar pinned at the bottom. That chat bar is the heart of Purl — paste a URL to save, type a question to ask, `@mention` to drill into a specific item.
+
+Everything is a URL. Purl auto-detects the type:
+
+- **Web page** — default for any URL
+- **PDF** — URL ending in `.pdf` or returning `application/pdf`
+- **Audio** — URL ending in `.mp3`, `.m4a`, `.wav`
+- **YouTube** — `youtube.com/watch`, `youtu.be/`, `youtube.com/shorts/`
+
+All types flow into the same AI pipeline — once Purl has the text, the embedding and chat layers treat them identically.
+
+---
+
+## What makes Purl different
+
+- **Pocket** saves links and forgets them
+- **Raindrop** organizes but doesn't understand
+- **Notion Web Clipper** clips but you still search manually
+- **Purl** understands everything you save and retrieves knowledge on demand

@@ -82,6 +82,7 @@ describe("links/[id] API route", () => {
         favicon: "https://example.com/favicon.ico",
         thumbnail: null,
         domain: "example.com",
+        contentType: "WEB",
         createdAt,
       });
 
@@ -99,6 +100,7 @@ describe("links/[id] API route", () => {
         favicon: "https://example.com/favicon.ico",
         thumbnail: null,
         domain: "example.com",
+        contentType: "WEB",
         createdAt: createdAt.toISOString(),
       });
     });
@@ -156,6 +158,7 @@ describe("links/[id] API route", () => {
         favicon: "https://example.com/favicon.ico",
         thumbnail: null,
         domain: "example.com",
+        contentType: "WEB",
         createdAt,
         userId: "user-123",
       });
@@ -182,6 +185,7 @@ describe("links/[id] API route", () => {
         favicon: "https://example.com/favicon.ico",
         thumbnail: null,
         domain: "example.com",
+        contentType: "WEB",
         createdAt: new Date("2025-06-15T10:00:00Z"),
         userId: "user-123",
       });

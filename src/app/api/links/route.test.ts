@@ -31,6 +31,7 @@ vi.mock("next/headers", () => ({
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
 const ogs = (await import("open-graph-scraper")).default;
+let fetchSpy: ReturnType<typeof vi.spyOn>;
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 const CREATED_AT = new Date("2025-06-15T10:00:00Z");
@@ -42,6 +43,7 @@ const MOCK_LINK = {
   favicon: "https://www.google.com/s2/favicons?domain=example.com&sz=64",
   thumbnail: null as string | null,
   domain: "example.com",
+  contentType: "WEB" as const,
   createdAt: CREATED_AT,
 };
 
@@ -86,10 +88,23 @@ function mockOgsFailure() {
 
 describe("POST /api/links", () => {
   beforeEach(() => {
+    fetchSpy?.mockRestore();
     vi.mocked(auth.api.getSession).mockReset();
     vi.mocked(prisma.link.create).mockReset();
     vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.link.update).mockReset();
+    vi.mocked(ogs).mockReset();
+    fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(null, {
+          status: 200,
+          headers: {
+            "content-type": "application/pdf",
+            "content-length": "217220",
+          },
+        }),
+      );
     mockOgsSuccess();
   });
 
@@ -138,9 +153,9 @@ describe("POST /api/links", () => {
       expect(await res.json()).toEqual({ error: "Invalid or missing URL" });
     });
 
-    it("returns 400 when url has no protocol", async () => {
+    it("returns 400 for malformed host without a valid domain", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      const res = await POST(postRequest({ url: "example.com" }));
+      const res = await POST(postRequest({ url: "example" }));
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({ error: "Invalid or missing URL" });
     });
@@ -189,6 +204,7 @@ describe("POST /api/links", () => {
         favicon: "https://www.google.com/s2/favicons?domain=example.com&sz=64",
         thumbnail: null,
         domain: "example.com",
+        contentType: "WEB",
         createdAt: CREATED_AT.toISOString(),
       });
     });
@@ -254,6 +270,189 @@ describe("POST /api/links", () => {
         where: { id: "link-1" },
         data: { createdAt: expect.any(Date) },
       });
+    });
+
+    it("treats YouTube URLs like normal links and uses OG scraping", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        url: "https://youtu.be/dQw4w9WgXcQ?t=43",
+        title: "Never Gonna Give You Up",
+        thumbnail: "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+        domain: "youtube.com",
+        contentType: "YOUTUBE",
+      } as never);
+
+      const res = await POST(
+        postRequest({ url: "https://youtu.be/dQw4w9WgXcQ?t=43" }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({
+        url: "https://youtu.be/dQw4w9WgXcQ?t=43",
+        contentType: "YOUTUBE",
+      });
+      expect(prisma.link.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            url: "https://youtu.be/dQw4w9WgXcQ?t=43",
+            contentType: "YOUTUBE",
+          }),
+        }),
+      );
+      expect(ogs).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: "https://youtu.be/dQw4w9WgXcQ?t=43",
+        }),
+      );
+    });
+
+    it("stores Spotify URLs with AUDIO contentType using OG scraping", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        url: "https://open.spotify.com/track/abc123",
+        title: "Spotify Track",
+        domain: "spotify.com",
+        contentType: "AUDIO",
+      } as never);
+
+      const res = await POST(
+        postRequest({ url: "https://open.spotify.com/track/abc123" }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({
+        url: "https://open.spotify.com/track/abc123",
+        contentType: "AUDIO",
+      });
+      expect(prisma.link.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            url: "https://open.spotify.com/track/abc123",
+            contentType: "AUDIO",
+          }),
+        }),
+      );
+      expect(ogs).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: "https://open.spotify.com/track/abc123",
+        }),
+      );
+    });
+
+    it("stores Apple Music URLs with AUDIO contentType", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        url: "https://music.apple.com/us/album/test/123",
+        title: "Apple Music Album",
+        domain: "apple.com",
+        contentType: "AUDIO",
+      } as never);
+
+      const res = await POST(
+        postRequest({ url: "https://music.apple.com/us/album/test/123" }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({
+        url: "https://music.apple.com/us/album/test/123",
+        contentType: "AUDIO",
+      });
+      expect(prisma.link.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            url: "https://music.apple.com/us/album/test/123",
+            contentType: "AUDIO",
+          }),
+        }),
+      );
+    });
+
+    it("stores YouTube Music URLs with AUDIO contentType", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        url: "https://music.youtube.com/watch?v=abc123",
+        title: "YouTube Music Track",
+        domain: "youtube.com",
+        contentType: "AUDIO",
+      } as never);
+
+      const res = await POST(
+        postRequest({ url: "https://music.youtube.com/watch?v=abc123" }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({
+        url: "https://music.youtube.com/watch?v=abc123",
+        contentType: "AUDIO",
+      });
+      expect(prisma.link.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            url: "https://music.youtube.com/watch?v=abc123",
+            contentType: "AUDIO",
+          }),
+        }),
+      );
+    });
+
+    it("stores PDF URLs with PDF contentType and skips OG scraping", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        url: "https://example.com/doc.pdf",
+        title: "Example PDF",
+        domain: "example.com",
+        contentType: "PDF",
+      } as never);
+
+      const res = await POST(postRequest({ url: "https://example.com/doc.pdf" }));
+
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({
+        url: "https://example.com/doc.pdf",
+        contentType: "PDF",
+      });
+      expect(prisma.link.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            url: "https://example.com/doc.pdf",
+            contentType: "PDF",
+          }),
+        }),
+      );
+      expect(ogs).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://example.com/doc.pdf",
+        expect.objectContaining({ method: "HEAD" }),
+      );
+    });
+
+    it("stores derived PDF title and file-size description from HEAD metadata", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        url: "https://example.com/course.pdf",
+        title: "course",
+        description: "PDF Document - 212 KB",
+        contentType: "PDF",
+      } as never);
+
+      await POST(postRequest({ url: "https://example.com/course.pdf" }));
+
+      expect(prisma.link.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            contentType: "PDF",
+            title: "course",
+            description: "PDF Document - 212 KB",
+            thumbnail: null,
+          }),
+        }),
+      );
     });
   });
 

@@ -32,6 +32,7 @@ function makeRow(
     title: string;
     description: string | null;
     thumbnail: string | null;
+    contentType: "WEB" | "YOUTUBE";
     createdAt: Date;
   }> = {}
 ) {
@@ -43,6 +44,7 @@ function makeRow(
     domain: "example.com",
     description: overrides.description ?? null,
     thumbnail: overrides.thumbnail ?? null,
+    contentType: overrides.contentType ?? "WEB",
     createdAt: overrides.createdAt ?? new Date("2025-06-15T10:00:00Z"),
   };
 }
@@ -90,6 +92,7 @@ describe("getLinksForCurrentUser", () => {
     expect(link.description).toBe(row.description);
     expect(link.thumbnail).toBe(row.thumbnail);
     expect(link.domain).toBe(row.domain);
+    expect(link.contentType).toBe(row.contentType);
     expect(link.createdAt).toBe(row.createdAt);
   });
 
