@@ -12,6 +12,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum ContentType {
+  WEB
+  YOUTUBE
+}
+
 model User {
   id            String    @id
   name          String
@@ -34,6 +39,7 @@ model Link {
   title       String
   favicon     String
   domain      String
+  contentType ContentType @default(WEB)
   description String?
   thumbnail   String?
   createdAt   DateTime @default(now())

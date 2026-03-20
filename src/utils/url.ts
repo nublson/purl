@@ -1,8 +1,23 @@
-export function isValidUrl(str: string): boolean {
+export function parseHttpUrl(input: string): URL | null {
+  const str = input.trim();
+
+  // Try as-is first
   try {
-    const u = new URL(str);
-    return u.protocol === "http:" || u.protocol === "https:";
+    const url = new URL(str);
+    if (url.protocol === "http:" || url.protocol === "https:") {
+      return url;
+    }
+  } catch {}
+
+  // Try with https:// prepended
+  try {
+    const url = new URL("https://" + str);
+    return url.hostname.includes(".") ? url : null; // basic sanity check
   } catch {
-    return false;
+    return null;
   }
+}
+
+export function isValidUrl(input: string): boolean {
+  return parseHttpUrl(input) !== null;
 }

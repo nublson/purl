@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import type { Link } from "@/utils/links";
 import { getUrlDomain } from "@/utils/formatter";
+import { isYouTubeUrl } from "@/utils/youtube";
 import { headers } from "next/headers";
 import ogs from "open-graph-scraper";
 
@@ -19,6 +20,7 @@ type LinkRow = {
   title: string;
   favicon: string;
   domain: string;
+  contentType: "WEB" | "YOUTUBE";
   description: string | null;
   thumbnail: string | null;
   createdAt: Date;
@@ -33,6 +35,7 @@ function mapRowToLink(row: LinkRow): Link {
     description: row.description,
     thumbnail: row.thumbnail,
     domain: row.domain,
+    contentType: row.contentType,
     createdAt: row.createdAt,
   };
 }
@@ -130,6 +133,7 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
     });
   }
 
+  const contentType = isYouTubeUrl(url) ? "YOUTUBE" : "WEB";
   const domain = getUrlDomain(url);
   const { title, description, favicon, thumbnail } =
     await scrapeLinkMetadata(url);
@@ -142,6 +146,7 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
       favicon,
       thumbnail,
       domain,
+      contentType,
       userId,
     },
   });
@@ -184,6 +189,7 @@ export async function updateLink(
   let updatePayload: Parameters<typeof prisma.link.update>[0]["data"] = {};
 
   if (urlChanged && nextUrl) {
+    const contentType = isYouTubeUrl(nextUrl) ? "YOUTUBE" : "WEB";
     const domain = getUrlDomain(nextUrl);
     const { title, description, favicon, thumbnail } =
       await scrapeLinkMetadata(nextUrl);
@@ -194,6 +200,7 @@ export async function updateLink(
       description,
       favicon,
       thumbnail,
+      contentType,
     };
   } else {
     if (typeof data.title === "string") updatePayload.title = data.title;

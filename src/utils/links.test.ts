@@ -8,6 +8,7 @@ function link(createdAt: Date, title: string): Link {
     title,
     url: "https://example.com",
     domain: "example.com",
+    contentType: "WEB",
     description: null,
     thumbnail: null,
     createdAt,

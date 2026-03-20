@@ -16,6 +16,7 @@ function serializeLink(link: {
   favicon: string;
   thumbnail: string | null;
   domain: string;
+  contentType?: "WEB" | "YOUTUBE";
   createdAt: Date;
 }) {
   return {
@@ -26,6 +27,7 @@ function serializeLink(link: {
     favicon: link.favicon,
     thumbnail: link.thumbnail,
     domain: link.domain,
+    contentType: link.contentType ?? "WEB",
     createdAt: link.createdAt.toISOString(),
   };
 }

@@ -42,6 +42,7 @@ const MOCK_LINK = {
   favicon: "https://www.google.com/s2/favicons?domain=example.com&sz=64",
   thumbnail: null as string | null,
   domain: "example.com",
+  contentType: "WEB" as const,
   createdAt: CREATED_AT,
 };
 
@@ -189,6 +190,7 @@ describe("POST /api/links", () => {
         favicon: "https://www.google.com/s2/favicons?domain=example.com&sz=64",
         thumbnail: null,
         domain: "example.com",
+        contentType: "WEB",
         createdAt: CREATED_AT.toISOString(),
       });
     });
@@ -254,6 +256,41 @@ describe("POST /api/links", () => {
         where: { id: "link-1" },
         data: { createdAt: expect.any(Date) },
       });
+    });
+
+    it("treats YouTube URLs like normal links and uses OG scraping", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        url: "https://youtu.be/dQw4w9WgXcQ?t=43",
+        title: "Never Gonna Give You Up",
+        thumbnail: "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+        domain: "youtube.com",
+        contentType: "YOUTUBE",
+      } as never);
+
+      const res = await POST(
+        postRequest({ url: "https://youtu.be/dQw4w9WgXcQ?t=43" }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({
+        url: "https://youtu.be/dQw4w9WgXcQ?t=43",
+        contentType: "YOUTUBE",
+      });
+      expect(prisma.link.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            url: "https://youtu.be/dQw4w9WgXcQ?t=43",
+            contentType: "YOUTUBE",
+          }),
+        }),
+      );
+      expect(ogs).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: "https://youtu.be/dQw4w9WgXcQ?t=43",
+        }),
+      );
     });
   });
 
