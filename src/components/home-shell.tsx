@@ -39,7 +39,7 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
 
   const showSkeleton = (pendingUrl !== null || isPending) && !newDataArrived;
   const skeletonUrl = pendingUrl ?? "";
-  const showSyntheticToday = showSkeleton && !groups.length;
+  const showSyntheticToday = showSkeleton && !todayGroup;
 
   useEffect(() => {
     if (!isPending) {

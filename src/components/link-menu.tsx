@@ -14,7 +14,13 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 
-export function LinkMenu({ link }: { link: LinkType }) {
+export function LinkMenu({
+  link,
+  onDeleteStart,
+}: {
+  link: LinkType;
+  onDeleteStart?: () => void;
+}) {
   const router = useRouter();
 
   async function handleCopyLink() {
@@ -27,6 +33,7 @@ export function LinkMenu({ link }: { link: LinkType }) {
   }
 
   async function handleDelete() {
+    onDeleteStart?.();
     const res = await fetch(`/api/links/${link.id}`, { method: "DELETE" });
     if (res.ok) {
       toast.success("Link deleted");
