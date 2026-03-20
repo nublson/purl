@@ -1,16 +1,10 @@
 "use client";
 
 import { Field } from "@/components/ui/field";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
+import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
 import { saveLink } from "@/lib/save-link";
 import { useForm } from "@tanstack/react-form";
-import { CirclePlus, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { Button } from "./ui/button";
 
 export function LinkInput() {
   const router = useRouter();
@@ -58,21 +52,6 @@ export function LinkInput() {
                   onChange={(event) => field.handleChange(event.target.value)}
                   disabled={form.state.isSubmitting}
                 />
-                <InputGroupAddon align="inline-end">
-                  <Button
-                    type="submit"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="cursor-pointer"
-                    disabled={form.state.isSubmitting || isUrlEmpty}
-                  >
-                    {form.state.isSubmitting ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <CirclePlus />
-                    )}
-                  </Button>
-                </InputGroupAddon>
               </InputGroup>
             </Field>
           );
