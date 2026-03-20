@@ -31,6 +31,7 @@ vi.mock("next/headers", () => ({
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
 const ogs = (await import("open-graph-scraper")).default;
+let fetchSpy: ReturnType<typeof vi.spyOn>;
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 const CREATED_AT = new Date("2025-06-15T10:00:00Z");
@@ -87,10 +88,23 @@ function mockOgsFailure() {
 
 describe("POST /api/links", () => {
   beforeEach(() => {
+    fetchSpy?.mockRestore();
     vi.mocked(auth.api.getSession).mockReset();
     vi.mocked(prisma.link.create).mockReset();
     vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.link.update).mockReset();
+    vi.mocked(ogs).mockReset();
+    fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(
+        new Response(null, {
+          status: 200,
+          headers: {
+            "content-type": "application/pdf",
+            "content-length": "217220",
+          },
+        }),
+      );
     mockOgsSuccess();
   });
 
@@ -293,7 +307,7 @@ describe("POST /api/links", () => {
       );
     });
 
-    it("stores PDF URLs with PDF contentType and still uses OG scraping", async () => {
+    it("stores PDF URLs with PDF contentType and skips OG scraping", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
       vi.mocked(prisma.link.create).mockResolvedValue({
         ...MOCK_LINK,
@@ -318,9 +332,33 @@ describe("POST /api/links", () => {
           }),
         }),
       );
-      expect(ogs).toHaveBeenCalledWith(
+      expect(ogs).not.toHaveBeenCalled();
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://example.com/doc.pdf",
+        expect.objectContaining({ method: "HEAD" }),
+      );
+    });
+
+    it("stores derived PDF title and file-size description from HEAD metadata", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        url: "https://example.com/course.pdf",
+        title: "course",
+        description: "PDF Document - 212 KB",
+        contentType: "PDF",
+      } as never);
+
+      await POST(postRequest({ url: "https://example.com/course.pdf" }));
+
+      expect(prisma.link.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: "https://example.com/doc.pdf",
+          data: expect.objectContaining({
+            contentType: "PDF",
+            title: "course",
+            description: "PDF Document - 212 KB",
+            thumbnail: null,
+          }),
         }),
       );
     });
