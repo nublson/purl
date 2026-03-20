@@ -2,7 +2,7 @@
 
 import { copyToClipboard } from "@/lib/clipboard";
 import type { Link as LinkType } from "@/utils/links";
-import { Ellipsis, Link, MessageCircle, Pencil, Trash } from "lucide-react";
+import { Ellipsis, Link, MessageCircle, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DropdownWrapper } from "./dropdown-wrapper";
@@ -14,7 +14,13 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 
-export function LinkMenu({ link }: { link: LinkType }) {
+export function LinkMenu({
+  link,
+  onDeleteStart,
+}: {
+  link: LinkType;
+  onDeleteStart?: () => void;
+}) {
   const router = useRouter();
 
   async function handleCopyLink() {
@@ -27,6 +33,7 @@ export function LinkMenu({ link }: { link: LinkType }) {
   }
 
   async function handleDelete() {
+    onDeleteStart?.();
     const res = await fetch(`/api/links/${link.id}`, { method: "DELETE" });
     if (res.ok) {
       toast.success("Link deleted");
@@ -74,7 +81,7 @@ export function LinkMenu({ link }: { link: LinkType }) {
           </DropdownMenuItem>
         </EditDialog>
         <DropdownMenuItem variant="destructive" onClick={handleDelete}>
-          <Trash /> Delete
+          Delete
         </DropdownMenuItem>
       </DropdownMenuGroup>
     </DropdownWrapper>

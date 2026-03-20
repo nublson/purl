@@ -1,12 +1,14 @@
- "use client";
+"use client";
 
 import { cn } from "@/lib/utils";
 import { Link as LinkType } from "@/utils/links";
 import { MessageCircle } from "lucide-react";
 import Image from "next/image";
 import * as React from "react";
+import { X } from "./animate-ui/icons/x";
 import { LinkMenu } from "./link-menu";
 import { LinkPreview } from "./link-preview";
+import { LinkItemSkeleton } from "./skeletons";
 import { Button } from "./ui/button";
 import {
   Item,
@@ -23,10 +25,13 @@ export const LinkItem = React.forwardRef<
   { link, className, onMouseEnter, onMouseLeave, ...rest },
   ref,
 ) {
+  const [isDeleting, setIsDeleting] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const hoveringActionsRef = React.useRef(false);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const clearOpenTimer = React.useCallback(() => {
     if (openTimerRef.current) clearTimeout(openTimerRef.current);
@@ -62,6 +67,15 @@ export const LinkItem = React.forwardRef<
       clearCloseTimer();
     };
   }, [clearCloseTimer, clearOpenTimer]);
+
+  if (isDeleting) {
+    return (
+      <LinkItemSkeleton
+        icon={<X className="size-5" animate={true} loop={true} />}
+        url={link.url}
+      />
+    );
+  }
 
   return (
     <LinkPreview
@@ -135,7 +149,12 @@ export const LinkItem = React.forwardRef<
           >
             <MessageCircle />
           </Button>
-          <LinkMenu link={link} />
+          <LinkMenu
+            link={link}
+            onDeleteStart={() => {
+              setIsDeleting(true);
+            }}
+          />
         </ItemActions>
       </Item>
     </LinkPreview>

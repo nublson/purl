@@ -2,15 +2,23 @@ import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { Typography } from "../typography";
 import { Spinner } from "../ui/spinner";
 
-export function LinkItemSkeleton({ url }: { url: string }) {
+interface LinkItemSkeletonProps {
+  icon?: React.ReactNode;
+  url: string;
+}
+
+export function LinkItemSkeleton({ icon, url }: LinkItemSkeletonProps) {
   return (
     <Item
       role="listitem"
       aria-busy
       className="p-2 gap-4 grid h-[50px] grid-cols-[20px_1fr] relative pointer-events-none"
     >
-      <ItemMedia variant="image" className="size-5 rounded">
-        <Spinner className="size-5 text-muted-foreground" />
+      <ItemMedia
+        variant="image"
+        className="size-5 rounded text-muted-foreground animate-pulse"
+      >
+        {icon || <Spinner />}
       </ItemMedia>
       <ItemContent>
         <ItemTitle className="flex flex-col gap-1">
