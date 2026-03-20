@@ -307,6 +307,98 @@ describe("POST /api/links", () => {
       );
     });
 
+    it("stores Spotify URLs with AUDIO contentType using OG scraping", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        url: "https://open.spotify.com/track/abc123",
+        title: "Spotify Track",
+        domain: "spotify.com",
+        contentType: "AUDIO",
+      } as never);
+
+      const res = await POST(
+        postRequest({ url: "https://open.spotify.com/track/abc123" }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({
+        url: "https://open.spotify.com/track/abc123",
+        contentType: "AUDIO",
+      });
+      expect(prisma.link.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            url: "https://open.spotify.com/track/abc123",
+            contentType: "AUDIO",
+          }),
+        }),
+      );
+      expect(ogs).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: "https://open.spotify.com/track/abc123",
+        }),
+      );
+    });
+
+    it("stores Apple Music URLs with AUDIO contentType", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        url: "https://music.apple.com/us/album/test/123",
+        title: "Apple Music Album",
+        domain: "apple.com",
+        contentType: "AUDIO",
+      } as never);
+
+      const res = await POST(
+        postRequest({ url: "https://music.apple.com/us/album/test/123" }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({
+        url: "https://music.apple.com/us/album/test/123",
+        contentType: "AUDIO",
+      });
+      expect(prisma.link.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            url: "https://music.apple.com/us/album/test/123",
+            contentType: "AUDIO",
+          }),
+        }),
+      );
+    });
+
+    it("stores YouTube Music URLs with AUDIO contentType", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        url: "https://music.youtube.com/watch?v=abc123",
+        title: "YouTube Music Track",
+        domain: "youtube.com",
+        contentType: "AUDIO",
+      } as never);
+
+      const res = await POST(
+        postRequest({ url: "https://music.youtube.com/watch?v=abc123" }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({
+        url: "https://music.youtube.com/watch?v=abc123",
+        contentType: "AUDIO",
+      });
+      expect(prisma.link.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            url: "https://music.youtube.com/watch?v=abc123",
+            contentType: "AUDIO",
+          }),
+        }),
+      );
+    });
+
     it("stores PDF URLs with PDF contentType and skips OG scraping", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
       vi.mocked(prisma.link.create).mockResolvedValue({

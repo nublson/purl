@@ -10,7 +10,7 @@ function serializeLink(link: {
   favicon: string;
   thumbnail: string | null;
   domain: string;
-  contentType?: "WEB" | "YOUTUBE" | "PDF";
+  contentType?: "WEB" | "YOUTUBE" | "PDF" | "AUDIO";
   createdAt: Date;
 }) {
   return {

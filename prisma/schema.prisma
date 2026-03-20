@@ -16,6 +16,7 @@ enum ContentType {
   WEB
   YOUTUBE
   PDF
+  AUDIO
 }
 
 model User {

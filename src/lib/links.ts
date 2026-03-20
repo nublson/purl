@@ -1,5 +1,7 @@
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import type { ContentType } from "@/generated/prisma/enums";
+import { isAudioUrl } from "@/utils/audio";
 import { getUrlDomain } from "@/utils/formatter";
 import type { Link } from "@/utils/links";
 import { isPdfUrl } from "@/utils/pdf";
@@ -90,15 +92,16 @@ type LinkRow = {
   title: string;
   favicon: string;
   domain: string;
-  contentType: "WEB" | "YOUTUBE" | "PDF";
+  contentType: ContentType;
   description: string | null;
   thumbnail: string | null;
   createdAt: Date;
 };
 
-function detectContentType(url: string): "WEB" | "YOUTUBE" | "PDF" {
+function detectContentType(url: string): ContentType {
   if (isYouTubeUrl(url)) return "YOUTUBE";
   if (isPdfUrl(url)) return "PDF";
+  if (isAudioUrl(url)) return "AUDIO";
   return "WEB";
 }
 
