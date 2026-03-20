@@ -2,7 +2,7 @@
 
 import { copyToClipboard } from "@/lib/clipboard";
 import type { Link as LinkType } from "@/utils/links";
-import { Ellipsis, Link, MessageCircle, Pencil } from "lucide-react";
+import { Ellipsis, Link, MessageCircle, Pencil, Trash } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DropdownWrapper } from "./dropdown-wrapper";
@@ -81,7 +81,7 @@ export function LinkMenu({
           </DropdownMenuItem>
         </EditDialog>
         <DropdownMenuItem variant="destructive" onClick={handleDelete}>
-          Delete
+          <Trash /> Delete
         </DropdownMenuItem>
       </DropdownMenuGroup>
     </DropdownWrapper>
