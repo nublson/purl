@@ -41,7 +41,7 @@ export function LinkPreview({
             alt={link.title}
             width={200}
             height={200}
-            className="w-full h-full object-fill aspect-video rounded-t-md"
+            className="w-full h-full object-cover object-top aspect-video rounded-t-md"
           />
         ) : null}
         <div className="p-4 flex flex-col gap-2">
