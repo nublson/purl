@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Link as LinkType } from "@/utils/links";
-import { MessageCircle } from "lucide-react";
+import { FileText, MessageCircle } from "lucide-react";
 import Image from "next/image";
 import * as React from "react";
 import { X } from "./animate-ui/icons/x";
@@ -111,13 +111,17 @@ export const LinkItem = React.forwardRef<
           className="absolute inset-0 z-0"
         />
         <ItemMedia variant="image" className="size-5 rounded">
-          <Image
-            src={link.favicon}
-            alt={link.title}
-            width={20}
-            height={20}
-            className="aspect-square object-contain"
-          />
+          {link.contentType === "PDF" ? (
+            <FileText className="size-5" />
+          ) : (
+            <Image
+              src={link.favicon}
+              alt={link.title}
+              width={20}
+              height={20}
+              className="aspect-square object-contain"
+            />
+          )}
         </ItemMedia>
         <ItemContent>
           <ItemTitle>

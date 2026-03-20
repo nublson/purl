@@ -8,7 +8,7 @@ export type Link = {
   thumbnail: string | null;
   url: string;
   domain: string;
-  contentType: "WEB" | "YOUTUBE";
+  contentType: "WEB" | "YOUTUBE" | "PDF";
   createdAt: Date;
 };
 

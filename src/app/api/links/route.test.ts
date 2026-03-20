@@ -139,9 +139,9 @@ describe("POST /api/links", () => {
       expect(await res.json()).toEqual({ error: "Invalid or missing URL" });
     });
 
-    it("returns 400 when url has no protocol", async () => {
+    it("returns 400 for malformed host without a valid domain", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      const res = await POST(postRequest({ url: "example.com" }));
+      const res = await POST(postRequest({ url: "example" }));
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({ error: "Invalid or missing URL" });
     });
@@ -289,6 +289,38 @@ describe("POST /api/links", () => {
       expect(ogs).toHaveBeenCalledWith(
         expect.objectContaining({
           url: "https://youtu.be/dQw4w9WgXcQ?t=43",
+        }),
+      );
+    });
+
+    it("stores PDF URLs with PDF contentType and still uses OG scraping", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        url: "https://example.com/doc.pdf",
+        title: "Example PDF",
+        domain: "example.com",
+        contentType: "PDF",
+      } as never);
+
+      const res = await POST(postRequest({ url: "https://example.com/doc.pdf" }));
+
+      expect(res.status).toBe(201);
+      expect(await res.json()).toMatchObject({
+        url: "https://example.com/doc.pdf",
+        contentType: "PDF",
+      });
+      expect(prisma.link.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            url: "https://example.com/doc.pdf",
+            contentType: "PDF",
+          }),
+        }),
+      );
+      expect(ogs).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: "https://example.com/doc.pdf",
         }),
       );
     });

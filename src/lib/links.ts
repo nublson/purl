@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import type { Link } from "@/utils/links";
 import { getUrlDomain } from "@/utils/formatter";
+import { isPdfUrl } from "@/utils/pdf";
 import { isYouTubeUrl } from "@/utils/youtube";
 import { headers } from "next/headers";
 import ogs from "open-graph-scraper";
@@ -20,11 +21,17 @@ type LinkRow = {
   title: string;
   favicon: string;
   domain: string;
-  contentType: "WEB" | "YOUTUBE";
+  contentType: "WEB" | "YOUTUBE" | "PDF";
   description: string | null;
   thumbnail: string | null;
   createdAt: Date;
 };
+
+function detectContentType(url: string): "WEB" | "YOUTUBE" | "PDF" {
+  if (isYouTubeUrl(url)) return "YOUTUBE";
+  if (isPdfUrl(url)) return "PDF";
+  return "WEB";
+}
 
 function mapRowToLink(row: LinkRow): Link {
   return {
@@ -133,7 +140,7 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
     });
   }
 
-  const contentType = isYouTubeUrl(url) ? "YOUTUBE" : "WEB";
+  const contentType = detectContentType(url);
   const domain = getUrlDomain(url);
   const { title, description, favicon, thumbnail } =
     await scrapeLinkMetadata(url);
@@ -189,7 +196,7 @@ export async function updateLink(
   let updatePayload: Parameters<typeof prisma.link.update>[0]["data"] = {};
 
   if (urlChanged && nextUrl) {
-    const contentType = isYouTubeUrl(nextUrl) ? "YOUTUBE" : "WEB";
+    const contentType = detectContentType(nextUrl);
     const domain = getUrlDomain(nextUrl);
     const { title, description, favicon, thumbnail } =
       await scrapeLinkMetadata(nextUrl);
