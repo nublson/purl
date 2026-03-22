@@ -16,8 +16,27 @@ vi.mock("@/lib/links", () => {
   };
 });
 
+vi.mock("@/lib/realtime-broadcast", () => ({
+  broadcastLinksChanged: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/auth", () => ({
+  auth: {
+    api: {
+      getSession: vi.fn(),
+    },
+  },
+}));
+
+vi.mock("next/headers", () => ({
+  headers: vi.fn().mockResolvedValue(new Headers()),
+}));
+
 const links = await import("@/lib/links");
 const { readLink, updateLink, deleteLink, UnauthorizedError } = links;
+
+const { broadcastLinksChanged } = await import("@/lib/realtime-broadcast");
+const { auth } = await import("@/lib/auth");
 
 const { GET, PATCH, DELETE: DELETE_HANDLER } = await import("./route");
 
@@ -45,6 +64,8 @@ describe("links/[id] API route", () => {
     vi.mocked(readLink).mockReset();
     vi.mocked(updateLink).mockReset();
     vi.mocked(deleteLink).mockReset();
+    vi.mocked(broadcastLinksChanged).mockClear();
+    vi.mocked(auth.api.getSession).mockReset();
   });
 
   describe("GET", () => {
@@ -174,6 +195,7 @@ describe("links/[id] API route", () => {
       expect(vi.mocked(updateLink)).toHaveBeenCalledWith(ID, {
         url: "https://example.com",
       });
+      expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith("user-123");
     });
 
     it("passes description explicitly null when provided", async () => {
@@ -214,6 +236,7 @@ describe("links/[id] API route", () => {
 
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual({ error: "Not found" });
+      expect(vi.mocked(broadcastLinksChanged)).not.toHaveBeenCalled();
     });
 
     it("returns 401 when the link layer throws UnauthorizedError", async () => {
@@ -246,6 +269,10 @@ describe("links/[id] API route", () => {
 
     it("returns 204 on success", async () => {
       vi.mocked(deleteLink).mockResolvedValue(true);
+      vi.mocked(auth.api.getSession).mockResolvedValue({
+        user: { id: "user-123" },
+        session: {},
+      } as never);
 
       const req = createRequest(`/api/links/${ID}`, { method: "DELETE" });
       const res = await DELETE_HANDLER(req, {
@@ -253,6 +280,20 @@ describe("links/[id] API route", () => {
       });
 
       expect(res.status).toBe(204);
+      expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith("user-123");
+    });
+
+    it("returns 204 without broadcasting when session has no user id", async () => {
+      vi.mocked(deleteLink).mockResolvedValue(true);
+      vi.mocked(auth.api.getSession).mockResolvedValue(null);
+
+      const req = createRequest(`/api/links/${ID}`, { method: "DELETE" });
+      const res = await DELETE_HANDLER(req, {
+        params: Promise.resolve({ id: ID }),
+      });
+
+      expect(res.status).toBe(204);
+      expect(vi.mocked(broadcastLinksChanged)).not.toHaveBeenCalled();
     });
 
     it("returns 401 when the link layer throws UnauthorizedError", async () => {

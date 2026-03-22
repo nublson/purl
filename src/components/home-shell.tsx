@@ -39,7 +39,9 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
   const todayLinksCount = todayGroup?.links.length ?? 0;
   const newDataArrived = !isPending && todayLinksCount > prevTodayCount;
 
-  const showSkeleton = (pendingUrl !== null || isPending) && !newDataArrived;
+  // Only show the optimistic row when this device pasted a URL — not when
+  // isPending is true from useRealtimeSync (remote refresh has no pendingUrl).
+  const showSkeleton = pendingUrl !== null && !newDataArrived;
   const skeletonUrl = pendingUrl ?? "";
   const showSyntheticToday = showSkeleton && !todayGroup;
 
