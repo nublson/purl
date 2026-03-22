@@ -35,6 +35,11 @@ Create a `.env` file in the repo root.
 ```bash
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME"
 
+# Supabase Realtime — cross-device instant link list sync (same project as Postgres)
+NEXT_PUBLIC_SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJ..."
+SUPABASE_SERVICE_ROLE_KEY="eyJ..."
+
 # Optional (used for email verification on signup)
 RESEND_API_KEY="re_..."
 RESEND_FROM="Purl <onboarding@resend.dev>"
@@ -43,6 +48,7 @@ RESEND_FROM="Purl <onboarding@resend.dev>"
 Notes:
 
 - **`DATABASE_URL` is required** (Prisma + Better Auth)
+- **Supabase env vars** — required for real-time sync across devices/tabs. Use **Project Settings → API** in the Supabase dashboard. The service role key must stay server-only (never expose in client code).
 - **Resend is optional** for local dev: if `RESEND_API_KEY` is not set, signup still works but verification emails won’t send
 
 ### 3) Run database migrations

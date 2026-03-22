@@ -28,7 +28,12 @@ vi.mock("next/headers", () => ({
   headers: vi.fn().mockResolvedValue(new Headers()),
 }));
 
+vi.mock("@/lib/realtime-broadcast", () => ({
+  broadcastLinksChanged: vi.fn().mockResolvedValue(undefined),
+}));
+
 const { auth } = await import("@/lib/auth");
+const { broadcastLinksChanged } = await import("@/lib/realtime-broadcast");
 const prisma = (await import("@/lib/prisma")).default;
 const ogs = (await import("open-graph-scraper")).default;
 let fetchSpy: ReturnType<typeof vi.spyOn>;
@@ -45,6 +50,7 @@ const MOCK_LINK = {
   domain: "example.com",
   contentType: "WEB" as const,
   createdAt: CREATED_AT,
+  userId: "user-123",
 };
 
 function postRequest(body: unknown): NextRequest {
@@ -94,6 +100,7 @@ describe("POST /api/links", () => {
     vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.link.update).mockReset();
     vi.mocked(ogs).mockReset();
+    vi.mocked(broadcastLinksChanged).mockClear();
     fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(
@@ -189,6 +196,15 @@ describe("POST /api/links", () => {
   });
 
   describe("successful link creation", () => {
+    it("calls broadcastLinksChanged with the link owner id after create", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue(MOCK_LINK as never);
+
+      await POST(postRequest({ url: "https://example.com" }));
+
+      expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith("user-123");
+    });
+
     it("returns 201 with the saved link data including scraped title", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
       vi.mocked(prisma.link.create).mockResolvedValue(MOCK_LINK as never);
@@ -270,6 +286,7 @@ describe("POST /api/links", () => {
         where: { id: "link-1" },
         data: { createdAt: expect.any(Date) },
       });
+      expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith("user-123");
     });
 
     it("uses YouTube oEmbed for youtu.be URLs and skips OG scraping", async () => {
