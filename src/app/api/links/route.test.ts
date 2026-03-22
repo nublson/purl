@@ -272,14 +272,39 @@ describe("POST /api/links", () => {
       });
     });
 
-    it("treats YouTube URLs like normal links and uses OG scraping", async () => {
+    it("uses YouTube oEmbed for youtu.be URLs and skips OG scraping", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      fetchSpy.mockImplementation((input: RequestInfo | URL) => {
+        const href =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+        if (href.includes("youtube.com/oembed")) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                title: "Never Gonna Give You Up",
+                author_name: "Rick Astley",
+                thumbnail_url:
+                  "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+              }),
+              {
+                status: 200,
+                headers: { "Content-Type": "application/json" },
+              },
+            ),
+          );
+        }
+        return Promise.resolve(new Response(null, { status: 200 }));
+      });
       vi.mocked(prisma.link.create).mockResolvedValue({
         ...MOCK_LINK,
         url: "https://youtu.be/dQw4w9WgXcQ?t=43",
         title: "Never Gonna Give You Up",
         thumbnail: "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
-        domain: "youtube.com",
+        domain: "youtu.be",
         contentType: "YOUTUBE",
       } as never);
 
@@ -297,12 +322,43 @@ describe("POST /api/links", () => {
           data: expect.objectContaining({
             url: "https://youtu.be/dQw4w9WgXcQ?t=43",
             contentType: "YOUTUBE",
+            title: "Never Gonna Give You Up",
+            thumbnail:
+              "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+            description: "Rick Astley",
           }),
         }),
       );
+      expect(ogs).not.toHaveBeenCalled();
+    });
+
+    it("falls back to OG scraping when YouTube oEmbed returns non-2xx", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      fetchSpy.mockImplementation((input: RequestInfo | URL) => {
+        const href =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url;
+        if (href.includes("youtube.com/oembed")) {
+          return Promise.resolve(new Response(null, { status: 404 }));
+        }
+        return Promise.resolve(new Response(null, { status: 200 }));
+      });
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        url: "https://youtu.be/dQw4w9WgXcQ",
+        title: "Example Domain",
+        domain: "youtu.be",
+        contentType: "YOUTUBE",
+      } as never);
+
+      await POST(postRequest({ url: "https://youtu.be/dQw4w9WgXcQ" }));
+
       expect(ogs).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: "https://youtu.be/dQw4w9WgXcQ?t=43",
+          url: "https://youtu.be/dQw4w9WgXcQ",
         }),
       );
     });
