@@ -1,3 +1,4 @@
+import { auth } from "@/lib/auth";
 import {
   readLink,
   updateLink,
@@ -5,7 +6,9 @@ import {
   type UpdateLinkData,
   UnauthorizedError,
 } from "@/lib/links";
+import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { isValidUrl } from "@/utils/url";
+import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 function serializeLink(link: {
@@ -91,6 +94,7 @@ export async function PATCH(
     if (!updated) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+    await broadcastLinksChanged(updated.userId);
     return NextResponse.json(serializeLink(updated));
   } catch (e) {
     if (e instanceof UnauthorizedError) {
@@ -109,6 +113,12 @@ export async function DELETE(
     const deleted = await deleteLink(id);
     if (!deleted) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+    if (session?.user?.id) {
+      await broadcastLinksChanged(session.user.id);
     }
     return new NextResponse(null, { status: 204 });
   } catch (e) {

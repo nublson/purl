@@ -3,6 +3,7 @@
 import { LinkGroup } from "@/components/link-group";
 import { PasteHandler } from "@/components/paste-handler";
 import { LinkItemSkeleton } from "@/components/skeletons";
+import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import type { LinkGroup as LinkGroupType } from "@/utils/links";
 import { PackageOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -11,6 +12,7 @@ import { useCallback, useEffect, useState, useTransition } from "react";
 export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  useRealtimeSync(startTransition);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [prevTodayCount, setPrevTodayCount] = useState(0);
   const [newLinkId, setNewLinkId] = useState<string | null>(null);
