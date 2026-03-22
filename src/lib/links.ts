@@ -17,30 +17,6 @@ export class UnauthorizedError extends Error {
 const FAVICON_BASE = "https://www.google.com/s2/favicons?domain=";
 const FAVICON_SIZE = "64";
 
-/** Debug session 357177: local ingest + console for Vercel/runtime logs. */
-function agentDebugLog357177(payload: {
-  runId: string;
-  hypothesisId: string;
-  location: string;
-  message: string;
-  data: Record<string, unknown>;
-}) {
-  const body = JSON.stringify({
-    sessionId: "357177",
-    timestamp: Date.now(),
-    ...payload,
-  });
-  console.warn("[purl-debug-session-357177]", body);
-  fetch("http://127.0.0.1:7934/ingest/3b140c39-9f39-4fe6-bb46-7844bf138e61", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "357177",
-    },
-    body,
-  }).catch(() => {});
-}
-
 function formatFileSize(bytes: number | null): string | null {
   if (bytes === null || !Number.isFinite(bytes) || bytes <= 0) return null;
   if (bytes < 1024) return `${bytes} B`;
@@ -110,6 +86,41 @@ async function scrapePdfMetadata(
   return { title, description, thumbnail };
 }
 
+async function scrapeYouTubeMetadata(
+  url: string,
+  defaultFavicon: string,
+): Promise<{
+  title: string;
+  description: string | null;
+  favicon: string;
+  thumbnail: string | null;
+} | null> {
+  try {
+    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+    const res = await fetch(oembedUrl, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent":
+          "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      title?: string;
+      author_name?: string;
+      thumbnail_url?: string;
+    };
+    const title = (data.title ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
+    if (!title) return null;
+    const description = data.author_name?.replace(/\s+/g, " ").trim() || null;
+    const thumbnail = data.thumbnail_url?.trim() || null;
+    return { title, description, favicon: defaultFavicon, thumbnail };
+  } catch {
+    return null;
+  }
+}
+
 type LinkRow = {
   id: string;
   url: string;
@@ -161,28 +172,13 @@ export async function scrapeLinkMetadata(url: string): Promise<{
     };
   }
 
-  try {
-    // #region agent log
-    agentDebugLog357177({
-      runId: "pre-fix",
-      hypothesisId: "H_env",
-      location: "links.ts:scrapeLinkMetadata:pre-ogs",
-      message: "OG scrape start",
-      data: {
-        urlHost: (() => {
-          try {
-            return new URL(url).hostname;
-          } catch {
-            return null;
-          }
-        })(),
-        vercel: Boolean(process.env.VERCEL),
-        nodeEnv: process.env.NODE_ENV ?? null,
-      },
-    });
-    // #endregion
+  if (isYouTubeUrl(url)) {
+    const yt = await scrapeYouTubeMetadata(url, defaultFavicon);
+    if (yt) return yt;
+  }
 
-    const ogsOut = await ogs({
+  try {
+    const { error, result } = await ogs({
       url,
       fetchOptions: {
         signal: AbortSignal.timeout(8000),
@@ -193,42 +189,7 @@ export async function scrapeLinkMetadata(url: string): Promise<{
       },
     });
 
-    const { error, result } = ogsOut;
-    const responseObj = ogsOut.response as { status?: number } | undefined;
-    const htmlPreview =
-      typeof ogsOut.html === "string"
-        ? ogsOut.html.slice(0, 120).replace(/\s+/g, " ")
-        : null;
-
-    // #region agent log
-    agentDebugLog357177({
-      runId: "pre-fix",
-      hypothesisId: "H2",
-      location: "links.ts:scrapeLinkMetadata:ogs-resolved",
-      message: "OGS returned",
-      data: {
-        ogsErrorFlag: error,
-        hasResult: Boolean(result),
-        responseStatus: responseObj?.status ?? null,
-        htmlLength:
-          typeof ogsOut.html === "string" ? ogsOut.html.length : null,
-        htmlPreview,
-        ogTitle: result?.ogTitle ?? null,
-        successField: (result as { success?: boolean } | undefined)?.success,
-      },
-    });
-    // #endregion
-
     if (error || !result) {
-      // #region agent log
-      agentDebugLog357177({
-        runId: "pre-fix",
-        hypothesisId: "H3",
-        location: "links.ts:scrapeLinkMetadata:fallback-branch",
-        message: "Using fallback (error or no result)",
-        data: { ogsErrorFlag: error },
-      });
-      // #endregion
       return {
         title: domain,
         description: null,
@@ -252,34 +213,7 @@ export async function scrapeLinkMetadata(url: string): Promise<{
       favicon,
       thumbnail,
     };
-  } catch (caught) {
-    // #region agent log
-    const fromOgs =
-      caught &&
-      typeof caught === "object" &&
-      "result" in caught &&
-      caught.result &&
-      typeof caught.result === "object" &&
-      "error" in caught.result;
-    const ogsErrMsg = fromOgs
-      ? String(
-          (caught as { result: { error?: unknown } }).result.error ?? "",
-        )
-      : null;
-    agentDebugLog357177({
-      runId: "pre-fix",
-      hypothesisId: "H1",
-      location: "links.ts:scrapeLinkMetadata:ogs-threw",
-      message: "OGS threw or fetch failed",
-      data: {
-        fromOgsThrowShape: fromOgs,
-        ogsLibraryError: ogsErrMsg,
-        exceptionMessage:
-          caught instanceof Error ? caught.message : String(caught),
-        exceptionName: caught instanceof Error ? caught.name : typeof caught,
-      },
-    });
-    // #endregion
+  } catch {
     return {
       title: domain,
       description: null,
