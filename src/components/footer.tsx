@@ -1,23 +1,21 @@
 import Link from "next/link";
+import footerNavigation from "../data/footer-navigation.json";
+import { Logo } from "./logo";
 
 export default function Footer() {
   return (
     <footer className="wrapper-public flex justify-between items-center p-12 text-muted-foreground text-xs">
-      <p>Purl</p>
+      <Logo size={24} />
 
       <ul className="flex gap-4">
-        <li>
-          <Link href="/features">Features</Link>
-        </li>
-        <li>
-          <Link href="/pricing">Pricing</Link>
-        </li>
-        <li>
-          <Link href="/privacy">Privacy</Link>
-        </li>
-        <li>
-          <Link href="/terms">Terms</Link>
-        </li>
+        {footerNavigation.map((item) => (
+          <li
+            className="hover:underline hover:text-foreground transition-all duration-100"
+            key={item.path}
+          >
+            <Link href={item.path}>{item.title}</Link>
+          </li>
+        ))}
       </ul>
 
       <p>© 2026 Purl.</p>
