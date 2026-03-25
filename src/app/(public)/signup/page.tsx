@@ -37,14 +37,14 @@ export default function Signup() {
 
   return (
     <form
-      className="w-full"
+      className="wrapper-center"
       onSubmit={(e) => {
         e.preventDefault();
         e.stopPropagation();
         form.handleSubmit();
       }}
     >
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="flex w-full items-center justify-center p-4">
         <Card className="w-full max-w-sm">
           <CardHeader>
             <CardTitle>
