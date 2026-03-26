@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
 
-export default function Hero() {
+export default function HeroSection() {
   return (
     <section
       id="hero"
-      className="w-full h-full overflow-hidden flex flex-col items-center justify-between gap-16 mt-8 pt-28"
+      className="w-full h-screen overflow-hidden flex flex-col items-center justify-between gap-16 pt-28"
     >
       <div className="w-full flex flex-col items-center justify-center gap-10">
         <div className="text-center flex flex-col gap-8">
@@ -44,7 +44,7 @@ export default function Hero() {
         src={previewAppDesktop}
         alt="Purl preview"
         width={780}
-        height={560}
+        height={507}
         className="w-full h-auto"
       />
       <SectionSeparator />

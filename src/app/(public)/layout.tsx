@@ -17,9 +17,14 @@ export default function PublicLayout({
   return (
     <Fragment>
       <Header>
-        <Button size="sm" asChild>
-          <Link href="/login">Sign in</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/login">Sign in</Link>
+          </Button>
+          <Button size="sm" asChild>
+            <Link href="/signup">Get started</Link>
+          </Button>
+        </div>
       </Header>
       <main className="wrapper-public flex-1 flex flex-col items-center justify-start px-12">
         {children}
