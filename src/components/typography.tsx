@@ -5,19 +5,16 @@ import * as React from "react";
 const typographyVariants = cva("", {
   variants: {
     variant: {
-      h1: "text-2xl md:text-3xl lg:text-5xl leading-[48px] tracking-[-1.5px] font-semibold text-foreground",
-      h2: "text-xl md:text-2xl lg:text-3xl leading-[30px] tracking-[-1px] font-semibold text-foreground",
-      h3: "text-lg md:text-xl lg:text-2xl leading-[28.8px] tracking-[-1px] font-semibold text-foreground",
-      h4: "text-base md:text-lg lg:text-xl leading-6 tracking-normal font-semibold text-foreground",
-      monospaced:
-        "text-xs md:text-sm lg:font-mono text-base leading-6 tracking-normal font-normal",
+      h1: "text-5xl font-normal font-serif text-foreground",
+      h2: "text-[54px] font-normal font-serif text-foreground",
+      h3: "text-2xl font-normal font-serif text-foreground",
+      h4: "text-xl font-normal font-serif text-foreground",
+      monospaced: "text-base font-normal font-serif",
     },
     size: {
-      regular:
-        "text-xs md:text-sm lg:text-base leading-6 tracking-normal text-muted-foreground",
-      small:
-        "text-[10px] md:text-xs lg:text-sm leading-[21px] tracking-[0.07px] text-muted-foreground",
-      mini: "text-[8px] md:text-[10px] lg:text-xs leading-4 tracking-[0.18px] text-muted-foreground",
+      regular: "text-base leading-6 tracking-normal text-muted-foreground",
+      small: "text-sm leading-[21px] tracking-[0.07px] text-muted-foreground",
+      mini: "text-xs leading-4 tracking-[0.18px] text-muted-foreground",
     },
   },
 });

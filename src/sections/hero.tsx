@@ -45,9 +45,9 @@ export default function HeroSection() {
         alt="Purl preview"
         width={780}
         height={507}
-        className="w-full h-auto"
+        className="h-auto"
       />
-      <SectionSeparator />
+      <SectionSeparator className="absolute bottom-0" />
     </section>
   );
 }
