@@ -1,4 +1,5 @@
 import previewAppDesktop from "@/assets/preview_app_desktop.svg";
+import SectionSeparator from "@/components/section-separator";
 import { Typography } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
@@ -46,7 +47,7 @@ export default function Hero() {
         height={560}
         className="w-full h-auto"
       />
-      <div className="absolute bottom-0 z-10 h-px w-screen bg-[linear-gradient(90deg,transparent_0%,#1F1F1F_20%,#1F1F1F_80%,transparent_100%)]" />
+      <SectionSeparator />
     </section>
   );
 }
