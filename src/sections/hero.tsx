@@ -16,14 +16,14 @@ export default function HeroSection() {
           <Typography
             component="span"
             size="mini"
-            className="text-muted-foreground"
+            className="text-muted-foreground uppercase"
           >
-            YOUR PERSONAL KNOWLEDGE BASE
+            Your personal knowledge base
           </Typography>
           <div className="text-center flex flex-col gap-6">
-            <h1 className="main-heading">
+            <Typography component="h1" variant="h1">
               Save Anything. <br /> Understand it deeply.
-            </h1>
+            </Typography>
             <Typography className="text-center font-light">
               Purl captures your links, PDFs, videos, and audio — then <br />{" "}
               lets you ask anything about what you&apos;ve saved.

@@ -145,7 +145,3 @@ body {
 .wrapper-center {
   @apply w-full flex-1 flex flex-col items-center justify-center;
 }
-
-.main-heading {
-  @apply font-serif font-normal text-[88px] leading-[92.4px] tracking-[-1.76px];
-}

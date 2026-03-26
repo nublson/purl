@@ -30,7 +30,7 @@ export default function SectionTitle({
       <Typography
         component="span"
         size="mini"
-        className="text-muted-foreground uppercase font-medium"
+        className="text-neutral-600 uppercase font-medium"
       >
         {data.label}
       </Typography>

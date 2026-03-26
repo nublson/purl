@@ -5,7 +5,7 @@ import * as React from "react";
 const typographyVariants = cva("", {
   variants: {
     variant: {
-      h1: "text-5xl font-normal font-serif text-foreground",
+      h1: "text-[88px] leading-[92.4px] font-normal font-serif text-foreground",
       h2: "text-[54px] font-normal font-serif text-foreground",
       h3: "text-2xl font-normal font-serif text-foreground",
       h4: "text-xl font-normal font-serif text-foreground",
