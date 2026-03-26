@@ -1,15 +1,14 @@
-import previewAppDesktop from "@/assets/preview_app_desktop.svg";
+import PreviewApp from "@/components/preview-app";
 import SectionSeparator from "@/components/section-separator";
 import { Typography } from "@/components/typography";
 import { Button } from "@/components/ui/button";
-import Image from "next/image";
 import Link from "next/link";
 
 export default function HeroSection() {
   return (
     <section
       id="hero"
-      className="w-full h-screen overflow-hidden flex flex-col items-center justify-between gap-16 pt-28"
+      className="relative w-full max-h-[842px] overflow-hidden flex flex-col items-center justify-between gap-16 pt-28"
     >
       <div className="w-full flex flex-col items-center justify-center gap-10">
         <div className="text-center flex flex-col gap-8">
@@ -40,13 +39,7 @@ export default function HeroSection() {
         </div>
       </div>
 
-      <Image
-        src={previewAppDesktop}
-        alt="Purl preview"
-        width={780}
-        height={507}
-        className="h-auto"
-      />
+      <PreviewApp />
       <SectionSeparator className="absolute bottom-0" />
     </section>
   );
