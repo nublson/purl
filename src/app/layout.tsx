@@ -64,7 +64,7 @@ export default function RootLayout({
       className={`${inter.variable} ${instrumentSerif.variable} h-full`}
       suppressHydrationWarning
     >
-      <body className={`antialiased h-full flex flex-col`}>
+      <body className={`antialiased h-full flex flex-col relative`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
