@@ -90,13 +90,11 @@ export const LinkItem = React.forwardRef<
       )}
       onMouseEnter={(event) => {
         onMouseEnter?.(event);
-        if (preview) return;
         hoveringActionsRef.current = false;
         scheduleOpen();
       }}
       onMouseLeave={(event) => {
         onMouseLeave?.(event);
-        if (preview) return;
         hoveringActionsRef.current = false;
         scheduleClose();
       }}
@@ -162,10 +160,6 @@ export const LinkItem = React.forwardRef<
       )}
     </Item>
   );
-
-  if (preview) {
-    return content;
-  }
 
   return (
     <LinkPreview
