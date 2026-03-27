@@ -1,0 +1,20 @@
+{
+  "defaultUrls": [
+    {
+      "id": "cmn9bz9zv0000yktygb6v6pds",
+      "url": "https://cursor.com/home",
+      "title": "The best way to code with AI",
+      "favicon": "https://cursor.com/marketing-static/icon-192x192.png",
+      "domain": "cursor.com",
+      "createdAt": "2026-03-27 20:05:21.115",
+      "userId": "UVN9YlrzIITzIrh7w3OL6hL4HKzp6BVh",
+      "description": "Built to make you extraordinarily productive, Cursor is the best way to build software with AI.",
+      "thumbnail": "https://cursor.com/public/opengraph-image.png",
+      "contentType": "WEB"
+    }
+  ],
+  "urls": [
+    "https://youtu.be/Z8DRvwXE9qY?si=Nn31PbsbLFZwX0td",
+    "https://anthropic.skilljar.com"
+  ]
+}

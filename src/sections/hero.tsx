@@ -2,6 +2,11 @@ import PreviewApp from "@/components/preview-app";
 import SectionSeparator from "@/components/section-separator";
 import { Typography } from "@/components/typography";
 import { Button } from "@/components/ui/button";
+import {
+  defaultUrls,
+  urls,
+} from "@/data/preview-links.json" with { type: "json" };
+import type { Link as LinkType } from "@/utils/links";
 import Link from "next/link";
 
 export default function HeroSection() {
@@ -40,11 +45,8 @@ export default function HeroSection() {
       </div>
 
       <PreviewApp
-        urls={[
-          "https://cursor.com",
-          "https://youtu.be/Z8DRvwXE9qY?si=Nn31PbsbLFZwX0td",
-          "https://anthropic.skilljar.com",
-        ]}
+        urls={urls}
+        defaultUrls={defaultUrls as unknown as LinkType[]}
       />
       <SectionSeparator className="absolute bottom-0" />
     </section>
