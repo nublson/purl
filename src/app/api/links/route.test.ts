@@ -101,17 +101,15 @@ describe("POST /api/links", () => {
     vi.mocked(prisma.link.update).mockReset();
     vi.mocked(ogs).mockReset();
     vi.mocked(broadcastLinksChanged).mockClear();
-    fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response(null, {
-          status: 200,
-          headers: {
-            "content-type": "application/pdf",
-            "content-length": "217220",
-          },
-        }),
-      );
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, {
+        status: 200,
+        headers: {
+          "content-type": "application/pdf",
+          "content-length": "217220",
+        },
+      }),
+    );
     mockOgsSuccess();
   });
 
@@ -340,8 +338,7 @@ describe("POST /api/links", () => {
             url: "https://youtu.be/dQw4w9WgXcQ?t=43",
             contentType: "YOUTUBE",
             title: "Never Gonna Give You Up",
-            thumbnail:
-              "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+            thumbnail: "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
             description: "Rick Astley",
           }),
         }),
@@ -482,7 +479,9 @@ describe("POST /api/links", () => {
         contentType: "PDF",
       } as never);
 
-      const res = await POST(postRequest({ url: "https://example.com/doc.pdf" }));
+      const res = await POST(
+        postRequest({ url: "https://example.com/doc.pdf" }),
+      );
 
       expect(res.status).toBe(201);
       expect(await res.json()).toMatchObject({

@@ -39,7 +39,14 @@ export default function HeroSection() {
         </div>
       </div>
 
-      <PreviewApp />
+      <PreviewApp
+        urls={[
+          "https://cursor.com",
+          "https://youtu.be/Z8DRvwXE9qY?si=Nn31PbsbLFZwX0td",
+          "https://anthropic.skilljar.com",
+          "https://tailwindcss.com/",
+        ]}
+      />
       <SectionSeparator className="absolute bottom-0" />
     </section>
   );

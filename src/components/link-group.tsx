@@ -7,11 +7,13 @@ export const LinkGroup = ({
   label,
   links,
   prependItems,
+  preview,
 }: {
   label: string;
   links: Link[];
   newLinkId?: string | null;
   prependItems?: React.ReactNode;
+  preview?: boolean;
 }) => {
   return (
     <div className="w-full flex flex-col justify-start items-start gap-4">
@@ -27,7 +29,7 @@ export const LinkGroup = ({
               initial={false}
               animate={{ opacity: 1, y: 0 }}
             >
-              <LinkItem link={link} />
+              <LinkItem link={link} preview={preview} />
             </motion.div>
           ))}
         </AnimatePresence>
