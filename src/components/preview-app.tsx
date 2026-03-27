@@ -1,11 +1,12 @@
 "use client";
 
-import { isAudioUrl } from "@/utils/audio";
+import type { ResolvedLinkFields } from "@/lib/links";
+import { getDefaultFaviconUrl } from "@/utils/default-favicon";
 import { getUrlDomain } from "@/utils/formatter";
 import type { Link } from "@/utils/links";
-import { isPdfUrl } from "@/utils/pdf";
+import { detectContentType } from "@/utils/link-content-type";
+import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
 import { isValidUrl } from "@/utils/url";
-import { isYouTubeUrl } from "@/utils/youtube";
 import { useEffect, useMemo, useState } from "react";
 import { LinkGroup } from "./link-group";
 import { LinkItemSkeleton } from "./skeletons";
@@ -13,36 +14,15 @@ import { LinkItemSkeleton } from "./skeletons";
 /** Pause after a link is fully shown before starting the next URL (skeleton + fetch). */
 const BETWEEN_LINKS_DELAY_MS = 3000;
 const BETWEEN_LINKS_DELAY_REDUCED_MS = 1000;
-const FAVICON_SIZE = "64";
 
-function faviconForDomain(domain: string): string {
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${FAVICON_SIZE}`;
-}
-
-function detectContentType(url: string): Link["contentType"] {
-  if (isYouTubeUrl(url)) return "YOUTUBE";
-  if (isPdfUrl(url)) return "PDF";
-  if (isAudioUrl(url)) return "AUDIO";
-  return "WEB";
-}
-
-function previewTitle(
+function syntheticFallbackTitle(
   url: string,
   domain: string,
   contentType: Link["contentType"],
 ): string {
   if (contentType === "YOUTUBE") return "YouTube";
-  if (contentType === "PDF") {
-    try {
-      const fileName = new URL(url).pathname.split("/").pop() ?? "";
-      const withoutPdf = decodeURIComponent(fileName).replace(/\.pdf$/i, "");
-      const normalized = withoutPdf.replace(/[-_]+/g, " ").trim();
-      if (normalized) return normalized.slice(0, 500);
-    } catch {
-      /* fall through */
-    }
-    return domain;
-  }
+  if (contentType === "PDF")
+    return derivePdfTitleFromUrl(url, domain).slice(0, 500);
   return domain;
 }
 
@@ -52,9 +32,9 @@ function buildSyntheticLink(url: string): Link {
   return {
     id: crypto.randomUUID(),
     url,
-    title: previewTitle(url, domain, contentType),
+    title: syntheticFallbackTitle(url, domain, contentType),
     description: null,
-    favicon: faviconForDomain(domain),
+    favicon: getDefaultFaviconUrl(domain),
     thumbnail: null,
     domain,
     contentType,
@@ -62,25 +42,18 @@ function buildSyntheticLink(url: string): Link {
   };
 }
 
-type PreviewMetadata = {
-  title: string;
-  description: string | null;
-  favicon: string;
-  thumbnail: string | null;
-};
-
-function buildLinkFromServerMetadata(url: string, meta: PreviewMetadata): Link {
-  const domain = getUrlDomain(url);
-  const contentType = detectContentType(url);
+function buildLinkFromResolved(resolved: ResolvedLinkFields): Link {
+  const domain = resolved.domain;
   return {
     id: crypto.randomUUID(),
-    url,
-    title: meta.title.replace(/\s+/g, " ").trim().slice(0, 500) || domain,
-    description: meta.description,
-    favicon: meta.favicon || faviconForDomain(domain),
-    thumbnail: meta.thumbnail,
-    domain,
-    contentType,
+    url: resolved.url,
+    title:
+      resolved.title.replace(/\s+/g, " ").trim().slice(0, 500) || domain,
+    description: resolved.description,
+    favicon: resolved.favicon || getDefaultFaviconUrl(domain),
+    thumbnail: resolved.thumbnail,
+    domain: resolved.domain,
+    contentType: resolved.contentType,
     createdAt: new Date(),
   };
 }
@@ -179,8 +152,8 @@ export default function PreviewApp({
             `/api/preview-link-metadata?url=${encodeURIComponent(targetUrl)}`,
           );
           if (!res.ok) throw new Error("metadata request failed");
-          const meta = (await res.json()) as PreviewMetadata;
-          link = buildLinkFromServerMetadata(targetUrl, meta);
+          const resolved = (await res.json()) as ResolvedLinkFields;
+          link = buildLinkFromResolved({ ...resolved, url: targetUrl });
         } catch {
           link = buildSyntheticLink(targetUrl);
         }

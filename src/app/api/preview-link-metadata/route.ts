@@ -1,4 +1,4 @@
-import { scrapeLinkMetadata } from "@/lib/links";
+import { resolveLinkFromUrl } from "@/lib/links";
 import { isValidUrl } from "@/utils/url";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -10,8 +10,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const meta = await scrapeLinkMetadata(url);
-    return NextResponse.json(meta);
+    const resolved = await resolveLinkFromUrl(url);
+    return NextResponse.json(resolved);
   } catch {
     return NextResponse.json(
       { error: "Failed to fetch metadata" },
