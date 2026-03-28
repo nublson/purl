@@ -1,6 +1,8 @@
+import { AskPurlSection } from "@/sections/ask-purl";
 import ContentTypeSection from "@/sections/content-type";
 import FeaturesSection from "@/sections/features";
 import HeroSection from "@/sections/hero";
+import { PricingSection } from "@/sections/pricing";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -14,6 +16,8 @@ export default function Home() {
       <HeroSection />
       <FeaturesSection />
       <ContentTypeSection />
+      <AskPurlSection />
+      <PricingSection />
     </div>
   );
 }
