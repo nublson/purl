@@ -1,3 +1,4 @@
+import ContentTypeSection from "@/sections/content-type";
 import FeaturesSection from "@/sections/features";
 import HeroSection from "@/sections/hero";
 import type { Metadata } from "next";
@@ -12,6 +13,7 @@ export default function Home() {
     <div className="w-full flex flex-col h-full items-center justify-center">
       <HeroSection />
       <FeaturesSection />
+      <ContentTypeSection />
     </div>
   );
 }

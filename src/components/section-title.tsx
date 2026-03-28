@@ -18,7 +18,7 @@ export default function SectionTitle({
 }: SectionTitleProps) {
   return (
     <div
-      className={cn("flex flex-col justify-start gap-5", {
+      className={cn("flex flex-col justify-start gap-5 max-w-lg", {
         "items-center": align === "center",
         "items-start": align === "left",
         "items-end": align === "right",

@@ -5,7 +5,6 @@ import {
 import SectionTitle from "@/components/section-title";
 import SectionWrapper from "@/components/section-wrapper";
 import featuresData from "@/data/features.json";
-
 import {
   Clock3,
   Link2,
