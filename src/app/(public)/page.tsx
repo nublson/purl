@@ -1,5 +1,6 @@
 import { AskPurlSection } from "@/sections/ask-purl";
 import ContentTypeSection from "@/sections/content-type";
+import FAQSection from "@/sections/faq";
 import FeaturesSection from "@/sections/features";
 import HeroSection from "@/sections/hero";
 import { PricingSection } from "@/sections/pricing";
@@ -18,6 +19,7 @@ export default function Home() {
       <ContentTypeSection />
       <AskPurlSection />
       <PricingSection />
+      <FAQSection />
     </div>
   );
 }
