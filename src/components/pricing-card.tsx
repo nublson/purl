@@ -29,7 +29,7 @@ export const PricingCard = ({
   popular,
 }: PricingCardProps) => {
   return (
-    <Card className="w-[352px] h-[544px] border-none bg-transparent px-8 py-9">
+    <Card className="w-full md:w-[352px] h-[544px] border-none bg-transparent px-8 py-9">
       <CardHeader className="p-0">
         <Typography
           component="span"
