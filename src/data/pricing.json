@@ -17,9 +17,11 @@
       "description": "Unlimited everything, plus audio and video transcription.",
       "price": 9,
       "features": [
-        "Unlimited savings",
+        "Everything in Free",
         "Unlimited PDFs",
-        "AI chat (unlimited)"
+        "Youtube transcripts",
+        "Audio transcription (120 min/month)",
+        "Unlimited AI chat"
       ],
       "actionText": "Try for free",
       "popular": true

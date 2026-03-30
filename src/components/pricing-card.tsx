@@ -50,7 +50,7 @@ export const PricingCard = ({
             </Typography>
           </Typography>
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="line-clamp-2">
           <Typography size="small" className="text-neutral-600">
             {description}
           </Typography>
