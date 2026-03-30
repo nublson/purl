@@ -12,7 +12,7 @@ import { LinkGroup } from "./link-group";
 import { LinkItemSkeleton } from "./skeletons";
 
 /** Pause after a link is fully shown before starting the next URL (skeleton + fetch). */
-const BETWEEN_LINKS_DELAY_MS = 3000;
+const BETWEEN_LINKS_DELAY_MS = 2000;
 const BETWEEN_LINKS_DELAY_REDUCED_MS = 1000;
 
 function syntheticFallbackTitle(
@@ -47,8 +47,7 @@ function buildLinkFromResolved(resolved: ResolvedLinkFields): Link {
   return {
     id: crypto.randomUUID(),
     url: resolved.url,
-    title:
-      resolved.title.replace(/\s+/g, " ").trim().slice(0, 500) || domain,
+    title: resolved.title.replace(/\s+/g, " ").trim().slice(0, 500) || domain,
     description: resolved.description,
     favicon: resolved.favicon || getDefaultFaviconUrl(domain),
     thumbnail: resolved.thumbnail,
@@ -85,9 +84,7 @@ function parseDefaultLinks(links: Link[]): Link[] {
     domain: l.domain,
     contentType: l.contentType,
     createdAt:
-      l.createdAt instanceof Date
-        ? l.createdAt
-        : new Date(String(l.createdAt)),
+      l.createdAt instanceof Date ? l.createdAt : new Date(String(l.createdAt)),
   }));
 }
 
@@ -129,9 +126,7 @@ export default function PreviewApp({
 
     const targetUrl = validUrls[queueIndex];
     const waitBeforeFirstFetch =
-      queueIndex === 0 && parsedDefaults.length > 0
-        ? betweenLinksDelayMs
-        : 0;
+      queueIndex === 0 && parsedDefaults.length > 0 ? betweenLinksDelayMs : 0;
 
     let cancelled = false;
     const timeoutIds: number[] = [];
