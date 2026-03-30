@@ -11,8 +11,8 @@ import {
 } from "./ui/card";
 import { Separator } from "./ui/separator";
 
-interface PricingCardProps {
-  title: string;
+export interface PricingCardProps {
+  name: string;
   description: string;
   price: string;
   features: string[];
@@ -21,7 +21,7 @@ interface PricingCardProps {
 }
 
 export const PricingCard = ({
-  title,
+  name,
   description,
   price,
   features,
@@ -36,7 +36,7 @@ export const PricingCard = ({
           size="mini"
           className="text-neutral-600 uppercase font-medium mb-5"
         >
-          {title}
+          {name}
         </Typography>
         <CardTitle>
           <Typography component="h3" variant="h2" className="text-5xl mb-2">
@@ -71,7 +71,7 @@ export const PricingCard = ({
         <Button
           variant={popular ? "default" : "outline"}
           size={"lg"}
-          className="w-full text-foreground"
+          className="w-full"
         >
           {actionText}
         </Button>

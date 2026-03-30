@@ -1,6 +1,7 @@
 import { PricingCard } from "@/components/pricing-card";
 import SectionTitle from "@/components/section-title";
 import SectionWrapper from "@/components/section-wrapper";
+import { plans } from "@/data/pricing.json" with { type: "json" };
 
 export const PricingSection = () => {
   return (
@@ -15,17 +16,17 @@ export const PricingSection = () => {
           }}
         />
         <div className="flex items-center justify-center gap-4">
-          <PricingCard
-            title="Free"
-            description="Everything you need to start building your personal knowledge base."
-            price="0"
-            features={[
-              "Unlimited savings",
-              "5 Pdfs per month",
-              "AI chat (limited)",
-            ]}
-            actionText="Get started free"
-          />
+          {plans.map((plan) => (
+            <PricingCard
+              key={plan.name}
+              name={plan.name}
+              description={plan.description}
+              price={plan.price.toString()}
+              features={plan.features}
+              actionText={plan.actionText}
+              popular={plan.popular}
+            />
+          ))}
         </div>
       </div>
     </SectionWrapper>
