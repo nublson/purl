@@ -28,11 +28,7 @@ export function LinkPreview({
       closeDelay={100}
     >
       <HoverCardTrigger asChild>{children}</HoverCardTrigger>
-      <HoverCardContent
-        side="right"
-        align="start"
-        className="p-0 flex flex-col "
-      >
+      <HoverCardContent side="right" align="start" className="p-0 flex-col">
         {link.contentType === "PDF" ? (
           <PdfThumbnail url={link.url} />
         ) : link.thumbnail ? (

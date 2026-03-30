@@ -1,0 +1,29 @@
+{
+  "questions": [
+    {
+      "value": "what-content-can-i-save",
+      "title": "What types of content can I save?",
+      "content": "Purl supports links (any URL), PDFs, YouTube videos, and audio files. When you save a link, Purl automatically fetches the title, favicon, and full text. PDFs are fully parsed, YouTube videos get their transcripts extracted, and audio is transcribed via Whisper. YouTube and audio support are coming soon."
+    },
+    {
+      "value": "how-does-ai-chat-work",
+      "title": "How does the AI chat work?",
+      "content": "You can ask Purl anything about your saved content in plain English — for example, \"what did I read about machine learning last week?\" Purl searches across all your saved articles, PDFs, and videos and returns a synthesized answer with sources, so you always know where the information came from."
+    },
+    {
+      "value": "free-vs-pro",
+      "title": "What's the difference between Free and Pro?",
+      "content": "The Free plan includes unlimited link saving, 5 PDFs per month, and limited AI chat. The Pro plan ($9/month) includes everything in Free plus unlimited PDFs, YouTube transcript extraction, audio transcription (120 minutes per month), and unlimited AI chat. No credit card is required to start."
+    },
+    {
+      "value": "is-my-data-private",
+      "title": "Is my saved content private?",
+      "content": "Yes. Your library is private to you — only you can see what you've saved and the answers you receive. Purl does not share your content with other users or use it to train AI models."
+    },
+    {
+      "value": "can-i-cancel",
+      "title": "Can I cancel my subscription at any time?",
+      "content": "Absolutely. You can cancel your Pro subscription at any time from your account settings. You'll retain access to Pro features until the end of your current billing period, and your saved content will remain accessible on the Free plan."
+    }
+  ]
+}

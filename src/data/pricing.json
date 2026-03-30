@@ -1,0 +1,30 @@
+{
+  "plans": [
+    {
+      "name": "Free",
+      "description": "Everything you need to start building your personal knowledge base.",
+      "price": 0,
+      "features": [
+        "Unlimited savings",
+        "5 PDFs per month",
+        "AI chat (limited)"
+      ],
+      "actionText": "Get started free",
+      "popular": false
+    },
+    {
+      "name": "Pro",
+      "description": "Unlimited everything, plus audio and video transcription.",
+      "price": 9,
+      "features": [
+        "Everything in Free",
+        "Unlimited PDFs",
+        "Youtube transcripts",
+        "Audio transcription (120 min/month)",
+        "Unlimited AI chat"
+      ],
+      "actionText": "Try for free",
+      "popular": true
+    }
+  ]
+}

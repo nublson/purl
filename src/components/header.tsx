@@ -1,11 +1,17 @@
-import { User } from "./user";
+import { Logo } from "./logo";
 
-export default function Header() {
+interface HeaderProps {
+  children: React.ReactNode;
+}
+
+export default function Header({ children }: HeaderProps) {
   return (
-    <header className="flex justify-between items-center p-4">
-      <p>Purl</p>
+    <header className="fixed inset-x-0 top-0 z-50 transform-none">
+      <div className="w-full flex justify-between items-center p-4 bg-linear-to-b from-background to-transparent">
+        <Logo size={32} />
 
-      <User />
+        {children}
+      </div>
     </header>
   );
 }

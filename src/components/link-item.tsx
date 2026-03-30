@@ -9,6 +9,7 @@ import { X } from "./animate-ui/icons/x";
 import { LinkMenu } from "./link-menu";
 import { LinkPreview } from "./link-preview";
 import { LinkItemSkeleton } from "./skeletons";
+import { TooltipWrapper } from "./tooltip-wrapper";
 import { Button } from "./ui/button";
 import {
   Item,
@@ -20,9 +21,11 @@ import {
 
 export const LinkItem = React.forwardRef<
   HTMLDivElement,
-  { link: LinkType } & React.ComponentPropsWithoutRef<typeof Item>
+  { link: LinkType; preview?: boolean } & React.ComponentPropsWithoutRef<
+    typeof Item
+  >
 >(function LinkItem(
-  { link, className, onMouseEnter, onMouseLeave, ...rest },
+  { link, className, onMouseEnter, onMouseLeave, preview, ...rest },
   ref,
 ) {
   const [isDeleting, setIsDeleting] = React.useState(false);
@@ -77,62 +80,57 @@ export const LinkItem = React.forwardRef<
     );
   }
 
-  return (
-    <LinkPreview
-      link={link}
-      open={previewOpen}
-      onOpenChange={() => {
-        // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.
+  const content = (
+    <Item
+      ref={ref}
+      role="listitem"
+      className={cn(
+        "p-2 gap-4 grid relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
+        preview ? "grid-cols-[20px_1fr]" : "grid-cols-[20px_1fr_auto]",
+        className,
+      )}
+      onMouseEnter={(event) => {
+        onMouseEnter?.(event);
+        hoveringActionsRef.current = false;
+        scheduleOpen();
       }}
+      onMouseLeave={(event) => {
+        onMouseLeave?.(event);
+        hoveringActionsRef.current = false;
+        scheduleClose();
+      }}
+      {...rest}
     >
-      <Item
-        ref={ref}
-        role="listitem"
-        className={cn(
-          "p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
-          className,
+      <a
+        href={link.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute inset-0 z-0"
+      />
+      <ItemMedia variant="image" className="size-5 rounded">
+        {link.contentType === "PDF" ? (
+          <FileText className="size-5" />
+        ) : (
+          <Image
+            src={link.favicon}
+            alt={link.title}
+            width={20}
+            height={20}
+            className="aspect-square object-contain"
+          />
         )}
-        onMouseEnter={(event) => {
-          onMouseEnter?.(event);
-          hoveringActionsRef.current = false;
-          scheduleOpen();
-        }}
-        onMouseLeave={(event) => {
-          onMouseLeave?.(event);
-          hoveringActionsRef.current = false;
-          scheduleClose();
-        }}
-        {...rest}
-      >
-        <a
-          href={link.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="absolute inset-0 z-0"
-        />
-        <ItemMedia variant="image" className="size-5 rounded">
-          {link.contentType === "PDF" ? (
-            <FileText className="size-5" />
-          ) : (
-            <Image
-              src={link.favicon}
-              alt={link.title}
-              width={20}
-              height={20}
-              className="aspect-square object-contain"
-            />
-          )}
-        </ItemMedia>
-        <ItemContent>
-          <ItemTitle>
-            <p className="text-accent-foreground text-sm font-medium line-clamp-1 break-all">
-              {link.title}
-            </p>
-            <p className="text-muted-foreground text-sm font-normal hidden md:block">
-              {link.domain}
-            </p>
-          </ItemTitle>
-        </ItemContent>
+      </ItemMedia>
+      <ItemContent>
+        <ItemTitle>
+          <p className="text-accent-foreground text-sm font-medium line-clamp-1 break-all">
+            {link.title}
+          </p>
+          <p className="text-muted-foreground text-sm font-normal hidden md:block">
+            {link.domain}
+          </p>
+        </ItemTitle>
+      </ItemContent>
+      {!preview && (
         <ItemActions
           className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100 transition-opacity duration-200"
           onMouseEnter={() => {
@@ -146,13 +144,15 @@ export const LinkItem = React.forwardRef<
             scheduleOpen();
           }}
         >
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
-          >
-            <MessageCircle />
-          </Button>
+          <TooltipWrapper content="Add to chat">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
+            >
+              <MessageCircle />
+            </Button>
+          </TooltipWrapper>
           <LinkMenu
             link={link}
             onDeleteStart={() => {
@@ -160,7 +160,19 @@ export const LinkItem = React.forwardRef<
             }}
           />
         </ItemActions>
-      </Item>
+      )}
+    </Item>
+  );
+
+  return (
+    <LinkPreview
+      link={link}
+      open={previewOpen}
+      onOpenChange={() => {
+        // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.
+      }}
+    >
+      {content}
     </LinkPreview>
   );
 });

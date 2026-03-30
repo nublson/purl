@@ -1,0 +1,28 @@
+{
+  "contentTypes": [
+    {
+      "type": "Links",
+      "description": "Any URL, fully extracted",
+      "icon": "Link",
+      "access": "Free"
+    },
+    {
+      "type": "PDFs",
+      "description": "Upload or link, fully parsed",
+      "icon": "FileText",
+      "access": "5 free / month"
+    },
+    {
+      "type": "YouTube",
+      "description": "Full transcripts extracted",
+      "icon": "TvMinimalPlay",
+      "access": "Coming soon"
+    },
+    {
+      "type": "Audio",
+      "description": "Transcribed via Whisper",
+      "icon": "Headphones",
+      "access": "Coming soon"
+    }
+  ]
+}

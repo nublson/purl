@@ -1,6 +1,5 @@
 "use client";
 
-import { useSession, signOut, sendVerificationEmail } from "@/lib/auth-client";
 import { Typography } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { sendVerificationEmail, signOut, useSession } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -47,7 +47,7 @@ export default function VerifyEmail() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
+    <div className="wrapper-center">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>

@@ -1,4 +1,5 @@
 import Header from "@/components/header";
+import { User } from "@/components/user";
 import type { Metadata } from "next";
 import { Fragment } from "react";
 
@@ -13,7 +14,9 @@ export default function PrivateLayout({
 }>) {
   return (
     <Fragment>
-      <Header />
+      <Header>
+        <User />
+      </Header>
       <main className="flex-1 flex flex-col items-center justify-start pt-6 overflow-y-auto px-4 md:px-0">
         {children}
       </main>
