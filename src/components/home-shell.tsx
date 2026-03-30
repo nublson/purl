@@ -1,6 +1,7 @@
 "use client";
 
 import { LinkGroup } from "@/components/link-group";
+import { LinkInput } from "@/components/link-input";
 import { PasteHandler } from "@/components/paste-handler";
 import { LinkItemSkeleton } from "@/components/skeletons";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
@@ -57,6 +58,11 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
 
   return (
     <>
+      <LinkInput
+        onSaveStart={onPasteStart}
+        onSaveSuccess={onSaveSuccess}
+        onSaveError={onSaveError}
+      />
       <PasteHandler
         onPasteStart={onPasteStart}
         onSaveSuccess={onSaveSuccess}

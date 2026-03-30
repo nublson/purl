@@ -1,25 +1,46 @@
 "use client";
 
 import { Field } from "@/components/ui/field";
-import { InputGroup, InputGroupInput } from "@/components/ui/input-group";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { saveLink } from "@/lib/save-link";
 import { useForm } from "@tanstack/react-form";
+import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Button } from "./ui/button";
 
-export function LinkInput() {
+export function LinkInput({
+  onSaveStart,
+  onSaveSuccess,
+  onSaveError,
+}: {
+  onSaveStart?: (url: string) => void;
+  onSaveSuccess?: (id: string) => void;
+  onSaveError?: () => void;
+}) {
   const router = useRouter();
   const form = useForm({
     defaultValues: {
       url: "",
     },
     onSubmit: async ({ value, formApi }) => {
+      onSaveStart?.(value.url);
       const result = await saveLink(value.url);
       if (!result) {
+        onSaveError?.();
         return;
       }
 
       formApi.reset();
-      router.refresh();
+      if (result.id) {
+        onSaveSuccess?.(result.id);
+      }
+      if (!onSaveSuccess) {
+        router.refresh();
+      }
     },
   });
 
@@ -52,6 +73,15 @@ export function LinkInput() {
                   onChange={(event) => field.handleChange(event.target.value)}
                   disabled={form.state.isSubmitting}
                 />
+                <InputGroupAddon align="inline-end">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={form.state.isSubmitting || isUrlEmpty}
+                  >
+                    <Plus />
+                  </Button>
+                </InputGroupAddon>
               </InputGroup>
             </Field>
           );

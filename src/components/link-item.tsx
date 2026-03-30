@@ -85,7 +85,7 @@ export const LinkItem = React.forwardRef<
       ref={ref}
       role="listitem"
       className={cn(
-        "p-2 gap-4 grid relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
+        "w-full p-2 gap-4 grid relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
         preview ? "grid-cols-[20px_1fr]" : "grid-cols-[20px_1fr_auto]",
         className,
       )}
@@ -105,7 +105,7 @@ export const LinkItem = React.forwardRef<
         href={link.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="absolute inset-0 z-0"
+        className="absolute inset-0 z-0 w-full"
       />
       <ItemMedia variant="image" className="size-5 rounded">
         {link.contentType === "PDF" ? (
