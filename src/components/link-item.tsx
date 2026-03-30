@@ -9,6 +9,7 @@ import { X } from "./animate-ui/icons/x";
 import { LinkMenu } from "./link-menu";
 import { LinkPreview } from "./link-preview";
 import { LinkItemSkeleton } from "./skeletons";
+import { TooltipWrapper } from "./tooltip-wrapper";
 import { Button } from "./ui/button";
 import {
   Item,
@@ -143,13 +144,15 @@ export const LinkItem = React.forwardRef<
             scheduleOpen();
           }}
         >
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
-          >
-            <MessageCircle />
-          </Button>
+          <TooltipWrapper content="Add to chat">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
+            >
+              <MessageCircle />
+            </Button>
+          </TooltipWrapper>
           <LinkMenu
             link={link}
             onDeleteStart={() => {
