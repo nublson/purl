@@ -20,16 +20,19 @@ interface AccordionWrapperProps {
 
 export function AccordionWrapper({
   item,
-  separator = true,
+  separator = false,
 }: AccordionWrapperProps) {
   return (
     <Accordion type="single" collapsible className="max-w-lg">
       <AccordionItem value={item.value}>
-        <AccordionTrigger className="md:text-base items-center cursor-pointer hover:no-underline">
+        <AccordionTrigger className="md:text-base lg:text-lg items-center cursor-pointer hover:no-underline">
           {item.title}
         </AccordionTrigger>
         <AccordionContent>
-          <Typography className="text-muted-foreground font-light">
+          <Typography
+            size="mini"
+            className="md:text-sm lg:text-base text-muted-foreground font-light"
+          >
             {item.content}
           </Typography>
         </AccordionContent>
