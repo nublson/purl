@@ -10,7 +10,7 @@ export const AskPurlSection = () => {
             label: "Ask Purl",
             title: "Ask anything about your saved content.",
             description:
-              "Type a question in plain English. Purl searches across everything you've saved — articles, PDFs, videos — and gives you a real, synthesized answer with sources.",
+              "Ask in plain English and get a synthesized answer with sources.",
           }}
         />
       </div>

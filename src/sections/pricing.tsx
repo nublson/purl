@@ -10,7 +10,11 @@ export const PricingSection = () => {
         <SectionTitle
           data={{
             label: "Pricing",
-            title: "Start free. Go deeper when ready.",
+            title: (
+              <>
+                Start free. <br /> Go deeper when ready.
+              </>
+            ),
             description:
               "No credit card required. Upgrade when you need more power.",
           }}
