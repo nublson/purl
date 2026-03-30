@@ -134,7 +134,7 @@ function mapRowToLink(row: LinkRow): Link {
   };
 }
 
-async function scrapeLinkMetadata(url: string): Promise<{
+export async function scrapeLinkMetadata(url: string): Promise<{
   title: string;
   description: string | null;
   favicon: string;
