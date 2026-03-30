@@ -14,6 +14,14 @@ export function PasteHandler({
 }) {
   const handlePaste = useCallback(
     async (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInputTarget =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target.isContentEditable;
+
+      if (isInputTarget) return;
+
       const text = e.clipboardData?.getData("text")?.trim();
       if (!text) return;
 
