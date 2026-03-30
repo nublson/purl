@@ -19,7 +19,7 @@ export const PricingSection = () => {
               "No credit card required. Upgrade when you need more power.",
           }}
         />
-        <div className="flex items-center justify-center gap-4">
+        <div className="flex flex-col md:flex-row items-center justify-center gap-4">
           {plans.map((plan) => (
             <PricingCard
               key={plan.name}

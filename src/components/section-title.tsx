@@ -19,14 +19,18 @@ export default function SectionTitle({
 }: SectionTitleProps) {
   return (
     <div
-      className={cn("flex flex-col justify-start gap-5 max-w-lg", {
-        "items-center": align === "center",
-        "items-start": align === "left",
-        "items-end": align === "right",
-        "text-center": align === "center",
-        "text-left": align === "left",
-        "text-right": align === "right",
-      })}
+      className={cn(
+        "flex flex-col justify-start gap-5 w-full lg:max-w-lg",
+        {
+          "lg:items-center": align === "center",
+          "lg:items-start": align === "left",
+          "lg:items-end": align === "right",
+          "lg:text-center": align === "center",
+          "lg:text-left": align === "left",
+          "lg:text-right": align === "right",
+        },
+        "items-center text-center",
+      )}
     >
       <Typography
         component="span"

@@ -40,7 +40,7 @@ export default async function PublicLayout({
           )}
         </div>
       </Header>
-      <main className="wrapper-public flex-1 flex flex-col items-center justify-start px-12">
+      <main className="wrapper-public flex-1 flex flex-col items-center justify-start px-6 lg:px-12">
         {children}
       </main>
       <Footer />
