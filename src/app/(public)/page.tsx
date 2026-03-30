@@ -1,4 +1,3 @@
-import { AskPurlSection } from "@/sections/ask-purl";
 import ContentTypeSection from "@/sections/content-type";
 import FAQSection from "@/sections/faq";
 import FeaturesSection from "@/sections/features";
@@ -17,7 +16,6 @@ export default function Home() {
       <HeroSection />
       <FeaturesSection />
       <ContentTypeSection />
-      <AskPurlSection />
       <PricingSection />
       <FAQSection />
     </div>
