@@ -2,7 +2,7 @@
 
 import { copyToClipboard } from "@/lib/clipboard";
 import type { Link as LinkType } from "@/utils/links";
-import { Ellipsis, Link, MessageCircle, Pencil, Trash } from "lucide-react";
+import { Ellipsis, Link, Pencil, ScrollText, Trash } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DropdownWrapper } from "./dropdown-wrapper";
@@ -58,8 +58,8 @@ export function LinkMenu({
       className="w-full"
     >
       <DropdownMenuGroup>
-        <DropdownMenuItem disabled>
-          <MessageCircle /> Add to chat
+        <DropdownMenuItem>
+          <ScrollText /> Summarize with AI
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

@@ -1,34 +1,13 @@
 "use client";
 
-import { Loader2, Plus } from "lucide-react";
-import { useRef, useState } from "react";
-import type { ChangeEvent } from "react";
 import {
-  UPLOAD_ERROR_EVENT,
-  UPLOAD_START_EVENT,
-  UPLOAD_SUCCESS_EVENT,
-} from "@/utils/upload-events";
+  UPLOAD_FILE_INPUT_ACCEPT,
+  uploadFileAsLink,
+} from "@/lib/upload-file-client";
+import { CloudUpload, Loader2 } from "lucide-react";
+import type { ChangeEvent } from "react";
+import { useRef, useState } from "react";
 import { Button } from "./ui/button";
-
-async function getAudioDurationInSeconds(file: File): Promise<number | null> {
-  if (!file.type.startsWith("audio/")) return null;
-
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const audio = document.createElement("audio");
-    audio.preload = "metadata";
-    audio.onloadedmetadata = () => {
-      const duration = Number.isFinite(audio.duration) ? audio.duration : null;
-      URL.revokeObjectURL(url);
-      resolve(duration);
-    };
-    audio.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolve(null);
-    };
-    audio.src = url;
-  });
-}
 
 export function UploadFile() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -39,40 +18,10 @@ export function UploadFile() {
     event.target.value = "";
     if (!selectedFile) return;
 
-    window.dispatchEvent(
-      new CustomEvent(UPLOAD_START_EVENT, {
-        detail: { label: selectedFile.name },
-      }),
-    );
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      const audioDuration = await getAudioDurationInSeconds(selectedFile);
-      formData.append("file", selectedFile);
-      if (audioDuration !== null) {
-        formData.append("durationSeconds", String(audioDuration));
-      }
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorBody = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null;
-        throw new Error(errorBody?.error ?? "Upload failed");
-      }
-      const body = (await response.json().catch(() => null)) as
-        | { id?: string }
-        | null;
-      window.dispatchEvent(
-        new CustomEvent(UPLOAD_SUCCESS_EVENT, {
-          detail: { id: body?.id },
-        }),
-      );
+      await uploadFileAsLink(selectedFile);
     } catch (error) {
-      window.dispatchEvent(new CustomEvent(UPLOAD_ERROR_EVENT));
       console.error(error);
       alert(error instanceof Error ? error.message : "Upload failed");
     } finally {
@@ -85,7 +34,7 @@ export function UploadFile() {
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf,audio/*"
+        accept={UPLOAD_FILE_INPUT_ACCEPT}
         className="hidden"
         onChange={handleFileChange}
       />
@@ -97,11 +46,7 @@ export function UploadFile() {
         disabled={isUploading}
         onClick={() => inputRef.current?.click()}
       >
-        {isUploading ? (
-          <Loader2 className="animate-spin" />
-        ) : (
-          <Plus />
-        )}
+        {isUploading ? <Loader2 className="animate-spin" /> : <CloudUpload />}
       </Button>
     </>
   );
