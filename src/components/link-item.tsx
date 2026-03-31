@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Link as LinkType } from "@/utils/links";
-import { FileText, MessageCircle } from "lucide-react";
+import { FileMusic, FileText, MessageCircle } from "lucide-react";
 import Image from "next/image";
 import * as React from "react";
 import { X } from "./animate-ui/icons/x";
@@ -80,6 +80,25 @@ export const LinkItem = React.forwardRef<
     );
   }
 
+  const media = (() => {
+    switch (link.contentType) {
+      case "PDF":
+        return <FileText className="size-5" />;
+      case "AUDIO":
+        return <FileMusic className="size-5" />;
+      default:
+        return (
+          <Image
+            src={link.favicon}
+            alt={link.title}
+            width={20}
+            height={20}
+            className="aspect-square object-contain"
+          />
+        );
+    }
+  })();
+
   const content = (
     <Item
       ref={ref}
@@ -108,17 +127,7 @@ export const LinkItem = React.forwardRef<
         className="absolute inset-0 z-0 w-full"
       />
       <ItemMedia variant="image" className="size-5 rounded">
-        {link.contentType === "PDF" ? (
-          <FileText className="size-5" />
-        ) : (
-          <Image
-            src={link.favicon}
-            alt={link.title}
-            width={20}
-            height={20}
-            className="aspect-square object-contain"
-          />
-        )}
+        {media}
       </ItemMedia>
       <ItemContent>
         <ItemTitle>

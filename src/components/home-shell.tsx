@@ -5,6 +5,13 @@ import { LinkInput } from "@/components/link-input";
 import { PasteHandler } from "@/components/paste-handler";
 import { LinkItemSkeleton } from "@/components/skeletons";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
+import {
+  UPLOAD_ERROR_EVENT,
+  UPLOAD_START_EVENT,
+  UPLOAD_SUCCESS_EVENT,
+  type UploadStartDetail,
+  type UploadSuccessDetail,
+} from "@/utils/upload-events";
 import type { LinkGroup as LinkGroupType } from "@/utils/links";
 import { PackageOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -55,6 +62,37 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
       });
     }
   }, [isPending, todayLinksCount]);
+
+  useEffect(() => {
+    const onUploadStart = (event: Event) => {
+      const customEvent = event as CustomEvent<UploadStartDetail>;
+      onPasteStart(customEvent.detail?.label ?? "Uploading file...");
+    };
+    const onUploadSuccess = (event: Event) => {
+      const customEvent = event as CustomEvent<UploadSuccessDetail>;
+      const id = customEvent.detail?.id;
+      if (id) {
+        onSaveSuccess(id);
+        return;
+      }
+      startTransition(() => {
+        router.refresh();
+      });
+    };
+    const onUploadError = () => {
+      onSaveError();
+    };
+
+    window.addEventListener(UPLOAD_START_EVENT, onUploadStart);
+    window.addEventListener(UPLOAD_SUCCESS_EVENT, onUploadSuccess);
+    window.addEventListener(UPLOAD_ERROR_EVENT, onUploadError);
+
+    return () => {
+      window.removeEventListener(UPLOAD_START_EVENT, onUploadStart);
+      window.removeEventListener(UPLOAD_SUCCESS_EVENT, onUploadSuccess);
+      window.removeEventListener(UPLOAD_ERROR_EVENT, onUploadError);
+    };
+  }, [onPasteStart, onSaveError, onSaveSuccess, router, startTransition]);
 
   return (
     <>
