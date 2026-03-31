@@ -48,14 +48,10 @@ describe("createLinkFromFile", () => {
     getPublicUrlMock.mockReset();
     fromMock.mockReset();
     vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("uuid-fixed");
-    vi.mocked(prisma.link.create).mockImplementation(async (payload: never) => {
-      const typed = payload as { data: Record<string, unknown> };
-      return {
-        id: "link-1",
-        createdAt: new Date("2026-03-31T10:00:00Z"),
-        ...typed.data,
-      } as never;
-    });
+    vi.mocked(prisma.link.create).mockResolvedValue({
+      id: "link-1",
+      createdAt: new Date("2026-03-31T10:00:00Z"),
+    } as never);
   });
 
   it("creates a PDF link with formatted file-size description and .pdf domain", async () => {
