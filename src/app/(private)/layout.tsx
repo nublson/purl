@@ -1,4 +1,5 @@
 import Header from "@/components/header";
+import { UploadFile } from "@/components/upload-file";
 import { User } from "@/components/user";
 import type { Metadata } from "next";
 import { Fragment } from "react";
@@ -15,7 +16,10 @@ export default function PrivateLayout({
   return (
     <Fragment>
       <Header>
-        <User />
+        <div className="flex items-center justify-end gap-2">
+          <UploadFile />
+          <User />
+        </div>
       </Header>
       <main className="flex-1 flex flex-col items-center justify-start pt-6 overflow-y-auto px-4 md:px-0">
         {children}

@@ -18,17 +18,14 @@ describe("isAudioUrl", () => {
     expect(isAudioUrl("https://example.com/track.FlAc")).toBe(true);
   });
 
-  it("returns true for supported streaming platform URLs", () => {
-    expect(isAudioUrl("https://open.spotify.com/track/abc123")).toBe(true);
-    expect(isAudioUrl("https://open.spotify.com/album/abc123")).toBe(true);
-    expect(isAudioUrl("https://open.spotify.com/playlist/abc123")).toBe(true);
-    expect(isAudioUrl("https://open.spotify.com/artist/abc123")).toBe(true);
-    expect(isAudioUrl("https://open.spotify.com/episode/abc123")).toBe(true);
-    expect(isAudioUrl("https://music.apple.com/us/album/id123")).toBe(true);
-    expect(isAudioUrl("https://music.youtube.com/watch?v=abc123")).toBe(true);
-  });
-
-  it("returns false for unsupported spotify paths and non-audio URLs", () => {
+  it("returns false for streaming platform pages and non-audio URLs", () => {
+    expect(isAudioUrl("https://open.spotify.com/track/abc123")).toBe(false);
+    expect(isAudioUrl("https://open.spotify.com/album/abc123")).toBe(false);
+    expect(isAudioUrl("https://open.spotify.com/playlist/abc123")).toBe(false);
+    expect(isAudioUrl("https://open.spotify.com/artist/abc123")).toBe(false);
+    expect(isAudioUrl("https://open.spotify.com/episode/abc123")).toBe(false);
+    expect(isAudioUrl("https://music.apple.com/us/album/id123")).toBe(false);
+    expect(isAudioUrl("https://music.youtube.com/watch?v=abc123")).toBe(false);
     expect(isAudioUrl("https://open.spotify.com/show/abc123")).toBe(false);
     expect(isAudioUrl("https://example.com/docs/file.pdf")).toBe(false);
     expect(isAudioUrl("https://example.com/page")).toBe(false);

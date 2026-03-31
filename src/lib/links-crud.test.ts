@@ -446,12 +446,12 @@ describe("createLink", () => {
     );
   });
 
-  it("stores a Spotify URL with contentType AUDIO", async () => {
+  it("stores a Spotify URL with contentType WEB", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
     const audioRow = makeRow({
       url: "https://open.spotify.com/track/abc",
-      contentType: "AUDIO",
+      contentType: "WEB",
     });
     vi.mocked(prisma.link.create).mockResolvedValue(audioRow as never);
 
@@ -459,7 +459,7 @@ describe("createLink", () => {
 
     expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ contentType: "AUDIO" }),
+        data: expect.objectContaining({ contentType: "WEB" }),
       }),
     );
   });
