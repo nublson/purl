@@ -15,8 +15,18 @@ function getContentTypeFromMime(mimeType: string): UploadableContentType | null 
 
 function getExtensionFromMime(mimeType: string): string {
   if (mimeType === "application/pdf") return "pdf";
+  if (mimeType === "audio/mpeg") return "mp3";
+  if (mimeType === "audio/x-m4a") return "m4a";
   const [, subtype] = mimeType.split("/");
   return subtype ? subtype.toLowerCase() : "bin";
+}
+
+function getExtensionFromFileName(fileName: string): string | null {
+  const normalized = fileName.trim().toLowerCase();
+  if (!normalized.includes(".")) return null;
+  const extension = normalized.split(".").pop();
+  if (!extension || !/^[a-z0-9]+$/.test(extension)) return null;
+  return extension;
 }
 
 function sanitizeFileName(name: string): string {
@@ -111,7 +121,7 @@ export async function createLinkFromFile(
   }
 
   const bytes = await file.arrayBuffer();
-  const extension = getExtensionFromMime(file.type);
+  const extension = getExtensionFromFileName(file.name) ?? getExtensionFromMime(file.type);
   const filePath = `${userId}/${crypto.randomUUID()}.${extension}`;
   const fileName = sanitizeFileName(file.name);
   const fallbackTitle = contentType === "PDF" ? "Uploaded PDF" : "Uploaded Audio";
@@ -134,7 +144,7 @@ export async function createLinkFromFile(
       description,
       favicon: getDefaultFaviconUrl("upload"),
       thumbnail: null,
-      domain: "upload",
+      domain: extension ? `.${extension}` : ".audio",
       contentType,
       userId,
     },
