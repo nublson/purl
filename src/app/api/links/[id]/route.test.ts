@@ -180,6 +180,7 @@ describe("links/[id] API route", () => {
         thumbnail: null,
         domain: "example.com",
         contentType: "WEB",
+        ingestStatus: "PENDING",
         createdAt,
         userId: "user-123",
       });
@@ -208,6 +209,7 @@ describe("links/[id] API route", () => {
         thumbnail: null,
         domain: "example.com",
         contentType: "WEB",
+        ingestStatus: "PENDING",
         createdAt: new Date("2025-06-15T10:00:00Z"),
         userId: "user-123",
       });
