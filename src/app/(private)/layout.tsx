@@ -15,7 +15,7 @@ export default function PrivateLayout({
 }>) {
   return (
     <Fragment>
-      <Header>
+      <Header pathname="/home">
         <div className="flex items-center justify-end gap-2">
           <UploadFile />
           <User />
