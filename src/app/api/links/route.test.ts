@@ -2,6 +2,14 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
 
+vi.mock("next/server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/server")>();
+  return {
+    ...actual,
+    after: vi.fn((callback: () => void | Promise<void>) => callback()),
+  };
+});
+
 vi.mock("@/lib/auth", () => ({
   auth: {
     api: {
