@@ -7,6 +7,7 @@ import {
 import { CloudUpload, Loader2 } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "./ui/button";
 
 export function UploadFile() {
@@ -23,7 +24,7 @@ export function UploadFile() {
       await uploadFileAsLink(selectedFile);
     } catch (error) {
       console.error(error);
-      alert(error instanceof Error ? error.message : "Upload failed");
+      toast.error(error instanceof Error ? error.message : "Upload failed");
     } finally {
       setIsUploading(false);
     }

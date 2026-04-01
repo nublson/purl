@@ -5,6 +5,11 @@ import {
   UPLOAD_START_EVENT,
   UPLOAD_SUCCESS_EVENT,
 } from "@/utils/upload-events";
+import {
+  AUDIO_MAX_UPLOAD_BYTES,
+  audioMaxSizeExceededMessage,
+} from "@/utils/upload-limits";
+import { toast } from "sonner";
 
 export const UPLOAD_FILE_INPUT_ACCEPT = ".pdf,audio/*";
 
@@ -45,6 +50,11 @@ export async function uploadFileAsLink(
 ): Promise<{ id?: string }> {
   const emitEvents = options?.emitEvents ?? true;
 
+  if (file.type.startsWith("audio/") && file.size > AUDIO_MAX_UPLOAD_BYTES) {
+    toast.error(audioMaxSizeExceededMessage());
+    return {};
+  }
+
   if (emitEvents) {
     window.dispatchEvent(
       new CustomEvent(UPLOAD_START_EVENT, {
@@ -66,7 +76,9 @@ export async function uploadFileAsLink(
       body: formData,
     });
 
-    const body = (await response.json().catch(() => null)) as UploadResponseBody | null;
+    const body = (await response
+      .json()
+      .catch(() => null)) as UploadResponseBody | null;
     if (!response.ok) {
       throw new Error(body?.error ?? "Upload failed");
     }

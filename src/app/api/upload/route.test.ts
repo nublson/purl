@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AUDIO_MAX_UPLOAD_BYTES } from "@/utils/upload-limits";
 import { POST } from "./route";
 
 vi.mock("next/server", async (importOriginal) => {
@@ -42,6 +43,10 @@ vi.mock("@/lib/upload-file", () => {
 
 vi.mock("@/lib/ingest-pdf", () => ({
   ingestPdf: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/ingest-audio", () => ({
+  ingestAudio: vi.fn().mockResolvedValue(undefined),
 }));
 
 const { auth } = await import("@/lib/auth");
@@ -103,6 +108,25 @@ describe("POST /api/upload", () => {
 
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "Unauthorized" });
+    expect(createLinkFromFile).not.toHaveBeenCalled();
+    expect(broadcastLinksChanged).not.toHaveBeenCalled();
+  });
+
+  it("returns 413 when audio file exceeds size limit", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+
+    const oversized = new File(
+      [new Uint8Array(AUDIO_MAX_UPLOAD_BYTES + 1)],
+      "big.mp3",
+      { type: "audio/mpeg" },
+    );
+
+    const res = await POST(postRequest({ file: oversized }));
+
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({
+      error: "Audio files must be under 5 MB",
+    });
     expect(createLinkFromFile).not.toHaveBeenCalled();
     expect(broadcastLinksChanged).not.toHaveBeenCalled();
   });

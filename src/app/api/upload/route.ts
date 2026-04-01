@@ -8,7 +8,12 @@ import {
 import { headers } from "next/headers";
 import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
+import { ingestAudio } from "@/lib/ingest-audio";
 import { ingestPdf } from "@/lib/ingest-pdf";
+import {
+  AUDIO_MAX_UPLOAD_BYTES,
+  audioMaxSizeExceededMessage,
+} from "@/utils/upload-limits";
 
 function serializeLink(link: {
   id: string;
@@ -46,7 +51,16 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const file = formData.get("file");
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: "Missing file upload." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Missing file upload." },
+      { status: 400 },
+    );
+  }
+  if (file.type.startsWith("audio/") && file.size > AUDIO_MAX_UPLOAD_BYTES) {
+    return NextResponse.json(
+      { error: audioMaxSizeExceededMessage() },
+      { status: 413 },
+    );
   }
   const durationValue = formData.get("durationSeconds");
   const audioDurationSeconds =
@@ -60,6 +74,9 @@ export async function POST(request: NextRequest) {
     );
     if (link.contentType === "PDF") {
       after(() => ingestPdf({ linkId: link.id, url: link.url }));
+    }
+    if (link.contentType === "AUDIO") {
+      after(() => ingestAudio({ linkId: link.id, url: link.url }));
     }
     await broadcastLinksChanged(userId);
     return NextResponse.json(serializeLink(link), { status: 201 });

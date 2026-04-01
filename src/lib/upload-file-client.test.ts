@@ -4,7 +4,15 @@ import {
   UPLOAD_START_EVENT,
   UPLOAD_SUCCESS_EVENT,
 } from "@/utils/upload-events";
+import { AUDIO_MAX_UPLOAD_BYTES } from "@/utils/upload-limits";
+import { toast } from "sonner";
 import { uploadFileAsLink } from "./upload-file-client";
+
+vi.mock("sonner", () => ({
+  toast: {
+    error: vi.fn(),
+  },
+}));
 
 describe("uploadFileAsLink", () => {
   const dispatchEvent = vi.fn();
@@ -13,6 +21,7 @@ describe("uploadFileAsLink", () => {
   beforeEach(() => {
     dispatchEvent.mockReset();
     fetchMock.mockReset();
+    vi.mocked(toast.error).mockReset();
 
     vi.stubGlobal("window", { dispatchEvent });
     vi.stubGlobal("fetch", fetchMock);
@@ -26,6 +35,18 @@ describe("uploadFileAsLink", () => {
         }
       },
     );
+  });
+
+  it("returns early and shows toast for oversized audio without calling fetch", async () => {
+    const buf = new Uint8Array(AUDIO_MAX_UPLOAD_BYTES + 1);
+    const file = new File([buf], "big.mp3", { type: "audio/mpeg" });
+
+    const result = await uploadFileAsLink(file);
+
+    expect(result).toEqual({});
+    expect(toast.error).toHaveBeenCalledWith("Audio files must be under 5 MB");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(dispatchEvent).not.toHaveBeenCalled();
   });
 
   it("dispatches start and success events on successful upload", async () => {
