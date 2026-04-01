@@ -11,6 +11,7 @@ import { isYouTubeUrl } from "@/utils/youtube";
 import { headers } from "next/headers";
 import { after } from "next/server";
 import ogs from "open-graph-scraper";
+import { ingestAudio } from "@/lib/ingest-audio";
 import { ingestPdf } from "@/lib/ingest-pdf";
 
 /** Thrown when link helpers are called without an authenticated user. */
@@ -273,6 +274,9 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
     if (link.contentType === "PDF") {
       after(() => ingestPdf({ linkId: link.id, url: link.url }));
     }
+    if (link.contentType === "AUDIO") {
+      after(() => ingestAudio({ linkId: link.id, url: link.url }));
+    }
     return link;
   }
 
@@ -292,6 +296,9 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
   });
   if (link.contentType === "PDF") {
     after(() => ingestPdf({ linkId: link.id, url: link.url }));
+  }
+  if (link.contentType === "AUDIO") {
+    after(() => ingestAudio({ linkId: link.id, url: link.url }));
   }
   return link;
 }
