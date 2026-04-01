@@ -9,7 +9,9 @@ import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
 import { isPdfUrl } from "@/utils/pdf";
 import { isYouTubeUrl } from "@/utils/youtube";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import ogs from "open-graph-scraper";
+import { ingestPdf } from "@/lib/ingest-pdf";
 
 /** Thrown when link helpers are called without an authenticated user. */
 export class UnauthorizedError extends Error {
@@ -264,15 +266,19 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
     where: { userId, url },
   });
   if (existing) {
-    return prisma.link.update({
+    const link = await prisma.link.update({
       where: { id: existing.id },
       data: { createdAt: new Date() },
     });
+    if (link.contentType === "PDF") {
+      after(() => ingestPdf({ linkId: link.id, url: link.url }));
+    }
+    return link;
   }
 
   const resolved = await resolveLinkFromUrl(url);
 
-  return prisma.link.create({
+  const link = await prisma.link.create({
     data: {
       url: resolved.url,
       title: resolved.title,
@@ -284,6 +290,10 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
       userId,
     },
   });
+  if (link.contentType === "PDF") {
+    after(() => ingestPdf({ linkId: link.id, url: link.url }));
+  }
+  return link;
 }
 
 /** Fetches a single link if it belongs to the current user; otherwise null. Throws UnauthorizedError if not authenticated. */

@@ -6,7 +6,9 @@ import {
   UploadStorageError,
 } from "@/lib/upload-file";
 import { headers } from "next/headers";
+import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
+import { ingestPdf } from "@/lib/ingest-pdf";
 
 function serializeLink(link: {
   id: string;
@@ -56,6 +58,9 @@ export async function POST(request: NextRequest) {
       userId,
       Number.isFinite(audioDurationSeconds) ? audioDurationSeconds : undefined,
     );
+    if (link.contentType === "PDF") {
+      after(() => ingestPdf({ linkId: link.id, url: link.url }));
+    }
     await broadcastLinksChanged(userId);
     return NextResponse.json(serializeLink(link), { status: 201 });
   } catch (error) {
