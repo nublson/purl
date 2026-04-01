@@ -1,6 +1,32 @@
 import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
 
+/** Thrown for hostnames that need a browser; ingest should mark the link FAILED. */
+export class UnsupportedSpaError extends Error {
+  readonly name = "UnsupportedSpaError";
+}
+
+const SPA_HOSTNAMES = new Set([
+  "x.com",
+  "twitter.com",
+  "instagram.com",
+  "facebook.com",
+  "threads.net",
+  "tiktok.com",
+  "linkedin.com",
+  "reddit.com",
+]);
+
+function isSpaHostname(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    const stripped = hostname.replace(/^www\./, "");
+    return SPA_HOSTNAMES.has(stripped);
+  } catch {
+    return false;
+  }
+}
+
 const USER_AGENT =
   "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)";
 
@@ -36,6 +62,12 @@ function cleanWebText(text: string): string {
  * and returns normalized plain text. Throws if the response is not HTML or extraction fails.
  */
 export async function scrapeWebContent(url: string): Promise<string> {
+  if (isSpaHostname(url)) {
+    throw new UnsupportedSpaError(
+      "This site requires a browser to render and cannot be scraped server-side.",
+    );
+  }
+
   const response = await fetch(url, {
     headers: {
       "User-Agent": USER_AGENT,

@@ -20,9 +20,15 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-vi.mock("@/lib/web-scraper", () => ({
-  scrapeWebContent: vi.fn(),
-}));
+vi.mock("@/lib/web-scraper", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/web-scraper")>(
+    "@/lib/web-scraper",
+  );
+  return {
+    ...actual,
+    scrapeWebContent: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/chunk-text", () => ({
   chunkText: vi.fn(),
@@ -33,7 +39,9 @@ vi.mock("@/lib/embeddings", () => ({
 }));
 
 const prisma = (await import("@/lib/prisma")).default;
-const { scrapeWebContent } = await import("@/lib/web-scraper");
+const { scrapeWebContent, UnsupportedSpaError } = await import(
+  "@/lib/web-scraper"
+);
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
 const { ingestWeb } = await import("./ingest-web");
@@ -109,6 +117,21 @@ describe("ingestWeb", () => {
       where: { id: "link-1" },
       data: { ingestStatus: "PROCESSING" },
     });
+    expect(prisma.link.update).toHaveBeenLastCalledWith({
+      where: { id: "link-1" },
+      data: { ingestStatus: "FAILED" },
+    });
+  });
+
+  it("marks failed when scraper throws UnsupportedSpaError", async () => {
+    vi.mocked(scrapeWebContent).mockRejectedValue(
+      new UnsupportedSpaError("SPA not supported"),
+    );
+
+    await expect(
+      ingestWeb({ linkId: "link-1", url: "https://x.com/centralreality" }),
+    ).rejects.toThrow("SPA not supported");
+
     expect(prisma.link.update).toHaveBeenLastCalledWith({
       where: { id: "link-1" },
       data: { ingestStatus: "FAILED" },
