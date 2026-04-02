@@ -8,6 +8,18 @@ vi.mock("next/server", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/ingest-pdf", () => ({
+  ingestPdf: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/ingest-audio", () => ({
+  ingestAudio: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/ingest-web", () => ({
+  ingestWeb: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("next/headers", () => ({
   headers: vi.fn().mockResolvedValue(new Headers()),
 }));
@@ -39,6 +51,9 @@ vi.mock("open-graph-scraper", () => ({
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
 const ogs = (await import("open-graph-scraper")).default;
+const { ingestPdf } = await import("@/lib/ingest-pdf");
+const { ingestAudio } = await import("@/lib/ingest-audio");
+const { ingestWeb } = await import("@/lib/ingest-web");
 const {
   createLink,
   readLink,
@@ -350,6 +365,9 @@ describe("createLink", () => {
     vi.mocked(prisma.link.findFirst).mockReset();
     vi.mocked(prisma.link.update).mockReset();
     vi.mocked(ogs).mockReset();
+    vi.mocked(ingestPdf).mockReset();
+    vi.mocked(ingestAudio).mockReset();
+    vi.mocked(ingestWeb).mockReset();
     fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response(null, { status: 200 }));
@@ -482,6 +500,126 @@ describe("createLink", () => {
     expect(vi.mocked(prisma.link.findFirst)).toHaveBeenCalledWith({
       where: { userId: "user-123", url: "https://example.com" },
     });
+  });
+
+  it("triggers ingestWeb after creating a WEB link", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+    const row = makeRow({ contentType: "WEB" });
+    vi.mocked(prisma.link.create).mockResolvedValue(row as never);
+    vi.mocked(ingestWeb).mockResolvedValue(undefined);
+
+    await createLink("https://example.com/article");
+
+    expect(vi.mocked(ingestWeb)).toHaveBeenCalledWith({
+      linkId: row.id,
+      url: row.url,
+    });
+    expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
+    expect(vi.mocked(ingestAudio)).not.toHaveBeenCalled();
+  });
+
+  it("triggers ingestAudio after creating an AUDIO link", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+    const row = makeRow({
+      url: "https://example.com/episode.mp3",
+      contentType: "AUDIO",
+    });
+    vi.mocked(prisma.link.create).mockResolvedValue(row as never);
+    vi.mocked(ingestAudio).mockResolvedValue(undefined);
+
+    await createLink("https://example.com/episode.mp3");
+
+    expect(vi.mocked(ingestAudio)).toHaveBeenCalledWith({
+      linkId: row.id,
+      url: row.url,
+    });
+    expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
+    expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
+  });
+
+  it("triggers ingestPdf after creating a PDF link", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+    const row = makeRow({
+      url: "https://example.com/report.pdf",
+      contentType: "PDF",
+    });
+    vi.mocked(prisma.link.create).mockResolvedValue(row as never);
+    vi.mocked(ingestPdf).mockResolvedValue(undefined);
+
+    await createLink("https://example.com/report.pdf");
+
+    expect(vi.mocked(ingestPdf)).toHaveBeenCalledWith({
+      linkId: row.id,
+      url: row.url,
+    });
+    expect(vi.mocked(ingestAudio)).not.toHaveBeenCalled();
+    expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
+  });
+
+  it("does not trigger any ingest for a YOUTUBE link", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+    const row = makeRow({
+      url: "https://youtu.be/dQw4w9WgXcQ",
+      contentType: "YOUTUBE",
+    });
+    vi.mocked(prisma.link.create).mockResolvedValue(row as never);
+    fetchSpy.mockResolvedValue(
+      new Response(
+        JSON.stringify({ title: "Rick Roll", author_name: "Rick Astley" }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    await createLink("https://youtu.be/dQw4w9WgXcQ");
+
+    expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
+    expect(vi.mocked(ingestAudio)).not.toHaveBeenCalled();
+    expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
+  });
+
+  it("re-triggers ingestWeb when a duplicate WEB link is bumped", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    const existing = makeRow({ contentType: "WEB" });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
+    const bumped = makeRow({ contentType: "WEB", createdAt: new Date() });
+    vi.mocked(prisma.link.update).mockResolvedValue(bumped as never);
+    vi.mocked(ingestWeb).mockResolvedValue(undefined);
+
+    await createLink("https://example.com");
+
+    expect(vi.mocked(ingestWeb)).toHaveBeenCalledWith({
+      linkId: bumped.id,
+      url: bumped.url,
+    });
+    expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
+  });
+
+  it("re-triggers ingestAudio when a duplicate AUDIO link is bumped", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    const existing = makeRow({
+      url: "https://example.com/ep.mp3",
+      contentType: "AUDIO",
+    });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
+    const bumped = makeRow({
+      url: "https://example.com/ep.mp3",
+      contentType: "AUDIO",
+      createdAt: new Date(),
+    });
+    vi.mocked(prisma.link.update).mockResolvedValue(bumped as never);
+    vi.mocked(ingestAudio).mockResolvedValue(undefined);
+
+    await createLink("https://example.com/ep.mp3");
+
+    expect(vi.mocked(ingestAudio)).toHaveBeenCalledWith({
+      linkId: bumped.id,
+      url: bumped.url,
+    });
+    expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
   });
 });
 
