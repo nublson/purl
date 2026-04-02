@@ -43,9 +43,7 @@ function parseContentLength(header: string | null): number | null {
 
 function isHtmlContentType(contentType: string): boolean {
   const lower = contentType.toLowerCase();
-  return (
-    lower.includes("text/html") || lower.includes("application/xhtml+xml")
-  );
+  return lower.includes("text/html") || lower.includes("application/xhtml+xml");
 }
 
 /** Collapse whitespace and strip common HTML-text artifacts. */
