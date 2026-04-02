@@ -176,7 +176,7 @@ export const LinkItem = React.forwardRef<
   return (
     <LinkPreview
       link={link}
-      open={previewOpen}
+      open={!preview && previewOpen}
       onOpenChange={() => {
         // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.
       }}

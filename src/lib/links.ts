@@ -10,6 +10,7 @@ import { isPdfUrl } from "@/utils/pdf";
 import { isYouTubeUrl } from "@/utils/youtube";
 import { headers } from "next/headers";
 import { after } from "next/server";
+import { cache } from "react";
 import ogs from "open-graph-scraper";
 import { ingestAudio } from "@/lib/ingest-audio";
 import { ingestPdf } from "@/lib/ingest-pdf";
@@ -246,8 +247,8 @@ async function getCurrentUserId(): Promise<string> {
   return session.user.id;
 }
 
-/** Fetches links for the currently authenticated user (server-only). */
-export async function getLinksForCurrentUser(): Promise<Link[]> {
+/** Fetches links for the currently authenticated user (server-only). Deduplicated per request via React cache(). */
+export const getLinksForCurrentUser = cache(async (): Promise<Link[]> => {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -258,7 +259,7 @@ export async function getLinksForCurrentUser(): Promise<Link[]> {
   });
 
   return rows.map(mapRowToLink);
-}
+});
 
 export type CreateLinkResult = Awaited<ReturnType<typeof prisma.link.create>>;
 export type RefreshLinkResult = Awaited<ReturnType<typeof prisma.link.update>>;
