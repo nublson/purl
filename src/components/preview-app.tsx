@@ -26,9 +26,9 @@ function syntheticFallbackTitle(
   return domain;
 }
 
-function buildSyntheticLink(url: string): Link {
+async function buildSyntheticLink(url: string): Promise<Link> {
   const domain = getUrlDomain(url);
-  const contentType = detectContentType(url);
+  const contentType = await detectContentType(url);
   return {
     id: crypto.randomUUID(),
     url,
@@ -150,7 +150,7 @@ export default function PreviewApp({
           const resolved = (await res.json()) as ResolvedLinkFields;
           link = buildLinkFromResolved({ ...resolved, url: targetUrl });
         } catch {
-          link = buildSyntheticLink(targetUrl);
+          link = await buildSyntheticLink(targetUrl);
         }
         if (cancelled) return;
         setCompletedLinks((prev) => [link, ...prev]);
