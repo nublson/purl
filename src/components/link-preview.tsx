@@ -20,6 +20,15 @@ export function LinkPreview({
   open,
   onOpenChange,
 }: LinkPreviewProps) {
+  const imageThumbnailClass = () => {
+    switch (link.contentType) {
+      case "YOUTUBE":
+        return "object-cover";
+      default:
+        return "object-fit";
+    }
+  };
+
   return (
     <HoverCard
       open={open}
@@ -41,7 +50,7 @@ export function LinkPreview({
             alt={link.title}
             width={200}
             height={200}
-            className="w-full h-full object-fit aspect-video rounded-t-md"
+            className={`w-full h-full aspect-video rounded-t-md ${imageThumbnailClass()}`}
           />
         ) : null}
         <div className="p-4 flex flex-col gap-2">
