@@ -1,4 +1,5 @@
 import Header from "@/components/header";
+import SearchLinks from "@/components/search-links";
 import { UploadFile } from "@/components/upload-file";
 import { User } from "@/components/user";
 import type { Metadata } from "next";
@@ -17,6 +18,7 @@ export default function PrivateLayout({
     <Fragment>
       <Header pathname="/home">
         <div className="flex items-center justify-end gap-2">
+          <SearchLinks />
           <UploadFile />
           <User />
         </div>
