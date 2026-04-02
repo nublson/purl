@@ -825,6 +825,10 @@ describe("updateLink", () => {
     vi.mocked(auth.api.getSession).mockReset();
     vi.mocked(prisma.link.findFirst).mockReset();
     vi.mocked(prisma.link.update).mockReset();
+    vi.mocked(ingestPdf).mockReset();
+    vi.mocked(ingestAudio).mockReset();
+    vi.mocked(ingestWeb).mockReset();
+    vi.mocked(ingestYoutube).mockReset();
     vi.mocked(ogs).mockReset();
     fetchSpy = vi
       .spyOn(globalThis, "fetch")
@@ -913,6 +917,48 @@ describe("updateLink", () => {
         }),
       }),
     );
+  });
+
+  it("dispatches ingest for the new contentType when URL changes", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    const existing = makeRow({
+      url: "https://example.com/article",
+      contentType: "WEB",
+    });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
+    const updated = makeRow({
+      url: "https://example.com/episode.mp3",
+      contentType: "AUDIO",
+    });
+    vi.mocked(prisma.link.update).mockResolvedValue(updated as never);
+    vi.mocked(ingestAudio).mockResolvedValue(undefined);
+
+    await updateLink("link-1", { url: "https://example.com/episode.mp3" });
+
+    expect(vi.mocked(ingestAudio)).toHaveBeenCalledWith({
+      linkId: updated.id,
+      url: updated.url,
+    });
+    expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
+    expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
+    expect(vi.mocked(ingestYoutube)).not.toHaveBeenCalled();
+  });
+
+  it("does not dispatch ingest when only title changes", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    const row = makeRow({ url: "https://example.com/article", contentType: "WEB" });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue({
+      ...row,
+      title: "Updated title",
+    } as never);
+
+    await updateLink("link-1", { title: "Updated title" });
+
+    expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
+    expect(vi.mocked(ingestAudio)).not.toHaveBeenCalled();
+    expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
+    expect(vi.mocked(ingestYoutube)).not.toHaveBeenCalled();
   });
 
   it("returns existing link without calling prisma.update when URL is unchanged and no other fields are provided", async () => {

@@ -395,10 +395,16 @@ export async function updateLink(
 
   if (Object.keys(updatePayload).length === 0) return existing;
 
-  return prisma.link.update({
+  const updated = await prisma.link.update({
     where: { id },
     data: updatePayload,
   });
+
+  if (urlChanged) {
+    dispatchIngest(updated);
+  }
+
+  return updated;
 }
 
 /** Deletes a link if it belongs to the current user. Returns true if deleted, false if not found or not owned. Throws UnauthorizedError if not authenticated. */
