@@ -71,13 +71,12 @@ export function extractVideoId(url: string): string {
 export async function fetchYouTubeTranscript(url: string): Promise<string> {
   const videoId = extractVideoId(url);
 
-  const { YoutubeTranscript } = (await import(
-    "youtube-transcript/dist/youtube-transcript.esm.js"
-  )) as unknown as {
-    YoutubeTranscript: {
-      fetchTranscript: (videoId: string) => Promise<TranscriptResponse[]>;
+  const { YoutubeTranscript } =
+    (await import("youtube-transcript/dist/youtube-transcript.esm.js")) as unknown as {
+      YoutubeTranscript: {
+        fetchTranscript: (videoId: string) => Promise<TranscriptResponse[]>;
+      };
     };
-  };
 
   const items = await YoutubeTranscript.fetchTranscript(videoId);
   const lines = items
@@ -95,4 +94,3 @@ export async function fetchYouTubeTranscript(url: string): Promise<string> {
 
   return lines.join("\n");
 }
-
