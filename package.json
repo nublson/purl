@@ -10,7 +10,8 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "fix:prisma-types": "tsx fix-prisma-types.ts"
+    "fix:prisma-types": "tsx fix-prisma-types.ts",
+    "dotenv": "npx dotenv-vault@latest"
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.49",
