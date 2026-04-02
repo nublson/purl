@@ -14,6 +14,7 @@ import ogs from "open-graph-scraper";
 import { ingestAudio } from "@/lib/ingest-audio";
 import { ingestPdf } from "@/lib/ingest-pdf";
 import { ingestWeb } from "@/lib/ingest-web";
+import { ingestYoutube } from "@/lib/ingest-youtube";
 
 /** Thrown when link helpers are called without an authenticated user. */
 export class UnauthorizedError extends Error {
@@ -278,6 +279,9 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
     if (link.contentType === "AUDIO") {
       after(() => ingestAudio({ linkId: link.id, url: link.url }));
     }
+    if (link.contentType === "YOUTUBE") {
+      after(() => ingestYoutube({ linkId: link.id, url: link.url }));
+    }
     if (link.contentType === "WEB") {
       after(() => ingestWeb({ linkId: link.id, url: link.url }));
     }
@@ -303,6 +307,9 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
   }
   if (link.contentType === "AUDIO") {
     after(() => ingestAudio({ linkId: link.id, url: link.url }));
+  }
+  if (link.contentType === "YOUTUBE") {
+    after(() => ingestYoutube({ linkId: link.id, url: link.url }));
   }
   if (link.contentType === "WEB") {
     after(() => ingestWeb({ linkId: link.id, url: link.url }));
