@@ -2,6 +2,7 @@ import prisma, { Prisma } from "@/lib/prisma";
 import { transcribeAudio } from "@/lib/audio-transcriber";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
+import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
 
 type IngestAudioInput = {
   linkId: string;
@@ -14,6 +15,7 @@ export async function ingestAudio({ linkId, url }: IngestAudioInput): Promise<vo
       where: { id: linkId },
       data: { ingestStatus: "PROCESSING" },
     });
+    logIngestStart("AUDIO", linkId, url);
 
     const transcript = await transcribeAudio(url);
     const chunks = chunkText(transcript);
@@ -64,6 +66,7 @@ export async function ingestAudio({ linkId, url }: IngestAudioInput): Promise<vo
       where: { id: linkId },
       data: { ingestStatus: "FAILED" },
     });
+    logIngestFailure("AUDIO", linkId, url, error);
     throw error;
   }
 }

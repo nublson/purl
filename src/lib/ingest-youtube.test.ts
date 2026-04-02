@@ -20,8 +20,8 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-vi.mock("@/lib/pdf-extractor", () => ({
-  extractPdfTextByPage: vi.fn(),
+vi.mock("@/lib/youtube-transcriber", () => ({
+  fetchYouTubeTranscript: vi.fn(),
 }));
 
 vi.mock("@/lib/chunk-text", () => ({
@@ -38,13 +38,13 @@ vi.mock("@/lib/ingest-logger", () => ({
 }));
 
 const prisma = (await import("@/lib/prisma")).default;
-const { extractPdfTextByPage } = await import("@/lib/pdf-extractor");
+const { fetchYouTubeTranscript } = await import("@/lib/youtube-transcriber");
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
 const { logIngestStart, logIngestFailure } = await import("@/lib/ingest-logger");
-const { ingestPdf } = await import("./ingest-pdf");
+const { ingestYoutube } = await import("./ingest-youtube");
 
-describe("ingestPdf", () => {
+describe("ingestYoutube", () => {
   beforeEach(() => {
     vi.mocked(prisma.link.update).mockReset();
     vi.mocked(prisma.linkContent.deleteMany).mockReset();
@@ -52,7 +52,7 @@ describe("ingestPdf", () => {
     vi.mocked(prisma.linkContent.findMany).mockReset();
     vi.mocked(prisma.$executeRaw).mockReset();
 
-    vi.mocked(extractPdfTextByPage).mockReset();
+    vi.mocked(fetchYouTubeTranscript).mockReset();
     vi.mocked(chunkText).mockReset();
     vi.mocked(embedTextChunks).mockReset();
     vi.mocked(logIngestStart).mockReset();
@@ -60,10 +60,10 @@ describe("ingestPdf", () => {
   });
 
   it("marks completed and exits early when no chunks are produced", async () => {
-    vi.mocked(extractPdfTextByPage).mockResolvedValue(["page text"]);
+    vi.mocked(fetchYouTubeTranscript).mockResolvedValue("[00:00:01] hello");
     vi.mocked(chunkText).mockReturnValue([]);
 
-    await ingestPdf({ linkId: "link-1", url: "https://example.com/doc.pdf" });
+    await ingestYoutube({ linkId: "link-1", url: "https://youtu.be/abc123" });
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
       where: { id: "link-1" },
@@ -74,9 +74,9 @@ describe("ingestPdf", () => {
     });
     expect(embedTextChunks).not.toHaveBeenCalled();
     expect(logIngestStart).toHaveBeenCalledWith(
-      "PDF",
+      "YOUTUBE",
       "link-1",
-      "https://example.com/doc.pdf",
+      "https://youtu.be/abc123",
     );
     expect(prisma.link.update).toHaveBeenLastCalledWith({
       where: { id: "link-1" },
@@ -85,7 +85,7 @@ describe("ingestPdf", () => {
   });
 
   it("stores chunks, writes vectors, and marks completed", async () => {
-    vi.mocked(extractPdfTextByPage).mockResolvedValue(["page 1", "page 2"]);
+    vi.mocked(fetchYouTubeTranscript).mockResolvedValue("[00:00:01] hi");
     vi.mocked(chunkText).mockReturnValue(["chunk-a", "chunk-b"]);
     vi.mocked(embedTextChunks).mockResolvedValue([
       [0.1, 0.2],
@@ -96,7 +96,7 @@ describe("ingestPdf", () => {
       { id: "row-2", chunkIndex: 1 },
     ] as never);
 
-    await ingestPdf({ linkId: "link-1", url: "https://example.com/doc.pdf" });
+    await ingestYoutube({ linkId: "link-1", url: "https://youtu.be/abc123" });
 
     expect(prisma.linkContent.createMany).toHaveBeenCalledWith({
       data: [
@@ -111,11 +111,11 @@ describe("ingestPdf", () => {
     });
   });
 
-  it("marks failed when extraction pipeline throws", async () => {
-    vi.mocked(extractPdfTextByPage).mockRejectedValue(new Error("boom"));
+  it("marks failed when transcription pipeline throws", async () => {
+    vi.mocked(fetchYouTubeTranscript).mockRejectedValue(new Error("boom"));
 
     await expect(
-      ingestPdf({ linkId: "link-1", url: "https://example.com/doc.pdf" }),
+      ingestYoutube({ linkId: "link-1", url: "https://youtu.be/abc123" }),
     ).rejects.toThrow("boom");
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
@@ -127,14 +127,14 @@ describe("ingestPdf", () => {
       data: { ingestStatus: "FAILED" },
     });
     expect(logIngestStart).toHaveBeenCalledWith(
-      "PDF",
+      "YOUTUBE",
       "link-1",
-      "https://example.com/doc.pdf",
+      "https://youtu.be/abc123",
     );
     expect(logIngestFailure).toHaveBeenCalledWith(
-      "PDF",
+      "YOUTUBE",
       "link-1",
-      "https://example.com/doc.pdf",
+      "https://youtu.be/abc123",
       expect.any(Error),
     );
   });

@@ -2,6 +2,7 @@ import prisma, { Prisma } from "@/lib/prisma";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
 import { fetchYouTubeTranscript } from "@/lib/youtube-transcriber";
+import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
 
 type IngestYoutubeInput = {
   linkId: string;
@@ -14,6 +15,7 @@ export async function ingestYoutube({ linkId, url }: IngestYoutubeInput): Promis
       where: { id: linkId },
       data: { ingestStatus: "PROCESSING" },
     });
+    logIngestStart("YOUTUBE", linkId, url);
 
     const transcript = await fetchYouTubeTranscript(url);
     const chunks = chunkText(transcript);
@@ -64,6 +66,7 @@ export async function ingestYoutube({ linkId, url }: IngestYoutubeInput): Promis
       where: { id: linkId },
       data: { ingestStatus: "FAILED" },
     });
+    logIngestFailure("YOUTUBE", linkId, url, error);
     throw error;
   }
 }

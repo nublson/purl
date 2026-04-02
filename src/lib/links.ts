@@ -223,7 +223,7 @@ export async function resolveLinkFromUrl(
   url: string,
 ): Promise<ResolvedLinkFields> {
   const domain = getUrlDomain(url);
-  const contentType = detectContentType(url) as ContentType;
+  const contentType = (await detectContentType(url)) as ContentType;
   const { title, description, favicon, thumbnail } =
     await scrapeLinkMetadata(url);
   return {
@@ -261,6 +261,56 @@ export async function getLinksForCurrentUser(): Promise<Link[]> {
 }
 
 export type CreateLinkResult = Awaited<ReturnType<typeof prisma.link.create>>;
+export type RefreshLinkResult = Awaited<ReturnType<typeof prisma.link.update>>;
+
+type IngestInput = { linkId: string; url: string };
+type IngestHandler = (input: IngestInput) => Promise<void>;
+
+const ingestHandlers: Record<ContentType, IngestHandler | null> = {
+  PDF: ({ linkId, url }) => ingestPdf({ linkId, url }),
+  AUDIO: ({ linkId, url }) => ingestAudio({ linkId, url }),
+  YOUTUBE: ({ linkId, url }) => ingestYoutube({ linkId, url }),
+  WEB: ({ linkId, url }) => ingestWeb({ linkId, url }),
+};
+
+function dispatchIngest(link: {
+  id: string;
+  url: string;
+  contentType: ContentType;
+}): void {
+  const handler = ingestHandlers[link.contentType];
+  if (!handler) return;
+
+  after(() => handler({ linkId: link.id, url: link.url }));
+}
+
+/** Re-scrapes link metadata and re-dispatches ingestion for the current user. */
+export async function refreshLink(
+  id: string,
+): Promise<RefreshLinkResult | null> {
+  const userId = await getCurrentUserId();
+  const existing = await prisma.link.findFirst({
+    where: { id, userId },
+  });
+  if (!existing) return null;
+
+  const resolved = await resolveLinkFromUrl(existing.url);
+  const refreshed = await prisma.link.update({
+    where: { id },
+    data: {
+      title: resolved.title,
+      description: resolved.description,
+      favicon: resolved.favicon,
+      thumbnail: resolved.thumbnail,
+      domain: resolved.domain,
+      contentType: resolved.contentType,
+      createdAt: new Date(),
+    },
+  });
+
+  dispatchIngest(refreshed);
+  return refreshed;
+}
 
 /** Creates a link for the current user after scraping metadata. If a link with the same URL already exists, updates its createdAt and returns it. Throws UnauthorizedError if not authenticated. */
 export async function createLink(url: string): Promise<CreateLinkResult> {
@@ -269,23 +319,7 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
     where: { userId, url },
   });
   if (existing) {
-    const link = await prisma.link.update({
-      where: { id: existing.id },
-      data: { createdAt: new Date() },
-    });
-    if (link.contentType === "PDF") {
-      after(() => ingestPdf({ linkId: link.id, url: link.url }));
-    }
-    if (link.contentType === "AUDIO") {
-      after(() => ingestAudio({ linkId: link.id, url: link.url }));
-    }
-    if (link.contentType === "YOUTUBE") {
-      after(() => ingestYoutube({ linkId: link.id, url: link.url }));
-    }
-    if (link.contentType === "WEB") {
-      after(() => ingestWeb({ linkId: link.id, url: link.url }));
-    }
-    return link;
+    return (await refreshLink(existing.id)) ?? existing;
   }
 
   const resolved = await resolveLinkFromUrl(url);
@@ -302,18 +336,7 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
       userId,
     },
   });
-  if (link.contentType === "PDF") {
-    after(() => ingestPdf({ linkId: link.id, url: link.url }));
-  }
-  if (link.contentType === "AUDIO") {
-    after(() => ingestAudio({ linkId: link.id, url: link.url }));
-  }
-  if (link.contentType === "YOUTUBE") {
-    after(() => ingestYoutube({ linkId: link.id, url: link.url }));
-  }
-  if (link.contentType === "WEB") {
-    after(() => ingestWeb({ linkId: link.id, url: link.url }));
-  }
+  dispatchIngest(link);
   return link;
 }
 
@@ -372,10 +395,16 @@ export async function updateLink(
 
   if (Object.keys(updatePayload).length === 0) return existing;
 
-  return prisma.link.update({
+  const updated = await prisma.link.update({
     where: { id },
     data: updatePayload,
   });
+
+  if (urlChanged) {
+    dispatchIngest(updated);
+  }
+
+  return updated;
 }
 
 /** Deletes a link if it belongs to the current user. Returns true if deleted, false if not found or not owned. Throws UnauthorizedError if not authenticated. */
