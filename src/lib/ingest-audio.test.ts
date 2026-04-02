@@ -32,10 +32,16 @@ vi.mock("@/lib/embeddings", () => ({
   embedTextChunks: vi.fn(),
 }));
 
+vi.mock("@/lib/ingest-logger", () => ({
+  logIngestStart: vi.fn(),
+  logIngestFailure: vi.fn(),
+}));
+
 const prisma = (await import("@/lib/prisma")).default;
 const { transcribeAudio } = await import("@/lib/audio-transcriber");
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
+const { logIngestStart, logIngestFailure } = await import("@/lib/ingest-logger");
 const { ingestAudio } = await import("./ingest-audio");
 
 describe("ingestAudio", () => {
@@ -49,6 +55,8 @@ describe("ingestAudio", () => {
     vi.mocked(transcribeAudio).mockReset();
     vi.mocked(chunkText).mockReset();
     vi.mocked(embedTextChunks).mockReset();
+    vi.mocked(logIngestStart).mockReset();
+    vi.mocked(logIngestFailure).mockReset();
   });
 
   it("marks completed and exits early when no chunks are produced", async () => {
@@ -65,6 +73,11 @@ describe("ingestAudio", () => {
       where: { linkId: "link-1" },
     });
     expect(embedTextChunks).not.toHaveBeenCalled();
+    expect(logIngestStart).toHaveBeenCalledWith(
+      "AUDIO",
+      "link-1",
+      "https://example.com/a.mp3",
+    );
     expect(prisma.link.update).toHaveBeenLastCalledWith({
       where: { id: "link-1" },
       data: { ingestStatus: "COMPLETED" },
@@ -113,5 +126,16 @@ describe("ingestAudio", () => {
       where: { id: "link-1" },
       data: { ingestStatus: "FAILED" },
     });
+    expect(logIngestStart).toHaveBeenCalledWith(
+      "AUDIO",
+      "link-1",
+      "https://example.com/a.mp3",
+    );
+    expect(logIngestFailure).toHaveBeenCalledWith(
+      "AUDIO",
+      "link-1",
+      "https://example.com/a.mp3",
+      expect.any(Error),
+    );
   });
 });

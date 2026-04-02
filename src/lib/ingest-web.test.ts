@@ -38,12 +38,18 @@ vi.mock("@/lib/embeddings", () => ({
   embedTextChunks: vi.fn(),
 }));
 
+vi.mock("@/lib/ingest-logger", () => ({
+  logIngestStart: vi.fn(),
+  logIngestFailure: vi.fn(),
+}));
+
 const prisma = (await import("@/lib/prisma")).default;
 const { scrapeWebContent, UnsupportedSpaError } = await import(
   "@/lib/web-scraper"
 );
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
+const { logIngestStart, logIngestFailure } = await import("@/lib/ingest-logger");
 const { ingestWeb } = await import("./ingest-web");
 
 describe("ingestWeb", () => {
@@ -57,6 +63,8 @@ describe("ingestWeb", () => {
     vi.mocked(scrapeWebContent).mockReset();
     vi.mocked(chunkText).mockReset();
     vi.mocked(embedTextChunks).mockReset();
+    vi.mocked(logIngestStart).mockReset();
+    vi.mocked(logIngestFailure).mockReset();
   });
 
   it("marks completed and exits early when no chunks are produced", async () => {
@@ -73,6 +81,11 @@ describe("ingestWeb", () => {
       where: { linkId: "link-1" },
     });
     expect(embedTextChunks).not.toHaveBeenCalled();
+    expect(logIngestStart).toHaveBeenCalledWith(
+      "WEB",
+      "link-1",
+      "https://example.com/article",
+    );
     expect(prisma.link.update).toHaveBeenLastCalledWith({
       where: { id: "link-1" },
       data: { ingestStatus: "COMPLETED" },
@@ -121,6 +134,17 @@ describe("ingestWeb", () => {
       where: { id: "link-1" },
       data: { ingestStatus: "FAILED" },
     });
+    expect(logIngestStart).toHaveBeenCalledWith(
+      "WEB",
+      "link-1",
+      "https://example.com/article",
+    );
+    expect(logIngestFailure).toHaveBeenCalledWith(
+      "WEB",
+      "link-1",
+      "https://example.com/article",
+      expect.any(Error),
+    );
   });
 
   it("marks failed when scraper throws UnsupportedSpaError", async () => {
@@ -136,5 +160,16 @@ describe("ingestWeb", () => {
       where: { id: "link-1" },
       data: { ingestStatus: "FAILED" },
     });
+    expect(logIngestStart).toHaveBeenCalledWith(
+      "WEB",
+      "link-1",
+      "https://x.com/centralreality",
+    );
+    expect(logIngestFailure).toHaveBeenCalledWith(
+      "WEB",
+      "link-1",
+      "https://x.com/centralreality",
+      expect.any(UnsupportedSpaError),
+    );
   });
 });

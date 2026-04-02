@@ -2,6 +2,7 @@ import prisma, { Prisma } from "@/lib/prisma";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
 import { scrapeWebContent } from "@/lib/web-scraper";
+import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
 
 type IngestWebInput = {
   linkId: string;
@@ -14,6 +15,7 @@ export async function ingestWeb({ linkId, url }: IngestWebInput): Promise<void> 
       where: { id: linkId },
       data: { ingestStatus: "PROCESSING" },
     });
+    logIngestStart("WEB", linkId, url);
 
     const text = await scrapeWebContent(url);
     const chunks = chunkText(text);
@@ -64,6 +66,7 @@ export async function ingestWeb({ linkId, url }: IngestWebInput): Promise<void> 
       where: { id: linkId },
       data: { ingestStatus: "FAILED" },
     });
+    logIngestFailure("WEB", linkId, url, error);
     throw error;
   }
 }

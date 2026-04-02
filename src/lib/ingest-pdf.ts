@@ -2,6 +2,7 @@ import prisma, { Prisma } from "@/lib/prisma";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
 import { extractPdfTextByPage } from "@/lib/pdf-extractor";
+import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
 
 type IngestPdfInput = {
   linkId: string;
@@ -14,6 +15,7 @@ export async function ingestPdf({ linkId, url }: IngestPdfInput): Promise<void> 
       where: { id: linkId },
       data: { ingestStatus: "PROCESSING" },
     });
+    logIngestStart("PDF", linkId, url);
 
     const pages = await extractPdfTextByPage(url);
     const chunks = chunkText(pages.join("\n\n"));
@@ -64,6 +66,7 @@ export async function ingestPdf({ linkId, url }: IngestPdfInput): Promise<void> 
       where: { id: linkId },
       data: { ingestStatus: "FAILED" },
     });
+    logIngestFailure("PDF", linkId, url, error);
     throw error;
   }
 }
