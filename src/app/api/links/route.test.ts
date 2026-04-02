@@ -113,8 +113,7 @@ describe("POST /api/links", () => {
       new Response(null, {
         status: 200,
         headers: {
-          "content-type": "application/pdf",
-          "content-length": "217220",
+          "content-type": "text/html; charset=utf-8",
         },
       }),
     );
@@ -270,7 +269,7 @@ describe("POST /api/links", () => {
       expect(json.createdAt).toBe(CREATED_AT.toISOString());
     });
 
-    it("when link already exists, updates createdAt and returns 201 without creating duplicate", async () => {
+    it("when link already exists, refreshes scraped fields and returns 201 without creating duplicate", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
       const bumpedAt = new Date("2025-06-20T12:00:00Z");
       vi.mocked(prisma.link.findFirst).mockResolvedValue(MOCK_LINK as never);
@@ -288,10 +287,16 @@ describe("POST /api/links", () => {
         createdAt: bumpedAt.toISOString(),
       });
       expect(prisma.link.create).not.toHaveBeenCalled();
-      expect(prisma.link.update).toHaveBeenCalledWith({
-        where: { id: "link-1" },
-        data: { createdAt: expect.any(Date) },
-      });
+      expect(prisma.link.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "link-1" },
+          data: expect.objectContaining({
+            title: "Example Domain",
+            contentType: "WEB",
+            createdAt: expect.any(Date),
+          }),
+        }),
+      );
       expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith("user-123");
     });
 
@@ -479,6 +484,15 @@ describe("POST /api/links", () => {
 
     it("stores PDF URLs with PDF contentType and skips OG scraping", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      fetchSpy.mockResolvedValue(
+        new Response(null, {
+          status: 200,
+          headers: {
+            "content-type": "application/pdf",
+            "content-length": "217220",
+          },
+        }),
+      );
       vi.mocked(prisma.link.create).mockResolvedValue({
         ...MOCK_LINK,
         url: "https://example.com/doc.pdf",
@@ -513,6 +527,15 @@ describe("POST /api/links", () => {
 
     it("stores derived PDF title and file-size description from HEAD metadata", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      fetchSpy.mockResolvedValue(
+        new Response(null, {
+          status: 200,
+          headers: {
+            "content-type": "application/pdf",
+            "content-length": "217220",
+          },
+        }),
+      );
       vi.mocked(prisma.link.create).mockResolvedValue({
         ...MOCK_LINK,
         url: "https://example.com/course.pdf",
