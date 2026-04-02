@@ -223,7 +223,7 @@ export async function resolveLinkFromUrl(
   url: string,
 ): Promise<ResolvedLinkFields> {
   const domain = getUrlDomain(url);
-  const contentType = detectContentType(url) as ContentType;
+  const contentType = (await detectContentType(url)) as ContentType;
   const { title, description, favicon, thumbnail } =
     await scrapeLinkMetadata(url);
   return {
