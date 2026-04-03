@@ -7,11 +7,14 @@
  * Waits for GitHub Actions check suites on the relevant commit to finish,
  * then proceeds only if all GitHub Actions suites succeeded (or neutral/skipped).
  *
+ * Only runs for deployments tied to an open PR (VERCEL_GIT_PULL_REQUEST_ID).
+ * Merges to develop/main build immediately without waiting.
+ *
  * Requires env GITHUB_WAIT_TOKEN on Vercel (classic PAT: repo scope, or
- * fine-grained: Contents read + Checks read). Add for Preview + Production.
+ * fine-grained: Contents read + Checks read). Preview is enough if only PR
+ * previews are gated.
  */
 
-const PROTECTED_BRANCHES = new Set(["main", "develop"]);
 const POLL_MS = 15_000;
 const MAX_WAIT_MS = 40 * 60 * 1000;
 
@@ -22,7 +25,6 @@ function exit(code) {
 const token = process.env.GITHUB_WAIT_TOKEN?.trim();
 const owner = process.env.VERCEL_GIT_REPO_OWNER;
 const repo = process.env.VERCEL_GIT_REPO_SLUG;
-const commitRef = process.env.VERCEL_GIT_COMMIT_REF ?? "";
 const commitSha = process.env.VERCEL_GIT_COMMIT_SHA ?? "";
 const prId = process.env.VERCEL_GIT_PULL_REQUEST_ID?.trim() ?? "";
 
@@ -40,9 +42,7 @@ if (!owner || !repo || !commitSha) {
   exit(1);
 }
 
-const shouldWait = Boolean(prId) || PROTECTED_BRANCHES.has(commitRef);
-
-if (!shouldWait) {
+if (!prId) {
   exit(1);
 }
 
@@ -62,9 +62,6 @@ async function githubJson(path) {
 }
 
 async function resolveSha() {
-  if (!prId) {
-    return commitSha;
-  }
   const pr = await githubJson(`/repos/${owner}/${repo}/pulls/${prId}`);
   return pr.head?.sha ?? commitSha;
 }
