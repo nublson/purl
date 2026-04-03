@@ -10,9 +10,13 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+  push:
+    branches:
+      - develop
+      - main
 
 concurrency:
-  group: pr-checks-${{ github.event.pull_request.number }}
+  group: pr-checks-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

@@ -1,4 +1,4 @@
-import PreviewApp from "@/components/preview-app";
+import { HeroPreviewApp } from "@/components/hero-preview-app";
 import SectionSeparator from "@/components/section-separator";
 import { Typography } from "@/components/typography";
 import { Button } from "@/components/ui/button";
@@ -44,7 +44,7 @@ export default function HeroSection() {
         </div>
       </div>
 
-      <PreviewApp
+      <HeroPreviewApp
         urls={urls}
         defaultUrls={defaultUrls as unknown as LinkType[]}
       />
