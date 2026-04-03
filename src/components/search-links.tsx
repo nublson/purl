@@ -123,7 +123,7 @@ export default function SearchLinks({ links: linksProp }: { links: Link[] }) {
             onValueChange={setQuery}
             wrapperClassName="p-0 border-b"
             inputGroupClassName="h-10! px-3.5 rounded-t-xl rounded-b-none border-none bg-transparent shadow-none focus-within:border-none focus-within:ring-0 dark:bg-transparent *:data-[slot=input-group-addon]:p-0!"
-            className="h-full border-0 bg-transparent px-0 py-0 text-sm shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
+            className="h-full border-0 bg-transparent px-0 py-0 text-base shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
           />
           <CommandList className="max-h-96">
             <CommandEmpty>
@@ -138,7 +138,7 @@ export default function SearchLinks({ links: linksProp }: { links: Link[] }) {
                 <CommandItem
                   key={link.id}
                   value={linkSearchValue(link)}
-                  className="mb-0.5 cursor-pointer p-0"
+                  className="mb-0.5 cursor-pointer p-0 [&>svg]:hidden"
                 >
                   <LinkItem
                     link={link}
