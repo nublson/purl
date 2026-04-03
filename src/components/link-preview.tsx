@@ -40,7 +40,7 @@ export function LinkPreview({
       <HoverCardContent
         side="right"
         align="start"
-        className="p-0 hidden lg:flex flex-col"
+        className="p-0 flex-col hidden md:[@media(hover:hover)]:flex"
       >
         {link.contentType === "PDF" ? (
           <PdfThumbnail url={link.url} />
