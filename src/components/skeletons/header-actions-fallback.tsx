@@ -6,8 +6,8 @@ export function HeaderActionsFallback() {
       aria-hidden="true"
       data-slot="header-actions-fallback"
     >
-      <div className="h-9 w-[4.5rem] rounded-md bg-muted animate-pulse" />
-      <div className="h-9 w-[5.5rem] rounded-md bg-muted animate-pulse" />
+      <div className="h-9 w-18 rounded-md bg-muted animate-pulse" />
+      <div className="h-9 w-22 rounded-md bg-muted animate-pulse" />
     </div>
   );
 }
