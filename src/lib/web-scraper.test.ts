@@ -67,6 +67,9 @@ describe("scrapeWebContent – SPA blocking", () => {
     "https://www.tiktok.com/@user/video/123",
     "https://linkedin.com/in/someone",
     "https://www.reddit.com/r/programming",
+    "https://open.spotify.com/track/abc",
+    "https://music.youtube.com/watch?v=abc123",
+    "https://music.apple.com/us/album/test/123456789",
   ];
 
   for (const url of SPA_URLS) {

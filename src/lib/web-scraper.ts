@@ -1,12 +1,13 @@
 import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
+import { STREAMING_MUSIC_DOMAINS } from "@/utils/streaming-music";
 
 /** Thrown for hostnames that need a browser; ingest should mark the link FAILED. */
 export class UnsupportedSpaError extends Error {
   readonly name = "UnsupportedSpaError";
 }
 
-const SPA_HOSTNAMES = new Set([
+const UNSUPPORTED_HOST_SUFFIXES = [
   "x.com",
   "twitter.com",
   "instagram.com",
@@ -15,13 +16,20 @@ const SPA_HOSTNAMES = new Set([
   "tiktok.com",
   "linkedin.com",
   "reddit.com",
-]);
+  ...STREAMING_MUSIC_DOMAINS,
+] as const;
+
+function isHostnameOrSubdomain(hostname: string, domain: string): boolean {
+  return hostname === domain || hostname.endsWith(`.${domain}`);
+}
 
 function isSpaHostname(url: string): boolean {
   try {
     const { hostname } = new URL(url);
     const stripped = hostname.replace(/^www\./, "");
-    return SPA_HOSTNAMES.has(stripped);
+    return UNSUPPORTED_HOST_SUFFIXES.some((domain) =>
+      isHostnameOrSubdomain(stripped, domain),
+    );
   } catch {
     return false;
   }

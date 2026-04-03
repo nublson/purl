@@ -24,6 +24,7 @@ enum IngestStatus {
   PROCESSING
   COMPLETED
   FAILED
+  SKIPPED
 }
 
 model User {

@@ -31,7 +31,66 @@ function linkSearchValue(link: Link): string {
 
 export default function SearchLinks({ links: linksProp }: { links: Link[] }) {
   const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState("");
+  const [semanticLinkIds, setSemanticLinkIds] = React.useState<string[] | null>(
+    null,
+  );
+  const [isSearching, setIsSearching] = React.useState(false);
   const links = React.useMemo(() => normalizeLinks(linksProp), [linksProp]);
+  const linksById = React.useMemo(
+    () => new Map(links.map((link) => [link.id, link])),
+    [links],
+  );
+  const normalizedQuery = query.trim();
+  const useSemanticMode = normalizedQuery.length >= 3;
+
+  React.useEffect(() => {
+    if (!useSemanticMode) {
+      setSemanticLinkIds(null);
+      setIsSearching(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const params = new URLSearchParams({ q: normalizedQuery });
+        const response = await fetch(`/api/search?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (!response.ok) {
+          setSemanticLinkIds([]);
+          return;
+        }
+        const data = (await response.json()) as {
+          results?: Array<{ linkId: string }>;
+        };
+        setSemanticLinkIds(data.results?.map((result) => result.linkId) ?? []);
+      } catch {
+        if (!controller.signal.aborted) {
+          setSemanticLinkIds([]);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsSearching(false);
+        }
+      }
+    }, 400);
+
+    return () => {
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [normalizedQuery, useSemanticMode]);
+
+  const visibleLinks = React.useMemo(() => {
+    if (!useSemanticMode) return links;
+    if (!semanticLinkIds) return [];
+    return semanticLinkIds
+      .map((linkId) => linksById.get(linkId))
+      .filter((link): link is Link => Boolean(link));
+  }, [links, linksById, semanticLinkIds, useSemanticMode]);
 
   return (
     <div>
@@ -52,28 +111,34 @@ export default function SearchLinks({ links: linksProp }: { links: Link[] }) {
       >
         <Command
           className="gap-0 p-0"
-          shouldFilter
+          shouldFilter={!useSemanticMode}
           filter={(value, search) => {
-            if (value.includes(search)) return 1;
+            if (value.includes(search.toLowerCase())) return 1;
             return 0;
           }}
         >
           <CommandInput
             placeholder="Search links..."
+            value={query}
+            onValueChange={setQuery}
             wrapperClassName="p-0 border-b"
             inputGroupClassName="h-10! px-3.5 rounded-t-xl rounded-b-none border-none bg-transparent shadow-none focus-within:border-none focus-within:ring-0 dark:bg-transparent *:data-[slot=input-group-addon]:p-0!"
-            className="h-full border-0 bg-transparent px-0 py-0 text-sm shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
+            className="h-full border-0 bg-transparent px-0 py-0 text-base shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
           />
           <CommandList className="max-h-96">
             <CommandEmpty>
-              {links.length === 0 ? "No saved links yet." : "No results found."}
+              {links.length === 0
+                ? "No saved links yet."
+                : isSearching || (useSemanticMode && semanticLinkIds === null)
+                  ? "Searching..."
+                  : "No results found."}
             </CommandEmpty>
             <CommandGroup className="p-1.5">
-              {links.map((link) => (
+              {visibleLinks.map((link) => (
                 <CommandItem
                   key={link.id}
                   value={linkSearchValue(link)}
-                  className="mb-0.5 cursor-pointer p-0"
+                  className="mb-0.5 cursor-pointer p-0 [&>svg]:hidden"
                 >
                   <LinkItem
                     link={link}
