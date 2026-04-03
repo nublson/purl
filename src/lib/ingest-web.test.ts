@@ -43,6 +43,10 @@ vi.mock("@/lib/ingest-logger", () => ({
   logIngestFailure: vi.fn(),
 }));
 
+vi.mock("@/lib/ingest-skip", () => ({
+  skipIngest: vi.fn(),
+}));
+
 const prisma = (await import("@/lib/prisma")).default;
 const { scrapeWebContent, UnsupportedSpaError } = await import(
   "@/lib/web-scraper"
@@ -50,6 +54,7 @@ const { scrapeWebContent, UnsupportedSpaError } = await import(
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
 const { logIngestStart, logIngestFailure } = await import("@/lib/ingest-logger");
+const { skipIngest } = await import("@/lib/ingest-skip");
 const { ingestWeb } = await import("./ingest-web");
 
 describe("ingestWeb", () => {
@@ -65,6 +70,7 @@ describe("ingestWeb", () => {
     vi.mocked(embedTextChunks).mockReset();
     vi.mocked(logIngestStart).mockReset();
     vi.mocked(logIngestFailure).mockReset();
+    vi.mocked(skipIngest).mockReset();
   });
 
   it("marks completed and exits early when no chunks are produced", async () => {
@@ -147,29 +153,21 @@ describe("ingestWeb", () => {
     );
   });
 
-  it("marks failed when scraper throws UnsupportedSpaError", async () => {
+  it("marks skipped when scraper throws UnsupportedSpaError", async () => {
     vi.mocked(scrapeWebContent).mockRejectedValue(
       new UnsupportedSpaError("SPA not supported"),
     );
 
     await expect(
       ingestWeb({ linkId: "link-1", url: "https://x.com/centralreality" }),
-    ).rejects.toThrow("SPA not supported");
+    ).resolves.toBeUndefined();
 
-    expect(prisma.link.update).toHaveBeenLastCalledWith({
-      where: { id: "link-1" },
-      data: { ingestStatus: "FAILED" },
-    });
+    expect(skipIngest).toHaveBeenCalledWith("link-1");
     expect(logIngestStart).toHaveBeenCalledWith(
       "WEB",
       "link-1",
       "https://x.com/centralreality",
     );
-    expect(logIngestFailure).toHaveBeenCalledWith(
-      "WEB",
-      "link-1",
-      "https://x.com/centralreality",
-      expect.any(UnsupportedSpaError),
-    );
+    expect(logIngestFailure).not.toHaveBeenCalled();
   });
 });

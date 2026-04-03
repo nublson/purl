@@ -129,7 +129,7 @@ export default function SearchLinks({ links: linksProp }: { links: Link[] }) {
             <CommandEmpty>
               {links.length === 0
                 ? "No saved links yet."
-                : isSearching
+                : isSearching || (useSemanticMode && semanticLinkIds === null)
                   ? "Searching..."
                   : "No results found."}
             </CommandEmpty>

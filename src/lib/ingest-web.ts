@@ -1,8 +1,9 @@
 import prisma, { Prisma } from "@/lib/prisma";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
-import { scrapeWebContent } from "@/lib/web-scraper";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
+import { skipIngest } from "@/lib/ingest-skip";
+import { scrapeWebContent, UnsupportedSpaError } from "@/lib/web-scraper";
 
 type IngestWebInput = {
   linkId: string;
@@ -62,6 +63,11 @@ export async function ingestWeb({ linkId, url }: IngestWebInput): Promise<void> 
       data: { ingestStatus: "COMPLETED" },
     });
   } catch (error) {
+    if (error instanceof UnsupportedSpaError) {
+      await skipIngest(linkId);
+      return;
+    }
+
     await prisma.link.update({
       where: { id: linkId },
       data: { ingestStatus: "FAILED" },

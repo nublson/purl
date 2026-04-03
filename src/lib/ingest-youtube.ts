@@ -9,7 +9,10 @@ type IngestYoutubeInput = {
   url: string;
 };
 
-export async function ingestYoutube({ linkId, url }: IngestYoutubeInput): Promise<void> {
+export async function ingestYoutube({
+  linkId,
+  url,
+}: IngestYoutubeInput): Promise<void> {
   try {
     await prisma.link.update({
       where: { id: linkId },
@@ -70,4 +73,3 @@ export async function ingestYoutube({ linkId, url }: IngestYoutubeInput): Promis
     throw error;
   }
 }
-

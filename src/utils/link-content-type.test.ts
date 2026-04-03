@@ -102,7 +102,7 @@ describe("detectContentType", () => {
       expect(await detectContentType("https://example.com/article")).toBe("WEB");
     });
 
-    it("returns WEB for a Spotify URL (audio platform, not a direct file)", async () => {
+    it("returns WEB for a Spotify URL (audio platform URL)", async () => {
       expect(
         await detectContentType("https://open.spotify.com/track/abc"),
       ).toBe("WEB");
@@ -161,4 +161,5 @@ describe("detectContentType", () => {
       expect(await detectContentType("https://example.com/no-ext")).toBe("WEB");
     });
   });
+
 });
