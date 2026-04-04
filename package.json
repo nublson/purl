@@ -5,7 +5,7 @@
   "scripts": {
     "setup": "bash setup.sh",
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
