@@ -3,7 +3,7 @@
 import { formatMentionToken } from "@/lib/chat-utils";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
-import { CornerDownLeft } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import * as React from "react";
 import { MentionList } from "./mention-list";
 import { Button } from "../ui/button";
@@ -20,9 +20,6 @@ function filterLinksForMention(links: Link[], query: string): Link[] {
   });
 }
 
-/**
- * Parses `@[title](id)` tokens (title cannot contain `]` — enforced on insert).
- */
 function splitInputByMentions(value: string): Array<
   { type: "text"; text: string } | { type: "mention"; title: string }
 > {
@@ -90,7 +87,7 @@ export function ChatInput({
   onChange,
   onSubmit,
   disabled,
-  placeholder = "Ask about your links… (@ to mention)",
+  placeholder = "Ask about your links...",
   className,
 }: {
   links: Link[];
@@ -205,13 +202,13 @@ export function ChatInput({
         highlightedIndex={highlightedIndex}
         onHighlightChange={setHighlightedIndex}
       />
-      <div className="flex items-end gap-2 rounded-xl border bg-background p-2 shadow-sm">
-        <div className="relative max-h-40 min-h-10 min-w-0 flex-1 overflow-hidden">
+      <div className="flex flex-col gap-3 rounded-xl border bg-background p-3 shadow-sm">
+        <div className="relative min-h-[5.5rem] w-full">
           {value ? (
             <div
               ref={mirrorRef}
               aria-hidden
-              className="pointer-events-none absolute inset-0 z-0 overflow-hidden whitespace-pre-wrap wrap-break-word px-2.5 py-2 text-base leading-normal md:text-sm"
+              className="pointer-events-none absolute inset-0 z-0 overflow-hidden whitespace-pre-wrap wrap-break-word px-0.5 py-0.5 text-base leading-relaxed md:text-sm"
             >
               <MentionMirror value={value} />
             </div>
@@ -233,26 +230,28 @@ export function ChatInput({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled}
-            rows={1}
+            rows={3}
             spellCheck={false}
             autoComplete="off"
             autoCorrect="off"
             className={cn(
-              "relative z-10 min-h-10 max-h-40 resize-none border-0 bg-transparent px-2.5 py-2 text-base leading-normal shadow-none focus-visible:ring-0 md:text-sm",
+              "relative z-10 min-h-[5.5rem] max-h-40 w-full resize-none border-0 bg-transparent px-0.5 py-0.5 text-base leading-relaxed shadow-none focus-visible:ring-0 md:text-sm",
               value ? "text-transparent caret-foreground selection:bg-primary/25" : "",
             )}
           />
         </div>
-        <Button
-          type="button"
-          size="icon"
-          className="shrink-0"
-          disabled={disabled || !value.trim()}
-          onClick={onSubmit}
-          aria-label="Send message"
-        >
-          <CornerDownLeft className="size-4" />
-        </Button>
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            size="icon"
+            disabled={disabled || !value.trim()}
+            onClick={onSubmit}
+            aria-label="Send message"
+            className="size-9 shrink-0 rounded-full"
+          >
+            <ArrowUp data-icon="inline-start" />
+          </Button>
+        </div>
       </div>
     </div>
   );

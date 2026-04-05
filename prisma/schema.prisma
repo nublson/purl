@@ -38,9 +38,35 @@ model User {
   sessions      Session[]
   accounts      Account[]
   links         Link[]
+  chats         Chat[]
 
   @@unique([email])
   @@map("users")
+}
+
+model Chat {
+  id        String        @id @default(cuid())
+  title     String?
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  messages  ChatMessage[]
+
+  @@map("chats")
+}
+
+model ChatMessage {
+  id          String   @id @default(cuid())
+  chatId      String
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  role        String
+  content     String
+  uiMessageId String?
+  createdAt   DateTime @default(now())
+
+  @@unique([chatId, uiMessageId])
+  @@map("chat_messages")
 }
 
 model Link {

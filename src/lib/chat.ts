@@ -79,8 +79,10 @@ export async function streamChatForUser(options: {
   userId: string;
   mentionedLinkIds: string[];
   searchQuery: string;
+  onFinish?: (event: { text: string }) => void | Promise<void>;
 }) {
-  const { messages, userId, mentionedLinkIds, searchQuery } = options;
+  const { messages, userId, mentionedLinkIds, searchQuery, onFinish } =
+    options;
 
   const chunks = await buildRagContextForChat({
     userId,
@@ -93,5 +95,10 @@ export async function streamChatForUser(options: {
     model: getChatModel(),
     system,
     messages,
+    onFinish: onFinish
+      ? async (event) => {
+          await onFinish({ text: event.text });
+        }
+      : undefined,
   });
 }

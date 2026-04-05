@@ -1,5 +1,11 @@
 import { auth } from "@/lib/auth";
 import { streamChatForUser } from "@/lib/chat";
+import {
+  appendAssistantChatMessage,
+  assertChatOwnedByUser,
+  setChatTitleIfEmpty,
+  upsertUserChatMessage,
+} from "@/lib/chats";
 import { extractMentionLinkIds, getTextFromUIMessage } from "@/lib/chat-utils";
 import { headers } from "next/headers";
 import { convertToModelMessages, type UIMessage } from "ai";
@@ -9,6 +15,7 @@ export const maxDuration = 120;
 type ChatRequestBody = {
   messages?: unknown[];
   mentionedLinkIds?: string[];
+  chatId?: string;
 };
 
 function isUIMessageArray(value: unknown): value is UIMessage[] {
@@ -51,9 +58,45 @@ export async function POST(req: Request) {
     });
   }
 
+  if (typeof body.chatId !== "string" || !body.chatId.trim()) {
+    return new Response(JSON.stringify({ error: "chatId required" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const chatId = body.chatId.trim();
+  const userId = session.user.id;
+
+  try {
+    await assertChatOwnedByUser(chatId, userId);
+  } catch (e) {
+    if (e instanceof Error && e.name === "ChatNotFoundError") {
+      return new Response(JSON.stringify({ error: "Chat not found" }), {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    throw e;
+  }
+
   const uiMessages = body.messages;
   const lastUser = [...uiMessages].reverse().find((m) => m.role === "user");
-  const lastUserText = lastUser ? getTextFromUIMessage(lastUser) : "";
+  if (!lastUser || lastUser.role !== "user") {
+    return new Response(JSON.stringify({ error: "Last message must be user" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const lastUserText = getTextFromUIMessage(lastUser);
+  await upsertUserChatMessage({
+    chatId,
+    userId,
+    uiMessageId: lastUser.id,
+    content: lastUserText,
+  });
+  await setChatTitleIfEmpty(chatId, userId, lastUserText);
 
   const fromBody = Array.isArray(body.mentionedLinkIds)
     ? body.mentionedLinkIds.filter((id): id is string => typeof id === "string")
@@ -73,9 +116,16 @@ export async function POST(req: Request) {
 
   const result = await streamChatForUser({
     messages: modelMessages,
-    userId: session.user.id,
+    userId,
     mentionedLinkIds,
     searchQuery: lastUserText,
+    onFinish: async ({ text: assistantText }) => {
+      await appendAssistantChatMessage({
+        chatId,
+        userId,
+        text: assistantText,
+      });
+    },
   });
 
   return result.toUIMessageStreamResponse({

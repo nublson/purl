@@ -1,3 +1,4 @@
+import { ChatPanel } from "@/components/chat/chat-panel";
 import Header from "@/components/header";
 import SearchLinks from "@/components/search-links";
 import { UploadFile } from "@/components/upload-file";
@@ -29,6 +30,7 @@ export default async function PrivateLayout({
       <main className="flex-1 flex flex-col items-center justify-start pt-6 overflow-y-auto px-4 md:px-0">
         {children}
       </main>
+      <ChatPanel links={links} />
     </Fragment>
   );
 }

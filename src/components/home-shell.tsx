@@ -1,6 +1,5 @@
 "use client";
 
-import { ChatPanel } from "@/components/chat/chat-panel";
 import { LinkGroup } from "@/components/link-group";
 import { LinkInput } from "@/components/link-input";
 import { PasteHandler } from "@/components/paste-handler";
@@ -13,19 +12,12 @@ import {
   type UploadStartDetail,
   type UploadSuccessDetail,
 } from "@/utils/upload-events";
-import type { Link } from "@/utils/links";
 import type { LinkGroup as LinkGroupType } from "@/utils/links";
 import { PackageOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 
-export function HomeShell({
-  groups,
-  links,
-}: {
-  groups: LinkGroupType[];
-  links: Link[];
-}) {
+export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   useRealtimeSync(startTransition);
@@ -104,7 +96,6 @@ export function HomeShell({
 
   return (
     <>
-      <ChatPanel links={links} />
       <LinkInput
         onSaveStart={onPasteStart}
         onSaveSuccess={onSaveSuccess}

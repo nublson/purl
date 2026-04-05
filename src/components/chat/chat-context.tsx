@@ -3,9 +3,11 @@
 import type { Link } from "@/utils/links";
 
 /**
- * Imperative handle for the home chat surface so link rows can "Add to chat"
- * without prop drilling through LinkGroup.
+ * Imperative handle for the private-layout chat widget (link rows, etc.).
  */
 export const chatSurfaceRef: {
-  current: null | { openWithMention: (link: Link) => void };
+  current: null | {
+    openWithMention: (link: Link) => void;
+    openWidget: () => void;
+  };
 } = { current: null };
