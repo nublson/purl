@@ -1,5 +1,6 @@
 "use client";
 
+import { chatSurfaceRef } from "@/components/chat/chat-context";
 import { cn } from "@/lib/utils";
 import { Link as LinkType } from "@/utils/links";
 import { FileMusic, FileText, MessageCircle } from "lucide-react";
@@ -155,9 +156,15 @@ export const LinkItem = React.forwardRef<
         >
           <TooltipWrapper content="Add to chat">
             <Button
+              type="button"
               variant="ghost"
               size="icon-sm"
               className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                chatSurfaceRef.current?.openWithMention(link);
+              }}
             >
               <MessageCircle />
             </Button>

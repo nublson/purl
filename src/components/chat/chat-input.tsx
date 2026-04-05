@@ -1,0 +1,259 @@
+"use client";
+
+import { formatMentionToken } from "@/lib/chat-utils";
+import { cn } from "@/lib/utils";
+import type { Link } from "@/utils/links";
+import { CornerDownLeft } from "lucide-react";
+import * as React from "react";
+import { MentionList } from "./mention-list";
+import { Button } from "../ui/button";
+import { Textarea } from "../ui/textarea";
+
+function filterLinksForMention(links: Link[], query: string): Link[] {
+  const q = query.toLowerCase().trim();
+  if (!q) return links;
+  return links.filter((link) => {
+    const hay = [link.title, link.domain, link.url, link.description ?? ""]
+      .join(" ")
+      .toLowerCase();
+    return hay.includes(q);
+  });
+}
+
+/**
+ * Parses `@[title](id)` tokens (title cannot contain `]` — enforced on insert).
+ */
+function splitInputByMentions(value: string): Array<
+  { type: "text"; text: string } | { type: "mention"; title: string }
+> {
+  const re = /@\[([^\]]*)\]\(([^)]+)\)/g;
+  const out: Array<
+    { type: "text"; text: string } | { type: "mention"; title: string }
+  > = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(value)) !== null) {
+    if (m.index > last) {
+      out.push({ type: "text", text: value.slice(last, m.index) });
+    }
+    out.push({ type: "mention", title: m[1]?.trim() || "Link" });
+    last = m.index + m[0].length;
+  }
+  if (last < value.length) {
+    out.push({ type: "text", text: value.slice(last) });
+  }
+  return out;
+}
+
+function MentionMirror({ value }: { value: string }) {
+  const segments = splitInputByMentions(value);
+  if (segments.length === 0) {
+    return <span className="text-foreground">{"\u00a0"}</span>;
+  }
+  return (
+    <>
+      {segments.map((seg, i) =>
+        seg.type === "text" ? (
+          <span key={i} className="text-foreground">
+            {seg.text}
+          </span>
+        ) : (
+          <span
+            key={i}
+            className="mx-0.5 inline align-baseline rounded-md bg-primary/20 px-1.5 py-px text-primary [text-decoration:none] first:ml-0"
+          >
+            @{seg.title}
+          </span>
+        ),
+      )}
+    </>
+  );
+}
+
+function getMentionState(
+  value: string,
+  cursor: number,
+): { open: boolean; query: string; start: number } {
+  const before = value.slice(0, cursor);
+  const at = before.lastIndexOf("@");
+  if (at === -1) return { open: false, query: "", start: -1 };
+  const afterAt = before.slice(at + 1);
+  if (afterAt.includes(" ") || afterAt.includes("\n")) {
+    return { open: false, query: "", start: -1 };
+  }
+  return { open: true, query: afterAt, start: at };
+}
+
+export function ChatInput({
+  links,
+  value,
+  onChange,
+  onSubmit,
+  disabled,
+  placeholder = "Ask about your links… (@ to mention)",
+  className,
+}: {
+  links: Link[];
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  disabled?: boolean;
+  placeholder?: string;
+  className?: string;
+}) {
+  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const mirrorRef = React.useRef<HTMLDivElement>(null);
+  const [mentionOpen, setMentionOpen] = React.useState(false);
+  const [mentionQuery, setMentionQuery] = React.useState("");
+  const [mentionStart, setMentionStart] = React.useState(-1);
+  const [highlightedIndex, setHighlightedIndex] = React.useState(0);
+
+  const syncMention = React.useCallback(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const cursor = el.selectionStart ?? value.length;
+    const state = getMentionState(value, cursor);
+    setMentionOpen(state.open);
+    setMentionQuery(state.query);
+    setMentionStart(state.start);
+  }, [value]);
+
+  React.useEffect(() => {
+    if (!mentionOpen) setHighlightedIndex(0);
+  }, [mentionOpen, mentionQuery]);
+
+  const filtered = React.useMemo(
+    () => filterLinksForMention(links, mentionQuery),
+    [links, mentionQuery],
+  );
+
+  React.useEffect(() => {
+    setHighlightedIndex((i) =>
+      filtered.length === 0 ? 0 : Math.min(i, filtered.length - 1),
+    );
+  }, [filtered.length]);
+
+  const insertMention = React.useCallback(
+    (link: Link) => {
+      if (mentionStart < 0) return;
+      const el = textareaRef.current;
+      const cursor = el?.selectionStart ?? value.length;
+      const before = value.slice(0, mentionStart);
+      const after = value.slice(cursor);
+      const token = `${formatMentionToken(link)} `;
+      const next = `${before}${token}${after}`;
+      onChange(next);
+      setMentionOpen(false);
+      queueMicrotask(() => {
+        const ta = textareaRef.current;
+        if (!ta) return;
+        const pos = before.length + token.length;
+        ta.focus();
+        ta.setSelectionRange(pos, pos);
+      });
+    },
+    [mentionStart, onChange, value],
+  );
+
+  const syncScroll = React.useCallback(() => {
+    const ta = textareaRef.current;
+    const mirror = mirrorRef.current;
+    if (ta && mirror) {
+      mirror.scrollTop = ta.scrollTop;
+    }
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionOpen && filtered.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlightedIndex((i) => (i + 1) % filtered.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHighlightedIndex((i) =>
+          i <= 0 ? filtered.length - 1 : i - 1,
+        );
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        insertMention(filtered[highlightedIndex]!);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setMentionOpen(false);
+        return;
+      }
+    }
+
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      onSubmit();
+    }
+  };
+
+  return (
+    <div className={cn("relative", className)}>
+      <MentionList
+        links={links}
+        query={mentionQuery}
+        open={mentionOpen && links.length > 0}
+        onSelect={insertMention}
+        highlightedIndex={highlightedIndex}
+        onHighlightChange={setHighlightedIndex}
+      />
+      <div className="flex items-end gap-2 rounded-xl border bg-background p-2 shadow-sm">
+        <div className="relative max-h-40 min-h-10 min-w-0 flex-1 overflow-hidden">
+          {value ? (
+            <div
+              ref={mirrorRef}
+              aria-hidden
+              className="pointer-events-none absolute inset-0 z-0 overflow-hidden whitespace-pre-wrap wrap-break-word px-2.5 py-2 text-base leading-normal md:text-sm"
+            >
+              <MentionMirror value={value} />
+            </div>
+          ) : null}
+          <Textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => {
+              onChange(e.target.value);
+              queueMicrotask(() => {
+                syncMention();
+                syncScroll();
+              });
+            }}
+            onScroll={syncScroll}
+            onSelect={syncMention}
+            onKeyUp={syncMention}
+            onClick={syncMention}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+            disabled={disabled}
+            rows={1}
+            spellCheck={false}
+            autoComplete="off"
+            autoCorrect="off"
+            className={cn(
+              "relative z-10 min-h-10 max-h-40 resize-none border-0 bg-transparent px-2.5 py-2 text-base leading-normal shadow-none focus-visible:ring-0 md:text-sm",
+              value ? "text-transparent caret-foreground selection:bg-primary/25" : "",
+            )}
+          />
+        </div>
+        <Button
+          type="button"
+          size="icon"
+          className="shrink-0"
+          disabled={disabled || !value.trim()}
+          onClick={onSubmit}
+          aria-label="Send message"
+        >
+          <CornerDownLeft className="size-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}

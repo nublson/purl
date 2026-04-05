@@ -1,37 +1,38 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import { buildChatSystemPrompt, type RagContextChunk } from "./chat-prompt";
+import { extractMentionLinkIds } from "./chat-utils";
 
-vi.mock("ai", () => ({
-  generateText: vi.fn(),
-}));
-
-vi.mock("@/lib/ai", () => ({
-  getChatModel: vi.fn(),
-}));
-
-const { generateText } = await import("ai");
-const { getChatModel } = await import("@/lib/ai");
-const { generateChatResponse } = await import("./chat");
-
-describe("generateChatResponse", () => {
-  beforeEach(() => {
-    vi.mocked(generateText).mockReset();
-    vi.mocked(getChatModel).mockReset();
+describe("extractMentionLinkIds", () => {
+  it("parses mention tokens and dedupes ids", () => {
+    const text =
+      'Summarize @[Article](abc) and @[Article](abc) plus @[Other](def)';
+    expect(extractMentionLinkIds(text)).toEqual(["abc", "def"]);
   });
 
-  it("delegates to AI SDK generateText with shared chat model", async () => {
-    const model = { id: "chat-model" };
-    const messages = [{ role: "user", content: [{ type: "text", text: "Hi" }] }];
-    const response = { text: "Hello back" };
+  it("returns empty array when no mentions", () => {
+    expect(extractMentionLinkIds("Hello world")).toEqual([]);
+  });
+});
 
-    vi.mocked(getChatModel).mockReturnValue(model as never);
-    vi.mocked(generateText).mockResolvedValue(response as never);
+describe("buildChatSystemPrompt", () => {
+  it("includes fallback instructions when there are no chunks", () => {
+    const prompt = buildChatSystemPrompt([]);
+    expect(prompt).toContain("no saved content was retrieved");
+  });
 
-    const result = await generateChatResponse(messages as never);
-
-    expect(generateText).toHaveBeenCalledWith({
-      model,
-      messages,
-    });
-    expect(result).toEqual(response);
+  it("includes titles and content for chunks", () => {
+    const chunks: RagContextChunk[] = [
+      {
+        linkId: "l1",
+        linkTitle: "My Doc",
+        linkUrl: "https://example.com",
+        chunkIndex: 0,
+        content: "Hello from chunk",
+      },
+    ];
+    const prompt = buildChatSystemPrompt(chunks);
+    expect(prompt).toContain("My Doc");
+    expect(prompt).toContain("https://example.com");
+    expect(prompt).toContain("Hello from chunk");
   });
 });
