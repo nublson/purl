@@ -2,10 +2,14 @@ import ChatArea from "./chat-area";
 import ChatHeader from "./chat-header";
 import ChatInput from "./chat-input";
 
-export default function ChatConversation() {
+interface ChatConversationProps {
+  onClose: () => void;
+}
+
+export default function ChatConversation({ onClose }: ChatConversationProps) {
   return (
-    <div className="w-96 h-[463px] flex flex-col items-center justify-start relative">
-      <ChatHeader />
+    <div className="relative flex h-full min-h-0 w-full flex-col justify-start md:h-[463px] md:w-96">
+      <ChatHeader onClose={onClose} />
       <ChatArea />
       <ChatInput />
     </div>

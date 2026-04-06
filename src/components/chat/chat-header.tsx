@@ -1,8 +1,12 @@
-import { History, Plus } from "lucide-react";
+import { History, Plus, X } from "lucide-react";
 import { Typography } from "../typography";
 import { Button } from "../ui/button";
 
-export default function ChatHeader() {
+interface ChatHeaderProps {
+  onClose: () => void;
+}
+
+export default function ChatHeader({ onClose }: ChatHeaderProps) {
   return (
     <header className="w-full flex items-center justify-between gap-4 px-4 py-2 border-b border-border">
       <Typography
@@ -22,6 +26,14 @@ export default function ChatHeader() {
         </Button>
         <Button size="icon-sm" variant="ghost" className="cursor-pointer">
           <Plus />
+        </Button>
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          className="cursor-pointer md:hidden"
+          onClick={onClose}
+        >
+          <X />
         </Button>
       </div>
     </header>

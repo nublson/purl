@@ -11,7 +11,7 @@ export default async function Home() {
   return (
     <div className="wrapper-private flex-1 flex flex-col gap-8 pt-24 pb-32">
       <HomeShell groups={groups} />
-      <div className="fixed bottom-8 right-8">
+      <div className="fixed bottom-4 right-4 md:bottom-8 md:right-8">
         <ChatWidget />
       </div>
     </div>
