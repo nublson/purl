@@ -1,7 +1,19 @@
 import { auth } from "@/lib/auth";
+import { getChatModel } from "@/lib/ai";
 import prisma from "@/lib/prisma";
 import type { MessageRole } from "@/generated/prisma/enums";
+import { generateText } from "ai";
 import { headers } from "next/headers";
+
+async function generateChatTitle(prompt: string): Promise<string> {
+  const { text } = await generateText({
+    model: getChatModel(),
+    system:
+      "Generate a short, specific chat title (max 6 words, no punctuation, no quotes) that captures the topic of the user's message. Reply with only the title.",
+    prompt,
+  });
+  return text.trim().slice(0, 80);
+}
 
 export class UnauthorizedError extends Error {
   readonly name = "UnauthorizedError";
@@ -97,10 +109,32 @@ export async function saveMessage(
     },
   });
 
-  await prisma.chat.update({
+  const chat = await prisma.chat.findUnique({
     where: { id: chatId },
-    data: { updatedAt: new Date() },
+    select: { title: true },
   });
+
+  const isFirstUserMessage = role === "USER" && !chat?.title;
+
+  if (isFirstUserMessage) {
+    try {
+      const newTitle = await generateChatTitle(content);
+      await prisma.chat.update({
+        where: { id: chatId },
+        data: { updatedAt: new Date(), title: newTitle },
+      });
+    } catch {
+      await prisma.chat.update({
+        where: { id: chatId },
+        data: { updatedAt: new Date() },
+      });
+    }
+  } else {
+    await prisma.chat.update({
+      where: { id: chatId },
+      data: { updatedAt: new Date() },
+    });
+  }
 
   return message;
 }
