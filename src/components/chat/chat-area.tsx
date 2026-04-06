@@ -1,5 +1,6 @@
 "use client";
 
+import type { Link } from "@/utils/links";
 import type { UIMessage } from "ai";
 import { useEffect, useRef } from "react";
 import { ScrollArea } from "../ui/scroll-area";
@@ -8,6 +9,7 @@ import ChatMessage from "./chat-message";
 
 interface ChatAreaProps {
   messages: UIMessage[];
+  messageMentions?: Link[][];
   isLoading: boolean;
   onSuggestion: (text: string) => void;
 }
@@ -23,6 +25,7 @@ function getMessageText(message: UIMessage): string {
 
 export default function ChatArea({
   messages,
+  messageMentions,
   isLoading,
   onSuggestion,
 }: ChatAreaProps) {
@@ -36,16 +39,27 @@ export default function ChatArea({
     return <ChatEmpty onSuggestion={onSuggestion} />;
   }
 
+  let userMessageIndex = -1;
+
   return (
     <ScrollArea className="flex-1 w-full h-20 p-4 pb-0 overflow-hidden">
       <div className="flex flex-col items-center justify-start gap-4 h-full">
-        {messages.map((message) => (
-          <ChatMessage
-            key={message.id}
-            content={getMessageText(message)}
-            role={message.role as "user" | "assistant"}
-          />
-        ))}
+        {messages.map((message) => {
+          const isUser = message.role === "user";
+          if (isUser) userMessageIndex += 1;
+          const mentions =
+            isUser && messageMentions
+              ? (messageMentions[userMessageIndex] ?? [])
+              : [];
+          return (
+            <ChatMessage
+              key={message.id}
+              content={getMessageText(message)}
+              role={message.role as "user" | "assistant"}
+              mentions={mentions}
+            />
+          );
+        })}
         {isLoading && messages[messages.length - 1]?.role === "user" && (
           <ChatMessage content="" role="assistant" isLoading />
         )}

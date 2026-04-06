@@ -1,5 +1,6 @@
+import { LinkContentTypeIcon } from "@/components/link-content-type-icon";
 import { Link } from "@/utils/links";
-import { FileText, Globe, Headphones, TvMinimalPlay, X } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "../ui/button";
 
 interface ChatMentionProps {
@@ -8,19 +9,6 @@ interface ChatMentionProps {
 }
 
 export default function ChatMention({ link, onRemove }: ChatMentionProps) {
-  const badgeIcon = () => {
-    switch (link.contentType) {
-      case "WEB":
-        return <Globe />;
-      case "YOUTUBE":
-        return <TvMinimalPlay />;
-      case "PDF":
-        return <FileText />;
-      case "AUDIO":
-        return <Headphones />;
-    }
-  };
-
   return (
     <Button
       type="button"
@@ -29,7 +17,7 @@ export default function ChatMention({ link, onRemove }: ChatMentionProps) {
       className="cursor-pointer"
       onClick={onRemove}
     >
-      {badgeIcon()}
+      <LinkContentTypeIcon contentType={link.contentType} />
       {link.title}
       <X />
     </Button>

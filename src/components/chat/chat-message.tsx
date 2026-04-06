@@ -1,22 +1,32 @@
 import { cn } from "@/lib/utils";
+import type { Link } from "@/utils/links";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Typography } from "../typography";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { Item, ItemContent, ItemMedia, ItemTitle } from "../ui/item";
+import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemMedia,
+  ItemTitle,
+} from "../ui/item";
+import ChatBadge from "./chat-badge";
 
 interface ChatMessageProps {
   content: string;
   role: "user" | "assistant";
   isLoading?: boolean;
+  mentions?: Link[];
 }
 
 export default function ChatMessage({
   content,
   role,
   isLoading,
+  mentions,
 }: ChatMessageProps) {
   const media =
     role === "user" ? (
@@ -116,6 +126,13 @@ export default function ChatMessage({
             </div>
           )}
         </ItemTitle>
+        {role === "user" && mentions && mentions.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1 overflow-hidden overflow-x-auto no-scrollbar">
+            {mentions.map((link) => (
+              <ChatBadge key={link.id} link={link} />
+            ))}
+          </div>
+        )}
       </ItemContent>
     </Item>
   );

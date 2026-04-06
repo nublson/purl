@@ -1,6 +1,7 @@
 "use client";
 
 import { useChatContext } from "@/contexts/chat-context";
+import type { Link } from "@/utils/links";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -25,6 +26,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     setChatId,
   } = useChatContext();
   const [input, setInput] = useState("");
+  const [messageMentions, setMessageMentions] = useState<Link[][]>([]);
   const chatIdRef = useRef(chatId);
   const mentionsRef = useRef(mentions);
 
@@ -76,6 +78,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
 
       const mentionedLinkIds = mentionsRef.current.map((m) => m.id);
       sendMessage({ text }, { body: { chatId: id, mentionedLinkIds } });
+      setMessageMentions((prev) => [...prev, [...mentionsRef.current]]);
       setInput("");
       clearMentions();
     },
@@ -90,6 +93,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       }
 
       sendMessage({ text }, { body: { chatId: id } });
+      setMessageMentions((prev) => [...prev, []]);
     },
     [createNewChat, sendMessage],
   );
@@ -98,6 +102,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     setChatId(null);
     setChatTitle(null);
     setMessages([]);
+    setMessageMentions([]);
     clearMentions();
     setInput("");
   }, [setChatId, setChatTitle, setMessages, clearMentions]);
@@ -107,6 +112,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       <ChatHeader title={chatTitle} onClose={onClose} onNewChat={handleNewChat} />
       <ChatArea
         messages={messages}
+        messageMentions={messageMentions}
         isLoading={isLoading}
         onSuggestion={handleSuggestion}
       />
