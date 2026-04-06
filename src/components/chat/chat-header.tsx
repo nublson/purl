@@ -4,9 +4,10 @@ import { Button } from "../ui/button";
 
 interface ChatHeaderProps {
   onClose: () => void;
+  onNewChat: () => void;
 }
 
-export default function ChatHeader({ onClose }: ChatHeaderProps) {
+export default function ChatHeader({ onClose, onNewChat }: ChatHeaderProps) {
   return (
     <header className="w-full flex items-center justify-between gap-4 px-4 py-2 border-b border-border">
       <Typography
@@ -21,10 +22,16 @@ export default function ChatHeader({ onClose }: ChatHeaderProps) {
           size="icon-sm"
           variant="ghost"
           className="cursor-pointer text-muted-foreground"
+          disabled
         >
           <History />
         </Button>
-        <Button size="icon-sm" variant="ghost" className="cursor-pointer">
+        <Button
+          size="icon-sm"
+          variant="ghost"
+          className="cursor-pointer"
+          onClick={onNewChat}
+        >
           <Plus />
         </Button>
         <Button

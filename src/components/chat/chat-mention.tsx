@@ -4,9 +4,10 @@ import { Button } from "../ui/button";
 
 interface ChatMentionProps {
   link: Link;
+  onRemove: () => void;
 }
 
-export default function ChatMention({ link }: ChatMentionProps) {
+export default function ChatMention({ link, onRemove }: ChatMentionProps) {
   const badgeIcon = () => {
     switch (link.contentType) {
       case "WEB":
@@ -21,7 +22,13 @@ export default function ChatMention({ link }: ChatMentionProps) {
   };
 
   return (
-    <Button variant={"outline"} size={"xs"} className="cursor-pointer">
+    <Button
+      type="button"
+      variant="outline"
+      size="xs"
+      className="cursor-pointer"
+      onClick={onRemove}
+    >
       {badgeIcon()}
       {link.title}
       <X />

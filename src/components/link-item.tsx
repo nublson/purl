@@ -1,5 +1,6 @@
 "use client";
 
+import { useChatContextSafe } from "@/contexts/chat-context";
 import { cn } from "@/lib/utils";
 import { Link as LinkType } from "@/utils/links";
 import { FileMusic, FileText, MessageCircle } from "lucide-react";
@@ -28,6 +29,7 @@ export const LinkItem = React.forwardRef<
   { link, className, onMouseEnter, onMouseLeave, preview, ...rest },
   ref,
 ) {
+  const chatCtx = useChatContextSafe();
   const [isDeleting, setIsDeleting] = React.useState(false);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const hoveringActionsRef = React.useRef(false);
@@ -153,15 +155,21 @@ export const LinkItem = React.forwardRef<
             scheduleOpen();
           }}
         >
-          <TooltipWrapper content="Add to chat">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
-            >
-              <MessageCircle />
-            </Button>
-          </TooltipWrapper>
+          {chatCtx && (
+            <TooltipWrapper content="Add to chat">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
+                onClick={() => {
+                  chatCtx.addMention(link);
+                  chatCtx.setIsWidgetOpen(true);
+                }}
+              >
+                <MessageCircle />
+              </Button>
+            </TooltipWrapper>
+          )}
           <LinkMenu
             link={link}
             onDeleteStart={() => {
