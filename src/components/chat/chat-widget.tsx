@@ -36,6 +36,12 @@ export default function ChatWidget() {
           "w-72 md:h-[80dvh] md:max-h-168 md:w-96",
           "max-md:h-dvh max-md:w-full max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:shadow-none max-md:ring-0",
         )}
+        onInteractOutside={(event) => {
+          const target = event.target;
+          if (target instanceof Element && target.closest("[data-add-to-chat]")) {
+            event.preventDefault();
+          }
+        }}
       >
         <ChatConversation onClose={handleClose} />
       </PopoverContent>

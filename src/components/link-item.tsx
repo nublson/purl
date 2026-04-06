@@ -158,8 +158,10 @@ export const LinkItem = React.forwardRef<
           {chatCtx && (
             <TooltipWrapper content="Add to chat">
               <Button
+                type="button"
                 variant="ghost"
                 size="icon-sm"
+                data-add-to-chat=""
                 className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
                 onClick={() => {
                   chatCtx.addMention(link);
