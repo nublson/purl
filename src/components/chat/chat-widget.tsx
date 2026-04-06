@@ -1,11 +1,9 @@
 "use client";
 
-import { ChevronDown, MessageCircle } from "lucide-react";
-import { useState } from "react";
-
 import { useFullscreenRadixPopperOnMobile } from "@/hooks/use-fullscreen-radix-popper-on-mobile";
 import { cn } from "@/lib/utils";
-
+import { ChevronDown, MessageCircle } from "lucide-react";
+import { useState } from "react";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import ChatConversation from "./chat-conversation";

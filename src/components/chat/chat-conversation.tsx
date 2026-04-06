@@ -8,7 +8,7 @@ interface ChatConversationProps {
 
 export default function ChatConversation({ onClose }: ChatConversationProps) {
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col justify-start md:h-[463px] md:w-96">
+    <div className="relative flex h-full min-h-0 w-full flex-col justify-start md:h-full md:w-96">
       <ChatHeader onClose={onClose} />
       <ChatArea />
       <ChatInput />
