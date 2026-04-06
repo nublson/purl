@@ -5,11 +5,36 @@ import type { MessageRole } from "@/generated/prisma/enums";
 import { generateText } from "ai";
 import { headers } from "next/headers";
 
-async function generateChatTitle(prompt: string): Promise<string> {
+async function generateChatTitle(input: {
+  userMessage?: string | null;
+  assistantReply?: string | null;
+}): Promise<string> {
+  const blocks: string[] = [];
+  if (input.assistantReply?.trim()) {
+    blocks.push(
+      "What the assistant actually answered about (primary source for the title):",
+      input.assistantReply.trim().slice(0, 6000),
+    );
+  }
+  if (input.userMessage?.trim()) {
+    blocks.push(
+      "What the user asked (only for disambiguation, not as the main label):",
+      input.userMessage.trim().slice(0, 2000),
+    );
+  }
+  const prompt = blocks.join("\n\n").trim() || "Untitled conversation";
+
   const { text } = await generateText({
     model: getChatModel(),
-    system:
-      "Generate a short, specific chat title (max 6 words, no punctuation, no quotes) that captures the topic of the user's message. Reply with only the title.",
+    system: `You name a personal chat thread the way a human would label it in a notes app or message list: concrete and specific, never bureaucratic.
+
+Rules:
+- Maximum 6 words. No quotation marks. No trailing punctuation.
+- Name the topic, person, place, work, product, or idea that is actually discussed — especially from the assistant's reply when present.
+- Do not describe the user's task or intent. Forbidden as the main idea: request, question, summary, overview, help, explain, chat, discussion, analysis, guide, tips, and similar meta labels (e.g. avoid titles like "Music Summary Request" or "Question About React").
+- Prefer real names, titles, and specifics when the assistant used them.
+
+Reply with only the title, nothing else.`,
     prompt,
   });
   return text.trim().slice(0, 80);
@@ -114,27 +139,36 @@ export async function saveMessage(
     select: { title: true },
   });
 
-  const isFirstUserMessage = role === "USER" && !chat?.title;
-
-  if (isFirstUserMessage) {
+  let newTitle: string | null = null;
+  if (
+    role === "ASSISTANT" &&
+    !chat?.title &&
+    content.trim().length > 0
+  ) {
     try {
-      const newTitle = await generateChatTitle(content);
-      await prisma.chat.update({
-        where: { id: chatId },
-        data: { updatedAt: new Date(), title: newTitle },
+      const lastUser = await prisma.chatMessage.findFirst({
+        where: { chatId, role: "USER" },
+        orderBy: { createdAt: "desc" },
+        select: { content: true },
       });
+      const raw = await generateChatTitle({
+        userMessage: lastUser?.content ?? null,
+        assistantReply: content,
+      });
+      const trimmed = raw.trim().slice(0, 80);
+      if (trimmed) newTitle = trimmed;
     } catch {
-      await prisma.chat.update({
-        where: { id: chatId },
-        data: { updatedAt: new Date() },
-      });
+      /* keep title unset */
     }
-  } else {
-    await prisma.chat.update({
-      where: { id: chatId },
-      data: { updatedAt: new Date() },
-    });
   }
+
+  await prisma.chat.update({
+    where: { id: chatId },
+    data: {
+      updatedAt: new Date(),
+      ...(newTitle ? { title: newTitle } : {}),
+    },
+  });
 
   return message;
 }
