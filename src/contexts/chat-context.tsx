@@ -11,6 +11,8 @@ import {
 
 interface ChatContextValue {
   chatId: string | null;
+  chatTitle: string | null;
+  setChatTitle: (title: string | null) => void;
   mentions: Link[];
   isWidgetOpen: boolean;
   setIsWidgetOpen: (open: boolean) => void;
@@ -25,6 +27,7 @@ const ChatContext = createContext<ChatContextValue | null>(null);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [chatId, setChatId] = useState<string | null>(null);
+  const [chatTitle, setChatTitle] = useState<string | null>(null);
   const [mentions, setMentions] = useState<Link[]>([]);
   const [isWidgetOpen, setIsWidgetOpen] = useState(false);
 
@@ -47,6 +50,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const res = await fetch("/api/chats", { method: "POST" });
     const data = await res.json();
     setChatId(data.id);
+    const nextTitle =
+      typeof data.title === "string" && data.title.trim()
+        ? data.title.trim()
+        : null;
+    setChatTitle(nextTitle);
     setMentions([]);
     return data.id;
   }, []);
@@ -55,6 +63,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     <ChatContext
       value={{
         chatId,
+        chatTitle,
+        setChatTitle,
         mentions,
         isWidgetOpen,
         setIsWidgetOpen,

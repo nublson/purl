@@ -15,8 +15,15 @@ interface ChatConversationProps {
 const transport = new DefaultChatTransport({ api: "/api/chat" });
 
 export default function ChatConversation({ onClose }: ChatConversationProps) {
-  const { chatId, mentions, clearMentions, createNewChat, setChatId } =
-    useChatContext();
+  const {
+    chatId,
+    chatTitle,
+    setChatTitle,
+    mentions,
+    clearMentions,
+    createNewChat,
+    setChatId,
+  } = useChatContext();
   const [input, setInput] = useState("");
   const chatIdRef = useRef(chatId);
   const mentionsRef = useRef(mentions);
@@ -34,6 +41,27 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
   });
 
   const isLoading = status === "submitted" || status === "streaming";
+
+  const wasLoadingRef = useRef(false);
+  useEffect(() => {
+    if (wasLoadingRef.current && !isLoading && chatId) {
+      void (async () => {
+        try {
+          const res = await fetch(`/api/chats/${chatId}`);
+          if (!res.ok) return;
+          const data = (await res.json()) as { title?: string | null };
+          const next =
+            typeof data.title === "string" && data.title.trim()
+              ? data.title.trim()
+              : null;
+          setChatTitle(next);
+        } catch {
+          /* ignore */
+        }
+      })();
+    }
+    wasLoadingRef.current = isLoading;
+  }, [isLoading, chatId, setChatTitle]);
 
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
@@ -68,14 +96,15 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
 
   const handleNewChat = useCallback(() => {
     setChatId(null);
+    setChatTitle(null);
     setMessages([]);
     clearMentions();
     setInput("");
-  }, [setChatId, setMessages, clearMentions]);
+  }, [setChatId, setChatTitle, setMessages, clearMentions]);
 
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col justify-start md:w-96">
-      <ChatHeader onClose={onClose} onNewChat={handleNewChat} />
+      <ChatHeader title={chatTitle} onClose={onClose} onNewChat={handleNewChat} />
       <ChatArea
         messages={messages}
         isLoading={isLoading}
