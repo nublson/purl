@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { buildChatContext, streamChatResponse } from "@/lib/chat";
+import { buildMentionContext, streamChatResponse } from "@/lib/chat";
 import { saveMessage, verifyChatOwnership } from "@/lib/chats";
 import { convertToModelMessages, type UIMessage } from "ai";
 import { headers } from "next/headers";
@@ -58,19 +58,23 @@ export async function POST(request: Request) {
     .map((p) => p.text)
     .join(" ") ?? "";
 
-  const context = await buildChatContext(
-    session.user.id,
-    query,
-    mentionedLinkIds,
-  );
+  const context =
+    mentionedLinkIds && mentionedLinkIds.length > 0
+      ? await buildMentionContext(mentionedLinkIds)
+      : null;
 
   const modelMessages = await convertToModelMessages(messages);
 
   await saveMessage(chatId, "USER", query, mentionedLinkIds);
 
-  const result = streamChatResponse(modelMessages, context, async (text) => {
-    await saveMessage(chatId, "ASSISTANT", text);
-  });
+  const result = streamChatResponse(
+    modelMessages,
+    session.user.id,
+    context,
+    async (text) => {
+      await saveMessage(chatId, "ASSISTANT", text);
+    },
+  );
 
   return result.toUIMessageStreamResponse();
 }

@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("ai", () => ({
   streamText: vi.fn(),
+  tool: vi.fn((t: unknown) => t),
+  jsonSchema: vi.fn((s: unknown) => s),
+  stepCountIs: vi.fn((n: number) => n),
 }));
 
 vi.mock("@/lib/ai", () => ({
@@ -9,7 +12,7 @@ vi.mock("@/lib/ai", () => ({
 }));
 
 vi.mock("@/lib/prisma", () => ({
-  default: { linkContent: { findMany: vi.fn() } },
+  default: { linkContent: { findMany: vi.fn() }, link: { findMany: vi.fn() } },
 }));
 
 vi.mock("@/lib/semantic-search", () => ({
@@ -26,7 +29,7 @@ describe("streamChatResponse", () => {
     vi.mocked(getChatModel).mockReset();
   });
 
-  it("delegates to AI SDK streamText with system prompt and messages", () => {
+  it("delegates to AI SDK streamText with system prompt, tools, and messages", () => {
     const model = { id: "chat-model" };
     const messages = [{ role: "user", content: [{ type: "text", text: "Hi" }] }];
     const streamResult = { toDataStreamResponse: vi.fn() };
@@ -34,19 +37,23 @@ describe("streamChatResponse", () => {
     vi.mocked(getChatModel).mockReturnValue(model as never);
     vi.mocked(streamText).mockReturnValue(streamResult as never);
 
-    const result = streamChatResponse(messages as never, null);
+    const result = streamChatResponse(messages as never, "user-123", null);
 
     expect(streamText).toHaveBeenCalledWith(
       expect.objectContaining({
         model,
         messages,
         system: expect.stringContaining("Purl AI"),
+        tools: expect.objectContaining({
+          listSavedItems: expect.anything(),
+          searchContent: expect.anything(),
+        }),
       }),
     );
     expect(result).toEqual(streamResult);
   });
 
-  it("includes context in system prompt when provided", () => {
+  it("includes mention context in system prompt when provided", () => {
     const model = { id: "chat-model" };
     const messages = [{ role: "user", content: [{ type: "text", text: "Hi" }] }];
     const context = "### Article\nSource: https://example.com\n\nSome content";
@@ -54,11 +61,11 @@ describe("streamChatResponse", () => {
     vi.mocked(getChatModel).mockReturnValue(model as never);
     vi.mocked(streamText).mockReturnValue({} as never);
 
-    streamChatResponse(messages as never, context);
+    streamChatResponse(messages as never, "user-123", context);
 
     expect(streamText).toHaveBeenCalledWith(
       expect.objectContaining({
-        system: expect.stringContaining("Relevant saved content"),
+        system: expect.stringContaining("@mentioned items"),
       }),
     );
   });
