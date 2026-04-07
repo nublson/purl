@@ -16,6 +16,7 @@ interface ChatContextValue {
   mentions: Link[];
   isWidgetOpen: boolean;
   setIsWidgetOpen: (open: boolean) => void;
+  resetWidgetChat: () => void;
   addMention: (link: Link) => void;
   removeMention: (linkId: string) => void;
   clearMentions: () => void;
@@ -59,6 +60,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     return data.id;
   }, []);
 
+  const resetWidgetChat = useCallback(() => {
+    setChatId(null);
+    setChatTitle(null);
+    setMentions([]);
+  }, []);
+
   return (
     <ChatContext
       value={{
@@ -68,6 +75,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         mentions,
         isWidgetOpen,
         setIsWidgetOpen,
+        resetWidgetChat,
         addMention,
         removeMention,
         clearMentions,
