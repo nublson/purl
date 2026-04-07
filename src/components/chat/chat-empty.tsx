@@ -5,6 +5,9 @@ import {
   EmptyHeader,
   EmptyMedia,
 } from "@/components/ui/empty";
+import { suggestions } from "@/data/chat-empty-suggestions.json" with {
+  type: "json",
+};
 import Image from "next/image";
 import { Button } from "../ui/button";
 
@@ -24,22 +27,16 @@ export const ChatEmpty = ({ onSuggestion }: ChatEmptyProps) => {
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        <Button
-          size="xs"
-          variant="outline"
-          onClick={() => onSuggestion("Recap everything I read this week")}
-        >
-          Recap everything I read this week
-        </Button>
-        <Button
-          size="xs"
-          variant="outline"
-          onClick={() =>
-            onSuggestion("Analyze my reading habits this month")
-          }
-        >
-          Analyze my reading habits this month
-        </Button>
+        {suggestions.map((text) => (
+          <Button
+            key={text}
+            size="xs"
+            variant="outline"
+            onClick={() => onSuggestion(text)}
+          >
+            {text}
+          </Button>
+        ))}
       </EmptyContent>
     </Empty>
   );
