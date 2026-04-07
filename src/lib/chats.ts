@@ -10,16 +10,16 @@ async function generateChatTitle(input: {
   assistantReply?: string | null;
 }): Promise<string> {
   const blocks: string[] = [];
-  if (input.assistantReply?.trim()) {
-    blocks.push(
-      "What the assistant actually answered about (primary source for the title):",
-      input.assistantReply.trim().slice(0, 6000),
-    );
-  }
   if (input.userMessage?.trim()) {
     blocks.push(
-      "What the user asked (only for disambiguation, not as the main label):",
+      "What the user asked (primary source for the title):",
       input.userMessage.trim().slice(0, 2000),
+    );
+  }
+  if (input.assistantReply?.trim()) {
+    blocks.push(
+      "What the assistant replied (context only — do not title based on cited sources or link names):",
+      input.assistantReply.trim().slice(0, 4000),
     );
   }
   const prompt = blocks.join("\n\n").trim() || "Untitled conversation";
@@ -30,9 +30,10 @@ async function generateChatTitle(input: {
 
 Rules:
 - Maximum 6 words. No quotation marks. No trailing punctuation.
-- Name the topic, person, place, work, product, or idea that is actually discussed — especially from the assistant's reply when present.
-- Do not describe the user's task or intent. Forbidden as the main idea: request, question, summary, overview, help, explain, chat, discussion, analysis, guide, tips, and similar meta labels (e.g. avoid titles like "Music Summary Request" or "Question About React").
-- Prefer real names, titles, and specifics when the assistant used them.
+- Base the title on what the USER asked or intended — not on the titles of links, articles, or sources mentioned in the assistant's reply.
+- Derive a concrete label from the intent: if the user asked about reading habits, say "April Reading Habits"; if they asked about a specific topic, name that topic.
+- Forbidden as the main idea: request, question, summary, overview, help, explain, chat, discussion, analysis, guide, tips, and similar meta labels.
+- Do not copy article or link titles verbatim from the assistant's reply.
 
 Reply with only the title, nothing else.`,
     prompt,
