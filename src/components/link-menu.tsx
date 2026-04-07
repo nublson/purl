@@ -1,6 +1,7 @@
 "use client";
 
 import { copyToClipboard } from "@/lib/clipboard";
+import { useChatContextSafe } from "@/contexts/chat-context";
 import type { Link as LinkType } from "@/utils/links";
 import { Ellipsis, Link, Pencil, ScrollText, Trash } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -22,6 +23,7 @@ export function LinkMenu({
   onDeleteStart?: () => void;
 }) {
   const router = useRouter();
+  const chatCtx = useChatContextSafe();
 
   async function handleCopyLink() {
     try {
@@ -58,7 +60,11 @@ export function LinkMenu({
       className="w-full"
     >
       <DropdownMenuGroup>
-        <DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => {
+            chatCtx?.triggerSummarize(link);
+          }}
+        >
           <ScrollText /> Summarize with AI
         </DropdownMenuItem>
         <DropdownMenuSeparator />

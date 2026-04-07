@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { getRelativeDateLabel, getUrlDomain } from "./formatter";
+import {
+  formatChatHistoryTime,
+  getRelativeDateLabel,
+  getUrlDomain,
+  groupChatsByChatHistoryDate,
+} from "./formatter";
 
 describe("getUrlDomain", () => {
   it("strips www. prefix", () => {
@@ -57,5 +62,116 @@ describe("getRelativeDateLabel", () => {
 
   it("returns Older for 2+ years ago", () => {
     expect(getRelativeDateLabel(new Date(2023, 0, 1))).toBe("Older");
+  });
+});
+
+describe("formatChatHistoryTime", () => {
+  const fixedNow = new Date(2025, 5, 15, 14, 30, 0); // 2025-06-15 14:30:00
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(fixedNow);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns a time string (containing ':') for a timestamp from today", () => {
+    const todayAt9am = new Date(2025, 5, 15, 9, 0, 0).toISOString();
+
+    const result = formatChatHistoryTime(todayAt9am);
+
+    expect(result).toMatch(/:/);
+  });
+
+  it("returns a date string (not containing ':') for a timestamp from a previous day", () => {
+    const yesterday = new Date(2025, 5, 14, 10, 0, 0).toISOString();
+
+    const result = formatChatHistoryTime(yesterday);
+
+    expect(result).not.toMatch(/\d:\d/);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("produces a different format for today versus a past date", () => {
+    const today = new Date(2025, 5, 15, 8, 0, 0).toISOString();
+    const past = new Date(2025, 4, 1, 8, 0, 0).toISOString();
+
+    expect(formatChatHistoryTime(today)).not.toBe(formatChatHistoryTime(past));
+  });
+});
+
+describe("groupChatsByChatHistoryDate", () => {
+  const fixedNow = new Date(2025, 5, 15, 12, 0, 0); // 2025-06-15
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(fixedNow);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns an empty array for an empty input", () => {
+    expect(groupChatsByChatHistoryDate([])).toEqual([]);
+  });
+
+  it("places a chat updated today into the 'Today' group", () => {
+    const chats = [{ id: "c1", updatedAt: new Date(2025, 5, 15, 10, 0, 0).toISOString() }];
+
+    const groups = groupChatsByChatHistoryDate(chats);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe("Today");
+    expect(groups[0].chats).toEqual(chats);
+  });
+
+  it("places a chat updated yesterday into the 'Yesterday' group", () => {
+    const chats = [{ id: "c2", updatedAt: new Date(2025, 5, 14, 10, 0, 0).toISOString() }];
+
+    const groups = groupChatsByChatHistoryDate(chats);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe("Yesterday");
+    expect(groups[0].chats).toEqual(chats);
+  });
+
+  it("places a chat updated before yesterday into the 'Earlier' group", () => {
+    const chats = [{ id: "c3", updatedAt: new Date(2025, 4, 1, 10, 0, 0).toISOString() }];
+
+    const groups = groupChatsByChatHistoryDate(chats);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe("Earlier");
+    expect(groups[0].chats).toEqual(chats);
+  });
+
+  it("omits groups that have no chats", () => {
+    const chats = [
+      { id: "c1", updatedAt: new Date(2025, 5, 15, 10, 0, 0).toISOString() },
+      { id: "c2", updatedAt: new Date(2025, 4, 1, 10, 0, 0).toISOString() },
+    ];
+
+    const groups = groupChatsByChatHistoryDate(chats);
+
+    const labels = groups.map((g) => g.label);
+    expect(labels).toContain("Today");
+    expect(labels).toContain("Earlier");
+    expect(labels).not.toContain("Yesterday");
+  });
+
+  it("groups multiple chats from the same bucket together", () => {
+    const chats = [
+      { id: "c1", updatedAt: new Date(2025, 5, 15, 9, 0, 0).toISOString() },
+      { id: "c2", updatedAt: new Date(2025, 5, 15, 11, 0, 0).toISOString() },
+    ];
+
+    const groups = groupChatsByChatHistoryDate(chats);
+
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe("Today");
+    expect(groups[0].chats).toHaveLength(2);
   });
 });

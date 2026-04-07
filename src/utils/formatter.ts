@@ -29,3 +29,58 @@ export function getRelativeDateLabel(date: Date): string {
   if (then.getFullYear() === now.getFullYear() - 1) return "Last Year";
   return "Older";
 }
+
+/** Chat list row: time for today, short date otherwise. */
+export function formatChatHistoryTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+
+  if (isToday) {
+    return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+
+  return date.toLocaleDateString([], { month: "short", day: "numeric" });
+}
+
+export interface ChatHistoryDateGroup<T extends { updatedAt: string }> {
+  label: string;
+  chats: T[];
+}
+
+/** Buckets chats by Today / Yesterday / Earlier using `updatedAt`. */
+export function groupChatsByChatHistoryDate<
+  T extends { updatedAt: string },
+>(chats: T[]): ChatHistoryDateGroup<T>[] {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const groups: Record<string, T[]> = {
+    Today: [],
+    Yesterday: [],
+    Earlier: [],
+  };
+
+  for (const chat of chats) {
+    const date = new Date(chat.updatedAt);
+    const chatDay = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+    );
+
+    if (chatDay.getTime() === today.getTime()) {
+      groups.Today.push(chat);
+    } else if (chatDay.getTime() === yesterday.getTime()) {
+      groups.Yesterday.push(chat);
+    } else {
+      groups.Earlier.push(chat);
+    }
+  }
+
+  return Object.entries(groups)
+    .filter(([, list]) => list.length > 0)
+    .map(([label, list]) => ({ label, chats: list }));
+}

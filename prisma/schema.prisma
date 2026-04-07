@@ -27,6 +27,11 @@ enum IngestStatus {
   SKIPPED
 }
 
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
 model User {
   id            String    @id
   name          String
@@ -38,6 +43,7 @@ model User {
   sessions      Session[]
   accounts      Account[]
   links         Link[]
+  chats         Chat[]
 
   @@unique([email])
   @@map("users")
@@ -57,6 +63,7 @@ model Link {
   userId       String
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   contents     LinkContent[]
+  chatMessages ChatMessage[]
 
   @@map("links")
 }
@@ -71,6 +78,32 @@ model LinkContent {
   createdAt  DateTime @default(now())
 
   @@map("link_contents")
+}
+
+model Chat {
+  id        String        @id @default(cuid())
+  title     String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+
+  @@index([userId])
+  @@map("chats")
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  chatId    String
+  chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  role      MessageRole
+  content   String
+  createdAt DateTime    @default(now())
+  mentions  Link[]
+
+  @@index([chatId])
+  @@map("chat_messages")
 }
 
 model Session {

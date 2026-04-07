@@ -26,6 +26,8 @@ export async function semanticSearch(
     type?: LinkContentType;
     matchCount?: number;
     similarityThreshold?: SimilarityThreshold;
+    dateFrom?: Date;
+    dateTo?: Date;
   },
 ): Promise<LinkSearchResult[]> {
   const normalizedQuery = query.trim();
@@ -37,6 +39,8 @@ export async function semanticSearch(
   const threshold = options?.similarityThreshold ?? SimilarityThreshold.RELAXED;
   const minSimilarity = Number(threshold);
   const contentType = options?.type ?? null;
+  const dateFrom = options?.dateFrom ?? null;
+  const dateTo = options?.dateTo ?? null;
 
   const rows = await prisma.$queryRaw<MatchLinkChunksRow[]>(
     Prisma.sql`
@@ -44,7 +48,9 @@ export async function semanticSearch(
         ${embeddingVector}::vector,
         ${userId},
         ${matchCount},
-        ${contentType}
+        ${contentType},
+        ${dateFrom},
+        ${dateTo}
       )
     `,
   );
