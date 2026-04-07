@@ -22,6 +22,9 @@ interface ChatContextValue {
   clearMentions: () => void;
   createNewChat: () => Promise<string>;
   setChatId: (id: string | null) => void;
+  pendingSummarize: Link | null;
+  triggerSummarize: (link: Link) => void;
+  clearPendingSummarize: () => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -31,6 +34,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [chatTitle, setChatTitle] = useState<string | null>(null);
   const [mentions, setMentions] = useState<Link[]>([]);
   const [isWidgetOpen, setIsWidgetOpen] = useState(false);
+  const [pendingSummarize, setPendingSummarize] = useState<Link | null>(null);
 
   const addMention = useCallback((link: Link) => {
     setMentions((prev) => {
@@ -66,6 +70,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setMentions([]);
   }, []);
 
+  const triggerSummarize = useCallback((link: Link) => {
+    setPendingSummarize(link);
+    setIsWidgetOpen(true);
+  }, []);
+
+  const clearPendingSummarize = useCallback(() => {
+    setPendingSummarize(null);
+  }, []);
+
   return (
     <ChatContext
       value={{
@@ -81,6 +94,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         clearMentions,
         createNewChat,
         setChatId,
+        pendingSummarize,
+        triggerSummarize,
+        clearPendingSummarize,
       }}
     >
       {children}

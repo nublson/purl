@@ -24,6 +24,8 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     clearMentions,
     createNewChat,
     setChatId,
+    pendingSummarize,
+    clearPendingSummarize,
   } = useChatContext();
   const [input, setInput] = useState("");
   const [messageMentions, setMessageMentions] = useState<Link[][]>([]);
@@ -46,6 +48,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
   const isLoading = status === "submitted" || status === "streaming";
 
   const wasLoadingRef = useRef(false);
+  const summarizeInFlightRef = useRef(false);
   useEffect(() => {
     if (wasLoadingRef.current && !isLoading && chatId) {
       void (async () => {
@@ -65,6 +68,31 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     }
     wasLoadingRef.current = isLoading;
   }, [isLoading, chatId, setChatTitle]);
+
+  useEffect(() => {
+    if (!pendingSummarize || summarizeInFlightRef.current) return;
+
+    summarizeInFlightRef.current = true;
+    const link = pendingSummarize;
+    clearPendingSummarize();
+
+    void (async () => {
+      try {
+        let id = chatIdRef.current;
+        if (!id) {
+          id = await createNewChat();
+        }
+
+        sendMessage(
+          { text: `Summarize @${link.title}` },
+          { body: { chatId: id, mentionedLinkIds: [link.id] } },
+        );
+        setMessageMentions((prev) => [...prev, [link]]);
+      } finally {
+        summarizeInFlightRef.current = false;
+      }
+    })();
+  }, [pendingSummarize, clearPendingSummarize, createNewChat, sendMessage]);
 
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
