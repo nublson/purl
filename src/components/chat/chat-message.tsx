@@ -13,7 +13,6 @@ import {
   ItemMedia,
   ItemTitle,
 } from "../ui/item";
-import ChatBadge from "./chat-badge";
 
 interface ChatMessageProps {
   content: string;
@@ -127,11 +126,21 @@ export default function ChatMessage({
           )}
         </ItemTitle>
         {role === "user" && mentions && mentions.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1 overflow-hidden overflow-x-auto no-scrollbar">
-            {mentions.map((link) => (
-              <ChatBadge key={link.id} link={link} />
+          <ItemDescription className="text-xs">
+            {mentions.map((link, index) => (
+              <span key={link.id}>
+                {index > 0 ? ", " : ""}
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  @{link.title}
+                </a>
+              </span>
             ))}
-          </div>
+          </ItemDescription>
         )}
       </ItemContent>
     </Item>
