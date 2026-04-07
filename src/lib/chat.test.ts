@@ -1,4 +1,18 @@
+import type { ToolExecutionOptions } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const stubToolOptions = {} as ToolExecutionOptions;
+
+/** AI SDK v6 `tool().execute` takes `(input, options)` and may return a plain value or a Promise. */
+async function callToolExecute<I>(
+  tool: { execute?: (input: I, options: ToolExecutionOptions) => unknown },
+  input: I,
+) {
+  if (!tool.execute) {
+    throw new Error("expected tool.execute to be defined");
+  }
+  return Promise.resolve(tool.execute(input, stubToolOptions));
+}
 
 vi.mock("ai", () => ({
   streamText: vi.fn(),
@@ -143,7 +157,7 @@ describe("buildChatTools – listSavedItems", () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
 
     const tools = buildChatTools(userId);
-    await tools.listSavedItems.execute({});
+    await callToolExecute(tools.listSavedItems, {});
 
     expect(prisma.link.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -157,7 +171,7 @@ describe("buildChatTools – listSavedItems", () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
 
     const tools = buildChatTools(userId);
-    await tools.listSavedItems.execute({ contentType: "PDF" });
+    await callToolExecute(tools.listSavedItems, { contentType: "PDF" });
 
     expect(prisma.link.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -170,7 +184,7 @@ describe("buildChatTools – listSavedItems", () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
 
     const tools = buildChatTools(userId);
-    await tools.listSavedItems.execute({
+    await callToolExecute(tools.listSavedItems, {
       dateFrom: "2025-01-01T00:00:00Z",
       dateTo: "2025-01-31T23:59:59Z",
     });
@@ -191,7 +205,7 @@ describe("buildChatTools – listSavedItems", () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
 
     const tools = buildChatTools(userId);
-    await tools.listSavedItems.execute({ limit: 0 });
+    await callToolExecute(tools.listSavedItems, { limit: 0 });
 
     expect(prisma.link.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ take: 1 }),
@@ -202,7 +216,7 @@ describe("buildChatTools – listSavedItems", () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
 
     const tools = buildChatTools(userId);
-    await tools.listSavedItems.execute({ limit: 999 });
+    await callToolExecute(tools.listSavedItems, { limit: 999 });
 
     expect(prisma.link.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ take: 50 }),
@@ -224,7 +238,7 @@ describe("buildChatTools – listSavedItems", () => {
     ] as never);
 
     const tools = buildChatTools(userId);
-    const result = await tools.listSavedItems.execute({});
+    const result = await callToolExecute(tools.listSavedItems, {});
 
     expect(result).toEqual([
       {
@@ -251,7 +265,9 @@ describe("buildChatTools – searchContent", () => {
     vi.mocked(semanticSearch).mockResolvedValue([]);
 
     const tools = buildChatTools(userId);
-    const result = await tools.searchContent.execute({ query: "react hooks" });
+    const result = await callToolExecute(tools.searchContent, {
+      query: "react hooks",
+    });
 
     expect(result).toEqual([]);
     expect(prisma.linkContent.findMany).not.toHaveBeenCalled();
@@ -261,7 +277,7 @@ describe("buildChatTools – searchContent", () => {
     vi.mocked(semanticSearch).mockResolvedValue([]);
 
     const tools = buildChatTools(userId);
-    await tools.searchContent.execute({ query: "typescript tips" });
+    await callToolExecute(tools.searchContent, { query: "typescript tips" });
 
     expect(semanticSearch).toHaveBeenCalledWith(
       "typescript tips",
@@ -274,7 +290,7 @@ describe("buildChatTools – searchContent", () => {
     vi.mocked(semanticSearch).mockResolvedValue([]);
 
     const tools = buildChatTools(userId);
-    await tools.searchContent.execute({ query: "q", limit: 100 });
+    await callToolExecute(tools.searchContent, { query: "q", limit: 100 });
 
     expect(semanticSearch).toHaveBeenCalledWith(
       "q",
@@ -287,7 +303,7 @@ describe("buildChatTools – searchContent", () => {
     vi.mocked(semanticSearch).mockResolvedValue([]);
 
     const tools = buildChatTools(userId);
-    await tools.searchContent.execute({ query: "q", limit: 0 });
+    await callToolExecute(tools.searchContent, { query: "q", limit: 0 });
 
     expect(semanticSearch).toHaveBeenCalledWith(
       "q",
@@ -323,7 +339,7 @@ describe("buildChatTools – searchContent", () => {
     ] as never);
 
     const tools = buildChatTools(userId);
-    const result = await tools.searchContent.execute({ query: "great" });
+    const result = await callToolExecute(tools.searchContent, { query: "great" });
 
     expect(result).toEqual([
       {
