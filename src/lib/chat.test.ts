@@ -21,7 +21,10 @@ vi.mock("@/lib/semantic-search", () => ({
 
 const { streamText } = await import("ai");
 const { getChatModel } = await import("@/lib/ai");
-const { streamChatResponse } = await import("./chat");
+const prisma = (await import("@/lib/prisma")).default;
+const { semanticSearch } = await import("@/lib/semantic-search");
+const { streamChatResponse, buildMentionContext, buildChatTools } =
+  await import("./chat");
 
 describe("streamChatResponse", () => {
   beforeEach(() => {
@@ -68,5 +71,268 @@ describe("streamChatResponse", () => {
         system: expect.stringContaining("@mentioned items"),
       }),
     );
+  });
+});
+
+describe("buildMentionContext", () => {
+  beforeEach(() => {
+    vi.mocked(prisma.linkContent.findMany).mockReset();
+  });
+
+  it("returns null immediately for empty mentionedLinkIds without querying the DB", async () => {
+    const result = await buildMentionContext([]);
+    expect(result).toBeNull();
+    expect(prisma.linkContent.findMany).not.toHaveBeenCalled();
+  });
+
+  it("returns null when no linkContent rows are found for the given ids", async () => {
+    vi.mocked(prisma.linkContent.findMany).mockResolvedValue([] as never);
+    const result = await buildMentionContext(["id-1"]);
+    expect(result).toBeNull();
+  });
+
+  it("groups multiple chunks for the same link under a single section", async () => {
+    vi.mocked(prisma.linkContent.findMany).mockResolvedValue([
+      {
+        content: "Chunk one",
+        link: { title: "My Article", url: "https://example.com/article" },
+      },
+      {
+        content: "Chunk two",
+        link: { title: "My Article", url: "https://example.com/article" },
+      },
+    ] as never);
+
+    const result = await buildMentionContext(["id-1"]);
+
+    expect(result).toContain("### My Article");
+    expect(result).toContain("Source: https://example.com/article");
+    expect(result).toContain("Chunk one");
+    expect(result).toContain("Chunk two");
+    expect(result).not.toContain("---");
+  });
+
+  it("separates multiple links with a horizontal rule", async () => {
+    vi.mocked(prisma.linkContent.findMany).mockResolvedValue([
+      {
+        content: "First content",
+        link: { title: "Article A", url: "https://a.com" },
+      },
+      {
+        content: "Second content",
+        link: { title: "Article B", url: "https://b.com" },
+      },
+    ] as never);
+
+    const result = await buildMentionContext(["id-1", "id-2"]);
+
+    expect(result).toContain("### Article A");
+    expect(result).toContain("### Article B");
+    expect(result).toContain("---");
+  });
+});
+
+describe("buildChatTools – listSavedItems", () => {
+  const userId = "user-123";
+
+  beforeEach(() => {
+    vi.mocked(prisma.link.findMany).mockReset();
+  });
+
+  it("queries all links for the user with default take=20 when no filters provided", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
+
+    const tools = buildChatTools(userId);
+    await tools.listSavedItems.execute({});
+
+    expect(prisma.link.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId },
+        take: 20,
+      }),
+    );
+  });
+
+  it("adds contentType to the where clause when provided", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
+
+    const tools = buildChatTools(userId);
+    await tools.listSavedItems.execute({ contentType: "PDF" });
+
+    expect(prisma.link.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ contentType: "PDF" }),
+      }),
+    );
+  });
+
+  it("adds dateFrom and dateTo to createdAt filter when provided", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
+
+    const tools = buildChatTools(userId);
+    await tools.listSavedItems.execute({
+      dateFrom: "2025-01-01T00:00:00Z",
+      dateTo: "2025-01-31T23:59:59Z",
+    });
+
+    expect(prisma.link.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          createdAt: {
+            gte: new Date("2025-01-01T00:00:00Z"),
+            lte: new Date("2025-01-31T23:59:59Z"),
+          },
+        }),
+      }),
+    );
+  });
+
+  it("clamps limit below 1 to 1", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
+
+    const tools = buildChatTools(userId);
+    await tools.listSavedItems.execute({ limit: 0 });
+
+    expect(prisma.link.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 1 }),
+    );
+  });
+
+  it("clamps limit above 50 to 50", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
+
+    const tools = buildChatTools(userId);
+    await tools.listSavedItems.execute({ limit: 999 });
+
+    expect(prisma.link.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 50 }),
+    );
+  });
+
+  it("maps prisma rows to the expected output shape", async () => {
+    const createdAt = new Date("2025-06-01T10:00:00Z");
+    vi.mocked(prisma.link.findMany).mockResolvedValue([
+      {
+        id: "l1",
+        title: "My Link",
+        url: "https://example.com",
+        domain: "example.com",
+        contentType: "WEB",
+        description: "A description",
+        createdAt,
+      },
+    ] as never);
+
+    const tools = buildChatTools(userId);
+    const result = await tools.listSavedItems.execute({});
+
+    expect(result).toEqual([
+      {
+        title: "My Link",
+        url: "https://example.com",
+        domain: "example.com",
+        contentType: "WEB",
+        description: "A description",
+        savedAt: createdAt.toISOString(),
+      },
+    ]);
+  });
+});
+
+describe("buildChatTools – searchContent", () => {
+  const userId = "user-456";
+
+  beforeEach(() => {
+    vi.mocked(semanticSearch).mockReset();
+    vi.mocked(prisma.linkContent.findMany).mockReset();
+  });
+
+  it("returns empty array when semanticSearch finds no results", async () => {
+    vi.mocked(semanticSearch).mockResolvedValue([]);
+
+    const tools = buildChatTools(userId);
+    const result = await tools.searchContent.execute({ query: "react hooks" });
+
+    expect(result).toEqual([]);
+    expect(prisma.linkContent.findMany).not.toHaveBeenCalled();
+  });
+
+  it("passes query and userId to semanticSearch with default matchCount=10", async () => {
+    vi.mocked(semanticSearch).mockResolvedValue([]);
+
+    const tools = buildChatTools(userId);
+    await tools.searchContent.execute({ query: "typescript tips" });
+
+    expect(semanticSearch).toHaveBeenCalledWith(
+      "typescript tips",
+      userId,
+      expect.objectContaining({ matchCount: 10 }),
+    );
+  });
+
+  it("clamps limit above 20 to 20 for matchCount", async () => {
+    vi.mocked(semanticSearch).mockResolvedValue([]);
+
+    const tools = buildChatTools(userId);
+    await tools.searchContent.execute({ query: "q", limit: 100 });
+
+    expect(semanticSearch).toHaveBeenCalledWith(
+      "q",
+      userId,
+      expect.objectContaining({ matchCount: 20 }),
+    );
+  });
+
+  it("clamps limit below 1 to 1 for matchCount", async () => {
+    vi.mocked(semanticSearch).mockResolvedValue([]);
+
+    const tools = buildChatTools(userId);
+    await tools.searchContent.execute({ query: "q", limit: 0 });
+
+    expect(semanticSearch).toHaveBeenCalledWith(
+      "q",
+      userId,
+      expect.objectContaining({ matchCount: 1 }),
+    );
+  });
+
+  it("groups linkContent chunks by link title and returns relevantContent", async () => {
+    vi.mocked(semanticSearch).mockResolvedValue([
+      { linkId: "l1", similarity: 0.9 },
+    ]);
+    const createdAt = new Date("2025-05-01T00:00:00Z");
+    vi.mocked(prisma.linkContent.findMany).mockResolvedValue([
+      {
+        content: "Part one",
+        link: {
+          title: "Great Article",
+          url: "https://great.com",
+          contentType: "WEB",
+          createdAt,
+        },
+      },
+      {
+        content: "Part two",
+        link: {
+          title: "Great Article",
+          url: "https://great.com",
+          contentType: "WEB",
+          createdAt,
+        },
+      },
+    ] as never);
+
+    const tools = buildChatTools(userId);
+    const result = await tools.searchContent.execute({ query: "great" });
+
+    expect(result).toEqual([
+      {
+        title: "Great Article",
+        url: "https://great.com",
+        contentType: "WEB",
+        savedAt: createdAt.toISOString(),
+        relevantContent: "Part one\n\nPart two",
+      },
+    ]);
   });
 });

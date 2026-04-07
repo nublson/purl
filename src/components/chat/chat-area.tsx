@@ -99,6 +99,11 @@ export default function ChatArea({
             content={getMessageText(message)}
             role={message.role as "user" | "assistant"}
             mentions={mentionsPerMessage[index] ?? []}
+            isLoading={
+              isLoading &&
+              index === messages.length - 1 &&
+              message.role === "assistant"
+            }
           />
         ))}
         {isLoading && messages[messages.length - 1]?.role === "user" && (

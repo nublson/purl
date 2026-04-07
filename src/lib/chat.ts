@@ -48,7 +48,7 @@ type SearchContentInput = {
   limit?: number;
 };
 
-function buildChatTools(userId: string) {
+export function buildChatTools(userId: string) {
   return {
     listSavedItems: tool({
       description:
