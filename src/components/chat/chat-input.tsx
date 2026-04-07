@@ -62,7 +62,7 @@ export default function ChatInput({
           onKeyDown={handleKeyDown}
           disabled={isLoading}
         />
-        <InputGroupAddon align="inline-end" className="justify-end gap-2">
+        <InputGroupAddon align="block-end" className="justify-end gap-2">
           <div className="shrink-0">
             <Button
               type="submit"

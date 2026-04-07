@@ -13,8 +13,7 @@ export default function ChatHeader({
   onClose,
   onNewChat,
 }: ChatHeaderProps) {
-  const label =
-    title && title.trim().length > 0 ? title.trim() : "New chat";
+  const label = title && title.trim().length > 0 ? title.trim() : "New chat";
 
   return (
     <header className="w-full flex items-center justify-between gap-4 px-4 py-2 border-b border-border">
@@ -30,7 +29,6 @@ export default function ChatHeader({
           size="icon-sm"
           variant="ghost"
           className="cursor-pointer text-muted-foreground"
-          disabled
         >
           <History />
         </Button>
