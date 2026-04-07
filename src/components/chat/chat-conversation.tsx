@@ -3,7 +3,7 @@
 import { useChatContext } from "@/contexts/chat-context";
 import type { Link } from "@/utils/links";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ChatArea from "./chat-area";
 import ChatHeader from "./chat-header";
@@ -27,6 +27,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
   } = useChatContext();
   const [input, setInput] = useState("");
   const [messageMentions, setMessageMentions] = useState<Link[][]>([]);
+  const [isLoadingChat, setIsLoadingChat] = useState(false);
   const chatIdRef = useRef(chatId);
   const mentionsRef = useRef(mentions);
 
@@ -107,13 +108,63 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     setInput("");
   }, [setChatId, setChatTitle, setMessages, clearMentions]);
 
+  const handleSelectChat = useCallback(
+    async (id: string) => {
+      setIsLoadingChat(true);
+      try {
+        const res = await fetch(`/api/chats/${id}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          id: string;
+          title: string | null;
+          messages: {
+            id: string;
+            role: "USER" | "ASSISTANT";
+            content: string;
+            mentions: Link[];
+          }[];
+        };
+
+        const converted: UIMessage[] = data.messages.map((msg) => ({
+          id: msg.id,
+          role: msg.role === "USER" ? "user" : "assistant",
+          content: msg.content,
+          parts: [{ type: "text" as const, text: msg.content }],
+        }));
+
+        const rebuiltMentions: Link[][] = data.messages.map((msg) =>
+          msg.role === "USER" ? msg.mentions : [],
+        );
+
+        setMessages(converted);
+        setMessageMentions(rebuiltMentions);
+        setChatId(id);
+        setChatTitle(data.title?.trim() || null);
+        clearMentions();
+        setInput("");
+      } catch {
+        /* ignore */
+      } finally {
+        setIsLoadingChat(false);
+      }
+    },
+    [setMessages, setChatId, setChatTitle, clearMentions],
+  );
+
   return (
     <div className="relative flex h-full min-h-0 w-full flex-col justify-start md:w-96">
-      <ChatHeader title={chatTitle} onClose={onClose} onNewChat={handleNewChat} />
+      <ChatHeader
+        title={chatTitle}
+        onClose={onClose}
+        onNewChat={handleNewChat}
+        onSelectChat={handleSelectChat}
+        isLoadingChat={isLoadingChat}
+      />
       <ChatArea
         messages={messages}
         messageMentions={messageMentions}
         isLoading={isLoading}
+        isLoadingChat={isLoadingChat}
         onSuggestion={handleSuggestion}
       />
       <ChatInput
