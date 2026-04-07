@@ -38,14 +38,14 @@ export default function ChatMessage({
     );
 
   return (
-    <Item className="p-0 gap-2 items-start">
+    <Item className="min-w-0 w-full p-0 gap-2 items-start">
       <ItemMedia>{media}</ItemMedia>
-      <ItemContent>
-        <ItemTitle>
+      <ItemContent className="min-w-0">
+        <ItemTitle className="line-clamp-none w-full min-w-0 max-w-full">
           {isLoading && !content ? (
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
           ) : (
-            <div className={cn("text-sm")}>
+            <div className={cn("min-w-0 max-w-full text-sm wrap-anywhere")}>
               {role === "assistant" ? (
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -118,7 +118,10 @@ export default function ChatMessage({
                   {content}
                 </ReactMarkdown>
               ) : (
-                <Typography size="small" className="text-accent-foreground">
+                <Typography
+                  size="small"
+                  className="text-accent-foreground wrap-anywhere"
+                >
                   {content}
                 </Typography>
               )}

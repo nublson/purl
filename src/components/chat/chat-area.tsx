@@ -26,7 +26,7 @@ const SKELETON_ROWS: Array<{ role: "user" | "assistant"; lines: string[] }> = [
 function ChatAreaSkeleton() {
   return (
     <ScrollArea className="flex-1 w-full h-20 p-4 pb-0 overflow-hidden">
-      <div className="flex flex-col items-center justify-start gap-4 h-full">
+      <div className="flex w-full min-w-0 flex-col items-stretch justify-start gap-4 h-full">
         {SKELETON_ROWS.map((row, i) => (
           <div key={i} className="flex items-start gap-2 w-full">
             <Skeleton className="size-5 shrink-0 rounded-full" />
@@ -92,7 +92,7 @@ export default function ChatArea({
 
   return (
     <ScrollArea className="flex-1 w-full h-20 p-4 pb-0 overflow-hidden">
-      <div className="flex flex-col items-center justify-start gap-4 h-full">
+      <div className="flex w-full min-w-0 flex-col items-stretch justify-start gap-4 h-full">
         {messages.map((message, index) => (
           <ChatMessage
             key={message.id}
