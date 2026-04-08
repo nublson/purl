@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({
   default: {
-    link: { update: vi.fn() },
+    link: { update: vi.fn(), findUnique: vi.fn() },
     linkContent: {
       deleteMany: vi.fn(),
       createMany: vi.fn(),
@@ -47,7 +47,17 @@ vi.mock("@/lib/ingest-skip", () => ({
   skipIngest: vi.fn(),
 }));
 
+import { buildMetadataText } from "@/lib/metadata-chunk";
+
 const prisma = (await import("@/lib/prisma")).default;
+
+const mockWebLink = {
+  title: "Article",
+  url: "https://example.com/article",
+  domain: "example.com",
+  contentType: "WEB" as const,
+  description: "OG description",
+};
 const { scrapeWebContent, UnsupportedSpaError } = await import(
   "@/lib/web-scraper"
 );
@@ -71,11 +81,17 @@ describe("ingestWeb", () => {
     vi.mocked(logIngestStart).mockReset();
     vi.mocked(logIngestFailure).mockReset();
     vi.mocked(skipIngest).mockReset();
+    vi.mocked(prisma.link.findUnique).mockReset();
+    vi.mocked(prisma.link.findUnique).mockResolvedValue(mockWebLink as never);
   });
 
-  it("marks completed and exits early when no chunks are produced", async () => {
+  it("stores metadata chunk only when body produces no chunks", async () => {
     vi.mocked(scrapeWebContent).mockResolvedValue("some text");
     vi.mocked(chunkText).mockReturnValue([]);
+    vi.mocked(embedTextChunks).mockResolvedValue([[0.1, 0.2]]);
+    vi.mocked(prisma.linkContent.findMany).mockResolvedValue([
+      { id: "row-meta", chunkIndex: 0 },
+    ] as never);
 
     await ingestWeb({ linkId: "link-1", url: "https://example.com/article" });
 
@@ -86,7 +102,9 @@ describe("ingestWeb", () => {
     expect(prisma.linkContent.deleteMany).toHaveBeenCalledWith({
       where: { linkId: "link-1" },
     });
-    expect(embedTextChunks).not.toHaveBeenCalled();
+    expect(embedTextChunks).toHaveBeenCalledWith([
+      buildMetadataText(mockWebLink),
+    ]);
     expect(logIngestStart).toHaveBeenCalledWith(
       "WEB",
       "link-1",
@@ -104,24 +122,42 @@ describe("ingestWeb", () => {
     vi.mocked(embedTextChunks).mockResolvedValue([
       [0.1, 0.2],
       [0.3, 0.4],
+      [0.5, 0.6],
     ]);
     vi.mocked(prisma.linkContent.findMany).mockResolvedValue([
       { id: "row-1", chunkIndex: 0 },
       { id: "row-2", chunkIndex: 1 },
+      { id: "row-3", chunkIndex: 2 },
     ] as never);
 
     await ingestWeb({ linkId: "link-1", url: "https://example.com/article" });
 
     expect(prisma.linkContent.createMany).toHaveBeenCalledWith({
       data: [
-        { linkId: "link-1", content: "chunk-a", chunkIndex: 0 },
-        { linkId: "link-1", content: "chunk-b", chunkIndex: 1 },
+        { linkId: "link-1", content: buildMetadataText(mockWebLink), chunkIndex: 0 },
+        { linkId: "link-1", content: "chunk-a", chunkIndex: 1 },
+        { linkId: "link-1", content: "chunk-b", chunkIndex: 2 },
       ],
     });
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(3);
     expect(prisma.link.update).toHaveBeenLastCalledWith({
       where: { id: "link-1" },
       data: { ingestStatus: "COMPLETED" },
+    });
+  });
+
+  it("marks failed when link row is missing after scrape", async () => {
+    vi.mocked(scrapeWebContent).mockResolvedValue("body");
+    vi.mocked(chunkText).mockReturnValue(["c"]);
+    vi.mocked(prisma.link.findUnique).mockResolvedValue(null);
+
+    await expect(
+      ingestWeb({ linkId: "link-1", url: "https://example.com/article" }),
+    ).rejects.toThrow("Link not found for ingest: link-1");
+
+    expect(prisma.link.update).toHaveBeenLastCalledWith({
+      where: { id: "link-1" },
+      data: { ingestStatus: "FAILED" },
     });
   });
 

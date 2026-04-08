@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({
   default: {
-    link: { update: vi.fn() },
+    link: { update: vi.fn(), findUnique: vi.fn() },
     linkContent: {
       deleteMany: vi.fn(),
       createMany: vi.fn(),
@@ -37,7 +37,17 @@ vi.mock("@/lib/ingest-logger", () => ({
   logIngestFailure: vi.fn(),
 }));
 
+import { buildMetadataText } from "@/lib/metadata-chunk";
+
 const prisma = (await import("@/lib/prisma")).default;
+
+const mockYoutubeLink = {
+  title: "Cool Video",
+  url: "https://youtu.be/abc123",
+  domain: "youtu.be",
+  contentType: "YOUTUBE" as const,
+  description: "Channel",
+};
 const { fetchYouTubeTranscript } = await import("@/lib/youtube-transcriber");
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
@@ -57,11 +67,17 @@ describe("ingestYoutube", () => {
     vi.mocked(embedTextChunks).mockReset();
     vi.mocked(logIngestStart).mockReset();
     vi.mocked(logIngestFailure).mockReset();
+    vi.mocked(prisma.link.findUnique).mockReset();
+    vi.mocked(prisma.link.findUnique).mockResolvedValue(mockYoutubeLink as never);
   });
 
-  it("marks completed and exits early when no chunks are produced", async () => {
+  it("stores metadata chunk only when transcript produces no chunks", async () => {
     vi.mocked(fetchYouTubeTranscript).mockResolvedValue("[00:00:01] hello");
     vi.mocked(chunkText).mockReturnValue([]);
+    vi.mocked(embedTextChunks).mockResolvedValue([[0.1, 0.2]]);
+    vi.mocked(prisma.linkContent.findMany).mockResolvedValue([
+      { id: "row-meta", chunkIndex: 0 },
+    ] as never);
 
     await ingestYoutube({ linkId: "link-1", url: "https://youtu.be/abc123" });
 
@@ -72,7 +88,9 @@ describe("ingestYoutube", () => {
     expect(prisma.linkContent.deleteMany).toHaveBeenCalledWith({
       where: { linkId: "link-1" },
     });
-    expect(embedTextChunks).not.toHaveBeenCalled();
+    expect(embedTextChunks).toHaveBeenCalledWith([
+      buildMetadataText(mockYoutubeLink),
+    ]);
     expect(logIngestStart).toHaveBeenCalledWith(
       "YOUTUBE",
       "link-1",
@@ -90,21 +108,28 @@ describe("ingestYoutube", () => {
     vi.mocked(embedTextChunks).mockResolvedValue([
       [0.1, 0.2],
       [0.3, 0.4],
+      [0.5, 0.6],
     ]);
     vi.mocked(prisma.linkContent.findMany).mockResolvedValue([
       { id: "row-1", chunkIndex: 0 },
       { id: "row-2", chunkIndex: 1 },
+      { id: "row-3", chunkIndex: 2 },
     ] as never);
 
     await ingestYoutube({ linkId: "link-1", url: "https://youtu.be/abc123" });
 
     expect(prisma.linkContent.createMany).toHaveBeenCalledWith({
       data: [
-        { linkId: "link-1", content: "chunk-a", chunkIndex: 0 },
-        { linkId: "link-1", content: "chunk-b", chunkIndex: 1 },
+        {
+          linkId: "link-1",
+          content: buildMetadataText(mockYoutubeLink),
+          chunkIndex: 0,
+        },
+        { linkId: "link-1", content: "chunk-a", chunkIndex: 1 },
+        { linkId: "link-1", content: "chunk-b", chunkIndex: 2 },
       ],
     });
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(3);
     expect(prisma.link.update).toHaveBeenLastCalledWith({
       where: { id: "link-1" },
       data: { ingestStatus: "COMPLETED" },

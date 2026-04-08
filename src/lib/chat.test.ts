@@ -314,7 +314,7 @@ describe("buildChatTools – searchContent", () => {
 
   it("groups linkContent chunks by link title and returns relevantContent", async () => {
     vi.mocked(semanticSearch).mockResolvedValue([
-      { linkId: "l1", similarity: 0.9 },
+      { linkId: "l1", similarity: 0.9, vectorSimilarity: 0.9 },
     ]);
     const createdAt = new Date("2025-05-01T00:00:00Z");
     vi.mocked(prisma.linkContent.findMany).mockResolvedValue([

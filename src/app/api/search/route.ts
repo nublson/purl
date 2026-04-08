@@ -46,12 +46,19 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const results = await semanticSearch(query, session.user.id, {
-    type: contentType,
-    matchCount: 20,
-  });
+  try {
+    const results = await semanticSearch(query, session.user.id, {
+      type: contentType,
+      matchCount: 20,
+    });
 
-  return NextResponse.json({
-    results: results.map((result) => ({ linkId: result.linkId })),
-  });
+    return NextResponse.json({
+      results: results.map((result) => ({ linkId: result.linkId })),
+    });
+  } catch {
+    return NextResponse.json(
+      { error: "Internal semantic search error" },
+      { status: 500 },
+    );
+  }
 }
