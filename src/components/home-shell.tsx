@@ -116,7 +116,7 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
             <LinkGroup
               label="Today"
               links={[]}
-              prependItems={<LinkItemSkeleton url={skeletonUrl} />}
+              prependItems={<LinkItemSkeleton url={skeletonUrl} animateIn />}
             />
           )}
           {groups.map((group) => (
@@ -127,7 +127,7 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
               newLinkId={group.label === "Today" ? newLinkId : undefined}
               prependItems={
                 group.label === "Today" && showSkeleton ? (
-                  <LinkItemSkeleton url={skeletonUrl} />
+                  <LinkItemSkeleton url={skeletonUrl} animateIn />
                 ) : undefined
               }
             />

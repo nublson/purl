@@ -21,12 +21,7 @@ export const LinkGroup = ({
       <ItemGroup className="w-full gap-0">
         {prependItems}
         {links.map((link) => (
-          <div
-            key={link.id}
-            className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
-          >
-            <LinkItem link={link} preview={preview} />
-          </div>
+          <LinkItem key={link.id} link={link} preview={preview} />
         ))}
       </ItemGroup>
     </div>

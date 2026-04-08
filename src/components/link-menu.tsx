@@ -18,9 +18,13 @@ import {
 export function LinkMenu({
   link,
   onDeleteStart,
+  onDeleteSuccess,
+  onDeleteError,
 }: {
   link: LinkType;
   onDeleteStart?: () => void;
+  onDeleteSuccess?: () => void;
+  onDeleteError?: () => void;
 }) {
   const router = useRouter();
   const chatCtx = useChatContextSafe();
@@ -36,11 +40,21 @@ export function LinkMenu({
 
   async function handleDelete() {
     onDeleteStart?.();
-    const res = await fetch(`/api/links/${link.id}`, { method: "DELETE" });
-    if (res.ok) {
-      toast.success("Link deleted");
-      router.refresh();
-    } else {
+    try {
+      const res = await fetch(`/api/links/${link.id}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Link deleted");
+        if (onDeleteSuccess) {
+          onDeleteSuccess();
+          return;
+        }
+        router.refresh();
+      } else {
+        onDeleteError?.();
+        toast.error("Failed to delete link");
+      }
+    } catch {
+      onDeleteError?.();
       toast.error("Failed to delete link");
     }
   }
