@@ -6,7 +6,7 @@ vi.mock("@/lib/links", () => {
     readonly name = "UnauthorizedError";
   }
   return {
-    refreshLink: vi.fn(),
+    reingestLink: vi.fn(),
     UnauthorizedError,
   };
 });
@@ -15,7 +15,7 @@ vi.mock("@/lib/realtime-broadcast", () => ({
   broadcastLinksChanged: vi.fn().mockResolvedValue(undefined),
 }));
 
-const { refreshLink, UnauthorizedError } = await import("@/lib/links");
+const { reingestLink, UnauthorizedError } = await import("@/lib/links");
 const { broadcastLinksChanged } = await import("@/lib/realtime-broadcast");
 const { POST } = await import("./route");
 
@@ -23,12 +23,12 @@ describe("POST /api/links/[id]/reingest", () => {
   const CREATED_AT = new Date("2025-06-15T10:00:00Z");
 
   beforeEach(() => {
-    vi.mocked(refreshLink).mockReset();
+    vi.mocked(reingestLink).mockReset();
     vi.mocked(broadcastLinksChanged).mockClear();
   });
 
-  it("returns 404 when refreshLink returns null", async () => {
-    vi.mocked(refreshLink).mockResolvedValue(null);
+  it("returns 404 when reingestLink returns null", async () => {
+    vi.mocked(reingestLink).mockResolvedValue(null);
 
     const res = await POST(new NextRequest("http://localhost/api/links/x/reingest"), {
       params: Promise.resolve({ id: "x" }),
@@ -39,8 +39,8 @@ describe("POST /api/links/[id]/reingest", () => {
     expect(broadcastLinksChanged).not.toHaveBeenCalled();
   });
 
-  it("returns 200, serialized link, and broadcasts when refresh succeeds", async () => {
-    vi.mocked(refreshLink).mockResolvedValue({
+  it("returns 200, serialized link, and broadcasts when reingest succeeds", async () => {
+    vi.mocked(reingestLink).mockResolvedValue({
       id: "link-1",
       url: "https://example.com",
       title: "Example",
@@ -72,12 +72,12 @@ describe("POST /api/links/[id]/reingest", () => {
       ingestStatus: "PENDING",
       createdAt: CREATED_AT.toISOString(),
     });
-    expect(refreshLink).toHaveBeenCalledWith("link-1");
+    expect(reingestLink).toHaveBeenCalledWith("link-1");
     expect(broadcastLinksChanged).toHaveBeenCalledWith("user-123");
   });
 
   it("returns 401 when UnauthorizedError is thrown", async () => {
-    vi.mocked(refreshLink).mockRejectedValue(new UnauthorizedError());
+    vi.mocked(reingestLink).mockRejectedValue(new UnauthorizedError());
 
     const res = await POST(
       new NextRequest("http://localhost/api/links/link-1/reingest"),

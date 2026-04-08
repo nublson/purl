@@ -64,6 +64,7 @@ const { ingestYoutube } = await import("@/lib/ingest-youtube");
 const {
   createLink,
   refreshLink,
+  reingestLink,
   readLink,
   updateLink,
   deleteLink,
@@ -766,6 +767,63 @@ describe("refreshLink", () => {
       url: refreshed.url,
     });
     expect(result).toEqual(refreshed);
+  });
+});
+
+// ─── reingestLink ────────────────────────────────────────────────────────────
+
+describe("reingestLink", () => {
+  beforeEach(() => {
+    vi.mocked(auth.api.getSession).mockReset();
+    vi.mocked(prisma.link.findFirst).mockReset();
+    vi.mocked(prisma.link.update).mockReset();
+    vi.mocked(ingestPdf).mockReset();
+    vi.mocked(ingestAudio).mockReset();
+    vi.mocked(ingestWeb).mockReset();
+    vi.mocked(ingestYoutube).mockReset();
+    vi.mocked(ogs).mockReset();
+  });
+
+  it("throws UnauthorizedError when there is no session", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+    await expect(reingestLink("link-1")).rejects.toThrow(UnauthorizedError);
+  });
+
+  it("returns null when the link does not exist or is not owned by the user", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+
+    const result = await reingestLink("link-1");
+
+    expect(result).toBeNull();
+    expect(vi.mocked(prisma.link.update)).not.toHaveBeenCalled();
+  });
+
+  it("only sets ingestStatus to PENDING and dispatches ingest without re-scraping metadata", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    const existing = makeRow({
+      url: "https://storage.example/bucket/177836f2-a9b8-4c1d-9e0f-abc123/resume.pdf",
+      title: "resume",
+      description: "My CV",
+      contentType: "PDF",
+      ingestStatus: "FAILED",
+    });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
+    const updated = { ...existing, ingestStatus: "PENDING" as const };
+    vi.mocked(prisma.link.update).mockResolvedValue(updated as never);
+
+    const result = await reingestLink("link-1");
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: "link-1" },
+      data: { ingestStatus: "PENDING" },
+    });
+    expect(vi.mocked(ogs)).not.toHaveBeenCalled();
+    expect(vi.mocked(ingestPdf)).toHaveBeenCalledWith({
+      linkId: updated.id,
+      url: updated.url,
+    });
+    expect(result).toEqual(updated);
   });
 });
 

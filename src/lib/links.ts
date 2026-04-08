@@ -316,6 +316,29 @@ export async function refreshLink(
   return refreshed;
 }
 
+/**
+ * Re-dispatches ingestion without re-scraping metadata. Use for manual re-ingest
+ * (e.g. failed uploads) so storage URLs do not overwrite title/description with
+ * blob-path garbage. Duplicate-URL refresh still uses {@link refreshLink}.
+ */
+export async function reingestLink(
+  id: string,
+): Promise<RefreshLinkResult | null> {
+  const userId = await getCurrentUserId();
+  const existing = await prisma.link.findFirst({
+    where: { id, userId },
+  });
+  if (!existing) return null;
+
+  const updated = await prisma.link.update({
+    where: { id },
+    data: { ingestStatus: "PENDING" },
+  });
+
+  dispatchIngest(updated);
+  return updated;
+}
+
 /** Creates a link for the current user after scraping metadata. If a link with the same URL already exists, updates its createdAt and returns it. Throws UnauthorizedError if not authenticated. */
 export async function createLink(url: string): Promise<CreateLinkResult> {
   const userId = await getCurrentUserId();

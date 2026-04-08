@@ -1,4 +1,4 @@
-import { refreshLink, UnauthorizedError } from "@/lib/links";
+import { reingestLink, UnauthorizedError } from "@/lib/links";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { serializeLink } from "@/lib/serialize-link";
 import { NextRequest, NextResponse } from "next/server";
@@ -9,12 +9,12 @@ export async function POST(
 ) {
   try {
     const { id } = await context.params;
-    const refreshed = await refreshLink(id);
-    if (!refreshed) {
+    const updated = await reingestLink(id);
+    if (!updated) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    await broadcastLinksChanged(refreshed.userId);
-    return NextResponse.json(serializeLink(refreshed));
+    await broadcastLinksChanged(updated.userId);
+    return NextResponse.json(serializeLink(updated));
   } catch (e) {
     if (e instanceof UnauthorizedError) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
