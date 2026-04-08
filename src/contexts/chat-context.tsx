@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  clearLastChatId,
+  getLastChatId,
+  setLastChatId,
+} from "@/lib/chat-storage";
 import type { Link } from "@/utils/links";
 import {
   createContext,
@@ -16,7 +21,8 @@ interface ChatContextValue {
   mentions: Link[];
   isWidgetOpen: boolean;
   setIsWidgetOpen: (open: boolean) => void;
-  resetWidgetChat: () => void;
+  /** Clears active chat and last-chat persistence; use for explicit "new chat" only. */
+  startNewChat: () => void;
   addMention: (link: Link) => void;
   removeMention: (linkId: string) => void;
   clearMentions: () => void;
@@ -30,11 +36,22 @@ interface ChatContextValue {
 const ChatContext = createContext<ChatContextValue | null>(null);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
-  const [chatId, setChatId] = useState<string | null>(null);
+  const [chatId, setChatIdState] = useState<string | null>(() =>
+    getLastChatId(),
+  );
   const [chatTitle, setChatTitle] = useState<string | null>(null);
   const [mentions, setMentions] = useState<Link[]>([]);
   const [isWidgetOpen, setIsWidgetOpen] = useState(false);
   const [pendingSummarize, setPendingSummarize] = useState<Link | null>(null);
+
+  const setChatId = useCallback((id: string | null) => {
+    setChatIdState(id);
+    if (id) {
+      setLastChatId(id);
+    } else {
+      clearLastChatId();
+    }
+  }, []);
 
   const addMention = useCallback((link: Link) => {
     setMentions((prev) => {
@@ -62,13 +79,13 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setChatTitle(nextTitle);
     setMentions([]);
     return data.id;
-  }, []);
+  }, [setChatId]);
 
-  const resetWidgetChat = useCallback(() => {
+  const startNewChat = useCallback(() => {
     setChatId(null);
     setChatTitle(null);
     setMentions([]);
-  }, []);
+  }, [setChatId]);
 
   const triggerSummarize = useCallback((link: Link) => {
     setPendingSummarize(link);
@@ -88,7 +105,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         mentions,
         isWidgetOpen,
         setIsWidgetOpen,
-        resetWidgetChat,
+        startNewChat,
         addMention,
         removeMention,
         clearMentions,

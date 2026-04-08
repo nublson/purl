@@ -183,6 +183,28 @@ describe("POST /api/chat", () => {
       expect(res.status).toBe(200);
     });
 
+    it("accepts optional requestId in the body", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(verifyChatOwnership).mockResolvedValue(true);
+      mockStreamResult();
+
+      const res = await POST(
+        postRequest({
+          chatId: "chat-1",
+          messages: VALID_MESSAGES,
+          requestId: "client-req-1",
+        }),
+      );
+
+      expect(saveMessage).toHaveBeenCalledWith(
+        "chat-1",
+        "USER",
+        "What did I read this week?",
+        undefined,
+      );
+      expect(res.status).toBe(200);
+    });
+
     it("builds mention context and passes it to streamChatResponse when mentionedLinkIds provided", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
       vi.mocked(verifyChatOwnership).mockResolvedValue(true);

@@ -18,12 +18,17 @@ export async function POST(request: Request) {
   let messages: UIMessage[];
   let chatId: string;
   let mentionedLinkIds: string[] | undefined;
+  /** Client-generated id for retries / dedupe; not persisted yet. */
+  let requestId: string | undefined;
 
   try {
     const body = await request.json();
     messages = body.messages;
     chatId = body.chatId;
     mentionedLinkIds = body.mentionedLinkIds;
+    if (typeof body.requestId === "string" && body.requestId.trim()) {
+      requestId = body.requestId.trim();
+    }
   } catch {
     return NextResponse.json(
       { error: "Invalid request body" },
@@ -64,6 +69,8 @@ export async function POST(request: Request) {
       : null;
 
   const modelMessages = await convertToModelMessages(messages);
+
+  void requestId;
 
   await saveMessage(chatId, "USER", query, mentionedLinkIds);
 

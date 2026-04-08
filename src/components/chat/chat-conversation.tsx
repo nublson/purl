@@ -1,10 +1,20 @@
 "use client";
 
 import { useChatContext } from "@/contexts/chat-context";
+import { loadChatFromApi } from "@/lib/load-chat";
+import {
+  clearChatSnapshot,
+  clearDraft,
+  DRAFT_NEW_CHAT_KEY,
+  getChatSnapshot,
+  getDraft,
+  setChatSnapshot,
+  setDraft,
+} from "@/lib/chat-storage";
 import type { Link } from "@/utils/links";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import ChatArea from "./chat-area";
 import ChatHeader from "./chat-header";
 import ChatInput from "./chat-input";
@@ -15,6 +25,10 @@ interface ChatConversationProps {
 
 const transport = new DefaultChatTransport({ api: "/api/chat" });
 
+function newRequestId(): string {
+  return crypto.randomUUID();
+}
+
 export default function ChatConversation({ onClose }: ChatConversationProps) {
   const {
     chatId,
@@ -24,6 +38,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     clearMentions,
     createNewChat,
     setChatId,
+    startNewChat,
     pendingSummarize,
     clearPendingSummarize,
   } = useChatContext();
@@ -32,6 +47,13 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
   const [isLoadingChat, setIsLoadingChat] = useState(false);
   const chatIdRef = useRef(chatId);
   const mentionsRef = useRef(mentions);
+  const inputRef = useRef("");
+  const needsInitialRestoreRef = useRef(true);
+  const loadAbortRef = useRef<AbortController | null>(null);
+  const lastRequestIdRef = useRef<string | null>(null);
+  const messagesForSnapshotRef = useRef<UIMessage[]>([]);
+  const messageMentionsForSnapshotRef = useRef<Link[][]>([]);
+  const chatTitleForSnapshotRef = useRef<string | null>(null);
 
   useEffect(() => {
     chatIdRef.current = chatId;
@@ -41,11 +63,116 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     mentionsRef.current = mentions;
   }, [mentions]);
 
+  useEffect(() => {
+    inputRef.current = input;
+  }, [input]);
+
   const { messages, sendMessage, status, setMessages } = useChat({
     transport,
   });
 
   const isLoading = status === "submitted" || status === "streaming";
+
+  useLayoutEffect(() => {
+    if (!chatId) return;
+    const snap = getChatSnapshot(chatId);
+    if (!snap?.messages.length) return;
+    setMessages(snap.messages as UIMessage[]);
+    setMessageMentions(snap.messageMentions);
+    setChatTitle(snap.title);
+  }, [chatId, setMessages, setChatTitle]);
+
+  useEffect(() => {
+    messagesForSnapshotRef.current = messages;
+    messageMentionsForSnapshotRef.current = messageMentions;
+    chatTitleForSnapshotRef.current = chatTitle;
+  }, [messages, messageMentions, chatTitle]);
+
+  useEffect(() => {
+    if (!chatId) return;
+    const t = window.setTimeout(() => {
+      setChatSnapshot(chatId, {
+        v: 1,
+        title: chatTitle,
+        messages: messages as unknown[],
+        messageMentions,
+      });
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [messages, messageMentions, chatId, chatTitle]);
+
+  useEffect(() => {
+    return () => {
+      const id = chatIdRef.current;
+      if (!id) return;
+      setChatSnapshot(id, {
+        v: 1,
+        title: chatTitleForSnapshotRef.current,
+        messages: messagesForSnapshotRef.current as unknown[],
+        messageMentions: messageMentionsForSnapshotRef.current,
+      });
+    };
+  }, []);
+
+  const syncChatFromServer = useCallback(
+    async (id: string) => {
+      const previousId = chatIdRef.current;
+      if (previousId !== id) {
+        setDraft(previousId ?? DRAFT_NEW_CHAT_KEY, inputRef.current);
+      }
+
+      loadAbortRef.current?.abort();
+      const ac = new AbortController();
+      loadAbortRef.current = ac;
+
+      const cached = getChatSnapshot(id);
+      const hasUiCache = Boolean(cached && cached.messages.length > 0);
+
+      if (hasUiCache) {
+        setMessages(cached!.messages as UIMessage[]);
+        setMessageMentions(cached!.messageMentions);
+        setChatTitle(cached!.title);
+        setChatId(id);
+        setIsLoadingChat(false);
+      } else {
+        setIsLoadingChat(true);
+        setChatId(id);
+        setMessages([]);
+        setMessageMentions([]);
+      }
+
+      try {
+        const payload = await loadChatFromApi(id, ac.signal);
+        if (ac.signal.aborted) return;
+
+        if (!payload) {
+          clearChatSnapshot(id);
+          setChatId(null);
+          setChatTitle(null);
+          setMessages([]);
+          setMessageMentions([]);
+          clearMentions();
+          return;
+        }
+
+        setMessages(payload.messages);
+        setMessageMentions(payload.messageMentions);
+        setChatId(payload.id);
+        setChatTitle(payload.title);
+        clearMentions();
+
+        setChatSnapshot(id, {
+          v: 1,
+          title: payload.title,
+          messages: payload.messages as unknown[],
+          messageMentions: payload.messageMentions,
+        });
+      } finally {
+        setIsLoadingChat(false);
+      }
+    },
+    [setChatId, setChatTitle, setMessages, clearMentions],
+  );
 
   const wasLoadingRef = useRef(false);
   const summarizeInFlightRef = useRef(false);
@@ -70,6 +197,36 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
   }, [isLoading, chatId, setChatTitle]);
 
   useEffect(() => {
+    if (!needsInitialRestoreRef.current) return;
+    const id = chatId;
+    if (!id) {
+      needsInitialRestoreRef.current = false;
+      return;
+    }
+    needsInitialRestoreRef.current = false;
+    void syncChatFromServer(id);
+  }, [chatId, syncChatFromServer]);
+
+  useEffect(() => {
+    return () => {
+      loadAbortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    const key = chatId ?? DRAFT_NEW_CHAT_KEY;
+    setInput(getDraft(key));
+  }, [chatId]);
+
+  useEffect(() => {
+    const key = chatId ?? DRAFT_NEW_CHAT_KEY;
+    const t = window.setTimeout(() => {
+      setDraft(key, input);
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [input, chatId]);
+
+  useEffect(() => {
     if (!pendingSummarize || summarizeInFlightRef.current) return;
 
     summarizeInFlightRef.current = true;
@@ -83,9 +240,17 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
           id = await createNewChat();
         }
 
+        const requestId = newRequestId();
+        lastRequestIdRef.current = requestId;
         sendMessage(
           { text: `Summarize @${link.title}` },
-          { body: { chatId: id, mentionedLinkIds: [link.id] } },
+          {
+            body: {
+              chatId: id,
+              mentionedLinkIds: [link.id],
+              requestId,
+            },
+          },
         );
         setMessageMentions((prev) => [...prev, [link]]);
       } finally {
@@ -102,12 +267,24 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
 
       let id = chatIdRef.current;
       if (!id) {
+        const newDraft = getDraft(DRAFT_NEW_CHAT_KEY);
         id = await createNewChat();
+        if (newDraft) {
+          setDraft(id, newDraft);
+          clearDraft(DRAFT_NEW_CHAT_KEY);
+        }
       }
 
       const mentionedLinkIds = mentionsRef.current.map((m) => m.id);
-      sendMessage({ text }, { body: { chatId: id, mentionedLinkIds } });
+      const requestId = newRequestId();
+      lastRequestIdRef.current = requestId;
+      sendMessage(
+        { text },
+        { body: { chatId: id, mentionedLinkIds, requestId } },
+      );
       setMessageMentions((prev) => [...prev, [...mentionsRef.current]]);
+      clearDraft(id);
+      clearDraft(DRAFT_NEW_CHAT_KEY);
       setInput("");
       clearMentions();
     },
@@ -121,62 +298,29 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
         id = await createNewChat();
       }
 
-      sendMessage({ text }, { body: { chatId: id } });
+      const requestId = newRequestId();
+      lastRequestIdRef.current = requestId;
+      sendMessage({ text }, { body: { chatId: id, requestId } });
       setMessageMentions((prev) => [...prev, []]);
     },
     [createNewChat, sendMessage],
   );
 
   const handleNewChat = useCallback(() => {
-    setChatId(null);
-    setChatTitle(null);
+    const prev = chatIdRef.current;
+    if (prev) clearDraft(prev);
+    clearDraft(DRAFT_NEW_CHAT_KEY);
+    startNewChat();
     setMessages([]);
     setMessageMentions([]);
-    clearMentions();
     setInput("");
-  }, [setChatId, setChatTitle, setMessages, clearMentions]);
+  }, [startNewChat, setMessages]);
 
   const handleSelectChat = useCallback(
     async (id: string) => {
-      setIsLoadingChat(true);
-      try {
-        const res = await fetch(`/api/chats/${id}`);
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          id: string;
-          title: string | null;
-          messages: {
-            id: string;
-            role: "USER" | "ASSISTANT";
-            content: string;
-            mentions: Link[];
-          }[];
-        };
-
-        const converted: UIMessage[] = data.messages.map((msg) => ({
-          id: msg.id,
-          role: msg.role === "USER" ? "user" : "assistant",
-          content: msg.content,
-          parts: [{ type: "text" as const, text: msg.content }],
-        }));
-
-        const rebuiltMentions: Link[][] = data.messages.map((msg) =>
-          msg.role === "USER" ? msg.mentions : [],
-        );
-
-        setMessages(converted);
-        setMessageMentions(rebuiltMentions);
-        setChatId(id);
-        setChatTitle(data.title?.trim() || null);
-        clearMentions();
-        setInput("");
-      } catch {
-        /* ignore */
-      } finally {
-        setIsLoadingChat(false);
-      }
+      await syncChatFromServer(id);
     },
-    [setMessages, setChatId, setChatTitle, clearMentions],
+    [syncChatFromServer],
   );
 
   return (
