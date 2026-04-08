@@ -54,6 +54,34 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
   const showSyntheticToday = showSkeleton && !todayGroup;
 
   useEffect(() => {
+    const totalLinks = groups.reduce((acc, group) => acc + group.links.length, 0);
+    // #region agent log
+    fetch("http://127.0.0.1:7934/ingest/3b140c39-9f39-4fe6-bb46-7844bf138e61", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Debug-Session-Id": "f65e73",
+      },
+      body: JSON.stringify({
+        sessionId: "f65e73",
+        runId: "pre-fix",
+        hypothesisId: "H3",
+        location: "src/components/home-shell.tsx:groupsEffect",
+        message: "home shell groups snapshot",
+        data: {
+          totalLinks,
+          todayLinksCount,
+          isPending,
+          showSkeleton,
+          showSyntheticToday,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [groups, isPending, showSkeleton, showSyntheticToday, todayLinksCount]);
+
+  useEffect(() => {
     if (!isPending) {
       queueMicrotask(() => {
         setPendingUrl(null);

@@ -77,16 +77,6 @@ export const LinkItem = React.forwardRef<
     };
   }, [clearCloseTimer, clearOpenTimer]);
 
-  React.useEffect(() => {
-    if (deletePhase !== "animating") return;
-    const timeoutId = setTimeout(() => {
-      setDeletePhase("loading");
-    }, 180);
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  }, [deletePhase]);
-
   if (deletePhase === "loading" || deletePhase === "exiting") {
     return (
       <LinkItemSkeleton
@@ -94,6 +84,10 @@ export const LinkItem = React.forwardRef<
         url={link.url}
         animateIn={deletePhase === "loading"}
         animateOut={deletePhase === "exiting"}
+        onAnimationEnd={() => {
+          if (deletePhase !== "exiting") return;
+          router.refresh();
+        }}
       />
     );
   }
@@ -137,6 +131,10 @@ export const LinkItem = React.forwardRef<
         onMouseLeave?.(event);
         hoveringActionsRef.current = false;
         scheduleClose();
+      }}
+      onAnimationEnd={() => {
+        if (deletePhase !== "animating") return;
+        setDeletePhase("loading");
       }}
       {...rest}
     >
@@ -197,9 +195,6 @@ export const LinkItem = React.forwardRef<
             }}
             onDeleteSuccess={() => {
               setDeletePhase("exiting");
-              setTimeout(() => {
-                router.refresh();
-              }, 200);
             }}
             onDeleteError={() => {
               setDeletePhase("idle");
