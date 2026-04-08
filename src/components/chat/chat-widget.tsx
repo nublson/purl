@@ -9,14 +9,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import ChatConversation from "./chat-conversation";
 
 export default function ChatWidget() {
-  const { isWidgetOpen, setIsWidgetOpen, resetWidgetChat } = useChatContext();
+  const { isWidgetOpen, setIsWidgetOpen } = useChatContext();
   const popoverContentRef = useFullscreenRadixPopperOnMobile(isWidgetOpen);
 
   const handleOpenChange = (open: boolean) => {
     setIsWidgetOpen(open);
-    if (!open) {
-      resetWidgetChat();
-    }
   };
 
   const handleClose = () => {
