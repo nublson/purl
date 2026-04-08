@@ -2,6 +2,7 @@ import prisma, { Prisma } from "@/lib/prisma";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
+import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import { buildMetadataText } from "@/lib/metadata-chunk";
 import { fetchYouTubeTranscript } from "@/lib/youtube-transcriber";
 
@@ -39,6 +40,7 @@ export async function ingestYoutube({
         where: { id: linkId },
         data: { ingestStatus: "FAILED" },
       });
+      await notifyLinksAfterIngest(linkId);
       throw new Error(`Link not found for ingest: ${linkId}`);
     }
 
@@ -78,11 +80,13 @@ export async function ingestYoutube({
       where: { id: linkId },
       data: { ingestStatus: "COMPLETED" },
     });
+    await notifyLinksAfterIngest(linkId);
   } catch (error) {
     await prisma.link.update({
       where: { id: linkId },
       data: { ingestStatus: "FAILED" },
     });
+    await notifyLinksAfterIngest(linkId);
     logIngestFailure("YOUTUBE", linkId, url, error);
     throw error;
   }

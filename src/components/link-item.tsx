@@ -77,6 +77,11 @@ export const LinkItem = React.forwardRef<
     };
   }, [clearCloseTimer, clearOpenTimer]);
 
+  const showIngestPulse =
+    link.ingestStatus === "PENDING" || link.ingestStatus === "PROCESSING";
+
+  const disableAddToChat = link.ingestStatus !== "COMPLETED";
+
   if (deletePhase === "loading" || deletePhase === "exiting") {
     return (
       <LinkItemSkeleton
@@ -115,8 +120,10 @@ export const LinkItem = React.forwardRef<
     <Item
       ref={ref}
       role="listitem"
+      aria-busy={showIngestPulse}
       className={cn(
         "w-full p-2 gap-4 grid relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
+        showIngestPulse && "animate-pulse",
         preview ? "grid-cols-[20px_1fr]" : "grid-cols-[20px_1fr_auto]",
         deletePhase === "animating" &&
           "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
@@ -144,7 +151,7 @@ export const LinkItem = React.forwardRef<
         rel="noopener noreferrer"
         className="absolute inset-0 z-0 w-full"
       />
-      <ItemMedia variant="image" className="size-5 rounded">
+      <ItemMedia variant="image" className={cn("relative size-5 rounded")}>
         {media}
       </ItemMedia>
       <ItemContent>
@@ -177,6 +184,7 @@ export const LinkItem = React.forwardRef<
                 type="button"
                 variant="ghost"
                 size="icon-sm"
+                disabled={disableAddToChat}
                 data-add-to-chat=""
                 className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
                 onClick={() => {

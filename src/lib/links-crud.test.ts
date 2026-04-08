@@ -86,6 +86,12 @@ function makeRow(
     contentType: "WEB" | "YOUTUBE" | "PDF" | "AUDIO";
     createdAt: Date;
     userId: string;
+    ingestStatus:
+      | "PENDING"
+      | "PROCESSING"
+      | "COMPLETED"
+      | "FAILED"
+      | "SKIPPED";
   }> = {},
 ) {
   return {
@@ -97,6 +103,7 @@ function makeRow(
     description: overrides.description ?? null,
     thumbnail: overrides.thumbnail ?? null,
     contentType: overrides.contentType ?? "WEB",
+    ingestStatus: overrides.ingestStatus ?? "COMPLETED",
     createdAt: overrides.createdAt ?? CREATED_AT,
     userId: overrides.userId ?? "user-123",
   };
@@ -421,6 +428,7 @@ describe("createLink", () => {
       thumbnail: "https://img.youtube.com/vi/abc/hqdefault.jpg",
       contentType: "YOUTUBE",
       createdAt: new Date(),
+      ingestStatus: "PENDING",
     });
     vi.mocked(prisma.link.update).mockResolvedValue(refreshed as never);
     fetchSpy.mockResolvedValue(
@@ -447,6 +455,7 @@ describe("createLink", () => {
         domain: "youtu.be",
         contentType: "YOUTUBE",
         createdAt: expect.any(Date),
+        ingestStatus: "PENDING",
       },
     });
     expect(result).toEqual(refreshed);
@@ -723,6 +732,7 @@ describe("refreshLink", () => {
       thumbnail: "https://img.youtube.com/vi/abc/hqdefault.jpg",
       contentType: "YOUTUBE",
       createdAt: new Date(),
+      ingestStatus: "PENDING",
     });
     vi.mocked(prisma.link.update).mockResolvedValue(refreshed as never);
     fetchSpy.mockResolvedValue(
@@ -748,6 +758,7 @@ describe("refreshLink", () => {
         domain: "youtu.be",
         contentType: "YOUTUBE",
         createdAt: expect.any(Date),
+        ingestStatus: "PENDING",
       },
     });
     expect(vi.mocked(ingestYoutube)).toHaveBeenCalledWith({
@@ -812,6 +823,7 @@ describe("readLink", () => {
       description: "A very important story",
       thumbnail: "https://example.com/thumb.jpg",
       contentType: "WEB",
+      ingestStatus: "COMPLETED",
     });
     // userId must not be leaked in the mapped Link shape
     expect(result).not.toHaveProperty("userId");

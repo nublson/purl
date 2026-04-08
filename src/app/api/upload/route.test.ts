@@ -68,6 +68,7 @@ const MOCK_LINK = {
   thumbnail: null,
   domain: ".pdf",
   contentType: "PDF" as const,
+  ingestStatus: "PENDING" as const,
   createdAt: CREATED_AT,
   userId: "user-123",
 };
@@ -195,6 +196,7 @@ describe("POST /api/upload", () => {
       thumbnail: null,
       domain: ".pdf",
       contentType: "PDF",
+      ingestStatus: "PENDING",
       createdAt: CREATED_AT.toISOString(),
     });
     expect(broadcastLinksChanged).toHaveBeenCalledWith("user-123");

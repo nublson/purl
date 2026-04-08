@@ -1,5 +1,12 @@
 import { getRelativeDateLabel } from "./formatter";
 
+export type IngestStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "FAILED"
+  | "SKIPPED";
+
 export type Link = {
   id: string;
   favicon: string;
@@ -9,6 +16,7 @@ export type Link = {
   url: string;
   domain: string;
   contentType: "WEB" | "YOUTUBE" | "PDF" | "AUDIO";
+  ingestStatus: IngestStatus;
   createdAt: Date;
 };
 

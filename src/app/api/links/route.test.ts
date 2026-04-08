@@ -57,6 +57,7 @@ const MOCK_LINK = {
   thumbnail: null as string | null,
   domain: "example.com",
   contentType: "WEB" as const,
+  ingestStatus: "PENDING" as const,
   createdAt: CREATED_AT,
   userId: "user-123",
 };
@@ -226,6 +227,7 @@ describe("POST /api/links", () => {
         thumbnail: null,
         domain: "example.com",
         contentType: "WEB",
+        ingestStatus: "PENDING",
         createdAt: CREATED_AT.toISOString(),
       });
     });
@@ -294,6 +296,7 @@ describe("POST /api/links", () => {
             title: "Example Domain",
             contentType: "WEB",
             createdAt: expect.any(Date),
+            ingestStatus: "PENDING",
           }),
         }),
       );

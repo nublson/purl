@@ -104,6 +104,7 @@ describe("links/[id] API route", () => {
         thumbnail: null,
         domain: "example.com",
         contentType: "WEB",
+        ingestStatus: "COMPLETED",
         createdAt,
       });
 
@@ -122,6 +123,7 @@ describe("links/[id] API route", () => {
         thumbnail: null,
         domain: "example.com",
         contentType: "WEB",
+        ingestStatus: "COMPLETED",
         createdAt: createdAt.toISOString(),
       });
     });

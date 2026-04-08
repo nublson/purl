@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import type { ContentType } from "@/generated/prisma/enums";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
 import { getUrlDomain } from "@/utils/formatter";
-import type { Link } from "@/utils/links";
+import type { IngestStatus, Link } from "@/utils/links";
 import { detectContentType } from "@/utils/link-content-type";
 import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
 import { isPdfUrl } from "@/utils/pdf";
@@ -124,6 +124,7 @@ type LinkRow = {
   description: string | null;
   thumbnail: string | null;
   createdAt: Date;
+  ingestStatus: IngestStatus;
 };
 
 function mapRowToLink(row: LinkRow): Link {
@@ -136,6 +137,7 @@ function mapRowToLink(row: LinkRow): Link {
     thumbnail: row.thumbnail,
     domain: row.domain,
     contentType: row.contentType,
+    ingestStatus: row.ingestStatus,
     createdAt: row.createdAt,
   };
 }
@@ -306,6 +308,7 @@ export async function refreshLink(
       domain: resolved.domain,
       contentType: resolved.contentType,
       createdAt: new Date(),
+      ingestStatus: "PENDING",
     },
   });
 

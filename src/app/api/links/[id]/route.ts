@@ -7,33 +7,10 @@ import {
   UnauthorizedError,
 } from "@/lib/links";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
+import { serializeLink } from "@/lib/serialize-link";
 import { isValidUrl } from "@/utils/url";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-
-function serializeLink(link: {
-  id: string;
-  url: string;
-  title: string;
-  description: string | null;
-  favicon: string;
-  thumbnail: string | null;
-  domain: string;
-  contentType?: "WEB" | "YOUTUBE" | "PDF" | "AUDIO";
-  createdAt: Date;
-}) {
-  return {
-    id: link.id,
-    url: link.url,
-    title: link.title,
-    description: link.description,
-    favicon: link.favicon,
-    thumbnail: link.thumbnail,
-    domain: link.domain,
-    contentType: link.contentType ?? "WEB",
-    createdAt: link.createdAt.toISOString(),
-  };
-}
 
 export async function GET(
   _request: NextRequest,

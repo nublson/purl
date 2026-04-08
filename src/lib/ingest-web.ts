@@ -3,6 +3,7 @@ import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
 import { skipIngest } from "@/lib/ingest-skip";
+import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import { buildMetadataText } from "@/lib/metadata-chunk";
 import { scrapeWebContent, UnsupportedSpaError } from "@/lib/web-scraper";
 
@@ -37,6 +38,7 @@ export async function ingestWeb({ linkId, url }: IngestWebInput): Promise<void> 
         where: { id: linkId },
         data: { ingestStatus: "FAILED" },
       });
+      await notifyLinksAfterIngest(linkId);
       throw new Error(`Link not found for ingest: ${linkId}`);
     }
 
@@ -76,6 +78,7 @@ export async function ingestWeb({ linkId, url }: IngestWebInput): Promise<void> 
       where: { id: linkId },
       data: { ingestStatus: "COMPLETED" },
     });
+    await notifyLinksAfterIngest(linkId);
   } catch (error) {
     if (error instanceof UnsupportedSpaError) {
       await skipIngest(linkId);
@@ -86,6 +89,7 @@ export async function ingestWeb({ linkId, url }: IngestWebInput): Promise<void> 
       where: { id: linkId },
       data: { ingestStatus: "FAILED" },
     });
+    await notifyLinksAfterIngest(linkId);
     logIngestFailure("WEB", linkId, url, error);
     throw error;
   }

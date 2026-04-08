@@ -1,9 +1,16 @@
 "use client";
 
-import { copyToClipboard } from "@/lib/clipboard";
 import { useChatContextSafe } from "@/contexts/chat-context";
+import { copyToClipboard } from "@/lib/clipboard";
 import type { Link as LinkType } from "@/utils/links";
-import { Ellipsis, Link, Pencil, ScrollText, Trash } from "lucide-react";
+import {
+  Ellipsis,
+  Link,
+  Pencil,
+  RefreshCw,
+  ScrollText,
+  Trash,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { DropdownWrapper } from "./dropdown-wrapper";
@@ -35,6 +42,25 @@ export function LinkMenu({
       toast.success("Link copied");
     } catch {
       toast.error("Failed to copy link");
+    }
+  }
+
+  async function handleReingest() {
+    try {
+      const res = await fetch(`/api/links/${link.id}/reingest`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        toast.success("Re-ingesting…");
+        router.refresh();
+      } else {
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        toast.error(data?.error ?? "Failed to re-ingest");
+      }
+    } catch {
+      toast.error("Failed to re-ingest");
     }
   }
 
@@ -75,12 +101,22 @@ export function LinkMenu({
     >
       <DropdownMenuGroup>
         <DropdownMenuItem
+          disabled={link.ingestStatus !== "COMPLETED"}
           onSelect={() => {
             chatCtx?.triggerSummarize(link);
           }}
         >
           <ScrollText /> Summarize with AI
         </DropdownMenuItem>
+        {link.ingestStatus === "FAILED" ? (
+          <DropdownMenuItem
+            onSelect={() => {
+              void handleReingest();
+            }}
+          >
+            <RefreshCw /> Re-ingest
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={() => {

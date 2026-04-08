@@ -10,34 +10,11 @@ import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { ingestAudio } from "@/lib/ingest-audio";
 import { ingestPdf } from "@/lib/ingest-pdf";
+import { serializeLink } from "@/lib/serialize-link";
 import {
   AUDIO_MAX_UPLOAD_BYTES,
   audioMaxSizeExceededMessage,
 } from "@/utils/upload-limits";
-
-function serializeLink(link: {
-  id: string;
-  url: string;
-  title: string;
-  description: string | null;
-  favicon: string;
-  thumbnail: string | null;
-  domain: string;
-  contentType?: "WEB" | "YOUTUBE" | "PDF" | "AUDIO";
-  createdAt: Date;
-}) {
-  return {
-    id: link.id,
-    url: link.url,
-    title: link.title,
-    description: link.description,
-    favicon: link.favicon,
-    thumbnail: link.thumbnail,
-    domain: link.domain,
-    contentType: link.contentType ?? "WEB",
-    createdAt: link.createdAt.toISOString(),
-  };
-}
 
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({
