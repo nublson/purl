@@ -1,7 +1,7 @@
 "use client";
 
-import { copyToClipboard } from "@/lib/clipboard";
 import { useChatContextSafe } from "@/contexts/chat-context";
+import { copyToClipboard } from "@/lib/clipboard";
 import type { Link as LinkType } from "@/utils/links";
 import { Ellipsis, Link, Pencil, ScrollText, Trash } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -75,6 +75,7 @@ export function LinkMenu({
     >
       <DropdownMenuGroup>
         <DropdownMenuItem
+          disabled={link.ingestStatus !== "COMPLETED"}
           onSelect={() => {
             chatCtx?.triggerSummarize(link);
           }}

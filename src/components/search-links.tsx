@@ -18,6 +18,7 @@ import { Button } from "./ui/button";
 function normalizeLinks(links: Link[]): Link[] {
   return links.map((l) => ({
     ...l,
+    ingestStatus: l.ingestStatus ?? "COMPLETED",
     createdAt:
       l.createdAt instanceof Date ? l.createdAt : new Date(l.createdAt),
   }));

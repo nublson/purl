@@ -10,7 +10,8 @@
       "userId": "UVN9YlrzIITzIrh7w3OL6hL4HKzp6BVh",
       "description": "Built to make you extraordinarily productive, Cursor is the best way to build software with AI.",
       "thumbnail": "https://cursor.com/public/opengraph-image.png",
-      "contentType": "WEB"
+      "contentType": "WEB",
+      "ingestStatus": "COMPLETED"
     }
   ],
   "urls": [

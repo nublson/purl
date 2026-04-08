@@ -3,10 +3,16 @@
 import { useChatContextSafe } from "@/contexts/chat-context";
 import { cn } from "@/lib/utils";
 import { Link as LinkType } from "@/utils/links";
-import { FileMusic, FileText, MessageCircle } from "lucide-react";
+import {
+  ArrowDownToLine,
+  FileMusic,
+  FileText,
+  MessageCircle,
+} from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import * as React from "react";
+import { toast } from "sonner";
 import { X } from "./animate-ui/icons/x";
 import { LinkMenu } from "./link-menu";
 import { LinkPreview } from "./link-preview";
@@ -36,6 +42,7 @@ export const LinkItem = React.forwardRef<
     "idle" | "animating" | "loading" | "exiting"
   >("idle");
   const [previewOpen, setPreviewOpen] = React.useState(false);
+  const [optimisticIngesting, setOptimisticIngesting] = React.useState(false);
   const hoveringActionsRef = React.useRef(false);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
@@ -77,6 +84,45 @@ export const LinkItem = React.forwardRef<
     };
   }, [clearCloseTimer, clearOpenTimer]);
 
+  React.useEffect(() => {
+    if (
+      link.ingestStatus === "PENDING" ||
+      link.ingestStatus === "PROCESSING" ||
+      link.ingestStatus === "COMPLETED"
+    ) {
+      setOptimisticIngesting(false);
+    }
+  }, [link.ingestStatus]);
+
+  const showIngestPulse =
+    optimisticIngesting ||
+    link.ingestStatus === "PENDING" ||
+    link.ingestStatus === "PROCESSING";
+
+  const disableAddToChat = link.ingestStatus !== "COMPLETED";
+
+  async function handleReingest() {
+    setOptimisticIngesting(true);
+    try {
+      const res = await fetch(`/api/links/${link.id}/reingest`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        toast.success("Re-ingesting…");
+        router.refresh();
+      } else {
+        setOptimisticIngesting(false);
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        toast.error(data?.error ?? "Failed to re-ingest");
+      }
+    } catch {
+      setOptimisticIngesting(false);
+      toast.error("Failed to re-ingest");
+    }
+  }
+
   if (deletePhase === "loading" || deletePhase === "exiting") {
     return (
       <LinkItemSkeleton
@@ -115,8 +161,10 @@ export const LinkItem = React.forwardRef<
     <Item
       ref={ref}
       role="listitem"
+      aria-busy={showIngestPulse}
       className={cn(
         "w-full p-2 gap-4 grid relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
+        showIngestPulse && "animate-pulse",
         preview ? "grid-cols-[20px_1fr]" : "grid-cols-[20px_1fr_auto]",
         deletePhase === "animating" &&
           "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
@@ -144,7 +192,7 @@ export const LinkItem = React.forwardRef<
         rel="noopener noreferrer"
         className="absolute inset-0 z-0 w-full"
       />
-      <ItemMedia variant="image" className="size-5 rounded">
+      <ItemMedia variant="image" className={cn("relative size-5 rounded")}>
         {media}
       </ItemMedia>
       <ItemContent>
@@ -171,22 +219,40 @@ export const LinkItem = React.forwardRef<
             scheduleOpen();
           }}
         >
-          {chatCtx && (
-            <TooltipWrapper content="Add to chat">
+          {link.ingestStatus === "FAILED" ? (
+            <TooltipWrapper content="Refetch content">
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                data-add-to-chat=""
+                disabled={optimisticIngesting}
                 className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
                 onClick={() => {
-                  chatCtx.addMention(link);
-                  chatCtx.setIsWidgetOpen(true);
+                  void handleReingest();
                 }}
               >
-                <MessageCircle />
+                <ArrowDownToLine />
               </Button>
             </TooltipWrapper>
+          ) : (
+            chatCtx && (
+              <TooltipWrapper content="Add to chat">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={disableAddToChat}
+                  data-add-to-chat=""
+                  className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
+                  onClick={() => {
+                    chatCtx.addMention(link);
+                    chatCtx.setIsWidgetOpen(true);
+                  }}
+                >
+                  <MessageCircle />
+                </Button>
+              </TooltipWrapper>
+            )
           )}
           <LinkMenu
             link={link}

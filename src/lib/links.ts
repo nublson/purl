@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 import type { ContentType } from "@/generated/prisma/enums";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
 import { getUrlDomain } from "@/utils/formatter";
-import type { Link } from "@/utils/links";
+import type { IngestStatus, Link } from "@/utils/links";
 import { detectContentType } from "@/utils/link-content-type";
 import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
 import { isPdfUrl } from "@/utils/pdf";
@@ -124,6 +124,7 @@ type LinkRow = {
   description: string | null;
   thumbnail: string | null;
   createdAt: Date;
+  ingestStatus: IngestStatus;
 };
 
 function mapRowToLink(row: LinkRow): Link {
@@ -136,6 +137,7 @@ function mapRowToLink(row: LinkRow): Link {
     thumbnail: row.thumbnail,
     domain: row.domain,
     contentType: row.contentType,
+    ingestStatus: row.ingestStatus,
     createdAt: row.createdAt,
   };
 }
@@ -306,11 +308,35 @@ export async function refreshLink(
       domain: resolved.domain,
       contentType: resolved.contentType,
       createdAt: new Date(),
+      ingestStatus: "PENDING",
     },
   });
 
   dispatchIngest(refreshed);
   return refreshed;
+}
+
+/**
+ * Re-dispatches ingestion without re-scraping metadata. Use for manual re-ingest
+ * (e.g. failed uploads) so storage URLs do not overwrite title/description with
+ * blob-path garbage. Duplicate-URL refresh still uses {@link refreshLink}.
+ */
+export async function reingestLink(
+  id: string,
+): Promise<RefreshLinkResult | null> {
+  const userId = await getCurrentUserId();
+  const existing = await prisma.link.findFirst({
+    where: { id, userId },
+  });
+  if (!existing) return null;
+
+  const updated = await prisma.link.update({
+    where: { id },
+    data: { ingestStatus: "PENDING" },
+  });
+
+  dispatchIngest(updated);
+  return updated;
 }
 
 /** Creates a link for the current user after scraping metadata. If a link with the same URL already exists, updates its createdAt and returns it. Throws UnauthorizedError if not authenticated. */

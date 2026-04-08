@@ -3,6 +3,7 @@ import { transcribeAudio } from "@/lib/audio-transcriber";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
+import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import { buildMetadataText } from "@/lib/metadata-chunk";
 
 type IngestAudioInput = {
@@ -36,6 +37,7 @@ export async function ingestAudio({ linkId, url }: IngestAudioInput): Promise<vo
         where: { id: linkId },
         data: { ingestStatus: "FAILED" },
       });
+      await notifyLinksAfterIngest(linkId);
       throw new Error(`Link not found for ingest: ${linkId}`);
     }
 
@@ -75,11 +77,13 @@ export async function ingestAudio({ linkId, url }: IngestAudioInput): Promise<vo
       where: { id: linkId },
       data: { ingestStatus: "COMPLETED" },
     });
+    await notifyLinksAfterIngest(linkId);
   } catch (error) {
     await prisma.link.update({
       where: { id: linkId },
       data: { ingestStatus: "FAILED" },
     });
+    await notifyLinksAfterIngest(linkId);
     logIngestFailure("AUDIO", linkId, url, error);
     throw error;
   }
