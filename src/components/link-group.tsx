@@ -1,5 +1,5 @@
 import { Link } from "@/utils/links";
-import { AnimatePresence, motion } from "motion/react";
+import type { ReactNode } from "react";
 import { LinkItem } from "./link-item";
 import { ItemGroup } from "./ui/item";
 
@@ -12,7 +12,7 @@ export const LinkGroup = ({
   label: string;
   links: Link[];
   newLinkId?: string | null;
-  prependItems?: React.ReactNode;
+  prependItems?: ReactNode;
   preview?: boolean;
 }) => {
   return (
@@ -20,19 +20,14 @@ export const LinkGroup = ({
       <p className="text-xs text-muted-foreground font-medium ml-2">{label}</p>
       <ItemGroup className="w-full gap-0">
         {prependItems}
-        <AnimatePresence>
-          {links.map((link) => (
-            <motion.div
-              key={link.id}
-              layout
-              transition={{ type: "spring", stiffness: 400, damping: 35 }}
-              initial={false}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <LinkItem link={link} preview={preview} />
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        {links.map((link) => (
+          <div
+            key={link.id}
+            className="animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
+          >
+            <LinkItem link={link} preview={preview} />
+          </div>
+        ))}
       </ItemGroup>
     </div>
   );

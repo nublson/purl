@@ -1,4 +1,4 @@
-import ChatWidget from "@/components/chat/chat-widget";
+import { HomeChatWidget } from "@/components/chat/home-chat-widget";
 import { HomeShell } from "@/components/home-shell";
 import { ChatProvider } from "@/contexts/chat-context";
 import { getLinksForCurrentUser } from "@/lib/links";
@@ -14,7 +14,7 @@ export default async function Home() {
       <div className="wrapper-private flex-1 flex flex-col gap-8 pt-24 pb-32">
         <HomeShell groups={groups} />
         <div className="fixed bottom-4 right-4 md:bottom-8 md:right-8">
-          <ChatWidget />
+          <HomeChatWidget />
         </div>
       </div>
     </ChatProvider>
