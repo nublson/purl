@@ -1,9 +1,10 @@
+"use client";
+
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { Suspense, lazy } from "react";
 import { Typography } from "../typography";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import {
@@ -14,11 +15,28 @@ import {
   ItemTitle,
 } from "../ui/item";
 
+const ChatMarkdownBody = lazy(() =>
+  import("./chat-markdown-body").then((m) => ({
+    default: m.ChatMarkdownBody,
+  })),
+);
+
 interface ChatMessageProps {
   content: string;
   role: "user" | "assistant";
   isLoading?: boolean;
   mentions?: Link[];
+}
+
+function AssistantMarkdownFallback({ content }: { content: string }) {
+  return (
+    <Typography
+      size="small"
+      className="text-accent-foreground wrap-anywhere whitespace-pre-wrap"
+    >
+      {content}
+    </Typography>
+  );
 }
 
 export default function ChatMessage({
@@ -47,76 +65,9 @@ export default function ChatMessage({
           ) : (
             <div className={cn("min-w-0 max-w-full text-sm wrap-anywhere")}>
               {role === "assistant" ? (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    a: ({ ...props }) => (
-                      <a
-                        {...props}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="underline underline-offset-2"
-                      />
-                    ),
-                    p: ({ ...props }) => (
-                      <p className="mb-2 last:mb-0" {...props} />
-                    ),
-                    ul: ({ ...props }) => (
-                      <ul
-                        className="mb-2 list-disc pl-5 last:mb-0"
-                        {...props}
-                      />
-                    ),
-                    ol: ({ ...props }) => (
-                      <ol
-                        className="mb-2 list-decimal pl-5 last:mb-0"
-                        {...props}
-                      />
-                    ),
-                    li: ({ ...props }) => <li className="mb-1" {...props} />,
-                    h1: ({ ...props }) => (
-                      <Typography
-                        component="h4"
-                        size="small"
-                        className="mb-2 font-semibold"
-                        {...props}
-                      />
-                    ),
-                    h2: ({ ...props }) => (
-                      <Typography
-                        component="h5"
-                        size="small"
-                        className="mb-2 font-semibold"
-                        {...props}
-                      />
-                    ),
-                    h3: ({ ...props }) => (
-                      <Typography
-                        component="h6"
-                        size="small"
-                        className="mb-2 font-semibold"
-                        {...props}
-                      />
-                    ),
-                    code: ({ className, ...props }) => (
-                      <code
-                        className={cn(
-                          "rounded bg-muted px-1 py-0.5 text-xs",
-                          className,
-                        )}
-                        {...props}
-                      />
-                    ),
-                    pre: ({ ...props }) => (
-                      <pre
-                        className="mb-2 overflow-x-auto rounded-md bg-muted p-2 text-xs last:mb-0"
-                        {...props}
-                      />
-                    ),
-                  }}
-                >
-                  {content}
-                </ReactMarkdown>
+                <Suspense fallback={<AssistantMarkdownFallback content={content} />}>
+                  <ChatMarkdownBody content={content} />
+                </Suspense>
               ) : (
                 <Typography
                   size="small"

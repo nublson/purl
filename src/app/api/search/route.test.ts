@@ -79,8 +79,8 @@ describe("GET /api/search", () => {
       session: {},
     } as never);
     vi.mocked(semanticSearch).mockResolvedValue([
-      { linkId: "l1", similarity: 0.9 },
-      { linkId: "l2", similarity: 0.8 },
+      { linkId: "l1", similarity: 0.9, vectorSimilarity: 0.9 },
+      { linkId: "l2", similarity: 0.8, vectorSimilarity: 0.8 },
     ]);
 
     const res = await GET(

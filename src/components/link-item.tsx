@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Link as LinkType } from "@/utils/links";
 import { FileMusic, FileText, MessageCircle } from "lucide-react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import { X } from "./animate-ui/icons/x";
 import { LinkMenu } from "./link-menu";
@@ -30,7 +31,10 @@ export const LinkItem = React.forwardRef<
   ref,
 ) {
   const chatCtx = useChatContextSafe();
-  const [isDeleting, setIsDeleting] = React.useState(false);
+  const router = useRouter();
+  const [deletePhase, setDeletePhase] = React.useState<
+    "idle" | "animating" | "loading" | "exiting"
+  >("idle");
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const hoveringActionsRef = React.useRef(false);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,11 +77,17 @@ export const LinkItem = React.forwardRef<
     };
   }, [clearCloseTimer, clearOpenTimer]);
 
-  if (isDeleting) {
+  if (deletePhase === "loading" || deletePhase === "exiting") {
     return (
       <LinkItemSkeleton
         icon={<X className="size-5" animate={true} loop={true} />}
         url={link.url}
+        animateIn={deletePhase === "loading"}
+        animateOut={deletePhase === "exiting"}
+        onAnimationEnd={() => {
+          if (deletePhase !== "exiting") return;
+          router.refresh();
+        }}
       />
     );
   }
@@ -108,6 +118,8 @@ export const LinkItem = React.forwardRef<
       className={cn(
         "w-full p-2 gap-4 grid relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
         preview ? "grid-cols-[20px_1fr]" : "grid-cols-[20px_1fr_auto]",
+        deletePhase === "animating" &&
+          "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
         className,
       )}
       onMouseEnter={(event) => {
@@ -119,6 +131,10 @@ export const LinkItem = React.forwardRef<
         onMouseLeave?.(event);
         hoveringActionsRef.current = false;
         scheduleClose();
+      }}
+      onAnimationEnd={() => {
+        if (deletePhase !== "animating") return;
+        setDeletePhase("loading");
       }}
       {...rest}
     >
@@ -175,7 +191,13 @@ export const LinkItem = React.forwardRef<
           <LinkMenu
             link={link}
             onDeleteStart={() => {
-              setIsDeleting(true);
+              setDeletePhase("animating");
+            }}
+            onDeleteSuccess={() => {
+              setDeletePhase("exiting");
+            }}
+            onDeleteError={() => {
+              setDeletePhase("idle");
             }}
           />
         </ItemActions>

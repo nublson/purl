@@ -1,8 +1,9 @@
 import prisma, { Prisma } from "@/lib/prisma";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
-import { fetchYouTubeTranscript } from "@/lib/youtube-transcriber";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
+import { buildMetadataText } from "@/lib/metadata-chunk";
+import { fetchYouTubeTranscript } from "@/lib/youtube-transcriber";
 
 type IngestYoutubeInput = {
   linkId: string;
@@ -21,19 +22,32 @@ export async function ingestYoutube({
     logIngestStart("YOUTUBE", linkId, url);
 
     const transcript = await fetchYouTubeTranscript(url);
-    const chunks = chunkText(transcript);
+    const contentChunks = chunkText(transcript);
+
+    const link = await prisma.link.findUnique({
+      where: { id: linkId },
+      select: {
+        title: true,
+        url: true,
+        domain: true,
+        contentType: true,
+        description: true,
+      },
+    });
+    if (!link) {
+      await prisma.link.update({
+        where: { id: linkId },
+        data: { ingestStatus: "FAILED" },
+      });
+      throw new Error(`Link not found for ingest: ${linkId}`);
+    }
+
+    const metadataChunk = buildMetadataText(link);
+    const chunks = [metadataChunk, ...contentChunks];
 
     await prisma.linkContent.deleteMany({
       where: { linkId },
     });
-
-    if (chunks.length === 0) {
-      await prisma.link.update({
-        where: { id: linkId },
-        data: { ingestStatus: "COMPLETED" },
-      });
-      return;
-    }
 
     const embeddings = await embedTextChunks(chunks);
 

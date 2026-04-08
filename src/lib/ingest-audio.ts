@@ -3,6 +3,7 @@ import { transcribeAudio } from "@/lib/audio-transcriber";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
+import { buildMetadataText } from "@/lib/metadata-chunk";
 
 type IngestAudioInput = {
   linkId: string;
@@ -18,19 +19,32 @@ export async function ingestAudio({ linkId, url }: IngestAudioInput): Promise<vo
     logIngestStart("AUDIO", linkId, url);
 
     const transcript = await transcribeAudio(url);
-    const chunks = chunkText(transcript);
+    const contentChunks = chunkText(transcript);
+
+    const link = await prisma.link.findUnique({
+      where: { id: linkId },
+      select: {
+        title: true,
+        url: true,
+        domain: true,
+        contentType: true,
+        description: true,
+      },
+    });
+    if (!link) {
+      await prisma.link.update({
+        where: { id: linkId },
+        data: { ingestStatus: "FAILED" },
+      });
+      throw new Error(`Link not found for ingest: ${linkId}`);
+    }
+
+    const metadataChunk = buildMetadataText(link);
+    const chunks = [metadataChunk, ...contentChunks];
 
     await prisma.linkContent.deleteMany({
       where: { linkId },
     });
-
-    if (chunks.length === 0) {
-      await prisma.link.update({
-        where: { id: linkId },
-        data: { ingestStatus: "COMPLETED" },
-      });
-      return;
-    }
 
     const embeddings = await embedTextChunks(chunks);
 

@@ -1,8 +1,9 @@
 import prisma, { Prisma } from "@/lib/prisma";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
-import { extractPdfTextByPage } from "@/lib/pdf-extractor";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
+import { buildMetadataText } from "@/lib/metadata-chunk";
+import { extractPdfTextByPage } from "@/lib/pdf-extractor";
 
 type IngestPdfInput = {
   linkId: string;
@@ -18,19 +19,32 @@ export async function ingestPdf({ linkId, url }: IngestPdfInput): Promise<void> 
     logIngestStart("PDF", linkId, url);
 
     const pages = await extractPdfTextByPage(url);
-    const chunks = chunkText(pages.join("\n\n"));
+    const contentChunks = chunkText(pages.join("\n\n"));
+
+    const link = await prisma.link.findUnique({
+      where: { id: linkId },
+      select: {
+        title: true,
+        url: true,
+        domain: true,
+        contentType: true,
+        description: true,
+      },
+    });
+    if (!link) {
+      await prisma.link.update({
+        where: { id: linkId },
+        data: { ingestStatus: "FAILED" },
+      });
+      throw new Error(`Link not found for ingest: ${linkId}`);
+    }
+
+    const metadataChunk = buildMetadataText(link);
+    const chunks = [metadataChunk, ...contentChunks];
 
     await prisma.linkContent.deleteMany({
       where: { linkId },
     });
-
-    if (chunks.length === 0) {
-      await prisma.link.update({
-        where: { id: linkId },
-        data: { ingestStatus: "COMPLETED" },
-      });
-      return;
-    }
 
     const embeddings = await embedTextChunks(chunks);
 
