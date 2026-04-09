@@ -16,13 +16,13 @@
       "type": "YouTube",
       "description": "Full transcripts extracted",
       "icon": "TvMinimalPlay",
-      "access": "Coming soon"
+      "access": "Pro"
     },
     {
       "type": "Audio",
       "description": "Transcribed via Whisper",
       "icon": "Headphones",
-      "access": "Coming soon"
+      "access": "Pro · 120 min/mo"
     }
   ]
 }
