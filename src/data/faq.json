@@ -3,7 +3,7 @@
     {
       "value": "what-content-can-i-save",
       "title": "What types of content can I save?",
-      "content": "Purl supports links (any URL), PDFs, YouTube videos, and audio files. When you save a link, Purl automatically fetches the title, favicon, and full text. PDFs are fully parsed, YouTube videos get their transcripts extracted, and audio is transcribed via Whisper. YouTube and audio support are coming soon."
+      "content": "Purl supports links (any URL), PDFs, YouTube videos, and audio files. When you save a link, Purl automatically fetches the title, favicon, and full text. PDFs are fully parsed, YouTube videos get their transcripts extracted, and audio is transcribed via Whisper. YouTube transcripts and audio transcription are included on Pro; see pricing for limits."
     },
     {
       "value": "how-does-ai-chat-work",
