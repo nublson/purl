@@ -26,6 +26,10 @@ interface ChatMessageProps {
   role: "user" | "assistant";
   isLoading?: boolean;
   mentions?: Link[];
+  /** Session profile image for user messages */
+  userAvatarUrl?: string | null;
+  /** Used for avatar alt text and fallback initial */
+  userDisplayName?: string | null;
 }
 
 function AssistantMarkdownFallback({ content }: { content: string }) {
@@ -44,12 +48,20 @@ export default function ChatMessage({
   role,
   isLoading,
   mentions,
+  userAvatarUrl,
+  userDisplayName,
 }: ChatMessageProps) {
+  const userInitial =
+    userDisplayName?.trim().charAt(0)?.toUpperCase() ?? "?";
+
   const media =
     role === "user" ? (
       <Avatar className="size-5">
-        <AvatarImage src="https://github.com/nublson.png" />
-        <AvatarFallback>N</AvatarFallback>
+        <AvatarImage
+          src={userAvatarUrl ?? ""}
+          alt={userDisplayName?.trim() || "You"}
+        />
+        <AvatarFallback>{userInitial}</AvatarFallback>
       </Avatar>
     ) : (
       <Image src="/logo.svg" alt="Purl" width={20} height={20} priority />
