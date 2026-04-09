@@ -9,7 +9,7 @@ import {
 } from "ai";
 import * as Sentry from "@sentry/nextjs";
 import { getChatModel } from "@/lib/ai";
-import { CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
+import { CHAT_STREAM_ERROR_CODES } from "@/lib/chat-http-errors";
 import type {
   ChatStreamErrorPayload,
   PurlChatUIMessage,
@@ -181,7 +181,7 @@ export function buildChatTools(
         } catch (err) {
           captureToolError("listSavedItems", err, toolCtx);
           emitChatStreamProtocolError(toolCtx.streamWriter, {
-            code: CHAT_ERROR_CODES.TOOL_FAILED,
+            code: CHAT_STREAM_ERROR_CODES.TOOL_FAILED,
             userMessage:
               "Something went wrong while loading your saved items. Please try again.",
             tool: "listSavedItems",
@@ -283,7 +283,7 @@ export function buildChatTools(
         } catch (err) {
           captureToolError("searchContent", err, toolCtx);
           emitChatStreamProtocolError(toolCtx.streamWriter, {
-            code: CHAT_ERROR_CODES.TOOL_FAILED,
+            code: CHAT_STREAM_ERROR_CODES.TOOL_FAILED,
             userMessage:
               "Something went wrong while searching your saved content. Please try again.",
             tool: "searchContent",
@@ -350,7 +350,7 @@ export function streamChatResponse(
     if (streamFailureNotified) return;
     streamFailureNotified = true;
     emitChatStreamProtocolError(streamWriter, {
-      code: CHAT_ERROR_CODES.STREAM_FAILED,
+      code: CHAT_STREAM_ERROR_CODES.STREAM_FAILED,
       userMessage: "Something went wrong. Please try again.",
     });
   }

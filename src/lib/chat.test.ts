@@ -1,4 +1,4 @@
-import { CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
+import { CHAT_STREAM_ERROR_CODES } from "@/lib/chat-http-errors";
 import type { ToolExecutionOptions } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -305,7 +305,7 @@ describe("buildChatTools – listSavedItems", () => {
     expect(write).toHaveBeenCalledWith({
       type: "data-chat-protocol-error",
       data: {
-        code: CHAT_ERROR_CODES.TOOL_FAILED,
+        code: CHAT_STREAM_ERROR_CODES.TOOL_FAILED,
         userMessage:
           "Something went wrong while loading your saved items. Please try again.",
         tool: "listSavedItems",

@@ -3,12 +3,12 @@ import "server-only";
 import { NextResponse } from "next/server";
 import {
   buildChatErrorBody,
-  type ChatErrorCode,
+  type ChatHttpErrorCode,
 } from "@/lib/chat-http-errors";
 
 export function chatJsonError(
   status: number,
-  code: ChatErrorCode,
+  code: ChatHttpErrorCode,
   message: string,
   options?: { retryAfterSeconds?: number },
 ): NextResponse {

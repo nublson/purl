@@ -1,12 +1,16 @@
 import type { ChatFlowError } from "@/lib/chat-flow-error";
-import { CHAT_ERROR_CODES, type ChatErrorCode } from "@/lib/chat-http-errors";
+import {
+  CHAT_ERROR_CODES,
+  CHAT_STREAM_ERROR_CODES,
+  type ChatStreamErrorCode,
+} from "@/lib/chat-http-errors";
 import type { UIMessage } from "ai";
 
 /** Safe fields only — no provider or DB internals. */
 export type ChatStreamToolName = "listSavedItems" | "searchContent";
 
 export type ChatStreamErrorPayload = {
-  code: ChatErrorCode;
+  code: ChatStreamErrorCode;
   userMessage: string;
   tool?: ChatStreamToolName;
   retryAfterSeconds?: number;
@@ -17,7 +21,10 @@ export type PurlChatUIMessage = UIMessage<
   { "chat-protocol-error": ChatStreamErrorPayload }
 >;
 
-const CHAT_STREAM_CODES = new Set<string>(Object.values(CHAT_ERROR_CODES));
+const CHAT_STREAM_CODES = new Set<string>([
+  ...Object.values(CHAT_ERROR_CODES),
+  ...Object.values(CHAT_STREAM_ERROR_CODES),
+]);
 
 export function isChatStreamErrorPayload(
   value: unknown,

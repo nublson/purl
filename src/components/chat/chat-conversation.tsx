@@ -71,6 +71,8 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
   const messagesForSnapshotRef = useRef<UIMessage[]>([]);
   const messageMentionsForSnapshotRef = useRef<Link[][]>([]);
   const chatTitleForSnapshotRef = useRef<string | null>(null);
+  /** When true, a valid `data-chat-protocol-error` already drove UX for this send. */
+  const protocolStreamErrorHandledRef = useRef(false);
 
   useEffect(() => {
     chatIdRef.current = chatId;
@@ -144,16 +146,17 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
           clearMentions();
         }
         setFlowError(flow);
+        protocolStreamErrorHandledRef.current = true;
       },
       onError: (err) => {
-        Sentry.captureException(err, {
-          tags: {
-            chatId: chatIdRef.current ?? "",
-            userId: sentryUserId,
-            phase: "client_send",
-          },
-        });
         if (isChatRequestError(err)) {
+          Sentry.captureException(err, {
+            tags: {
+              chatId: chatIdRef.current ?? "",
+              userId: sentryUserId,
+              phase: "client_send",
+            },
+          });
           const flow = chatFlowErrorFromRequestError(err);
           if (flow.kind === "missing_chat") {
             toast.error("This chat is no longer available.");
@@ -168,6 +171,26 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
           setFlowError(flow);
           return;
         }
+        if (protocolStreamErrorHandledRef.current) {
+          Sentry.captureMessage("Chat transport error after protocol error handled", {
+            level: "info",
+            tags: {
+              chatId: chatIdRef.current ?? "",
+              userId: sentryUserId,
+              phase: "client_send",
+              errorSource: "sdk_transport",
+              skippedReason: "protocol_error_already_handled",
+            },
+          });
+          return;
+        }
+        Sentry.captureException(err, {
+          tags: {
+            chatId: chatIdRef.current ?? "",
+            userId: sentryUserId,
+            phase: "client_send",
+          },
+        });
         setFlowError({
           kind: "retry",
           message: err.message || "Something went wrong. Please try again.",
@@ -175,6 +198,19 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       },
       onFinish: ({ isError }) => {
         if (isError) {
+          if (protocolStreamErrorHandledRef.current) {
+            Sentry.captureMessage("Chat stream SDK finish after protocol error handled", {
+              level: "info",
+              tags: {
+                chatId: chatIdRef.current ?? "",
+                userId: sentryUserId,
+                phase: "client_stream",
+                skippedReason: "protocol_error_already_handled",
+                errorSource: "sdk_finish",
+              },
+            });
+            return;
+          }
           Sentry.captureMessage("Chat stream finished with error", {
             level: "error",
             tags: {
@@ -193,6 +229,12 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
         setFlowError((prev) => (prev?.kind === "session" ? prev : null));
       },
     });
+
+  useEffect(() => {
+    if (status === "submitted") {
+      protocolStreamErrorHandledRef.current = false;
+    }
+  }, [status]);
 
   const isLoading = status === "submitted" || status === "streaming";
 
