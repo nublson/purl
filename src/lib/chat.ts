@@ -1,4 +1,12 @@
-import { streamText, tool, jsonSchema, stepCountIs, type ModelMessage } from "ai";
+import {
+  streamText,
+  tool,
+  jsonSchema,
+  stepCountIs,
+  type ModelMessage,
+  type ToolExecutionOptions,
+} from "ai";
+import * as Sentry from "@sentry/nextjs";
 import { getChatModel } from "@/lib/ai";
 import prisma from "@/lib/prisma";
 import {
@@ -48,7 +56,29 @@ type SearchContentInput = {
   limit?: number;
 };
 
-export function buildChatTools(userId: string) {
+type ChatToolContext = {
+  chatId: string;
+  userId: string;
+};
+
+function captureToolError(
+  toolName: string,
+  err: unknown,
+  ctx: ChatToolContext,
+): void {
+  Sentry.captureException(err, {
+    tags: {
+      phase: "tool_execute",
+      tool: toolName,
+      userId: ctx.userId,
+      chatId: ctx.chatId,
+    },
+  });
+}
+
+export function buildChatTools(userId: string, ctx: { chatId: string }) {
+  const toolCtx: ChatToolContext = { userId, chatId: ctx.chatId };
+
   return {
     listSavedItems: tool({
       description:
@@ -75,45 +105,54 @@ export function buildChatTools(userId: string) {
           },
         },
       }),
-      execute: async ({ dateFrom, dateTo, contentType, limit }) => {
-        const where: Record<string, unknown> = { userId };
+      execute: async (
+        { dateFrom, dateTo, contentType, limit }: ListSavedItemsInput,
+        options: ToolExecutionOptions,
+      ) => {
+        void options;
+        try {
+          const where: Record<string, unknown> = { userId };
 
-        if (contentType) {
-          where.contentType = contentType;
+          if (contentType) {
+            where.contentType = contentType;
+          }
+
+          const createdAt: Record<string, Date> = {};
+          if (dateFrom) createdAt.gte = new Date(dateFrom);
+          if (dateTo) createdAt.lte = new Date(dateTo);
+          if (Object.keys(createdAt).length > 0) {
+            where.createdAt = createdAt;
+          }
+
+          const take = Math.max(1, Math.min(limit ?? 20, 50));
+
+          const links = await prisma.link.findMany({
+            where,
+            orderBy: { createdAt: "desc" },
+            take,
+            select: {
+              id: true,
+              title: true,
+              url: true,
+              domain: true,
+              contentType: true,
+              description: true,
+              createdAt: true,
+            },
+          });
+
+          return links.map((l) => ({
+            title: l.title,
+            url: l.url,
+            domain: l.domain,
+            contentType: l.contentType,
+            description: l.description,
+            savedAt: l.createdAt.toISOString(),
+          }));
+        } catch (err) {
+          captureToolError("listSavedItems", err, toolCtx);
+          throw err;
         }
-
-        const createdAt: Record<string, Date> = {};
-        if (dateFrom) createdAt.gte = new Date(dateFrom);
-        if (dateTo) createdAt.lte = new Date(dateTo);
-        if (Object.keys(createdAt).length > 0) {
-          where.createdAt = createdAt;
-        }
-
-        const take = Math.max(1, Math.min(limit ?? 20, 50));
-
-        const links = await prisma.link.findMany({
-          where,
-          orderBy: { createdAt: "desc" },
-          take,
-          select: {
-            id: true,
-            title: true,
-            url: true,
-            domain: true,
-            contentType: true,
-            description: true,
-            createdAt: true,
-          },
-        });
-
-        return links.map((l) => ({
-          title: l.title,
-          url: l.url,
-          domain: l.domain,
-          contentType: l.contentType,
-          description: l.description,
-          savedAt: l.createdAt.toISOString(),
-        }));
       },
     }),
 
@@ -147,60 +186,69 @@ export function buildChatTools(userId: string) {
         },
         required: ["query"],
       }),
-      execute: async ({ query, dateFrom, dateTo, contentType, limit }) => {
-        const results = await semanticSearch(query, userId, {
-          matchCount: Math.max(1, Math.min(limit ?? 10, 20)),
-          type: contentType as LinkContentType | undefined,
-          dateFrom: dateFrom ? new Date(dateFrom) : undefined,
-          dateTo: dateTo ? new Date(dateTo) : undefined,
-        });
+      execute: async (
+        { query, dateFrom, dateTo, contentType, limit }: SearchContentInput,
+        options: ToolExecutionOptions,
+      ) => {
+        void options;
+        try {
+          const results = await semanticSearch(query, userId, {
+            matchCount: Math.max(1, Math.min(limit ?? 10, 20)),
+            type: contentType as LinkContentType | undefined,
+            dateFrom: dateFrom ? new Date(dateFrom) : undefined,
+            dateTo: dateTo ? new Date(dateTo) : undefined,
+          });
 
-        if (results.length === 0) return [];
+          if (results.length === 0) return [];
 
-        const linkIds = [...new Set(results.map((r) => r.linkId))];
-        const linkContents = await prisma.linkContent.findMany({
-          where: { linkId: { in: linkIds } },
-          orderBy: [{ linkId: "asc" }, { chunkIndex: "asc" }],
-          select: {
-            content: true,
-            link: {
-              select: {
-                title: true,
-                url: true,
-                contentType: true,
-                createdAt: true,
+          const linkIds = [...new Set(results.map((r) => r.linkId))];
+          const linkContents = await prisma.linkContent.findMany({
+            where: { linkId: { in: linkIds } },
+            orderBy: [{ linkId: "asc" }, { chunkIndex: "asc" }],
+            select: {
+              content: true,
+              link: {
+                select: {
+                  title: true,
+                  url: true,
+                  contentType: true,
+                  createdAt: true,
+                },
               },
             },
-          },
-        });
+          });
 
-        const grouped = new Map<
-          string,
-          { url: string; contentType: string; savedAt: string; texts: string[] }
-        >();
-        for (const c of linkContents) {
-          const existing = grouped.get(c.link.title);
-          if (existing) {
-            existing.texts.push(c.content);
-          } else {
-            grouped.set(c.link.title, {
-              url: c.link.url,
-              contentType: c.link.contentType,
-              savedAt: c.link.createdAt.toISOString(),
-              texts: [c.content],
-            });
+          const grouped = new Map<
+            string,
+            { url: string; contentType: string; savedAt: string; texts: string[] }
+          >();
+          for (const c of linkContents) {
+            const existing = grouped.get(c.link.title);
+            if (existing) {
+              existing.texts.push(c.content);
+            } else {
+              grouped.set(c.link.title, {
+                url: c.link.url,
+                contentType: c.link.contentType,
+                savedAt: c.link.createdAt.toISOString(),
+                texts: [c.content],
+              });
+            }
           }
-        }
 
-        return Array.from(grouped.entries()).map(
-          ([title, { url, contentType: type, savedAt, texts }]) => ({
-            title,
-            url,
-            contentType: type,
-            savedAt,
-            relevantContent: texts.join("\n\n"),
-          }),
-        );
+          return Array.from(grouped.entries()).map(
+            ([title, { url, contentType: type, savedAt, texts }]) => ({
+              title,
+              url,
+              contentType: type,
+              savedAt,
+              relevantContent: texts.join("\n\n"),
+            }),
+          );
+        } catch (err) {
+          captureToolError("searchContent", err, toolCtx);
+          throw err;
+        }
       },
     }),
   };
@@ -243,20 +291,49 @@ export async function buildMentionContext(
   return sections.join("\n\n---\n\n");
 }
 
+export type StreamChatResponseOptions = {
+  chatId: string;
+  onAssistantText?: (text: string) => void | Promise<void>;
+};
+
 export function streamChatResponse(
   messages: ModelMessage[],
   userId: string,
   context: string | null,
-  onFinish?: (text: string) => void | Promise<void>,
+  options: StreamChatResponseOptions,
 ) {
+  const { chatId, onAssistantText } = options;
+
   return streamText({
     model: getChatModel(),
     system: buildSystemPrompt(context),
     messages,
-    tools: buildChatTools(userId),
+    tools: buildChatTools(userId, { chatId }),
     stopWhen: stepCountIs(5),
-    onFinish: async ({ text }) => {
-      if (onFinish) await onFinish(text);
+    onError: ({ error }) => {
+      Sentry.captureException(error, {
+        tags: {
+          phase: "stream",
+          userId,
+          chatId,
+        },
+      });
+    },
+    onFinish: async ({ text, finishReason }) => {
+      if (finishReason === "error") {
+        Sentry.captureMessage("Chat stream finished with error finishReason", {
+          level: "error",
+          tags: {
+            phase: "stream",
+            userId,
+            chatId,
+          },
+          extra: {
+            textLength: text.length,
+          },
+        });
+      }
+      if (onAssistantText) await onAssistantText(text);
     },
   });
 }

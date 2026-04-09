@@ -284,7 +284,10 @@ describe("POST /api/chat", () => {
         [],
         "user-123",
         null,
-        expect.any(Function),
+        expect.objectContaining({
+          chatId: "chat-1",
+          onAssistantText: expect.any(Function),
+        }),
       );
       expect(res.status).toBe(200);
     });
@@ -331,7 +334,10 @@ describe("POST /api/chat", () => {
         [],
         "user-123",
         "### My Article\n...",
-        expect.any(Function),
+        expect.objectContaining({
+          chatId: "chat-1",
+          onAssistantText: expect.any(Function),
+        }),
       );
     });
 
@@ -353,7 +359,10 @@ describe("POST /api/chat", () => {
         [],
         "user-123",
         null,
-        expect.any(Function),
+        expect.objectContaining({
+          chatId: "chat-1",
+          onAssistantText: expect.any(Function),
+        }),
       );
     });
   });

@@ -125,14 +125,12 @@ export async function POST(request: Request) {
     await saveMessage(chatId, "USER", query, mentionedLinkIds);
 
     phase = "stream_start";
-    const result = streamChatResponse(
-      modelMessages,
-      userId,
-      context,
-      async (text) => {
+    const result = streamChatResponse(modelMessages, userId, context, {
+      chatId,
+      onAssistantText: async (text) => {
         await saveMessage(chatId, "ASSISTANT", text);
       },
-    );
+    });
 
     return result.toUIMessageStreamResponse();
   } catch (err) {
