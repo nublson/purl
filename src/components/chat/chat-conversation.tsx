@@ -1,6 +1,16 @@
 "use client";
 
 import { useChatContext } from "@/contexts/chat-context";
+import { useSession } from "@/lib/auth-client";
+import {
+  chatFlowErrorFromHttp,
+  chatFlowErrorFromRequestError,
+  type ChatFlowError,
+} from "@/lib/chat-flow-error";
+import {
+  isChatRequestError,
+  throwIfChatErrorResponse,
+} from "@/lib/chat-http-errors";
 import { loadChatFromApi } from "@/lib/load-chat";
 import {
   clearChatSnapshot,
@@ -13,8 +23,10 @@ import {
 } from "@/lib/chat-storage";
 import type { Link } from "@/utils/links";
 import { useChat } from "@ai-sdk/react";
+import * as Sentry from "@sentry/nextjs";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import ChatArea from "./chat-area";
 import ChatHeader from "./chat-header";
 import ChatInput from "./chat-input";
@@ -22,8 +34,6 @@ import ChatInput from "./chat-input";
 interface ChatConversationProps {
   onClose: () => void;
 }
-
-const transport = new DefaultChatTransport({ api: "/api/chat" });
 
 function newRequestId(): string {
   return crypto.randomUUID();
@@ -42,9 +52,12 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     pendingSummarize,
     clearPendingSummarize,
   } = useChatContext();
+  const { data: sessionData } = useSession();
+  const sentryUserId = sessionData?.user?.id ?? "";
   const [input, setInput] = useState("");
   const [messageMentions, setMessageMentions] = useState<Link[][]>([]);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
+  const [flowError, setFlowError] = useState<ChatFlowError | null>(null);
   const chatIdRef = useRef(chatId);
   const mentionsRef = useRef(mentions);
   const inputRef = useRef("");
@@ -67,9 +80,77 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     inputRef.current = input;
   }, [input]);
 
-  const { messages, sendMessage, status, setMessages } = useChat({
-    transport,
-  });
+  const chatFetch = useCallback(
+    async (inputReq: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const res = await fetch(inputReq, init);
+      if (!res.ok) {
+        await throwIfChatErrorResponse(res);
+      }
+      return res;
+    },
+    [],
+  );
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/chat",
+        fetch: chatFetch,
+      }),
+    [chatFetch],
+  );
+
+  const { messages, sendMessage, status, setMessages, regenerate, clearError } =
+    useChat({
+      transport,
+      onError: (err) => {
+        Sentry.captureException(err, {
+          tags: {
+            chatId: chatIdRef.current ?? "",
+            userId: sentryUserId,
+            phase: "client_send",
+          },
+        });
+        if (isChatRequestError(err)) {
+          const flow = chatFlowErrorFromRequestError(err);
+          if (flow.kind === "missing_chat") {
+            toast.error("This chat is no longer available.");
+            const goneId = chatIdRef.current;
+            if (goneId) clearChatSnapshot(goneId);
+            setChatId(null);
+            setChatTitle(null);
+            setMessages([]);
+            setMessageMentions([]);
+            clearMentions();
+          }
+          setFlowError(flow);
+          return;
+        }
+        setFlowError({
+          kind: "retry",
+          message: err.message || "Something went wrong. Please try again.",
+        });
+      },
+      onFinish: ({ isError }) => {
+        if (isError) {
+          Sentry.captureMessage("Chat stream finished with error", {
+            level: "error",
+            tags: {
+              chatId: chatIdRef.current ?? "",
+              userId: sentryUserId,
+              phase: "client_stream",
+            },
+          });
+          setFlowError({
+            kind: "retry",
+            message: "Something went wrong. Try again.",
+          });
+          return;
+        }
+        clearError();
+        setFlowError((prev) => (prev?.kind === "session" ? prev : null));
+      },
+    });
 
   const isLoading = status === "submitted" || status === "streaming";
 
@@ -114,6 +195,17 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     };
   }, []);
 
+  const dismissFlowError = useCallback(() => {
+    clearError();
+    setFlowError(null);
+  }, [clearError]);
+
+  const handleRetrySend = useCallback(() => {
+    clearError();
+    setFlowError(null);
+    void regenerate();
+  }, [clearError, regenerate]);
+
   const syncChatFromServer = useCallback(
     async (id: string) => {
       const previousId = chatIdRef.current;
@@ -142,19 +234,63 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       }
 
       try {
-        const payload = await loadChatFromApi(id, ac.signal);
+        const result = await loadChatFromApi(id, ac.signal);
         if (ac.signal.aborted) return;
 
-        if (!payload) {
-          clearChatSnapshot(id);
-          setChatId(null);
-          setChatTitle(null);
-          setMessages([]);
-          setMessageMentions([]);
-          clearMentions();
+        if (!result.ok) {
+          if (result.aborted) return;
+
+          if (result.status === 404) {
+            toast.error("This chat is no longer available.");
+            clearChatSnapshot(id);
+            setChatId(null);
+            setChatTitle(null);
+            setMessages([]);
+            setMessageMentions([]);
+            clearMentions();
+            return;
+          }
+
+          if (result.status === 401) {
+            setFlowError({ kind: "session" });
+            Sentry.captureMessage("Chat load unauthorized", {
+              level: "warning",
+              tags: {
+                chatId: id,
+                userId: sentryUserId,
+                phase: "client_load_chat",
+              },
+            });
+            return;
+          }
+
+          if (result.status === 429) {
+            setFlowError(
+              chatFlowErrorFromHttp(result.status, result.parsed),
+            );
+            return;
+          }
+
+          const err =
+            result.status >= 500 || result.status === 0
+              ? new Error(`load chat failed: ${result.status}`)
+              : new Error(`load chat failed: ${result.status}`);
+          Sentry.captureException(err, {
+            tags: {
+              chatId: id,
+              userId: sentryUserId,
+              phase: "client_load_chat",
+            },
+            extra: { status: result.status, parsed: result.parsed },
+          });
+          setFlowError(
+            chatFlowErrorFromHttp(result.status, result.parsed),
+          );
           return;
         }
 
+        const payload = result.payload;
+        setFlowError(null);
         setMessages(payload.messages);
         setMessageMentions(payload.messageMentions);
         setChatId(payload.id);
@@ -171,7 +307,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
         setIsLoadingChat(false);
       }
     },
-    [setChatId, setChatTitle, setMessages, clearMentions],
+    [setChatId, setChatTitle, setMessages, clearMentions, sentryUserId],
   );
 
   const wasLoadingRef = useRef(false);
@@ -181,6 +317,10 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       void (async () => {
         try {
           const res = await fetch(`/api/chats/${chatId}`);
+          if (res.status === 401) {
+            setFlowError({ kind: "session" });
+            return;
+          }
           if (!res.ok) return;
           const data = (await res.json()) as { title?: string | null };
           const next =
@@ -189,7 +329,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
               : null;
           setChatTitle(next);
         } catch {
-          /* ignore */
+          /* network — ignore title refresh */
         }
       })();
     }
@@ -237,7 +377,25 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       try {
         let id = chatIdRef.current;
         if (!id) {
-          id = await createNewChat();
+          try {
+            id = await createNewChat();
+          } catch (e) {
+            if (isChatRequestError(e)) {
+              setFlowError(chatFlowErrorFromRequestError(e));
+              Sentry.captureException(e, {
+                tags: { phase: "client_create_chat", userId: sentryUserId },
+              });
+            } else {
+              Sentry.captureException(e, {
+                tags: { phase: "client_create_chat", userId: sentryUserId },
+              });
+              setFlowError({
+                kind: "retry",
+                message: "Could not start a chat.",
+              });
+            }
+            return;
+          }
         }
 
         const requestId = newRequestId();
@@ -257,7 +415,13 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
         summarizeInFlightRef.current = false;
       }
     })();
-  }, [pendingSummarize, clearPendingSummarize, createNewChat, sendMessage]);
+  }, [
+    pendingSummarize,
+    clearPendingSummarize,
+    createNewChat,
+    sendMessage,
+    sentryUserId,
+  ]);
 
   const handleSubmit = useCallback(
     async (e?: React.FormEvent) => {
@@ -268,7 +432,25 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       let id = chatIdRef.current;
       if (!id) {
         const newDraft = getDraft(DRAFT_NEW_CHAT_KEY);
-        id = await createNewChat();
+        try {
+          id = await createNewChat();
+        } catch (err) {
+          if (isChatRequestError(err)) {
+            setFlowError(chatFlowErrorFromRequestError(err));
+            Sentry.captureException(err, {
+              tags: { phase: "client_create_chat", userId: sentryUserId },
+            });
+          } else {
+            Sentry.captureException(err, {
+              tags: { phase: "client_create_chat", userId: sentryUserId },
+            });
+            setFlowError({
+              kind: "retry",
+              message: "Could not start a chat.",
+            });
+          }
+          return;
+        }
         if (newDraft) {
           setDraft(id, newDraft);
           clearDraft(DRAFT_NEW_CHAT_KEY);
@@ -288,14 +470,32 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       setInput("");
       clearMentions();
     },
-    [input, createNewChat, sendMessage, clearMentions],
+    [input, createNewChat, sendMessage, clearMentions, sentryUserId],
   );
 
   const handleSuggestion = useCallback(
     async (text: string) => {
       let id = chatIdRef.current;
       if (!id) {
-        id = await createNewChat();
+        try {
+          id = await createNewChat();
+        } catch (err) {
+          if (isChatRequestError(err)) {
+            setFlowError(chatFlowErrorFromRequestError(err));
+            Sentry.captureException(err, {
+              tags: { phase: "client_create_chat", userId: sentryUserId },
+            });
+          } else {
+            Sentry.captureException(err, {
+              tags: { phase: "client_create_chat", userId: sentryUserId },
+            });
+            setFlowError({
+              kind: "retry",
+              message: "Could not start a chat.",
+            });
+          }
+          return;
+        }
       }
 
       const requestId = newRequestId();
@@ -303,7 +503,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       sendMessage({ text }, { body: { chatId: id, requestId } });
       setMessageMentions((prev) => [...prev, []]);
     },
-    [createNewChat, sendMessage],
+    [createNewChat, sendMessage, sentryUserId],
   );
 
   const handleNewChat = useCallback(() => {
@@ -314,7 +514,9 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     setMessages([]);
     setMessageMentions([]);
     setInput("");
-  }, [startNewChat, setMessages]);
+    clearError();
+    setFlowError(null);
+  }, [startNewChat, setMessages, clearError]);
 
   const handleSelectChat = useCallback(
     async (id: string) => {
@@ -331,6 +533,9 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
         onNewChat={handleNewChat}
         onSelectChat={handleSelectChat}
         isLoadingChat={isLoadingChat}
+        flowError={flowError}
+        onDismissFlowError={dismissFlowError}
+        onRetrySend={handleRetrySend}
       />
       <ChatArea
         messages={messages}

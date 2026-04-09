@@ -31,25 +31,35 @@ describe("loadChatFromApi", () => {
     vi.unstubAllGlobals();
   });
 
-  it("returns null when the API responds with a non-2xx status", async () => {
+  it("returns ok:false with status when the API responds with a non-2xx status", async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(null, { status: 404 }),
     );
 
     const result = await loadChatFromApi("chat-1");
 
-    expect(result).toBeNull();
+    expect(result).toEqual({
+      ok: false,
+      aborted: false,
+      status: 404,
+      parsed: null,
+    });
   });
 
-  it("returns null when the fetch call throws (e.g. network error)", async () => {
+  it("returns ok:false with status 0 when the fetch call throws (e.g. network error)", async () => {
     vi.mocked(fetch).mockRejectedValue(new TypeError("Failed to fetch"));
 
     const result = await loadChatFromApi("chat-1");
 
-    expect(result).toBeNull();
+    expect(result).toEqual({
+      ok: false,
+      aborted: false,
+      status: 0,
+      parsed: null,
+    });
   });
 
-  it("returns null when the signal is already aborted before the request", async () => {
+  it("returns ok:false aborted when the signal is already aborted before the request", async () => {
     const controller = new AbortController();
     controller.abort();
     vi.mocked(fetch).mockRejectedValue(
@@ -58,12 +68,15 @@ describe("loadChatFromApi", () => {
 
     const result = await loadChatFromApi("chat-1", controller.signal);
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, aborted: true });
   });
 
   it("calls the correct endpoint URL", async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(makeApiResponse()), { status: 200 }),
+      new Response(JSON.stringify(makeApiResponse()), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
     );
 
     await loadChatFromApi("chat-42");
@@ -78,15 +91,16 @@ describe("loadChatFromApi", () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(
         JSON.stringify(makeApiResponse({ id: "c1", title: "Empty chat", messages: [] })),
-        { status: 200 },
+        { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
 
     const result = await loadChatFromApi("c1");
 
-    expect(result).not.toBeNull();
-    expect(result!.messages).toEqual([]);
-    expect(result!.messageMentions).toEqual([]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.payload.messages).toEqual([]);
+    expect(result.payload.messageMentions).toEqual([]);
   });
 
   it("maps USER messages to role='user' with text parts", async () => {
@@ -99,14 +113,16 @@ describe("loadChatFromApi", () => {
             ],
           }),
         ),
-        { status: 200 },
+        { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
 
     const result = await loadChatFromApi("chat-1");
 
-    expect(result!.messages).toHaveLength(1);
-    expect(result!.messages[0]).toMatchObject({
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.payload.messages).toHaveLength(1);
+    expect(result.payload.messages[0]).toMatchObject({
       id: "m1",
       role: "user",
       content: "Hello!",
@@ -124,13 +140,15 @@ describe("loadChatFromApi", () => {
             ],
           }),
         ),
-        { status: 200 },
+        { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
 
     const result = await loadChatFromApi("chat-1");
 
-    expect(result!.messages[0]).toMatchObject({
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.payload.messages[0]).toMatchObject({
       id: "m2",
       role: "assistant",
       content: "Here is the answer.",
@@ -149,66 +167,76 @@ describe("loadChatFromApi", () => {
             ],
           }),
         ),
-        { status: 200 },
+        { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
 
     const result = await loadChatFromApi("chat-1");
 
-    expect(result!.messageMentions).toHaveLength(2);
-    expect(result!.messageMentions[0]).toEqual([mention]);
-    expect(result!.messageMentions[1]).toEqual([]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.payload.messageMentions).toHaveLength(2);
+    expect(result.payload.messageMentions[0]).toEqual([mention]);
+    expect(result.payload.messageMentions[1]).toEqual([]);
   });
 
   it("trims whitespace from title and coerces empty string to null", async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(
         JSON.stringify(makeApiResponse({ title: "   " })),
-        { status: 200 },
+        { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
 
     const result = await loadChatFromApi("chat-1");
 
-    expect(result!.title).toBeNull();
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.payload.title).toBeNull();
   });
 
   it("preserves a non-empty title after trimming", async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(
         JSON.stringify(makeApiResponse({ title: "  My Chat  " })),
-        { status: 200 },
+        { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
 
     const result = await loadChatFromApi("chat-1");
 
-    expect(result!.title).toBe("My Chat");
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.payload.title).toBe("My Chat");
   });
 
-  it("returns null when title from API is null", async () => {
+  it("returns null title in payload when title from API is null", async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(
         JSON.stringify(makeApiResponse({ title: null })),
-        { status: 200 },
+        { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
 
     const result = await loadChatFromApi("chat-1");
 
-    expect(result!.title).toBeNull();
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.payload.title).toBeNull();
   });
 
   it("returns the correct id from the API response", async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(
         JSON.stringify(makeApiResponse({ id: "xyz-999" })),
-        { status: 200 },
+        { status: 200, headers: { "content-type": "application/json" } },
       ),
     );
 
     const result = await loadChatFromApi("xyz-999");
 
-    expect(result!.id).toBe("xyz-999");
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.payload.id).toBe("xyz-999");
   });
 });

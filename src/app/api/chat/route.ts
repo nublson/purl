@@ -1,19 +1,58 @@
 import { auth } from "@/lib/auth";
+import { chatJsonError } from "@/lib/chat-api-error-response";
+import { CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
 import { buildMentionContext, streamChatResponse } from "@/lib/chat";
 import { saveMessage, verifyChatOwnership } from "@/lib/chats";
 import { convertToModelMessages, type UIMessage } from "ai";
+import * as Sentry from "@sentry/nextjs";
 import { headers } from "next/headers";
-import { NextResponse } from "next/server";
 
 export const maxDuration = 60;
+
+type ChatRoutePhase =
+  | "verify_ownership"
+  | "build_context"
+  | "convert_messages"
+  | "save_user_message"
+  | "stream_start";
+
+function httpStatusFromUnknownError(err: unknown): number | undefined {
+  if (!err || typeof err !== "object") return undefined;
+  const o = err as Record<string, unknown>;
+  if (typeof o.statusCode === "number") return o.statusCode;
+  const cause = o.cause;
+  if (cause && typeof cause === "object") {
+    const c = cause as Record<string, unknown>;
+    if (typeof c.statusCode === "number") return c.statusCode;
+    if (typeof c.status === "number") return c.status;
+  }
+  if (typeof o.status === "number") return o.status;
+  return undefined;
+}
+
+function isRateLimitedError(err: unknown): boolean {
+  const s = httpStatusFromUnknownError(err);
+  if (s === 429) return true;
+  const msg =
+    err instanceof Error
+      ? `${err.message} ${err.cause ?? ""}`
+      : String(err);
+  return /rate\s*limit|429|too many requests/i.test(msg);
+}
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return chatJsonError(
+      401,
+      CHAT_ERROR_CODES.SESSION_EXPIRED,
+      "Please sign in again.",
+    );
   }
+
+  const userId = session.user.id;
 
   let messages: UIMessage[];
   let chatId: string;
@@ -30,29 +69,36 @@ export async function POST(request: Request) {
       requestId = body.requestId.trim();
     }
   } catch {
-    return NextResponse.json(
-      { error: "Invalid request body" },
-      { status: 400 },
+    return chatJsonError(
+      400,
+      CHAT_ERROR_CODES.BAD_REQUEST,
+      "Invalid request body.",
     );
   }
 
   if (!chatId || typeof chatId !== "string") {
-    return NextResponse.json(
-      { error: "chatId is required" },
-      { status: 400 },
+    return chatJsonError(
+      400,
+      CHAT_ERROR_CODES.BAD_REQUEST,
+      "chatId is required.",
     );
   }
 
   if (!Array.isArray(messages) || messages.length === 0) {
-    return NextResponse.json(
-      { error: "Messages array is required" },
-      { status: 400 },
+    return chatJsonError(
+      400,
+      CHAT_ERROR_CODES.BAD_REQUEST,
+      "Messages array is required.",
     );
   }
 
-  const isOwner = await verifyChatOwnership(chatId, session.user.id);
+  const isOwner = await verifyChatOwnership(chatId, userId);
   if (!isOwner) {
-    return NextResponse.json({ error: "Chat not found" }, { status: 404 });
+    return chatJsonError(
+      404,
+      CHAT_ERROR_CODES.CHAT_NOT_FOUND,
+      "Chat not found.",
+    );
   }
 
   const lastUserMessage = [...messages]
@@ -63,25 +109,52 @@ export async function POST(request: Request) {
     .map((p) => p.text)
     .join(" ") ?? "";
 
-  const context =
-    mentionedLinkIds && mentionedLinkIds.length > 0
-      ? await buildMentionContext(mentionedLinkIds)
-      : null;
+  let phase: ChatRoutePhase = "build_context";
 
-  const modelMessages = await convertToModelMessages(messages);
+  try {
+    let context: string | null = null;
+    if (mentionedLinkIds && mentionedLinkIds.length > 0) {
+      phase = "build_context";
+      context = await buildMentionContext(mentionedLinkIds);
+    }
 
-  void requestId;
+    phase = "convert_messages";
+    const modelMessages = await convertToModelMessages(messages);
 
-  await saveMessage(chatId, "USER", query, mentionedLinkIds);
+    phase = "save_user_message";
+    await saveMessage(chatId, "USER", query, mentionedLinkIds);
 
-  const result = streamChatResponse(
-    modelMessages,
-    session.user.id,
-    context,
-    async (text) => {
-      await saveMessage(chatId, "ASSISTANT", text);
-    },
-  );
+    phase = "stream_start";
+    const result = streamChatResponse(
+      modelMessages,
+      userId,
+      context,
+      async (text) => {
+        await saveMessage(chatId, "ASSISTANT", text);
+      },
+    );
 
-  return result.toUIMessageStreamResponse();
+    return result.toUIMessageStreamResponse();
+  } catch (err) {
+    Sentry.captureException(err, {
+      tags: {
+        chatId,
+        userId,
+        phase,
+      },
+      extra: requestId ? { requestId } : undefined,
+    });
+
+    if (isRateLimitedError(err)) {
+      return chatJsonError(429, CHAT_ERROR_CODES.RATE_LIMITED, "Too many requests. Try again shortly.", {
+        retryAfterSeconds: 60,
+      });
+    }
+
+    return chatJsonError(
+      500,
+      CHAT_ERROR_CODES.INTERNAL_ERROR,
+      "Something went wrong. Please try again.",
+    );
+  }
 }

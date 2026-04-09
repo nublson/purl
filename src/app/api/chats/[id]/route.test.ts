@@ -1,3 +1,4 @@
+import { buildChatErrorBody, CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DELETE, GET } from "./route";
 
@@ -43,7 +44,12 @@ describe("GET /api/chats/[id]", () => {
     const res = await GET(makeRequest("GET"), params("chat-1"));
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Unauthorized" });
+    expect(await res.json()).toEqual(
+      buildChatErrorBody(
+        CHAT_ERROR_CODES.SESSION_EXPIRED,
+        "Please sign in again.",
+      ),
+    );
     expect(getChatWithMessages).not.toHaveBeenCalled();
   });
 
@@ -54,7 +60,9 @@ describe("GET /api/chats/[id]", () => {
     const res = await GET(makeRequest("GET"), params("chat-ghost"));
 
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "Chat not found" });
+    expect(await res.json()).toEqual(
+      buildChatErrorBody(CHAT_ERROR_CODES.CHAT_NOT_FOUND, "Chat not found."),
+    );
   });
 
   it("returns the chat with its messages when found", async () => {
@@ -88,7 +96,12 @@ describe("DELETE /api/chats/[id]", () => {
     const res = await DELETE(makeRequest("DELETE"), params("chat-1"));
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Unauthorized" });
+    expect(await res.json()).toEqual(
+      buildChatErrorBody(
+        CHAT_ERROR_CODES.SESSION_EXPIRED,
+        "Please sign in again.",
+      ),
+    );
     expect(deleteChat).not.toHaveBeenCalled();
   });
 
@@ -99,7 +112,9 @@ describe("DELETE /api/chats/[id]", () => {
     const res = await DELETE(makeRequest("DELETE"), params("chat-ghost"));
 
     expect(res.status).toBe(404);
-    expect(await res.json()).toEqual({ error: "Chat not found" });
+    expect(await res.json()).toEqual(
+      buildChatErrorBody(CHAT_ERROR_CODES.CHAT_NOT_FOUND, "Chat not found."),
+    );
   });
 
   it("returns 204 with no body when the chat is successfully deleted", async () => {

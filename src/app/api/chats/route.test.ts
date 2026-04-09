@@ -1,3 +1,4 @@
+import { buildChatErrorBody, CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET, POST } from "./route";
@@ -24,10 +25,6 @@ const { getChatsForCurrentUser, createChat } = await import("@/lib/chats");
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 
-function getRequest(): NextRequest {
-  return new NextRequest("http://localhost/api/chats", { method: "GET" });
-}
-
 function postRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/chats", {
     method: "POST",
@@ -48,7 +45,12 @@ describe("GET /api/chats", () => {
     const res = await GET();
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Unauthorized" });
+    expect(await res.json()).toEqual(
+      buildChatErrorBody(
+        CHAT_ERROR_CODES.SESSION_EXPIRED,
+        "Please sign in again.",
+      ),
+    );
     expect(getChatsForCurrentUser).not.toHaveBeenCalled();
   });
 
@@ -79,7 +81,12 @@ describe("POST /api/chats", () => {
     const res = await POST(postRequest({ title: "My Chat" }));
 
     expect(res.status).toBe(401);
-    expect(await res.json()).toEqual({ error: "Unauthorized" });
+    expect(await res.json()).toEqual(
+      buildChatErrorBody(
+        CHAT_ERROR_CODES.SESSION_EXPIRED,
+        "Please sign in again.",
+      ),
+    );
     expect(createChat).not.toHaveBeenCalled();
   });
 

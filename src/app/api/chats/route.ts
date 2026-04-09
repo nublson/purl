@@ -1,4 +1,6 @@
 import { auth } from "@/lib/auth";
+import { chatJsonError } from "@/lib/chat-api-error-response";
+import { CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
 import { createChat, getChatsForCurrentUser } from "@/lib/chats";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
@@ -8,7 +10,11 @@ export async function GET() {
     headers: await headers(),
   });
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return chatJsonError(
+      401,
+      CHAT_ERROR_CODES.SESSION_EXPIRED,
+      "Please sign in again.",
+    );
   }
 
   const chats = await getChatsForCurrentUser();
@@ -20,7 +26,11 @@ export async function POST(request: NextRequest) {
     headers: await headers(),
   });
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return chatJsonError(
+      401,
+      CHAT_ERROR_CODES.SESSION_EXPIRED,
+      "Please sign in again.",
+    );
   }
 
   let title: string | undefined;
