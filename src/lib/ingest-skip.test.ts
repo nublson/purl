@@ -42,18 +42,14 @@ describe("skipIngest", () => {
   });
 
   it("calls prisma update before notifyLinksAfterIngest", async () => {
-    const callOrder: string[] = [];
-    vi.mocked(prisma.link.update).mockImplementation(async () => {
-      callOrder.push("update");
-      return {} as never;
-    });
-    vi.mocked(notifyLinksAfterIngest).mockImplementation(async () => {
-      callOrder.push("notify");
-    });
-
     await skipIngest("link-3");
 
-    expect(callOrder).toEqual(["update", "notify"]);
+    const updateCallOrder = vi.mocked(prisma.link.update).mock.invocationCallOrder[0];
+    const notifyCallOrder = vi
+      .mocked(notifyLinksAfterIngest)
+      .mock.invocationCallOrder[0];
+
+    expect(updateCallOrder).toBeLessThan(notifyCallOrder);
   });
 
   it("propagates errors thrown by prisma.link.update", async () => {
