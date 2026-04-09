@@ -29,9 +29,13 @@ vi.mock("@/lib/chats", () => ({
   verifyChatOwnership: vi.fn(),
 }));
 
-vi.mock("ai", () => ({
-  convertToModelMessages: vi.fn().mockReturnValue([]),
-}));
+vi.mock("ai", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("ai")>();
+  return {
+    ...actual,
+    convertToModelMessages: vi.fn().mockResolvedValue([]),
+  };
+});
 
 const { auth } = await import("@/lib/auth");
 const { buildMentionContext, streamChatResponse } = await import("@/lib/chat");
@@ -58,10 +62,13 @@ function postRequest(body: unknown): Request {
 }
 
 function mockStreamResult() {
+  const uiStream = new ReadableStream({
+    start(controller) {
+      controller.close();
+    },
+  });
   const streamResult = {
-    toUIMessageStreamResponse: vi.fn().mockReturnValue(
-      new Response("stream", { status: 200 }),
-    ),
+    toUIMessageStream: vi.fn().mockReturnValue(uiStream),
   };
   vi.mocked(streamChatResponse).mockReturnValue(streamResult as never);
   return streamResult;
@@ -286,6 +293,7 @@ describe("POST /api/chat", () => {
         null,
         expect.objectContaining({
           chatId: "chat-1",
+          streamWriter: expect.any(Object),
           onAssistantText: expect.any(Function),
         }),
       );
@@ -336,6 +344,7 @@ describe("POST /api/chat", () => {
         "### My Article\n...",
         expect.objectContaining({
           chatId: "chat-1",
+          streamWriter: expect.any(Object),
           onAssistantText: expect.any(Function),
         }),
       );
@@ -361,6 +370,7 @@ describe("POST /api/chat", () => {
         null,
         expect.objectContaining({
           chatId: "chat-1",
+          streamWriter: expect.any(Object),
           onAssistantText: expect.any(Function),
         }),
       );

@@ -11,6 +11,10 @@ import {
   isChatRequestError,
   throwIfChatErrorResponse,
 } from "@/lib/chat-http-errors";
+import {
+  chatFlowErrorFromStreamPayload,
+  isChatStreamErrorPayload,
+} from "@/lib/chat-stream-error";
 import { loadChatFromApi } from "@/lib/load-chat";
 import {
   clearChatSnapshot,
@@ -103,6 +107,44 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
   const { messages, sendMessage, status, setMessages, regenerate, clearError } =
     useChat({
       transport,
+      onData: (part) => {
+        if (part.type !== "data-chat-protocol-error") return;
+        const raw = part.data;
+        if (!isChatStreamErrorPayload(raw)) {
+          Sentry.captureMessage("Invalid chat stream protocol error payload", {
+            level: "warning",
+            tags: {
+              phase: "client_stream_data",
+              chatId: chatIdRef.current ?? "",
+              userId: sentryUserId,
+            },
+          });
+          return;
+        }
+        Sentry.captureMessage("Chat stream protocol error", {
+          level: "error",
+          tags: {
+            phase: "client_stream_data",
+            chatId: chatIdRef.current ?? "",
+            userId: sentryUserId,
+            code: raw.code,
+            tool: raw.tool ?? "",
+          },
+          extra: { retryAfterSeconds: raw.retryAfterSeconds },
+        });
+        const flow = chatFlowErrorFromStreamPayload(raw);
+        if (flow.kind === "missing_chat") {
+          toast.error("This chat is no longer available.");
+          const goneId = chatIdRef.current;
+          if (goneId) clearChatSnapshot(goneId);
+          setChatId(null);
+          setChatTitle(null);
+          setMessages([]);
+          setMessageMentions([]);
+          clearMentions();
+        }
+        setFlowError(flow);
+      },
       onError: (err) => {
         Sentry.captureException(err, {
           tags: {

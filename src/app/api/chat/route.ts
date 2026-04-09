@@ -2,8 +2,14 @@ import { auth } from "@/lib/auth";
 import { chatJsonError } from "@/lib/chat-api-error-response";
 import { CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
 import { buildMentionContext, streamChatResponse } from "@/lib/chat";
+import type { PurlChatUIMessage } from "@/lib/chat-stream-error";
 import { saveMessage, verifyChatOwnership } from "@/lib/chats";
-import { convertToModelMessages, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  type UIMessage,
+} from "ai";
 import * as Sentry from "@sentry/nextjs";
 import { headers } from "next/headers";
 
@@ -125,14 +131,20 @@ export async function POST(request: Request) {
     await saveMessage(chatId, "USER", query, mentionedLinkIds);
 
     phase = "stream_start";
-    const result = streamChatResponse(modelMessages, userId, context, {
-      chatId,
-      onAssistantText: async (text) => {
-        await saveMessage(chatId, "ASSISTANT", text);
+    const stream = createUIMessageStream<PurlChatUIMessage>({
+      execute: ({ writer }) => {
+        const result = streamChatResponse(modelMessages, userId, context, {
+          chatId,
+          streamWriter: writer,
+          onAssistantText: async (text) => {
+            await saveMessage(chatId, "ASSISTANT", text);
+          },
+        });
+        writer.merge(result.toUIMessageStream());
       },
     });
 
-    return result.toUIMessageStreamResponse();
+    return createUIMessageStreamResponse({ stream });
   } catch (err) {
     Sentry.captureException(err, {
       tags: {

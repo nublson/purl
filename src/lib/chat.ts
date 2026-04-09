@@ -5,9 +5,15 @@ import {
   stepCountIs,
   type ModelMessage,
   type ToolExecutionOptions,
+  type UIMessageStreamWriter,
 } from "ai";
 import * as Sentry from "@sentry/nextjs";
 import { getChatModel } from "@/lib/ai";
+import { CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
+import type {
+  ChatStreamErrorPayload,
+  PurlChatUIMessage,
+} from "@/lib/chat-stream-error";
 import prisma from "@/lib/prisma";
 import {
   semanticSearch,
@@ -59,7 +65,20 @@ type SearchContentInput = {
 type ChatToolContext = {
   chatId: string;
   userId: string;
+  streamWriter?: UIMessageStreamWriter<PurlChatUIMessage>;
 };
+
+function emitChatStreamProtocolError(
+  writer: UIMessageStreamWriter<PurlChatUIMessage> | undefined,
+  payload: ChatStreamErrorPayload,
+): void {
+  if (!writer) return;
+  writer.write({
+    type: "data-chat-protocol-error",
+    data: payload,
+    transient: true,
+  });
+}
 
 function captureToolError(
   toolName: string,
@@ -76,8 +95,18 @@ function captureToolError(
   });
 }
 
-export function buildChatTools(userId: string, ctx: { chatId: string }) {
-  const toolCtx: ChatToolContext = { userId, chatId: ctx.chatId };
+export function buildChatTools(
+  userId: string,
+  ctx: {
+    chatId: string;
+    streamWriter?: UIMessageStreamWriter<PurlChatUIMessage>;
+  },
+) {
+  const toolCtx: ChatToolContext = {
+    userId,
+    chatId: ctx.chatId,
+    streamWriter: ctx.streamWriter,
+  };
 
   return {
     listSavedItems: tool({
@@ -151,6 +180,12 @@ export function buildChatTools(userId: string, ctx: { chatId: string }) {
           }));
         } catch (err) {
           captureToolError("listSavedItems", err, toolCtx);
+          emitChatStreamProtocolError(toolCtx.streamWriter, {
+            code: CHAT_ERROR_CODES.TOOL_FAILED,
+            userMessage:
+              "Something went wrong while loading your saved items. Please try again.",
+            tool: "listSavedItems",
+          });
           throw err;
         }
       },
@@ -247,6 +282,12 @@ export function buildChatTools(userId: string, ctx: { chatId: string }) {
           );
         } catch (err) {
           captureToolError("searchContent", err, toolCtx);
+          emitChatStreamProtocolError(toolCtx.streamWriter, {
+            code: CHAT_ERROR_CODES.TOOL_FAILED,
+            userMessage:
+              "Something went wrong while searching your saved content. Please try again.",
+            tool: "searchContent",
+          });
           throw err;
         }
       },
@@ -294,6 +335,7 @@ export async function buildMentionContext(
 export type StreamChatResponseOptions = {
   chatId: string;
   onAssistantText?: (text: string) => void | Promise<void>;
+  streamWriter?: UIMessageStreamWriter<PurlChatUIMessage>;
 };
 
 export function streamChatResponse(
@@ -302,13 +344,22 @@ export function streamChatResponse(
   context: string | null,
   options: StreamChatResponseOptions,
 ) {
-  const { chatId, onAssistantText } = options;
+  const { chatId, onAssistantText, streamWriter } = options;
+  let streamFailureNotified = false;
+  function notifyStreamFailure(): void {
+    if (streamFailureNotified) return;
+    streamFailureNotified = true;
+    emitChatStreamProtocolError(streamWriter, {
+      code: CHAT_ERROR_CODES.STREAM_FAILED,
+      userMessage: "Something went wrong. Please try again.",
+    });
+  }
 
   return streamText({
     model: getChatModel(),
     system: buildSystemPrompt(context),
     messages,
-    tools: buildChatTools(userId, { chatId }),
+    tools: buildChatTools(userId, { chatId, streamWriter }),
     stopWhen: stepCountIs(5),
     onError: ({ error }) => {
       Sentry.captureException(error, {
@@ -318,6 +369,7 @@ export function streamChatResponse(
           chatId,
         },
       });
+      notifyStreamFailure();
     },
     onFinish: async ({ text, finishReason }) => {
       if (finishReason === "error") {
@@ -332,6 +384,7 @@ export function streamChatResponse(
             textLength: text.length,
           },
         });
+        notifyStreamFailure();
       }
       if (onAssistantText) await onAssistantText(text);
     },

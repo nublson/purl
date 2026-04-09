@@ -1,3 +1,4 @@
+import { CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
 import type { ToolExecutionOptions } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -286,6 +287,31 @@ describe("buildChatTools – listSavedItems", () => {
         }),
       }),
     );
+  });
+
+  it("emits a transient protocol error when streamWriter is set and listSavedItems fails", async () => {
+    vi.mocked(prisma.link.findMany).mockRejectedValue(new Error("db fail"));
+    const write = vi.fn();
+    const streamWriter = { write, merge: vi.fn(), onError: undefined };
+
+    const tools = buildChatTools(userId, {
+      chatId: TEST_CHAT_ID,
+      streamWriter: streamWriter as never,
+    });
+    await expect(callToolExecute(tools.listSavedItems, {})).rejects.toThrow(
+      "db fail",
+    );
+
+    expect(write).toHaveBeenCalledWith({
+      type: "data-chat-protocol-error",
+      data: {
+        code: CHAT_ERROR_CODES.TOOL_FAILED,
+        userMessage:
+          "Something went wrong while loading your saved items. Please try again.",
+        tool: "listSavedItems",
+      },
+      transient: true,
+    });
   });
 });
 

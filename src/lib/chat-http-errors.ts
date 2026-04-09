@@ -7,6 +7,10 @@ export const CHAT_ERROR_CODES = {
   BAD_REQUEST: "BAD_REQUEST",
   UPSTREAM_ERROR: "UPSTREAM_ERROR",
   INTERNAL_ERROR: "INTERNAL_ERROR",
+  /** In-stream only: tool execution failed (also reported to Sentry). */
+  TOOL_FAILED: "TOOL_FAILED",
+  /** In-stream only: model stream failed (also reported to Sentry). */
+  STREAM_FAILED: "STREAM_FAILED",
 } as const;
 
 export type ChatErrorCode =
