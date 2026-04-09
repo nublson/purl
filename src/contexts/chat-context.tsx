@@ -1,6 +1,11 @@
 "use client";
 
 import {
+  ChatRequestError,
+  CHAT_ERROR_CODES,
+  parseChatErrorBody,
+} from "@/lib/chat-http-errors";
+import {
   clearLastChatId,
   getLastChatId,
   setLastChatId,
@@ -70,7 +75,33 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const createNewChat = useCallback(async (): Promise<string> => {
     const res = await fetch("/api/chats", { method: "POST" });
-    const data = await res.json();
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      body = null;
+    }
+    if (!res.ok) {
+      const parsed = parseChatErrorBody(body);
+      const headerRetry = res.headers.get("Retry-After");
+      const retrySec =
+        headerRetry != null ? parseInt(headerRetry, 10) : undefined;
+      throw new ChatRequestError(
+        res.status,
+        parsed?.code ?? CHAT_ERROR_CODES.INTERNAL_ERROR,
+        parsed?.message ?? "Could not create a new chat.",
+        parsed?.retryAfterSeconds ??
+          (Number.isFinite(retrySec) ? retrySec : undefined),
+      );
+    }
+    const data = body as { id?: string; title?: string | null };
+    if (typeof data.id !== "string" || !data.id) {
+      throw new ChatRequestError(
+        500,
+        CHAT_ERROR_CODES.INTERNAL_ERROR,
+        "Invalid response when creating chat.",
+      );
+    }
     setChatId(data.id);
     const nextTitle =
       typeof data.title === "string" && data.title.trim()

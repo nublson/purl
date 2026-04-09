@@ -1,5 +1,11 @@
+import { buildChatErrorBody, CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
+
+vi.mock("@sentry/nextjs", () => ({
+  captureException: vi.fn(),
+  captureMessage: vi.fn(),
+}));
 
 vi.mock("@/lib/auth", () => ({
   auth: {
@@ -23,13 +29,18 @@ vi.mock("@/lib/chats", () => ({
   verifyChatOwnership: vi.fn(),
 }));
 
-vi.mock("ai", () => ({
-  convertToModelMessages: vi.fn().mockReturnValue([]),
-}));
+vi.mock("ai", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("ai")>();
+  return {
+    ...actual,
+    convertToModelMessages: vi.fn().mockResolvedValue([]),
+  };
+});
 
 const { auth } = await import("@/lib/auth");
 const { buildMentionContext, streamChatResponse } = await import("@/lib/chat");
 const { saveMessage, verifyChatOwnership } = await import("@/lib/chats");
+const Sentry = await import("@sentry/nextjs");
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 
@@ -51,10 +62,13 @@ function postRequest(body: unknown): Request {
 }
 
 function mockStreamResult() {
+  const uiStream = new ReadableStream({
+    start(controller) {
+      controller.close();
+    },
+  });
   const streamResult = {
-    toUIMessageStreamResponse: vi.fn().mockReturnValue(
-      new Response("stream", { status: 200 }),
-    ),
+    toUIMessageStream: vi.fn().mockReturnValue(uiStream),
   };
   vi.mocked(streamChatResponse).mockReturnValue(streamResult as never);
   return streamResult;
@@ -67,6 +81,7 @@ describe("POST /api/chat", () => {
     vi.mocked(streamChatResponse).mockReset();
     vi.mocked(saveMessage).mockReset();
     vi.mocked(verifyChatOwnership).mockReset();
+    vi.mocked(Sentry.captureException).mockReset();
     vi.mocked(saveMessage).mockResolvedValue({} as never);
     vi.mocked(buildMentionContext).mockResolvedValue(null);
   });
@@ -78,7 +93,12 @@ describe("POST /api/chat", () => {
       const res = await POST(postRequest({ chatId: "c1", messages: VALID_MESSAGES }));
 
       expect(res.status).toBe(401);
-      expect(await res.json()).toEqual({ error: "Unauthorized" });
+      expect(await res.json()).toEqual(
+        buildChatErrorBody(
+          CHAT_ERROR_CODES.SESSION_EXPIRED,
+          "Please sign in again.",
+        ),
+      );
     });
 
     it("returns 401 when session has no user id", async () => {
@@ -102,7 +122,9 @@ describe("POST /api/chat", () => {
       const res = await POST(req);
 
       expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ error: "Invalid request body" });
+      expect(await res.json()).toEqual(
+        buildChatErrorBody(CHAT_ERROR_CODES.BAD_REQUEST, "Invalid request body."),
+      );
     });
 
     it("returns 400 when chatId is missing", async () => {
@@ -111,7 +133,9 @@ describe("POST /api/chat", () => {
       const res = await POST(postRequest({ messages: VALID_MESSAGES }));
 
       expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ error: "chatId is required" });
+      expect(await res.json()).toEqual(
+        buildChatErrorBody(CHAT_ERROR_CODES.BAD_REQUEST, "chatId is required."),
+      );
     });
 
     it("returns 400 when chatId is not a string", async () => {
@@ -120,7 +144,9 @@ describe("POST /api/chat", () => {
       const res = await POST(postRequest({ chatId: 123, messages: VALID_MESSAGES }));
 
       expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ error: "chatId is required" });
+      expect(await res.json()).toEqual(
+        buildChatErrorBody(CHAT_ERROR_CODES.BAD_REQUEST, "chatId is required."),
+      );
     });
 
     it("returns 400 when messages array is missing", async () => {
@@ -129,7 +155,12 @@ describe("POST /api/chat", () => {
       const res = await POST(postRequest({ chatId: "chat-1" }));
 
       expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ error: "Messages array is required" });
+      expect(await res.json()).toEqual(
+        buildChatErrorBody(
+          CHAT_ERROR_CODES.BAD_REQUEST,
+          "Messages array is required.",
+        ),
+      );
     });
 
     it("returns 400 when messages array is empty", async () => {
@@ -138,7 +169,12 @@ describe("POST /api/chat", () => {
       const res = await POST(postRequest({ chatId: "chat-1", messages: [] }));
 
       expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ error: "Messages array is required" });
+      expect(await res.json()).toEqual(
+        buildChatErrorBody(
+          CHAT_ERROR_CODES.BAD_REQUEST,
+          "Messages array is required.",
+        ),
+      );
     });
   });
 
@@ -152,7 +188,84 @@ describe("POST /api/chat", () => {
       );
 
       expect(res.status).toBe(404);
-      expect(await res.json()).toEqual({ error: "Chat not found" });
+      expect(await res.json()).toEqual(
+        buildChatErrorBody(CHAT_ERROR_CODES.CHAT_NOT_FOUND, "Chat not found."),
+      );
+    });
+  });
+
+  describe("pre-stream failures", () => {
+    it("returns 500 and captures Sentry when saveMessage throws", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(verifyChatOwnership).mockResolvedValue(true);
+      vi.mocked(saveMessage).mockRejectedValue(new Error("db down"));
+      mockStreamResult();
+
+      const res = await POST(
+        postRequest({ chatId: "chat-1", messages: VALID_MESSAGES }),
+      );
+
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual(
+        buildChatErrorBody(
+          CHAT_ERROR_CODES.INTERNAL_ERROR,
+          "Something went wrong. Please try again.",
+        ),
+      );
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({
+            chatId: "chat-1",
+            userId: "user-123",
+            phase: "save_user_message",
+          }),
+        }),
+      );
+    });
+
+    it("returns 500 when buildMentionContext throws", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(verifyChatOwnership).mockResolvedValue(true);
+      vi.mocked(buildMentionContext).mockRejectedValue(new Error("context fail"));
+      mockStreamResult();
+
+      const res = await POST(
+        postRequest({
+          chatId: "chat-1",
+          messages: VALID_MESSAGES,
+          mentionedLinkIds: ["l1"],
+        }),
+      );
+
+      expect(res.status).toBe(500);
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          tags: expect.objectContaining({ phase: "build_context" }),
+        }),
+      );
+    });
+
+    it("returns 429 when error looks rate-limited", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(verifyChatOwnership).mockResolvedValue(true);
+      const err = new Error("rate limit exceeded");
+      vi.mocked(saveMessage).mockRejectedValue(err);
+      mockStreamResult();
+
+      const res = await POST(
+        postRequest({ chatId: "chat-1", messages: VALID_MESSAGES }),
+      );
+
+      expect(res.status).toBe(429);
+      expect(await res.json()).toEqual(
+        buildChatErrorBody(
+          CHAT_ERROR_CODES.RATE_LIMITED,
+          "Too many requests. Try again shortly.",
+          60,
+        ),
+      );
     });
   });
 
@@ -178,7 +291,11 @@ describe("POST /api/chat", () => {
         [],
         "user-123",
         null,
-        expect.any(Function),
+        expect.objectContaining({
+          chatId: "chat-1",
+          streamWriter: expect.any(Object),
+          onAssistantText: expect.any(Function),
+        }),
       );
       expect(res.status).toBe(200);
     });
@@ -203,6 +320,7 @@ describe("POST /api/chat", () => {
         undefined,
       );
       expect(res.status).toBe(200);
+      expect(Sentry.captureException).not.toHaveBeenCalled();
     });
 
     it("builds mention context and passes it to streamChatResponse when mentionedLinkIds provided", async () => {
@@ -224,7 +342,11 @@ describe("POST /api/chat", () => {
         [],
         "user-123",
         "### My Article\n...",
-        expect.any(Function),
+        expect.objectContaining({
+          chatId: "chat-1",
+          streamWriter: expect.any(Object),
+          onAssistantText: expect.any(Function),
+        }),
       );
     });
 
@@ -246,7 +368,11 @@ describe("POST /api/chat", () => {
         [],
         "user-123",
         null,
-        expect.any(Function),
+        expect.objectContaining({
+          chatId: "chat-1",
+          streamWriter: expect.any(Object),
+          onAssistantText: expect.any(Function),
+        }),
       );
     });
   });

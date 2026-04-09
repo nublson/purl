@@ -1,3 +1,5 @@
+import type { ParsedChatError } from "@/lib/chat-http-errors";
+import { parseChatErrorFromResponse } from "@/lib/chat-http-errors";
 import type { Link } from "@/utils/links";
 import type { UIMessage } from "ai";
 
@@ -8,17 +10,40 @@ export type LoadedChatPayload = {
   messageMentions: Link[][];
 };
 
+export type LoadChatResult =
+  | { ok: true; payload: LoadedChatPayload }
+  | { ok: false; aborted: true }
+  | {
+      ok: false;
+      aborted: false;
+      status: number;
+      parsed: ParsedChatError | null;
+    };
+
 /**
  * Fetches a chat and maps DB rows to UI message state for the widget.
- * Returns null when the chat is missing or the request fails.
+ * On success returns payload; on failure returns status (unless aborted).
  */
 export async function loadChatFromApi(
   id: string,
   signal?: AbortSignal,
-): Promise<LoadedChatPayload | null> {
+): Promise<LoadChatResult> {
   try {
     const res = await fetch(`/api/chats/${id}`, { signal });
-    if (!res.ok) return null;
+    if (signal?.aborted) {
+      return { ok: false, aborted: true };
+    }
+
+    if (!res.ok) {
+      const parsed = await parseChatErrorFromResponse(res);
+      return {
+        ok: false,
+        aborted: false,
+        status: res.status,
+        parsed,
+      };
+    }
+
     const data = (await res.json()) as {
       id: string;
       title: string | null;
@@ -42,14 +67,26 @@ export async function loadChatFromApi(
     );
 
     return {
-      id: data.id,
-      title: data.title?.trim() || null,
-      messages,
-      messageMentions,
+      ok: true,
+      payload: {
+        id: data.id,
+        title: data.title?.trim() || null,
+        messages,
+        messageMentions,
+      },
     };
   } catch (e) {
-    if (signal?.aborted) return null;
-    if (e instanceof DOMException && e.name === "AbortError") return null;
-    return null;
+    if (signal?.aborted) {
+      return { ok: false, aborted: true };
+    }
+    if (e instanceof DOMException && e.name === "AbortError") {
+      return { ok: false, aborted: true };
+    }
+    return {
+      ok: false,
+      aborted: false,
+      status: 0,
+      parsed: null,
+    };
   }
 }
