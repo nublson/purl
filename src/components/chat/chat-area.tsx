@@ -14,6 +14,8 @@ interface ChatAreaProps {
   isLoading: boolean;
   isLoadingChat?: boolean;
   onSuggestion: (text: string) => void;
+  userAvatarUrl?: string | null;
+  userDisplayName?: string | null;
 }
 
 const SKELETON_ROWS: Array<{ role: "user" | "assistant"; lines: string[] }> = [
@@ -73,6 +75,8 @@ export default function ChatArea({
   isLoading,
   isLoadingChat,
   onSuggestion,
+  userAvatarUrl,
+  userDisplayName,
 }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -99,6 +103,8 @@ export default function ChatArea({
             content={getMessageText(message)}
             role={message.role as "user" | "assistant"}
             mentions={mentionsPerMessage[index] ?? []}
+            userAvatarUrl={userAvatarUrl}
+            userDisplayName={userDisplayName}
             isLoading={
               isLoading &&
               index === messages.length - 1 &&

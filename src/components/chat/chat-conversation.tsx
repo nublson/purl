@@ -57,7 +57,8 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     clearPendingSummarize,
   } = useChatContext();
   const { data: sessionData } = useSession();
-  const sentryUserId = sessionData?.user?.id ?? "";
+  const sessionUser = sessionData?.user;
+  const sentryUserId = sessionUser?.id ?? "";
   const [input, setInput] = useState("");
   const [messageMentions, setMessageMentions] = useState<Link[][]>([]);
   const [isLoadingChat, setIsLoadingChat] = useState(false);
@@ -627,6 +628,8 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
         isLoading={isLoading}
         isLoadingChat={isLoadingChat}
         onSuggestion={handleSuggestion}
+        userAvatarUrl={sessionUser?.image}
+        userDisplayName={sessionUser?.name}
       />
       <ChatInput
         input={input}
