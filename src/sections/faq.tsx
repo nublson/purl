@@ -1,7 +1,7 @@
 import { AccordionGroup } from "@/components/accordion-group";
 import SectionTitle from "@/components/section-title";
 import SectionWrapper from "@/components/section-wrapper";
-import { questions } from "@/data/faq.json" with { type: "json" };
+import faqJson from "@/data/faq.json" with { type: "json" };
 
 export default function FAQSection() {
   return (
@@ -16,7 +16,7 @@ export default function FAQSection() {
           }}
           align="center"
         />
-        <AccordionGroup items={questions} />
+        <AccordionGroup items={faqJson.questions} />
       </div>
     </SectionWrapper>
   );

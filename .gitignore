@@ -50,3 +50,6 @@ next-env.d.ts
 .flaskenv*
 !.env.project
 !.env.vault
+
+# Source maps
+*.map
