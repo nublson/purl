@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { sanitizeChatMarkdownHref } from "@/utils/safe-markdown-href";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Typography } from "../typography";
@@ -10,14 +11,37 @@ export function ChatMarkdownBody({ content }: { content: string }) {
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
       components={{
-        a: ({ ...props }) => (
-          <a
-            {...props}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline underline-offset-2"
-          />
-        ),
+        // F-004: never pass raw model-provided href — block javascript:/data:/etc.
+        a: (anchorProps) => {
+          const { href, children, node, ...props } = anchorProps;
+          void node; // MDAST node from react-markdown must not be forwarded to the DOM
+          const safe = sanitizeChatMarkdownHref(
+            typeof href === "string" ? href : undefined,
+          );
+          if (!safe) {
+            return (
+              <span
+                className={cn(
+                  "text-muted-foreground underline underline-offset-2",
+                  props.className,
+                )}
+              >
+                {children}
+              </span>
+            );
+          }
+          return (
+            <a
+              {...props}
+              href={safe}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn("underline underline-offset-2", props.className)}
+            >
+              {children}
+            </a>
+          );
+        },
         p: ({ ...props }) => <p className="mb-2 last:mb-0" {...props} />,
         ul: ({ ...props }) => (
           <ul className="mb-2 list-disc pl-5 last:mb-0" {...props} />
