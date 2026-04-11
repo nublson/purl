@@ -7,6 +7,9 @@ import prisma from "@/lib/prisma";
  * (web, YouTube, PDF, audio): fetch text → chunk → delete old rows → embed →
  * insert rows → this helper → mark COMPLETED. Steps before this are strictly
  * ordered; this replaces N per-row UPDATEs with batched statements.
+ *
+ * `link_contents.id` is a cuid string (text), not PostgreSQL uuid — do not cast
+ * the id column in VALUES to `::uuid` or joins hit `text = uuid` errors.
  */
 export type LinkContentEmbeddingRow = { id: string; chunkIndex: number };
 
@@ -32,7 +35,7 @@ export async function applyLinkContentEmbeddings(
     const vector = embeddings[row.chunkIndex];
     if (!vector) continue;
     valueRows.push(
-      Prisma.sql`(${row.id}::uuid, ${JSON.stringify(vector)}::vector)`,
+      Prisma.sql`(${row.id}, ${JSON.stringify(vector)}::vector)`,
     );
   }
 
@@ -40,7 +43,7 @@ export async function applyLinkContentEmbeddings(
     const batch = valueRows.slice(i, i + EMBEDDING_UPDATE_BATCH);
     await prisma.$executeRaw(Prisma.sql`
       UPDATE "link_contents" AS lc
-      SET "embedding" = v.emb
+      SET "embedding" = v.emb::vector
       FROM (VALUES ${sqlCommaList(batch)}) AS v(id, emb)
       WHERE lc.id = v.id
     `);
