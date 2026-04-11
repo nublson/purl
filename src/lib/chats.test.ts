@@ -14,6 +14,9 @@ vi.mock("@/lib/prisma", () => ({
       create: vi.fn(),
       findFirst: vi.fn(),
     },
+    link: {
+      findMany: vi.fn(),
+    },
   },
 }));
 
@@ -43,6 +46,7 @@ const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
 const {
   verifyChatOwnership,
+  filterMentionLinkIdsForUser,
   saveMessage,
   createChat,
   deleteChat,
@@ -83,6 +87,53 @@ describe("verifyChatOwnership", () => {
     const result = await verifyChatOwnership("chat-1", "other-user");
 
     expect(result).toBe(false);
+  });
+});
+
+describe("filterMentionLinkIdsForUser", () => {
+  beforeEach(() => {
+    vi.mocked(prisma.link.findMany).mockReset();
+  });
+
+  it("returns [] without querying when linkIds is empty", async () => {
+    const result = await filterMentionLinkIdsForUser("user-1", []);
+    expect(result).toEqual([]);
+    expect(prisma.link.findMany).not.toHaveBeenCalled();
+  });
+
+  it("returns owned ids in input order", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([
+      { id: "b" },
+      { id: "a" },
+    ] as never);
+
+    const result = await filterMentionLinkIdsForUser("user-1", ["a", "b"]);
+
+    expect(prisma.link.findMany).toHaveBeenCalledWith({
+      where: { userId: "user-1", id: { in: ["a", "b"] } },
+      select: { id: true },
+    });
+    expect(result).toEqual(["a", "b"]);
+  });
+
+  it("omits ids not returned by the query (not owned)", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([{ id: "mine" }] as never);
+
+    const result = await filterMentionLinkIdsForUser("user-1", [
+      "stolen",
+      "mine",
+      "also-stolen",
+    ]);
+
+    expect(result).toEqual(["mine"]);
+  });
+
+  it("dedupes repeated owned ids using first occurrence order", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([{ id: "x" }] as never);
+
+    const result = await filterMentionLinkIdsForUser("user-1", ["x", "x", "y"]);
+
+    expect(result).toEqual(["x"]);
   });
 });
 

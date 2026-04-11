@@ -121,6 +121,33 @@ export async function deleteChat(chatId: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * Keeps only link IDs owned by the user, in first-seen input order (deduped).
+ * Non-owned IDs are dropped silently (no 403): keeps partial-mention UX when the
+ * client mixes valid and invalid IDs, and avoids revealing whether an ID belongs
+ * to another user. Security boundary is server-side only — not the mention UI.
+ */
+export async function filterMentionLinkIdsForUser(
+  userId: string,
+  linkIds: string[],
+): Promise<string[]> {
+  if (linkIds.length === 0) return [];
+
+  const rows = await prisma.link.findMany({
+    where: { userId, id: { in: linkIds } },
+    select: { id: true },
+  });
+  const owned = new Set(rows.map((r) => r.id));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const id of linkIds) {
+    if (!owned.has(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
 export async function saveMessage(
   chatId: string,
   role: MessageRole,

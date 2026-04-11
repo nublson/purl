@@ -25,6 +25,7 @@ vi.mock("@/lib/chat", () => ({
 }));
 
 vi.mock("@/lib/chats", () => ({
+  filterMentionLinkIdsForUser: vi.fn(),
   saveMessage: vi.fn(),
   verifyChatOwnership: vi.fn(),
 }));
@@ -39,7 +40,8 @@ vi.mock("ai", async (importOriginal) => {
 
 const { auth } = await import("@/lib/auth");
 const { buildMentionContext, streamChatResponse } = await import("@/lib/chat");
-const { saveMessage, verifyChatOwnership } = await import("@/lib/chats");
+const { filterMentionLinkIdsForUser, saveMessage, verifyChatOwnership } =
+  await import("@/lib/chats");
 const Sentry = await import("@sentry/nextjs");
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
@@ -81,9 +83,13 @@ describe("POST /api/chat", () => {
     vi.mocked(streamChatResponse).mockReset();
     vi.mocked(saveMessage).mockReset();
     vi.mocked(verifyChatOwnership).mockReset();
+    vi.mocked(filterMentionLinkIdsForUser).mockReset();
     vi.mocked(Sentry.captureException).mockReset();
     vi.mocked(saveMessage).mockResolvedValue({} as never);
     vi.mocked(buildMentionContext).mockResolvedValue(null);
+    vi.mocked(filterMentionLinkIdsForUser).mockImplementation(async (_userId, ids) =>
+      ids,
+    );
   });
 
   describe("authentication", () => {
@@ -337,7 +343,20 @@ describe("POST /api/chat", () => {
         }),
       );
 
-      expect(buildMentionContext).toHaveBeenCalledWith(["link-1", "link-2"]);
+      expect(filterMentionLinkIdsForUser).toHaveBeenCalledWith("user-123", [
+        "link-1",
+        "link-2",
+      ]);
+      expect(buildMentionContext).toHaveBeenCalledWith("user-123", [
+        "link-1",
+        "link-2",
+      ]);
+      expect(saveMessage).toHaveBeenCalledWith(
+        "chat-1",
+        "USER",
+        "What did I read this week?",
+        ["link-1", "link-2"],
+      );
       expect(streamChatResponse).toHaveBeenCalledWith(
         [],
         "user-123",
@@ -373,6 +392,38 @@ describe("POST /api/chat", () => {
           streamWriter: expect.any(Object),
           onAssistantText: expect.any(Function),
         }),
+      );
+    });
+
+    it("does not call buildMentionContext or persist mentions when no link IDs are owned", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(verifyChatOwnership).mockResolvedValue(true);
+      vi.mocked(filterMentionLinkIdsForUser).mockResolvedValue([]);
+      mockStreamResult();
+
+      await POST(
+        postRequest({
+          chatId: "chat-1",
+          messages: VALID_MESSAGES,
+          mentionedLinkIds: ["foreign-link"],
+        }),
+      );
+
+      expect(filterMentionLinkIdsForUser).toHaveBeenCalledWith("user-123", [
+        "foreign-link",
+      ]);
+      expect(buildMentionContext).not.toHaveBeenCalled();
+      expect(saveMessage).toHaveBeenCalledWith(
+        "chat-1",
+        "USER",
+        "What did I read this week?",
+        undefined,
+      );
+      expect(streamChatResponse).toHaveBeenCalledWith(
+        [],
+        "user-123",
+        null,
+        expect.objectContaining({ chatId: "chat-1" }),
       );
     });
   });

@@ -295,13 +295,18 @@ export function buildChatTools(
   };
 }
 
+/** Loads chunk text only for links owned by the given user (defense in depth with route filtering). */
 export async function buildMentionContext(
+  userId: string,
   mentionedLinkIds: string[],
 ): Promise<string | null> {
   if (mentionedLinkIds.length === 0) return null;
 
   const linkContents = await prisma.linkContent.findMany({
-    where: { linkId: { in: mentionedLinkIds } },
+    where: {
+      linkId: { in: mentionedLinkIds },
+      link: { userId },
+    },
     orderBy: [{ linkId: "asc" }, { chunkIndex: "asc" }],
     select: {
       content: true,
