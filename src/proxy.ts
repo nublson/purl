@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { rateLimitApiRequest } from "@/lib/proxy-rate-limit";
 import { type NextRequest, NextResponse } from "next/server";
 
 const publicRoutes = [
@@ -22,6 +23,11 @@ function isPublicRoute(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
+  const rateLimited = await rateLimitApiRequest(request);
+  if (rateLimited) {
+    return rateLimited;
+  }
+
   const session = await auth.api.getSession({
     headers: request.headers,
   });
