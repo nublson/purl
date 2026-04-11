@@ -72,6 +72,13 @@
   "pnpm": {
     "overrides": {
       "jsdom": "25.0.1"
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "@sentry/cli",
+      "esbuild",
+      "msw",
+      "prisma"
+    ]
   }
 }
