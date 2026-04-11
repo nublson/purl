@@ -1,6 +1,7 @@
-import prisma, { Prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
+import { applyLinkContentEmbeddings } from "@/lib/ingest-link-content-embeddings";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
 import { skipIngest } from "@/lib/ingest-skip";
 import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
@@ -65,14 +66,7 @@ export async function ingestWeb({ linkId, url }: IngestWebInput): Promise<void> 
       select: { id: true, chunkIndex: true },
     });
 
-    for (const row of contentRows) {
-      const vector = embeddings[row.chunkIndex];
-      if (!vector) continue;
-
-      await prisma.$executeRaw(
-        Prisma.sql`UPDATE "link_contents" SET "embedding" = ${JSON.stringify(vector)}::vector WHERE "id" = ${row.id}`,
-      );
-    }
+    await applyLinkContentEmbeddings(contentRows, embeddings);
 
     await prisma.link.update({
       where: { id: linkId },

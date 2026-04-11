@@ -1,7 +1,8 @@
-import prisma, { Prisma } from "@/lib/prisma";
+import prisma from "@/lib/prisma";
 import { transcribeAudio } from "@/lib/audio-transcriber";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
+import { applyLinkContentEmbeddings } from "@/lib/ingest-link-content-embeddings";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
 import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import { buildMetadataText } from "@/lib/metadata-chunk";
@@ -64,14 +65,7 @@ export async function ingestAudio({ linkId, url }: IngestAudioInput): Promise<vo
       select: { id: true, chunkIndex: true },
     });
 
-    for (const row of contentRows) {
-      const vector = embeddings[row.chunkIndex];
-      if (!vector) continue;
-
-      await prisma.$executeRaw(
-        Prisma.sql`UPDATE "link_contents" SET "embedding" = ${JSON.stringify(vector)}::vector WHERE "id" = ${row.id}`,
-      );
-    }
+    await applyLinkContentEmbeddings(contentRows, embeddings);
 
     await prisma.link.update({
       where: { id: linkId },

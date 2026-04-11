@@ -129,7 +129,7 @@ describe("ingestAudio", () => {
         { linkId: "link-1", content: "chunk-b", chunkIndex: 2 },
       ],
     });
-    expect(prisma.$executeRaw).toHaveBeenCalledTimes(3);
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(1);
     expect(prisma.link.update).toHaveBeenLastCalledWith({
       where: { id: "link-1" },
       data: { ingestStatus: "COMPLETED" },
