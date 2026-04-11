@@ -35,6 +35,7 @@ export default function Login() {
   return (
     <form
       className="wrapper-center h-full"
+      aria-busy={form.state.isSubmitting}
       onSubmit={(e) => {
         e.preventDefault();
         e.stopPropagation();

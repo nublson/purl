@@ -14,8 +14,7 @@ export function useAuth() {
       return res;
     }
     toast.success("Signed in successfully.");
-    router.push("/home");
-    router.refresh();
+    router.replace("/home");
     return res;
   }
 
