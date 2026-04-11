@@ -11,12 +11,12 @@ const DEFAULT_DNS_ANSWER = { address: "198.51.100.10", family: 4 as const };
 
 function restoreDefaultDnsMock() {
   vi.mocked(dns.lookup).mockImplementation(
-    (_hostname: string, options?: { all?: boolean }) => {
+    ((_hostname: string, options?: { all?: boolean }) => {
       if (options?.all) {
         return Promise.resolve([DEFAULT_DNS_ANSWER]);
       }
       return Promise.resolve(DEFAULT_DNS_ANSWER);
-    },
+    }) as typeof dns.lookup,
   );
 }
 
@@ -57,7 +57,19 @@ describe("assertResolvableHostIsPublic", () => {
   });
 
   it("rejects when DNS returns a private IPv4", async () => {
-    vi.mocked(dns.lookup).mockResolvedValueOnce([{ address: "10.0.0.1", family: 4 }]);
+    vi.mocked(dns.lookup).mockImplementationOnce(
+      ((_hostname, options) => {
+        const all =
+          options &&
+          typeof options === "object" &&
+          "all" in options &&
+          Boolean(options.all);
+        if (all) {
+          return Promise.resolve([{ address: "10.0.0.1", family: 4 }]);
+        }
+        return Promise.resolve({ address: "10.0.0.1", family: 4 });
+      }) as typeof dns.lookup,
+    );
     await expect(
       assertResolvableHostIsPublic("internal.example.com"),
     ).rejects.toThrow(UnsafeOutboundUrlError);
@@ -77,18 +89,29 @@ describe("safeFetch", () => {
   });
 
   it("blocks redirect target that resolves to a private address", async () => {
-    vi.mocked(dns.lookup).mockImplementation((hostname: string, options) => {
-      const all = options && typeof options === "object" && "all" in options && options.all;
-      if (hostname === "public.test") {
-        return Promise.resolve(
-          all ? [DEFAULT_DNS_ANSWER] : DEFAULT_DNS_ANSWER,
-        );
-      }
-      if (hostname === "private.test") {
-        return Promise.resolve(all ? [{ address: "192.168.1.1", family: 4 }] : { address: "192.168.1.1", family: 4 });
-      }
-      return Promise.resolve(all ? [DEFAULT_DNS_ANSWER] : DEFAULT_DNS_ANSWER);
-    });
+    vi.mocked(dns.lookup).mockImplementation(
+      ((hostname: string, options?: unknown) => {
+        const all =
+          options &&
+          typeof options === "object" &&
+          options !== null &&
+          "all" in options &&
+          Boolean((options as { all?: boolean }).all);
+        if (hostname === "public.test") {
+          return Promise.resolve(
+            all ? [DEFAULT_DNS_ANSWER] : DEFAULT_DNS_ANSWER,
+          );
+        }
+        if (hostname === "private.test") {
+          return Promise.resolve(
+            all
+              ? [{ address: "192.168.1.1", family: 4 as const }]
+              : { address: "192.168.1.1", family: 4 as const },
+          );
+        }
+        return Promise.resolve(all ? [DEFAULT_DNS_ANSWER] : DEFAULT_DNS_ANSWER);
+      }) as typeof dns.lookup,
+    );
 
     fetchSpy.mockResolvedValueOnce(
       new Response(null, {
