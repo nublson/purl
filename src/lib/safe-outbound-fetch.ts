@@ -1,14 +1,21 @@
 /**
  * SSRF mitigation for server-side fetches to user-supplied URLs.
- * Validates http(s), resolves DNS, blocks private/link-local/reserved ranges,
- * follows redirects manually with per-hop host checks.
+ * Validates http(s), blocks private/link-local/reserved ranges, follows redirects
+ * manually with per-hop host checks.
  *
- * Pre-fetch DNS checks reduce SSRF risk but do not remove DNS rebinding (TOCTOU);
- * stricter setups would pin addresses or use an isolated egress proxy.
+ * Connections use Undici with a custom `connect` that resolves DNS immediately
+ * before `tls.connect` / `net.connect`, rejects answers that include any blocked
+ * address (same policy as a pre-check), then pins the socket to one public IP
+ * while preserving TLS SNI / hostname for certificate verification. That removes
+ * the gap between an earlier DNS check and the actual connect where classic DNS
+ * rebinding targets the pre-check vs connect split. A malicious authoritative
+ * server can still race two clients between lookups; mitigating that fully needs
+ * an egress proxy or non-cooperative resolver.
  */
 
 import dns from "node:dns/promises";
 import net from "node:net";
+import { Agent, buildConnector, fetch as undiciFetch } from "undici";
 
 const DEFAULT_MAX_REDIRECTS = 8;
 
@@ -16,6 +23,10 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /** Max bytes streamed through the PDF viewer proxy (aligned with reasonable PDF size). */
 export const PDF_PROXY_MAX_RESPONSE_BYTES = 40 * 1024 * 1024;
+
+const CONNECT_TIMEOUT_MS = 10_000;
+
+const baseUndiciConnect = buildConnector({ timeout: CONNECT_TIMEOUT_MS });
 
 export class UnsafeOutboundUrlError extends Error {
   readonly name = "UnsafeOutboundUrlError";
@@ -53,6 +64,101 @@ function isBlockedIp(address: string, family: 4 | 6): boolean {
   return privateNetworkBlockList.check(address, type);
 }
 
+function stripBrackets(hostname: string): string {
+  if (hostname.startsWith("[") && hostname.endsWith("]")) {
+    return hostname.slice(1, -1);
+  }
+  return hostname;
+}
+
+/**
+ * Ensures the host resolves only to non-blocked addresses, then returns one
+ * public IP to open the TCP connection to (TLS SNI uses the original hostname).
+ */
+export async function pickPinnedConnectAddress(hostname: string): Promise<{
+  address: string;
+  family: 4 | 6;
+}> {
+  const host = stripBrackets(hostname);
+
+  const kind = net.isIP(host);
+  if (kind === 4) {
+    if (isBlockedIp(host, 4)) {
+      throw new UnsafeOutboundUrlError("Target address is not allowed");
+    }
+    return { address: host, family: 4 };
+  }
+  if (kind === 6) {
+    const lower = host.toLowerCase();
+    const mapped = lower.startsWith("::ffff:") ? host.slice(7) : null;
+    if (mapped && net.isIPv4(mapped)) {
+      if (isBlockedIp(mapped, 4)) {
+        throw new UnsafeOutboundUrlError("Target address is not allowed");
+      }
+      return { address: host, family: 6 };
+    }
+    if (isBlockedIp(host, 6)) {
+      throw new UnsafeOutboundUrlError("Target address is not allowed");
+    }
+    return { address: host, family: 6 };
+  }
+
+  const records = await dns.lookup(host, { all: true, verbatim: true });
+  for (const { address, family } of records) {
+    const fam: 4 | 6 = family === 6 ? 6 : 4;
+    if (fam === 6 && address.toLowerCase().startsWith("::ffff:")) {
+      const v4 = address.slice(7);
+      if (net.isIPv4(v4) && isBlockedIp(v4, 4)) {
+        throw new UnsafeOutboundUrlError("Target address is not allowed");
+      }
+      continue;
+    }
+    if (isBlockedIp(address, fam)) {
+      throw new UnsafeOutboundUrlError("Target address is not allowed");
+    }
+  }
+
+  if (records.length === 0) {
+    throw new UnsafeOutboundUrlError("DNS lookup returned no addresses");
+  }
+
+  const first = records[0]!;
+  const fam: 4 | 6 = first.family === 6 ? 6 : 4;
+  return { address: first.address, family: fam };
+}
+
+/**
+ * Undici connect hook: resolve + validate in the same turn as connect, then dial
+ * the chosen IP so the socket target matches the validated address.
+ */
+function safeOutboundConnect(
+  opts: Parameters<typeof baseUndiciConnect>[0],
+  callback: Parameters<typeof baseUndiciConnect>[1],
+): void {
+  const originalHostname = opts.hostname;
+
+  pickPinnedConnectAddress(originalHostname)
+    .then(({ address }) => {
+      const next: Parameters<typeof baseUndiciConnect>[0] = {
+        ...opts,
+        hostname: address,
+      };
+      if (next.protocol === "https:") {
+        next.servername = opts.servername ?? originalHostname;
+      }
+      baseUndiciConnect(next, callback);
+    })
+    .catch((err: unknown) => {
+      const e =
+        err instanceof Error ? err : new Error(String(err));
+      callback(e, null);
+    });
+}
+
+const safeOutboundAgent = new Agent({
+  connect: safeOutboundConnect,
+});
+
 export function assertSafeHttpUrl(urlInput: string | URL): URL {
   let url: URL;
   try {
@@ -72,48 +178,11 @@ export function assertSafeHttpUrl(urlInput: string | URL): URL {
   return url;
 }
 
-export async function assertResolvableHostIsPublic(hostname: string): Promise<void> {
-  const host =
-    hostname.startsWith("[") && hostname.endsWith("]")
-      ? hostname.slice(1, -1)
-      : hostname;
-
-  const kind = net.isIP(host);
-  if (kind === 4) {
-    if (isBlockedIp(host, 4)) {
-      throw new UnsafeOutboundUrlError("Target address is not allowed");
-    }
-    return;
-  }
-  if (kind === 6) {
-    const lower = host.toLowerCase();
-    const mapped = lower.startsWith("::ffff:") ? host.slice(7) : null;
-    if (mapped && net.isIPv4(mapped)) {
-      if (isBlockedIp(mapped, 4)) {
-        throw new UnsafeOutboundUrlError("Target address is not allowed");
-      }
-      return;
-    }
-    if (isBlockedIp(host, 6)) {
-      throw new UnsafeOutboundUrlError("Target address is not allowed");
-    }
-    return;
-  }
-
-  const records = await dns.lookup(host, { all: true, verbatim: true });
-  for (const { address, family } of records) {
-    const fam: 4 | 6 = family === 6 ? 6 : 4;
-    if (fam === 6 && address.toLowerCase().startsWith("::ffff:")) {
-      const v4 = address.slice(7);
-      if (net.isIPv4(v4) && isBlockedIp(v4, 4)) {
-        throw new UnsafeOutboundUrlError("Target address is not allowed");
-      }
-      continue;
-    }
-    if (isBlockedIp(address, fam)) {
-      throw new UnsafeOutboundUrlError("Target address is not allowed");
-    }
-  }
+/** Fails if the host is a blocked literal IP or DNS returns any blocked record. */
+export async function assertResolvableHostIsPublic(
+  hostname: string,
+): Promise<void> {
+  await pickPinnedConnectAddress(hostname);
 }
 
 export type SafeFetchInit = RequestInit & {
@@ -123,8 +192,8 @@ export type SafeFetchInit = RequestInit & {
 };
 
 /**
- * Fetch with manual redirects; re-validates each redirect target host.
- * Does not read the body; callers can enforce streaming limits separately.
+ * Fetch with manual redirects; each request uses connection-time DNS validation
+ * and IP pinning via {@link safeOutboundAgent}.
  */
 export async function safeFetch(
   input: string | URL,
@@ -137,15 +206,26 @@ export async function safeFetch(
   } = init;
 
   let url = assertSafeHttpUrl(typeof input === "string" ? input : input.href);
-  await assertResolvableHostIsPublic(url.hostname);
 
   let redirectCount = 0;
 
   for (;;) {
-    const res = await fetch(url.href, {
-      ...requestInit,
-      redirect: "manual",
-    });
+    let res: Awaited<ReturnType<typeof undiciFetch>>;
+    try {
+      res = await undiciFetch(url.href, {
+        ...requestInit,
+        dispatcher: safeOutboundAgent,
+        redirect: "manual",
+      } as Parameters<typeof undiciFetch>[1]);
+    } catch (err) {
+      if (
+        err instanceof TypeError &&
+        err.cause instanceof UnsafeOutboundUrlError
+      ) {
+        throw err.cause;
+      }
+      throw err;
+    }
 
     if (REDIRECT_STATUSES.has(res.status)) {
       const location = res.headers.get("location");
@@ -166,7 +246,6 @@ export async function safeFetch(
         throw new UnsafeOutboundUrlError("Invalid redirect URL");
       }
       url = assertSafeHttpUrl(nextUrl);
-      await assertResolvableHostIsPublic(url.hostname);
       await res.body?.cancel();
       continue;
     }
@@ -182,7 +261,7 @@ export async function safeFetch(
       }
     }
 
-    return res;
+    return res as unknown as Response;
   }
 }
 
