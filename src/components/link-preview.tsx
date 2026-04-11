@@ -3,8 +3,8 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import type { Link } from "@/utils/links";
-import Image from "next/image";
 import { PdfThumbnail } from "./pdf-thumbnail";
 
 type LinkPreviewProps = {
@@ -32,6 +32,10 @@ export function LinkPreview({
     }
   };
 
+  const thumbnailSrc = link.thumbnail
+    ? safeRemoteImgSrc(link.thumbnail)
+    : null;
+
   return (
     <HoverCard
       open={open}
@@ -47,14 +51,16 @@ export function LinkPreview({
       >
         {link.contentType === "PDF" ? (
           <PdfThumbnail url={link.url} />
-        ) : link.thumbnail ? (
-          <Image
-            src={link.thumbnail}
+        ) : thumbnailSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element -- user-controlled OG URLs; avoid next/image optimizer SSRF
+          <img
+            src={thumbnailSrc}
             alt={link.title}
             width={200}
             height={200}
             sizes="256px"
             loading={eagerThumbnail ? "eager" : "lazy"}
+            referrerPolicy="no-referrer"
             className={`w-full h-full aspect-video rounded-t-md ${imageThumbnailClass()}`}
           />
         ) : null}

@@ -1,18 +1,33 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
+import { buildContentSecurityPolicy } from "./src/lib/csp-header";
+
+const BASE_SECURITY_HEADERS: { key: string; value: string }[] = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  {
+    key: "Permissions-Policy",
+    value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
+  },
+];
 
 const nextConfig: NextConfig = {
-  images: {
-    remotePatterns: [
+  async headers() {
+    if (process.env.NODE_ENV !== "production") {
+      return [{ source: "/:path*", headers: [...BASE_SECURITY_HEADERS] }];
+    }
+    return [
       {
-        protocol: "https",
-        hostname: "**",
+        source: "/:path*",
+        headers: [
+          ...BASE_SECURITY_HEADERS,
+          {
+            key: "Content-Security-Policy",
+            value: buildContentSecurityPolicy(),
+          },
+        ],
       },
-      {
-        protocol: "http",
-        hostname: "**",
-      },
-    ],
+    ];
   },
 };
 

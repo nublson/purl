@@ -45,12 +45,13 @@ describe("proxy", () => {
     expect(res.headers.get("location")).toBeNull();
   });
 
-  it("returns next for /api/auth when session exists", async () => {
+  it("returns next for /api/auth without session lookup (Better Auth handles its own cookies)", async () => {
     vi.mocked(auth.auth.api.getSession).mockResolvedValue({ user: {}, session: {} } as never);
     const req = createRequest("/api/auth/session");
     const res = await proxy(req);
     expect(res.status).toBe(200);
     expect(res.headers.get("location")).toBeNull();
+    expect(auth.auth.api.getSession).not.toHaveBeenCalled();
   });
 
   it("redirects to /login for private route when no session", async () => {

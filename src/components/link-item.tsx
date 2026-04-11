@@ -1,15 +1,16 @@
 "use client";
 
 import { useChatContextSafe } from "@/contexts/chat-context";
+import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import { Link as LinkType } from "@/utils/links";
 import {
   ArrowDownToLine,
   FileMusic,
   FileText,
+  Globe,
   MessageCircle,
 } from "lucide-react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -223,18 +224,24 @@ export const LinkItem = React.forwardRef<
         return <FileText className="size-5" />;
       case "AUDIO":
         return <FileMusic className="size-5" />;
-      default:
-        return (
-          <Image
-            src={link.favicon}
+      default: {
+        const faviconSrc = safeRemoteImgSrc(link.favicon);
+        return faviconSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element -- user-controlled favicon URLs; avoid next/image optimizer SSRF
+          <img
+            src={faviconSrc}
             alt={link.title}
             width={20}
             height={20}
             sizes="20px"
             loading={eagerFavicon ? "eager" : undefined}
-            className="aspect-square object-contain"
+            referrerPolicy="no-referrer"
+            className="aspect-square object-contain size-5"
           />
+        ) : (
+          <Globe className="size-5 text-muted-foreground" aria-hidden />
         );
+      }
     }
   })();
 
