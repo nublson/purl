@@ -4,7 +4,7 @@ import type { ContentType } from "@/generated/prisma/enums";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
 import { getUrlDomain } from "@/utils/formatter";
 import type { IngestStatus, Link } from "@/utils/links";
-import { detectContentType } from "@/utils/link-content-type";
+import { detectContentType } from "@/lib/server-detect-content-type";
 import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
 import { isPdfUrl } from "@/utils/pdf";
 import { isYouTubeUrl } from "@/utils/youtube";
@@ -16,6 +16,9 @@ import { ingestAudio } from "@/lib/ingest-audio";
 import { ingestPdf } from "@/lib/ingest-pdf";
 import { ingestWeb } from "@/lib/ingest-web";
 import { ingestYoutube } from "@/lib/ingest-youtube";
+import { safeFetch } from "@/lib/safe-outbound-fetch";
+
+const OGS_HTML_MAX_BYTES = 5 * 1024 * 1024;
 
 /** Thrown when link helpers are called without an authenticated user. */
 export class UnauthorizedError extends Error {
@@ -43,7 +46,7 @@ async function scrapePdfMetadata(
   let contentDisposition: string | null = null;
 
   try {
-    const headResponse = await fetch(url, {
+    const headResponse = await safeFetch(url, {
       method: "HEAD",
       headers: {
         "User-Agent":
@@ -51,6 +54,7 @@ async function scrapePdfMetadata(
       },
       signal: AbortSignal.timeout(8000),
     });
+    await headResponse.body?.cancel();
     contentLengthBytes = Number(
       headResponse.headers.get("content-length") ?? "",
     );
@@ -166,15 +170,29 @@ export async function scrapeLinkMetadata(url: string): Promise<{
   }
 
   try {
-    const { error, result } = await ogs({
-      url,
-      fetchOptions: {
-        signal: AbortSignal.timeout(8000),
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
-        },
+    const pageResponse = await safeFetch(url, {
+      headers: {
+        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+        "User-Agent":
+          "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
       },
+      signal: AbortSignal.timeout(8000),
+      maxResponseBytes: OGS_HTML_MAX_BYTES,
+    });
+
+    const html = await pageResponse.text();
+    if (new TextEncoder().encode(html).byteLength > OGS_HTML_MAX_BYTES) {
+      return {
+        title: domain,
+        description: null,
+        favicon: defaultFavicon,
+        thumbnail: null,
+      };
+    }
+
+    const { error, result } = await ogs({
+      html,
+      timeout: 8,
     });
 
     if (error || !result) {

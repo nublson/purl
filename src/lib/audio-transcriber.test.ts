@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { UnsafeOutboundUrlError } from "@/lib/safe-outbound-fetch";
 
 vi.mock("ai", () => ({
   experimental_transcribe: vi.fn(),
@@ -16,11 +17,12 @@ describe("transcribeAudio", () => {
     vi.mocked(transcribeMock).mockReset();
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({ "content-length": "10" }),
-        blob: async () => new Blob([new Uint8Array(10)], { type: "audio/mpeg" }),
-      }),
+      vi.fn().mockResolvedValue(
+        new Response(new Blob([new Uint8Array(10)], { type: "audio/mpeg" }), {
+          status: 200,
+          headers: { "content-length": "10" },
+        }),
+      ),
     );
   });
 
@@ -28,31 +30,31 @@ describe("transcribeAudio", () => {
     const sixMb = 6 * 1024 * 1024;
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers({ "content-length": String(sixMb) }),
-        blob: async () => new Blob(),
-      }),
+      vi.fn().mockResolvedValue(
+        new Response(null, {
+          status: 200,
+          headers: { "content-length": String(sixMb) },
+        }),
+      ),
     );
 
     await expect(transcribeAudio("https://example.com/a.mp3")).rejects.toThrow(
-      "Audio files must be under 5 MB",
+      UnsafeOutboundUrlError,
     );
     expect(transcribeMock).not.toHaveBeenCalled();
   });
 
   it("throws when downloaded blob exceeds limit", async () => {
     const { AUDIO_MAX_UPLOAD_BYTES } = await import("@/utils/upload-limits");
+    const big = new Uint8Array(AUDIO_MAX_UPLOAD_BYTES + 1);
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        headers: new Headers(),
-        blob: async () =>
-          new Blob([new Uint8Array(AUDIO_MAX_UPLOAD_BYTES + 1)], {
-            type: "audio/mpeg",
-          }),
-      }),
+      vi.fn().mockResolvedValue(
+        new Response(big, {
+          status: 200,
+          headers: { "content-type": "audio/mpeg" },
+        }),
+      ),
     );
 
     await expect(transcribeAudio("https://example.com/a.mp3")).rejects.toThrow(
@@ -78,11 +80,7 @@ describe("transcribeAudio", () => {
   it("throws when the fetch response is not ok", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn().mockResolvedValue({
-        ok: false,
-        status: 404,
-        headers: new Headers(),
-      }),
+      vi.fn().mockResolvedValue(new Response(null, { status: 404 })),
     );
 
     await expect(transcribeAudio("https://example.com/missing.mp3")).rejects.toThrow(

@@ -285,7 +285,23 @@ describe("scrapeLinkMetadata – YouTube branch", () => {
   });
 
   it("falls back to OGS when the oEmbed response is not ok", async () => {
-    fetchSpy.mockResolvedValue(new Response(null, { status: 404 }));
+    fetchSpy.mockImplementation((input: RequestInfo | URL) => {
+      const href =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      if (href.includes("youtube.com/oembed")) {
+        return Promise.resolve(new Response(null, { status: 404 }));
+      }
+      return Promise.resolve(
+        new Response("<html><head><title>OG</title></head></html>", {
+          status: 200,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
+    });
     mockOgsSuccess({ ogTitle: "OGS Fallback Title" });
     const result = await scrapeLinkMetadata(
       "https://www.youtube.com/watch?v=abc123",
@@ -295,12 +311,28 @@ describe("scrapeLinkMetadata – YouTube branch", () => {
   });
 
   it("falls back to OGS when the oEmbed title is empty", async () => {
-    fetchSpy.mockResolvedValue(
-      new Response(JSON.stringify({ title: "" }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      }),
-    );
+    fetchSpy.mockImplementation((input: RequestInfo | URL) => {
+      const href =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.href
+            : input.url;
+      if (href.includes("youtube.com/oembed")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ title: "" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
+      return Promise.resolve(
+        new Response("<html><head><title>OG</title></head></html>", {
+          status: 200,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
+    });
     mockOgsSuccess({ ogTitle: "OGS Title" });
     const result = await scrapeLinkMetadata(
       "https://www.youtube.com/watch?v=abc123",
@@ -315,6 +347,12 @@ describe("scrapeLinkMetadata – web/OGS branch", () => {
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(globalThis, "fetch");
+    fetchSpy.mockResolvedValue(
+      new Response("<html><head></head><body></body></html>", {
+        status: 200,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+    );
   });
 
   afterEach(() => {
