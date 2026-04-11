@@ -2,7 +2,6 @@ import {
   getAuthRateLimiter,
   getChatPostRateLimiter,
   getLinksPostRateLimiter,
-  getSearchGetRateLimiter,
   getUploadPostRateLimiter,
 } from "@/lib/upstash-rate-limit";
 import { type NextRequest, NextResponse } from "next/server";
@@ -53,15 +52,6 @@ export async function rateLimitApiRequest(
 
   if (pathname === "/api/chat" && request.method === "POST") {
     const limiter = getChatPostRateLimiter();
-    if (limiter) {
-      const { success, reset } = await limiter.limit(ip);
-      if (!success) return tooManyRequests(reset);
-    }
-    return null;
-  }
-
-  if (pathname === "/api/search" && request.method === "GET") {
-    const limiter = getSearchGetRateLimiter();
     if (limiter) {
       const { success, reset } = await limiter.limit(ip);
       if (!success) return tooManyRequests(reset);

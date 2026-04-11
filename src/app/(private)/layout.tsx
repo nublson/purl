@@ -30,7 +30,7 @@ export default function PrivateLayout({
   return (
     <Fragment>
       <Header pathname="/home">
-        <Suspense fallback={<HeaderActionsFallback />}>
+        <Suspense fallback={<HeaderActionsFallback variant="private" />}>
           <HeaderActions />
         </Suspense>
       </Header>

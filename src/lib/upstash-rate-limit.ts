@@ -41,13 +41,11 @@ function makeLimiter(
 
 const authLimiter = () => makeLimiter("auth", 30, "1 m");
 const chatPostLimiter = () => makeLimiter("chat_post", 30, "1 m");
-const searchGetLimiter = () => makeLimiter("search_get", 60, "1 m");
 const linksPostLimiter = () => makeLimiter("links_post", 30, "1 m");
 const uploadPostLimiter = () => makeLimiter("upload_post", 20, "1 m");
 
 let cachedAuth: Ratelimit | null | undefined;
 let cachedChat: Ratelimit | null | undefined;
-let cachedSearch: Ratelimit | null | undefined;
 let cachedLinksPost: Ratelimit | null | undefined;
 let cachedUploadPost: Ratelimit | null | undefined;
 
@@ -59,11 +57,6 @@ export function getAuthRateLimiter(): Ratelimit | null {
 export function getChatPostRateLimiter(): Ratelimit | null {
   if (cachedChat === undefined) cachedChat = chatPostLimiter();
   return cachedChat;
-}
-
-export function getSearchGetRateLimiter(): Ratelimit | null {
-  if (cachedSearch === undefined) cachedSearch = searchGetLimiter();
-  return cachedSearch;
 }
 
 export function getLinksPostRateLimiter(): Ratelimit | null {
