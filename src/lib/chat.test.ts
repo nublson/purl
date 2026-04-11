@@ -109,15 +109,23 @@ describe("buildMentionContext", () => {
   });
 
   it("returns null immediately for empty mentionedLinkIds without querying the DB", async () => {
-    const result = await buildMentionContext([]);
+    const result = await buildMentionContext("user-1", []);
     expect(result).toBeNull();
     expect(prisma.linkContent.findMany).not.toHaveBeenCalled();
   });
 
   it("returns null when no linkContent rows are found for the given ids", async () => {
     vi.mocked(prisma.linkContent.findMany).mockResolvedValue([] as never);
-    const result = await buildMentionContext(["id-1"]);
+    const result = await buildMentionContext("user-1", ["id-1"]);
     expect(result).toBeNull();
+    expect(prisma.linkContent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          linkId: { in: ["id-1"] },
+          link: { userId: "user-1" },
+        },
+      }),
+    );
   });
 
   it("groups multiple chunks for the same link under a single section", async () => {
@@ -132,8 +140,16 @@ describe("buildMentionContext", () => {
       },
     ] as never);
 
-    const result = await buildMentionContext(["id-1"]);
+    const result = await buildMentionContext("user-1", ["id-1"]);
 
+    expect(prisma.linkContent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          linkId: { in: ["id-1"] },
+          link: { userId: "user-1" },
+        },
+      }),
+    );
     expect(result).toContain("### My Article");
     expect(result).toContain("Source: https://example.com/article");
     expect(result).toContain("Chunk one");
@@ -153,8 +169,16 @@ describe("buildMentionContext", () => {
       },
     ] as never);
 
-    const result = await buildMentionContext(["id-1", "id-2"]);
+    const result = await buildMentionContext("user-1", ["id-1", "id-2"]);
 
+    expect(prisma.linkContent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          linkId: { in: ["id-1", "id-2"] },
+          link: { userId: "user-1" },
+        },
+      }),
+    );
     expect(result).toContain("### Article A");
     expect(result).toContain("### Article B");
     expect(result).toContain("---");

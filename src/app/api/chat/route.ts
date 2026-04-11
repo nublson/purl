@@ -3,7 +3,11 @@ import { chatJsonError } from "@/lib/chat-api-error-response";
 import { CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
 import { buildMentionContext, streamChatResponse } from "@/lib/chat";
 import type { PurlChatUIMessage } from "@/lib/chat-stream-error";
-import { saveMessage, verifyChatOwnership } from "@/lib/chats";
+import {
+  filterMentionLinkIdsForUser,
+  saveMessage,
+  verifyChatOwnership,
+} from "@/lib/chats";
 import {
   convertToModelMessages,
   createUIMessageStream,
@@ -107,6 +111,14 @@ export async function POST(request: Request) {
     );
   }
 
+  let ownedMentionLinkIds: string[] | undefined;
+  if (mentionedLinkIds && mentionedLinkIds.length > 0) {
+    ownedMentionLinkIds = await filterMentionLinkIdsForUser(
+      userId,
+      mentionedLinkIds,
+    );
+  }
+
   const lastUserMessage = [...messages]
     .reverse()
     .find((m) => m.role === "user");
@@ -119,16 +131,23 @@ export async function POST(request: Request) {
 
   try {
     let context: string | null = null;
-    if (mentionedLinkIds && mentionedLinkIds.length > 0) {
+    if (ownedMentionLinkIds && ownedMentionLinkIds.length > 0) {
       phase = "build_context";
-      context = await buildMentionContext(mentionedLinkIds);
+      context = await buildMentionContext(userId, ownedMentionLinkIds);
     }
 
     phase = "convert_messages";
     const modelMessages = await convertToModelMessages(messages);
 
     phase = "save_user_message";
-    await saveMessage(chatId, "USER", query, mentionedLinkIds);
+    await saveMessage(
+      chatId,
+      "USER",
+      query,
+      ownedMentionLinkIds && ownedMentionLinkIds.length > 0
+        ? ownedMentionLinkIds
+        : undefined,
+    );
 
     phase = "stream_start";
     const stream = createUIMessageStream<PurlChatUIMessage>({
