@@ -1,6 +1,15 @@
+import bundleAnalyzer from "@next/bundle-analyzer";
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 import { buildContentSecurityPolicy } from "./src/lib/csp-header";
+
+const withBundleAnalyzer = bundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+  // Static HTML under .next/analyze/ is often a blank treemap when opened as file://
+  // (FoamTree/WebGL + large inline data). After `pnpm analyze`, run `pnpm analyze:view`
+  // and open http://localhost:3456/client over HTTP (`serve` 301s /client.html → /client).
+  openAnalyzer: false,
+});
 
 const BASE_SECURITY_HEADERS: { key: string; value: string }[] = [
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -31,7 +40,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
+export default withSentryConfig(withBundleAnalyzer(nextConfig), {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
