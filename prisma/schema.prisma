@@ -65,6 +65,7 @@ model Link {
   contents     LinkContent[]
   chatMessages ChatMessage[]
 
+  @@index([userId, createdAt])
   @@map("links")
 }
 

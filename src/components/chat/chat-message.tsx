@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { assistantContentLikelyUsesMarkdown } from "@/utils/assistant-markdown-heuristic";
 import type { Link } from "@/utils/links";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
@@ -77,9 +78,15 @@ export default function ChatMessage({
           ) : (
             <div className={cn("min-w-0 max-w-full text-sm wrap-anywhere")}>
               {role === "assistant" ? (
-                <Suspense fallback={<AssistantMarkdownFallback content={content} />}>
-                  <ChatMarkdownBody content={content} />
-                </Suspense>
+                assistantContentLikelyUsesMarkdown(content) ? (
+                  <Suspense
+                    fallback={<AssistantMarkdownFallback content={content} />}
+                  >
+                    <ChatMarkdownBody content={content} />
+                  </Suspense>
+                ) : (
+                  <AssistantMarkdownFallback content={content} />
+                )
               ) : (
                 <Typography
                   size="small"
