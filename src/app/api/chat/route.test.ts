@@ -42,6 +42,7 @@ const { auth } = await import("@/lib/auth");
 const { buildMentionContext, streamChatResponse } = await import("@/lib/chat");
 const { filterMentionLinkIdsForUser, saveMessage, verifyChatOwnership } =
   await import("@/lib/chats");
+const { convertToModelMessages } = await import("ai");
 const Sentry = await import("@sentry/nextjs");
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
@@ -84,6 +85,8 @@ describe("POST /api/chat", () => {
     vi.mocked(saveMessage).mockReset();
     vi.mocked(verifyChatOwnership).mockReset();
     vi.mocked(filterMentionLinkIdsForUser).mockReset();
+    vi.mocked(convertToModelMessages).mockReset();
+    vi.mocked(convertToModelMessages).mockResolvedValue([]);
     vi.mocked(Sentry.captureException).mockReset();
     vi.mocked(saveMessage).mockResolvedValue({} as never);
     vi.mocked(buildMentionContext).mockResolvedValue(null);
@@ -248,7 +251,7 @@ describe("POST /api/chat", () => {
       expect(Sentry.captureException).toHaveBeenCalledWith(
         expect.any(Error),
         expect.objectContaining({
-          tags: expect.objectContaining({ phase: "build_context" }),
+          tags: expect.objectContaining({ phase: "prepare_stream" }),
         }),
       );
     });
@@ -351,6 +354,7 @@ describe("POST /api/chat", () => {
         "link-1",
         "link-2",
       ]);
+      expect(convertToModelMessages).toHaveBeenCalledWith(VALID_MESSAGES);
       expect(saveMessage).toHaveBeenCalledWith(
         "chat-1",
         "USER",

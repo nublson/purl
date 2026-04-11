@@ -21,8 +21,7 @@ export const maxDuration = 60;
 
 type ChatRoutePhase =
   | "verify_ownership"
-  | "build_context"
-  | "convert_messages"
+  | "prepare_stream"
   | "save_user_message"
   | "stream_start";
 
@@ -127,17 +126,23 @@ export async function POST(request: Request) {
     .map((p) => p.text)
     .join(" ") ?? "";
 
-  let phase: ChatRoutePhase = "build_context";
+  let phase: ChatRoutePhase = "prepare_stream";
 
   try {
-    let context: string | null = null;
-    if (ownedMentionLinkIds && ownedMentionLinkIds.length > 0) {
-      phase = "build_context";
-      context = await buildMentionContext(userId, ownedMentionLinkIds);
-    }
+    const ownedIds = ownedMentionLinkIds;
+    const hasMentionContext = Boolean(ownedIds?.length);
 
-    phase = "convert_messages";
-    const modelMessages = await convertToModelMessages(messages);
+    let context: string | null;
+    let modelMessages: Awaited<ReturnType<typeof convertToModelMessages>>;
+    if (hasMentionContext && ownedIds) {
+      [context, modelMessages] = await Promise.all([
+        buildMentionContext(userId, ownedIds),
+        convertToModelMessages(messages),
+      ]);
+    } else {
+      context = null;
+      modelMessages = await convertToModelMessages(messages);
+    }
 
     phase = "save_user_message";
     await saveMessage(
