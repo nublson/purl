@@ -1,6 +1,15 @@
+import * as safeOutbound from "@/lib/safe-outbound-fetch";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
+
+const realSafeFetch = safeOutbound.safeFetch;
+
+function hrefFromSafeFetchInput(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
 
 vi.mock("next/server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("next/server")>();
@@ -45,6 +54,7 @@ const { broadcastLinksChanged } = await import("@/lib/realtime-broadcast");
 const prisma = (await import("@/lib/prisma")).default;
 const ogs = (await import("open-graph-scraper")).default;
 let fetchSpy: ReturnType<typeof vi.spyOn>;
+let safeFetchSpy: ReturnType<typeof vi.spyOn>;
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 const CREATED_AT = new Date("2025-06-15T10:00:00Z");
@@ -104,6 +114,7 @@ function mockOgsFailure() {
 describe("POST /api/links", () => {
   beforeEach(() => {
     fetchSpy?.mockRestore();
+    safeFetchSpy?.mockRestore();
     vi.mocked(auth.api.getSession).mockReset();
     vi.mocked(prisma.link.create).mockReset();
     vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
@@ -117,6 +128,10 @@ describe("POST /api/links", () => {
           "content-type": "text/html; charset=utf-8",
         },
       }),
+    );
+    safeFetchSpy = vi.spyOn(safeOutbound, "safeFetch").mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) =>
+        realSafeFetch(input as string | URL, init!),
     );
     mockOgsSuccess();
   });
@@ -305,31 +320,26 @@ describe("POST /api/links", () => {
 
     it("uses YouTube oEmbed for youtu.be URLs and skips OG scraping", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      fetchSpy.mockImplementation((input: RequestInfo | URL) => {
-        const href =
-          typeof input === "string"
-            ? input
-            : input instanceof URL
-              ? input.href
-              : input.url;
+      safeFetchSpy.mockImplementation(
+        async (input: RequestInfo | URL, init?: RequestInit) => {
+        const href = hrefFromSafeFetchInput(input);
         if (href.includes("youtube.com/oembed")) {
-          return Promise.resolve(
-            new Response(
-              JSON.stringify({
-                title: "Never Gonna Give You Up",
-                author_name: "Rick Astley",
-                thumbnail_url:
-                  "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
-              }),
-              {
-                status: 200,
-                headers: { "Content-Type": "application/json" },
-              },
-            ),
+          return new Response(
+            JSON.stringify({
+              title: "Never Gonna Give You Up",
+              author_name: "Rick Astley",
+              thumbnail_url:
+                "https://img.youtube.com/vi/dQw4w9WgXcQ/hqdefault.jpg",
+            }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
           );
         }
-        return Promise.resolve(new Response(null, { status: 200 }));
-      });
+        return realSafeFetch(input as string | URL, init!);
+      },
+      );
       vi.mocked(prisma.link.create).mockResolvedValue({
         ...MOCK_LINK,
         url: "https://youtu.be/dQw4w9WgXcQ?t=43",
@@ -364,18 +374,15 @@ describe("POST /api/links", () => {
 
     it("falls back to OG scraping when YouTube oEmbed returns non-2xx", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-      fetchSpy.mockImplementation((input: RequestInfo | URL) => {
-        const href =
-          typeof input === "string"
-            ? input
-            : input instanceof URL
-              ? input.href
-              : input.url;
+      safeFetchSpy.mockImplementation(
+        async (input: RequestInfo | URL, init?: RequestInit) => {
+        const href = hrefFromSafeFetchInput(input);
         if (href.includes("youtube.com/oembed")) {
-          return Promise.resolve(new Response(null, { status: 404 }));
+          return new Response(null, { status: 404 });
         }
-        return Promise.resolve(new Response(null, { status: 200 }));
-      });
+        return realSafeFetch(input as string | URL, init!);
+      },
+      );
       vi.mocked(prisma.link.create).mockResolvedValue({
         ...MOCK_LINK,
         url: "https://youtu.be/dQw4w9WgXcQ",

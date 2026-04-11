@@ -45,6 +45,7 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
 
   const todayGroup = groups.find((g) => g.label === "Today");
   const todayLinksCount = todayGroup?.links.length ?? 0;
+  const firstGroupWithLinksIndex = groups.findIndex((g) => g.links.length > 0);
   const newDataArrived = !isPending && todayLinksCount > prevTodayCount;
 
   // Only show the optimistic row when this device pasted a URL — not when
@@ -52,34 +53,6 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
   const showSkeleton = pendingUrl !== null && !newDataArrived;
   const skeletonUrl = pendingUrl ?? "";
   const showSyntheticToday = showSkeleton && !todayGroup;
-
-  useEffect(() => {
-    const totalLinks = groups.reduce((acc, group) => acc + group.links.length, 0);
-    // #region agent log
-    fetch("http://127.0.0.1:7934/ingest/3b140c39-9f39-4fe6-bb46-7844bf138e61", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Debug-Session-Id": "f65e73",
-      },
-      body: JSON.stringify({
-        sessionId: "f65e73",
-        runId: "pre-fix",
-        hypothesisId: "H3",
-        location: "src/components/home-shell.tsx:groupsEffect",
-        message: "home shell groups snapshot",
-        data: {
-          totalLinks,
-          todayLinksCount,
-          isPending,
-          showSkeleton,
-          showSyntheticToday,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [groups, isPending, showSkeleton, showSyntheticToday, todayLinksCount]);
 
   useEffect(() => {
     if (!isPending) {
@@ -147,7 +120,7 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
               prependItems={<LinkItemSkeleton url={skeletonUrl} animateIn />}
             />
           )}
-          {groups.map((group) => (
+          {groups.map((group, groupIndex) => (
             <LinkGroup
               key={group.label}
               label={group.label}
@@ -157,6 +130,10 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
                 group.label === "Today" && showSkeleton ? (
                   <LinkItemSkeleton url={skeletonUrl} animateIn />
                 ) : undefined
+              }
+              eagerFirstLinkFavicon={
+                firstGroupWithLinksIndex >= 0 &&
+                groupIndex === firstGroupWithLinksIndex
               }
             />
           ))}

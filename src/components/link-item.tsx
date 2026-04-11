@@ -29,11 +29,22 @@ import {
 
 export const LinkItem = React.forwardRef<
   HTMLDivElement,
-  { link: LinkType; preview?: boolean } & React.ComponentPropsWithoutRef<
-    typeof Item
-  >
+  {
+    link: LinkType;
+    preview?: boolean;
+    /** First above-the-fold row: eager-load favicon to satisfy LCP when src is large. */
+    eagerFavicon?: boolean;
+  } & React.ComponentPropsWithoutRef<typeof Item>
 >(function LinkItem(
-  { link, className, onMouseEnter, onMouseLeave, preview, ...rest },
+  {
+    link,
+    className,
+    onMouseEnter,
+    onMouseLeave,
+    preview,
+    eagerFavicon,
+    ...rest
+  },
   ref,
 ) {
   const chatCtx = useChatContextSafe();
@@ -151,6 +162,8 @@ export const LinkItem = React.forwardRef<
             alt={link.title}
             width={20}
             height={20}
+            sizes="20px"
+            loading={eagerFavicon ? "eager" : undefined}
             className="aspect-square object-contain"
           />
         );
@@ -274,6 +287,7 @@ export const LinkItem = React.forwardRef<
   return (
     <LinkPreview
       link={link}
+      eagerThumbnail={Boolean(eagerFavicon)}
       open={!preview && previewOpen}
       onOpenChange={() => {
         // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.

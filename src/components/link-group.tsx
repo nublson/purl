@@ -8,12 +8,14 @@ export const LinkGroup = ({
   links,
   prependItems,
   preview,
+  eagerFirstLinkFavicon = false,
 }: {
   label: string;
   links: Link[];
   newLinkId?: string | null;
   prependItems?: ReactNode;
   preview?: boolean;
+  eagerFirstLinkFavicon?: boolean;
 }) => {
   const prevIdsRef = useRef<string[]>([]);
   const initializedRef = useRef(false);
@@ -48,7 +50,7 @@ export const LinkGroup = ({
       <p className="text-xs text-muted-foreground font-medium ml-2">{label}</p>
       <ItemGroup className="w-full gap-0">
         {prependItems}
-        {links.map((link) => {
+        {links.map((link, index) => {
           const animateAdded = animatingAddedIds.has(link.id);
           return (
             <div
@@ -68,7 +70,11 @@ export const LinkGroup = ({
                 });
               }}
             >
-              <LinkItem link={link} preview={preview} />
+              <LinkItem
+                link={link}
+                preview={preview}
+                eagerFavicon={eagerFirstLinkFavicon && index === 0}
+              />
             </div>
           );
         })}

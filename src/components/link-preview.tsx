@@ -12,6 +12,8 @@ type LinkPreviewProps = {
   link: Link;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Eager-load preview thumbnail (first above-the-fold row) for LCP. */
+  eagerThumbnail?: boolean;
 };
 
 export function LinkPreview({
@@ -19,6 +21,7 @@ export function LinkPreview({
   link,
   open,
   onOpenChange,
+  eagerThumbnail = false,
 }: LinkPreviewProps) {
   const imageThumbnailClass = () => {
     switch (link.contentType) {
@@ -50,6 +53,8 @@ export function LinkPreview({
             alt={link.title}
             width={200}
             height={200}
+            sizes="256px"
+            loading={eagerThumbnail ? "eager" : "lazy"}
             className={`w-full h-full aspect-video rounded-t-md ${imageThumbnailClass()}`}
           />
         ) : null}

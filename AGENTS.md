@@ -46,3 +46,15 @@ See `README.md` and `package.json` scripts for the full list. Quick reference:
 - **Email verification on signup**: Resend sends a real email. For local dev/testing, manually set `emailVerified = true` on the user record in the database if you can't receive the verification email.
 - **The chat input bar at `/home`** is for saving URLs, not asking questions. AI chat questions are handled differently (via the chat interface, not the URL input bar).
 - **`.env` is gitignored** — never commit it.
+
+### Outbound URL fetching (`safeFetch`)
+
+Link ingest, OG scraping, PDF/audio fetch, and related paths use [`src/lib/safe-outbound-fetch.ts`](src/lib/safe-outbound-fetch.ts). Optional env (server-only):
+
+| Variable | Purpose |
+|----------|---------|
+| `SAFE_OUTBOUND_HTTP_PROXY` | HTTP(S) CONNECT proxy. The leg to the **proxy** uses the same pinned DNS/connect policy as direct mode; the proxy opens the upstream connection. Use an explicit URL here instead of relying on `HTTPS_PROXY` / `NO_PROXY` (mis-set `NO_PROXY` can bypass proxies). |
+| `SAFE_OUTBOUND_SOCKS_PROXY` | `socks5://` or `socks://` only. Undici’s SOCKS support is experimental; the TCP connect to the SOCKS server is **not** pinned in-app—prefer HTTP proxy if you need full pinning to the egress hop. Only one of HTTP proxy or SOCKS may be set. |
+| `SAFE_OUTBOUND_DNS_SERVERS` | Comma-separated resolvers passed to `dns.setServers` (e.g. `1.1.1.1,8.8.8.8`). Reduces reliance on the platform default resolver; does not replace DoH or an egress proxy. |
+
+**Staging / production:** The proxy must be reachable from your deployment regions (e.g. Vercel). Configure the proxy to refuse private/upstream SSRF targets where possible. After enabling, smoke-test saving a normal HTTPS link, a PDF URL, and YouTube/audio flows. Proxy auth belongs only in server env, never in client-exposed vars.
