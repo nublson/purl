@@ -1,7 +1,7 @@
 import { PricingCard } from "@/components/pricing-card";
 import SectionTitle from "@/components/section-title";
 import SectionWrapper from "@/components/section-wrapper";
-import { plans } from "@/data/pricing.json" with { type: "json" };
+import pricingJson from "@/data/pricing.json" with { type: "json" };
 
 export const PricingSection = () => {
   return (
@@ -20,7 +20,7 @@ export const PricingSection = () => {
           }}
         />
         <div className="flex flex-col md:flex-row items-center justify-center gap-4">
-          {plans.map((plan) => (
+          {pricingJson.plans.map((plan) => (
             <PricingCard
               key={plan.name}
               name={plan.name}

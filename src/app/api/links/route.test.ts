@@ -388,7 +388,8 @@ describe("POST /api/links", () => {
 
       expect(ogs).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: "https://youtu.be/dQw4w9WgXcQ",
+          html: expect.any(String),
+          timeout: 8,
         }),
       );
     });
@@ -422,7 +423,8 @@ describe("POST /api/links", () => {
       );
       expect(ogs).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: "https://open.spotify.com/track/abc123",
+          html: expect.any(String),
+          timeout: 8,
         }),
       );
     });
@@ -524,7 +526,7 @@ describe("POST /api/links", () => {
       expect(ogs).not.toHaveBeenCalled();
       expect(fetchSpy).toHaveBeenCalledWith(
         "https://example.com/doc.pdf",
-        expect.objectContaining({ method: "HEAD" }),
+        expect.objectContaining({ method: "HEAD", redirect: "manual" }),
       );
     });
 
@@ -677,21 +679,26 @@ describe("POST /api/links", () => {
       );
     });
 
-    it("passes fetchOptions with User-Agent when calling ogs", async () => {
+    it("fetches HTML with User-Agent then passes html and timeout to ogs", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
       vi.mocked(prisma.link.create).mockResolvedValue(MOCK_LINK as never);
 
       await POST(postRequest({ url: "https://example.com" }));
 
+      expect(fetchSpy).toHaveBeenCalledWith(
+        "https://example.com/",
+        expect.objectContaining({
+          redirect: "manual",
+          headers: expect.objectContaining({
+            "User-Agent":
+              "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
+          }),
+        }),
+      );
       expect(ogs).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: "https://example.com",
-          fetchOptions: expect.objectContaining({
-            headers: expect.objectContaining({
-              "User-Agent":
-                "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
-            }),
-          }),
+          html: expect.any(String),
+          timeout: 8,
         }),
       );
     });

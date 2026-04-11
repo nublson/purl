@@ -14,11 +14,7 @@ describe("extractPdfTextByPage", () => {
   });
 
   it("throws when PDF fetch fails", async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: false,
-      status: 404,
-      headers: new Headers(),
-    } as never);
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 404 }));
 
     await expect(
       extractPdfTextByPage("https://example.com/doc.pdf"),
@@ -26,11 +22,12 @@ describe("extractPdfTextByPage", () => {
   });
 
   it("throws when response is not a PDF content type", async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      status: 200,
-      headers: new Headers({ "content-type": "text/html" }),
-    } as never);
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(null, {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }),
+    );
 
     await expect(
       extractPdfTextByPage("https://example.com/doc"),
@@ -38,12 +35,12 @@ describe("extractPdfTextByPage", () => {
   });
 
   it("extracts and normalizes non-empty page text", async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      status: 200,
-      headers: new Headers({ "content-type": "application/pdf" }),
-      arrayBuffer: vi.fn().mockResolvedValue(new Uint8Array([1, 2, 3]).buffer),
-    } as never);
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(new Uint8Array([1, 2, 3]).buffer, {
+        status: 200,
+        headers: { "content-type": "application/pdf" },
+      }),
+    );
     vi.mocked(extractText).mockResolvedValue({
       text: ["  First   page  ", "   ", "\nSecond\tpage\n"],
       totalPages: 3,

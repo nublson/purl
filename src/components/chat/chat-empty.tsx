@@ -5,7 +5,7 @@ import {
   EmptyHeader,
   EmptyMedia,
 } from "@/components/ui/empty";
-import { suggestions } from "@/data/chat-empty-suggestions.json" with {
+import chatEmptySuggestionsJson from "@/data/chat-empty-suggestions.json" with {
   type: "json",
 };
 import Image from "next/image";
@@ -27,7 +27,7 @@ export const ChatEmpty = ({ onSuggestion }: ChatEmptyProps) => {
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>
-        {suggestions.map((text) => (
+        {chatEmptySuggestionsJson.suggestions.map((text) => (
           <Button
             key={text}
             size="xs"

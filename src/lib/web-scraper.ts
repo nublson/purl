@@ -1,5 +1,6 @@
 import { Readability } from "@mozilla/readability";
 import { JSDOM } from "jsdom";
+import { safeFetch } from "@/lib/safe-outbound-fetch";
 import { STREAMING_MUSIC_DOMAINS } from "@/utils/streaming-music";
 
 /** Thrown for hostnames that need a browser; ingest should mark the link FAILED. */
@@ -74,12 +75,13 @@ export async function scrapeWebContent(url: string): Promise<string> {
     );
   }
 
-  const response = await fetch(url, {
+  const response = await safeFetch(url, {
     headers: {
       "User-Agent": USER_AGENT,
       Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
     },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    maxResponseBytes: WEB_MAX_RESPONSE_BYTES,
   });
 
   if (!response.ok) {

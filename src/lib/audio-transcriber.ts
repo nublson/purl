@@ -1,5 +1,6 @@
 import { experimental_transcribe as transcribe } from "ai";
 import { getTranscriptionModel } from "@/lib/ai";
+import { safeFetch } from "@/lib/safe-outbound-fetch";
 import {
   AUDIO_MAX_UPLOAD_BYTES,
   audioMaxSizeExceededMessage,
@@ -43,12 +44,13 @@ function segmentsToTimestampedText(
  * and returns text with inline [HH:MM:SS] timestamps per segment.
  */
 export async function transcribeAudio(url: string): Promise<string> {
-  const response = await fetch(url, {
+  const response = await safeFetch(url, {
     headers: {
       "User-Agent":
         "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
     },
     signal: AbortSignal.timeout(120_000),
+    maxResponseBytes: AUDIO_MAX_UPLOAD_BYTES,
   });
   if (!response.ok) {
     throw new Error(`Failed to fetch audio (${response.status})`);

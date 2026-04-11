@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { UnsafeOutboundUrlError } from "@/lib/safe-outbound-fetch";
 
 vi.mock("@mozilla/readability", () => ({
   Readability: vi.fn(),
@@ -179,7 +180,7 @@ describe("scrapeWebContent – size limit enforcement", () => {
 
     await expect(
       scrapeWebContent("https://example.com/huge"),
-    ).rejects.toThrow("Web page exceeds maximum size");
+    ).rejects.toThrow(UnsafeOutboundUrlError);
   });
 
   it("throws when the downloaded body exceeds 5 MB even without content-length header", async () => {

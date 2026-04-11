@@ -1,7 +1,7 @@
 import ContentTypeGroup from "@/components/content-type-group";
 import SectionTitle from "@/components/section-title";
 import SectionWrapper from "@/components/section-wrapper";
-import { contentTypes as contentTypesData } from "@/data/content-types.json" with { type: "json" };
+import contentTypesJson from "@/data/content-types.json" with { type: "json" };
 import {
   FileText,
   Headphones,
@@ -30,7 +30,7 @@ type ContentTypeData = Omit<ContentTypeProps, "icon"> & {
 };
 
 const contentTypes: ContentTypeProps[] = (
-  contentTypesData as ContentTypeData[]
+  contentTypesJson.contentTypes as ContentTypeData[]
 ).map((contentType) => ({
   ...contentType,
   icon: contentTypeIcons[contentType.icon],
