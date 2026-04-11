@@ -27,17 +27,85 @@ import {
   ItemTitle,
 } from "./ui/item";
 
+const INGEST_POLL_INTERVAL_MS = 1200;
+const INGEST_POLL_MAX_ATTEMPTS = 45;
+
+/** Poll until ingest leaves PENDING/PROCESSING so UI matches DB when RSC refresh fails or lags. */
+async function pollIngestUntilSettled(
+  linkId: string,
+  generation: number,
+  genRef: React.MutableRefObject<number>,
+  setStatus: React.Dispatch<React.SetStateAction<LinkType["ingestStatus"]>>,
+) {
+  for (let i = 0; i < INGEST_POLL_MAX_ATTEMPTS; i++) {
+    await new Promise((r) => setTimeout(r, INGEST_POLL_INTERVAL_MS));
+    if (genRef.current !== generation) return;
+    try {
+      const r = await fetch(`/api/links/${linkId}`);
+      if (!r.ok) continue;
+      const j = (await r.json()) as { ingestStatus: LinkType["ingestStatus"] };
+      if (genRef.current !== generation) return;
+      setStatus(j.ingestStatus);
+      if (j.ingestStatus !== "PENDING" && j.ingestStatus !== "PROCESSING") {
+        return;
+      }
+    } catch {
+      /* ignore transient network errors */
+    }
+  }
+}
+
 export const LinkItem = React.forwardRef<
   HTMLDivElement,
-  { link: LinkType; preview?: boolean } & React.ComponentPropsWithoutRef<
-    typeof Item
-  >
+  {
+    link: LinkType;
+    preview?: boolean;
+    /** First above-the-fold row: eager-load favicon to satisfy LCP when src is large. */
+    eagerFavicon?: boolean;
+  } & React.ComponentPropsWithoutRef<typeof Item>
 >(function LinkItem(
-  { link, className, onMouseEnter, onMouseLeave, preview, ...rest },
+  {
+    link,
+    className,
+    onMouseEnter,
+    onMouseLeave,
+    preview,
+    eagerFavicon,
+    ...rest
+  },
   ref,
 ) {
   const chatCtx = useChatContextSafe();
   const router = useRouter();
+  const ingestPollGenRef = React.useRef(0);
+  const lastLinkIdRef = React.useRef(link.id);
+  const [displayIngestStatus, setDisplayIngestStatus] = React.useState<
+    LinkType["ingestStatus"]
+  >(() => link.ingestStatus);
+
+  React.useEffect(() => {
+    if (lastLinkIdRef.current !== link.id) {
+      lastLinkIdRef.current = link.id;
+      setDisplayIngestStatus(link.ingestStatus);
+      return;
+    }
+    setDisplayIngestStatus((prev) => {
+      const incoming = link.ingestStatus;
+      if (
+        (prev === "FAILED" || prev === "SKIPPED") &&
+        (incoming === "PENDING" || incoming === "PROCESSING")
+      ) {
+        return prev;
+      }
+      return incoming;
+    });
+  }, [link.id, link.ingestStatus]);
+
+  const linkForUi = React.useMemo(
+    () => ({ ...link, ingestStatus: displayIngestStatus }),
+    [link, displayIngestStatus],
+  );
+
   const [deletePhase, setDeletePhase] = React.useState<
     "idle" | "animating" | "loading" | "exiting"
   >("idle");
@@ -86,20 +154,22 @@ export const LinkItem = React.forwardRef<
 
   React.useEffect(() => {
     if (
-      link.ingestStatus === "PENDING" ||
-      link.ingestStatus === "PROCESSING" ||
-      link.ingestStatus === "COMPLETED"
+      displayIngestStatus === "PENDING" ||
+      displayIngestStatus === "PROCESSING" ||
+      displayIngestStatus === "COMPLETED" ||
+      displayIngestStatus === "FAILED" ||
+      displayIngestStatus === "SKIPPED"
     ) {
       setOptimisticIngesting(false);
     }
-  }, [link.ingestStatus]);
+  }, [link.id, displayIngestStatus]);
 
   const showIngestPulse =
     optimisticIngesting ||
-    link.ingestStatus === "PENDING" ||
-    link.ingestStatus === "PROCESSING";
+    displayIngestStatus === "PENDING" ||
+    displayIngestStatus === "PROCESSING";
 
-  const disableAddToChat = link.ingestStatus !== "COMPLETED";
+  const disableAddToChat = displayIngestStatus !== "COMPLETED";
 
   async function handleReingest() {
     setOptimisticIngesting(true);
@@ -108,8 +178,17 @@ export const LinkItem = React.forwardRef<
         method: "POST",
       });
       if (res.ok) {
+        const body = (await res.json()) as LinkType;
+        setDisplayIngestStatus(body.ingestStatus);
         toast.success("Re-ingesting…");
         router.refresh();
+        const gen = ++ingestPollGenRef.current;
+        void pollIngestUntilSettled(
+          link.id,
+          gen,
+          ingestPollGenRef,
+          setDisplayIngestStatus,
+        );
       } else {
         setOptimisticIngesting(false);
         const data = (await res.json().catch(() => ({}))) as {
@@ -151,6 +230,8 @@ export const LinkItem = React.forwardRef<
             alt={link.title}
             width={20}
             height={20}
+            sizes="20px"
+            loading={eagerFavicon ? "eager" : undefined}
             className="aspect-square object-contain"
           />
         );
@@ -219,7 +300,7 @@ export const LinkItem = React.forwardRef<
             scheduleOpen();
           }}
         >
-          {link.ingestStatus === "FAILED" ? (
+          {displayIngestStatus === "FAILED" ? (
             <TooltipWrapper content="Refetch content">
               <Button
                 type="button"
@@ -245,7 +326,7 @@ export const LinkItem = React.forwardRef<
                   data-add-to-chat=""
                   className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
                   onClick={() => {
-                    chatCtx.addMention(link);
+                    chatCtx.addMention(linkForUi);
                     chatCtx.setIsWidgetOpen(true);
                   }}
                 >
@@ -255,7 +336,7 @@ export const LinkItem = React.forwardRef<
             )
           )}
           <LinkMenu
-            link={link}
+            link={linkForUi}
             onDeleteStart={() => {
               setDeletePhase("animating");
             }}
@@ -273,7 +354,8 @@ export const LinkItem = React.forwardRef<
 
   return (
     <LinkPreview
-      link={link}
+      link={linkForUi}
+      eagerThumbnail={Boolean(eagerFavicon)}
       open={!preview && previewOpen}
       onOpenChange={() => {
         // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.

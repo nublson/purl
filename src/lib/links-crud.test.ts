@@ -1,4 +1,7 @@
+import * as safeOutbound from "@/lib/safe-outbound-fetch";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const realSafeFetch = safeOutbound.safeFetch;
 
 vi.mock("next/server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("next/server")>();
@@ -250,20 +253,26 @@ describe("scrapeLinkMetadata – PDF branch", () => {
   });
 });
 
+function hrefFromSafeFetchInput(input: RequestInfo | URL): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
+
 describe("scrapeLinkMetadata – YouTube branch", () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let safeFetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    fetchSpy = vi.spyOn(globalThis, "fetch");
+    safeFetchSpy = vi.spyOn(safeOutbound, "safeFetch");
   });
 
   afterEach(() => {
-    fetchSpy.mockRestore();
+    safeFetchSpy.mockRestore();
     vi.mocked(ogs).mockReset();
   });
 
   it("returns oEmbed title, author as description, and thumbnail for YouTube URLs", async () => {
-    fetchSpy.mockResolvedValue(
+    safeFetchSpy.mockResolvedValue(
       new Response(
         JSON.stringify({
           title: "My Video",
@@ -285,23 +294,21 @@ describe("scrapeLinkMetadata – YouTube branch", () => {
   });
 
   it("falls back to OGS when the oEmbed response is not ok", async () => {
-    fetchSpy.mockImplementation((input: RequestInfo | URL) => {
-      const href =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.href
-            : input.url;
+    safeFetchSpy.mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+      const href = hrefFromSafeFetchInput(input);
       if (href.includes("youtube.com/oembed")) {
-        return Promise.resolve(new Response(null, { status: 404 }));
+        return new Response(null, { status: 404 });
       }
-      return Promise.resolve(
-        new Response("<html><head><title>OG</title></head></html>", {
+      if (href.includes("youtube.com/watch")) {
+        return new Response("<html><head><title>OG</title></head></html>", {
           status: 200,
           headers: { "content-type": "text/html; charset=utf-8" },
-        }),
-      );
-    });
+        });
+      }
+      return realSafeFetch(input as string | URL, init!);
+    },
+    );
     mockOgsSuccess({ ogTitle: "OGS Fallback Title" });
     const result = await scrapeLinkMetadata(
       "https://www.youtube.com/watch?v=abc123",
@@ -311,28 +318,24 @@ describe("scrapeLinkMetadata – YouTube branch", () => {
   });
 
   it("falls back to OGS when the oEmbed title is empty", async () => {
-    fetchSpy.mockImplementation((input: RequestInfo | URL) => {
-      const href =
-        typeof input === "string"
-          ? input
-          : input instanceof URL
-            ? input.href
-            : input.url;
+    safeFetchSpy.mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+      const href = hrefFromSafeFetchInput(input);
       if (href.includes("youtube.com/oembed")) {
-        return Promise.resolve(
-          new Response(JSON.stringify({ title: "" }), {
-            status: 200,
-            headers: { "Content-Type": "application/json" },
-          }),
-        );
+        return new Response(JSON.stringify({ title: "" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
       }
-      return Promise.resolve(
-        new Response("<html><head><title>OG</title></head></html>", {
+      if (href.includes("youtube.com/watch")) {
+        return new Response("<html><head><title>OG</title></head></html>", {
           status: 200,
           headers: { "content-type": "text/html; charset=utf-8" },
-        }),
-      );
-    });
+        });
+      }
+      return realSafeFetch(input as string | URL, init!);
+    },
+    );
     mockOgsSuccess({ ogTitle: "OGS Title" });
     const result = await scrapeLinkMetadata(
       "https://www.youtube.com/watch?v=abc123",

@@ -20,6 +20,9 @@ import { safeFetch } from "@/lib/safe-outbound-fetch";
 
 const OGS_HTML_MAX_BYTES = 5 * 1024 * 1024;
 
+/** oEmbed JSON is small; cap avoids unbounded reads. */
+const YOUTUBE_OEMBED_MAX_BYTES = 256 * 1024;
+
 /** Thrown when link helpers are called without an authenticated user. */
 export class UnauthorizedError extends Error {
   readonly name = "UnauthorizedError";
@@ -94,13 +97,15 @@ async function scrapeYouTubeMetadata(
 } | null> {
   try {
     const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
-    const res = await fetch(oembedUrl, {
+    const res = await safeFetch(oembedUrl, {
       headers: {
         Accept: "application/json",
         "User-Agent":
           "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
       },
       signal: AbortSignal.timeout(8000),
+      maxRedirects: 4,
+      maxResponseBytes: YOUTUBE_OEMBED_MAX_BYTES,
     });
     if (!res.ok) return null;
     const data = (await res.json()) as {

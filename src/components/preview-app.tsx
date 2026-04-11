@@ -195,6 +195,7 @@ export default function PreviewApp({
           label="Today"
           links={completedLinks}
           preview
+          eagerFirstLinkFavicon={completedLinks.length > 0}
           prependItems={
             isSaving && pendingUrl ? (
               <LinkItemSkeleton url={pendingUrl} />

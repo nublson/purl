@@ -11,11 +11,33 @@
  * rebinding targets the pre-check vs connect split. A malicious authoritative
  * server can still race two clients between lookups; mitigating that fully needs
  * an egress proxy or non-cooperative resolver.
+ *
+ * Use {@link safeFetch} for fixed-host outbound calls too (e.g. YouTube oEmbed)
+ * so every egress uses the same pinned-connect path; global fetch does not.
+ *
+ * Optional env (server-only):
+ * - `SAFE_OUTBOUND_HTTP_PROXY` — HTTP(S) CONNECT proxy; proxy host uses the same
+ *   pinned DNS/connect path via {@link safeOutboundConnect}. Upstream origin is
+ *   reached by the proxy (not pinned in-app). Do not set `NO_PROXY` to bypass this;
+ *   use explicit env only (not `EnvHttpProxyAgent`).
+ * - `SAFE_OUTBOUND_SOCKS_PROXY` — `socks5://` or `socks://` proxy (Undici
+ *   experimental). The TCP leg to the SOCKS host uses Undici’s default connector
+ *   (no in-app pinning for that hop).
+ * - `SAFE_OUTBOUND_DNS_SERVERS` — comma-separated resolvers for `dns.lookup`
+ *   (e.g. `1.1.1.1,8.8.8.8`). Does not replace DoH or egress proxy guarantees.
  */
 
 import dns from "node:dns/promises";
+import dnsSync from "node:dns";
 import net from "node:net";
-import { Agent, buildConnector, fetch as undiciFetch } from "undici";
+import {
+  Agent,
+  Pool,
+  ProxyAgent,
+  Socks5ProxyAgent,
+  buildConnector,
+  fetch as undiciFetch,
+} from "undici";
 
 const DEFAULT_MAX_REDIRECTS = 8;
 
@@ -31,6 +53,44 @@ const baseUndiciConnect = buildConnector({ timeout: CONNECT_TIMEOUT_MS });
 export class UnsafeOutboundUrlError extends Error {
   readonly name = "UnsafeOutboundUrlError";
 }
+
+/** How {@link safeFetch} reaches the network (set at module load from env). */
+export type SafeOutboundEgressMode = "direct" | "http_proxy" | "socks5";
+
+function applySafeOutboundDnsServers(): void {
+  const raw = process.env.SAFE_OUTBOUND_DNS_SERVERS?.trim();
+  if (!raw) return;
+
+  const servers = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (servers.length === 0) return;
+
+  for (const entry of servers) {
+    if (!isValidDnsServerEntry(entry)) {
+      throw new Error(
+        `Invalid SAFE_OUTBOUND_DNS_SERVERS entry: ${JSON.stringify(entry)}`,
+      );
+    }
+  }
+
+  try {
+    dnsSync.setServers(servers);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(`SAFE_OUTBOUND_DNS_SERVERS could not be applied: ${msg}`);
+  }
+}
+
+function isValidDnsServerEntry(entry: string): boolean {
+  if (entry.length === 0 || entry.length > 253) return false;
+  if (net.isIP(entry)) return true;
+  return /^[a-zA-Z0-9.-]+$/.test(entry);
+}
+
+applySafeOutboundDnsServers();
 
 function createPrivateNetworkBlockList(): net.BlockList {
   const bl = new net.BlockList();
@@ -159,6 +219,84 @@ const safeOutboundAgent = new Agent({
   connect: safeOutboundConnect,
 });
 
+function assertValidHttpProxyUri(raw: string): string {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("SAFE_OUTBOUND_HTTP_PROXY is not a valid URL");
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error(
+      "SAFE_OUTBOUND_HTTP_PROXY must use http:// or https://",
+    );
+  }
+  if (!url.hostname) {
+    throw new Error("SAFE_OUTBOUND_HTTP_PROXY must include a hostname");
+  }
+  return url.href;
+}
+
+function assertValidSocksProxyUri(raw: string): string {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("SAFE_OUTBOUND_SOCKS_PROXY is not a valid URL");
+  }
+  if (url.protocol !== "socks5:" && url.protocol !== "socks:") {
+    throw new Error(
+      "SAFE_OUTBOUND_SOCKS_PROXY must use socks5:// or socks://",
+    );
+  }
+  if (!url.hostname) {
+    throw new Error("SAFE_OUTBOUND_SOCKS_PROXY must include a hostname");
+  }
+  return url.href;
+}
+
+function createSafeFetchDispatcher(): {
+  dispatcher: Agent | ProxyAgent | Socks5ProxyAgent;
+  mode: SafeOutboundEgressMode;
+} {
+  const httpProxyRaw = process.env.SAFE_OUTBOUND_HTTP_PROXY?.trim() ?? "";
+  const socksProxyRaw = process.env.SAFE_OUTBOUND_SOCKS_PROXY?.trim() ?? "";
+
+  if (httpProxyRaw && socksProxyRaw) {
+    throw new Error(
+      "Set only one of SAFE_OUTBOUND_HTTP_PROXY or SAFE_OUTBOUND_SOCKS_PROXY",
+    );
+  }
+
+  if (httpProxyRaw) {
+    const uri = assertValidHttpProxyUri(httpProxyRaw);
+    const dispatcher = new ProxyAgent({
+      uri,
+      clientFactory: (origin, options) =>
+        new Pool(origin, {
+          ...options,
+          connect: safeOutboundConnect,
+        }),
+    });
+    return { dispatcher, mode: "http_proxy" };
+  }
+
+  if (socksProxyRaw) {
+    const uri = assertValidSocksProxyUri(socksProxyRaw);
+    return {
+      dispatcher: new Socks5ProxyAgent(uri),
+      mode: "socks5",
+    };
+  }
+
+  return { dispatcher: safeOutboundAgent, mode: "direct" };
+}
+
+const { dispatcher: safeFetchDispatcher, mode: safeOutboundEgressMode } =
+  createSafeFetchDispatcher();
+
+export { safeOutboundEgressMode };
+
 export function assertSafeHttpUrl(urlInput: string | URL): URL {
   let url: URL;
   try {
@@ -192,8 +330,8 @@ export type SafeFetchInit = RequestInit & {
 };
 
 /**
- * Fetch with manual redirects; each request uses connection-time DNS validation
- * and IP pinning via {@link safeOutboundAgent}.
+ * Fetch with manual redirects; each request uses the configured egress dispatcher
+ * (direct pinned connect, HTTP proxy with pinned connect to the proxy, or SOCKS5).
  */
 export async function safeFetch(
   input: string | URL,
@@ -214,7 +352,7 @@ export async function safeFetch(
     try {
       res = await undiciFetch(url.href, {
         ...requestInit,
-        dispatcher: safeOutboundAgent,
+        dispatcher: safeFetchDispatcher,
         redirect: "manual",
       } as Parameters<typeof undiciFetch>[1]);
     } catch (err) {
