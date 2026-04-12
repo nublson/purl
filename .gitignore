@@ -53,3 +53,9 @@ next-env.d.ts
 
 # Source maps
 *.map
+
+# Serwist (generated at build)
+public/sw.js
+public/sw.js.map
+public/swe-worker-*.js
+public/swe-worker-*.js.map

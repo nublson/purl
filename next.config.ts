@@ -1,7 +1,32 @@
+import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import bundleAnalyzer from "@next/bundle-analyzer";
 import { withSentryConfig } from "@sentry/nextjs";
+import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
 import { buildContentSecurityPolicy } from "./src/lib/csp-header";
+
+function getSerwistRevision(): string {
+  const fromEnv =
+    process.env.VERCEL_GIT_COMMIT_SHA?.trim() ||
+    process.env.GITHUB_SHA?.trim();
+  if (fromEnv) return fromEnv;
+  const result = spawnSync("git", ["rev-parse", "HEAD"], {
+    encoding: "utf-8",
+  });
+  const stdout = result.stdout?.trim();
+  if (stdout) return stdout;
+  return randomUUID();
+}
+
+const withSerwist = withSerwistInit({
+  swSrc: "src/app/sw.ts",
+  swDest: "public/sw.js",
+  additionalPrecacheEntries: [
+    { url: "/~offline", revision: getSerwistRevision() },
+  ],
+  disable: process.env.NODE_ENV === "development",
+});
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
@@ -40,7 +65,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(withBundleAnalyzer(nextConfig), {
+export default withSentryConfig(withBundleAnalyzer(withSerwist(nextConfig)), {
   // For all available options, see:
   // https://www.npmjs.com/package/@sentry/webpack-plugin#options
 
