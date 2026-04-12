@@ -7,24 +7,31 @@ declare const self: ServiceWorkerGlobalScope & {
 };
 
 /**
- * Serwist's production defaultCache applies StaleWhileRevalidate to any URL whose
- * pathname matches image extensions — including third-party favicons and OG images.
- * Caching those cross-origin no-cors responses is unreliable and surfaces as
- * `no-response` in the console with broken <img> in the UI. Dev uses NetworkOnly for
- * all routes, which is why this only shows up in production.
+ * Third-party assets must bypass Serwist’s runtime strategies.
  *
- * @see https://github.com/serwist/serwist/blob/main/packages/next/src/index.worker.ts
+ * 1. **RegExp routes** — Serwist’s `RegExpRoute` ignores cross-origin URLs unless the
+ *    regex matches the *entire* `url.href` (`result.index === 0`). So the default
+ *    “image extension” rule usually does *not* run for `https://other/img.png`; those
+ *    requests fall through to the generic **cross-origin `NetworkFirst`** rule.
+ * 2. **`NetworkFirst` + `ExpirationPlugin`** on opaque / flaky cross-origin responses
+ *    often surfaces as **`no-response`** and broken `<img>` / favicons. Dev has no SW
+ *    (or Network-only defaults), so this is prod-only.
+ *
+ * We use **NetworkOnly** for all cross-origin GETs except **Google Fonts** (still
+ * handled by the following `defaultCache` entries).
+ *
+ * @see https://github.com/serwist/serwist/blob/main/packages/serwist/src/RegExpRoute.ts
  */
-function isCrossOriginImageLikeRequest({
-  request,
+function isCrossOriginExcludingGoogleFonts({
   sameOrigin,
   url,
 }: RouteMatchCallbackOptions): boolean {
   if (sameOrigin) return false;
-  if (request.destination === "image") return true;
-  const path = url.pathname;
-  if (/\/s2\/favicons\b/i.test(path)) return true;
-  return /\.(?:jpg|jpeg|gif|png|svg|ico|webp)(?:$|[?#])/i.test(path);
+  const host = url.hostname;
+  if (host === "fonts.gstatic.com" || host === "fonts.googleapis.com") {
+    return false;
+  }
+  return true;
 }
 
 const serwist = new Serwist({
@@ -34,7 +41,7 @@ const serwist = new Serwist({
   navigationPreload: true,
   runtimeCaching: [
     {
-      matcher: isCrossOriginImageLikeRequest,
+      matcher: isCrossOriginExcludingGoogleFonts,
       handler: new NetworkOnly(),
     },
     ...defaultCache,
