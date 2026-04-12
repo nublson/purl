@@ -31,6 +31,53 @@ The product goal: one place to stash material you care about, then query it late
 - **Link actions** — Open original, copy URL, edit metadata, re-ingest, delete, add to chat context from the list.
 - **Operational extras** — Optional Upstash-backed API rate limiting, optional Sentry, Vitest coverage for critical paths.
 
+## Ingestion flow
+
+Saving a link is **synchronous** through metadata resolution and the database row; **heavy work runs afterward** so the API can return quickly.
+
+1. **Input** — `POST /api/links` with a URL, or `POST /api/upload` with a PDF/audio file (files go to Supabase Storage; the `Link` stores the public URL).
+2. **Classify & decorate** — Server-side [`detectContentType`](src/lib/server-detect-content-type.ts) (SSRF-safe `HEAD` / sniff) plus [`scrapeLinkMetadata`](src/lib/links.ts) (Open Graph HTML, PDF `Content-Disposition` / size, YouTube oEmbed). Duplicates of the same URL **refresh** metadata and reset ingestion.
+3. **Persist** — A `Link` row is created (default **`PENDING`**) with title, favicon, thumbnail, domain, and `contentType` (`WEB`, `PDF`, `YOUTUBE`, or `AUDIO`).
+4. **Schedule** — [`dispatchIngest`](src/lib/links.ts) uses Next.js [`after()`](https://nextjs.org/docs/app/api-reference/functions/after) to run the right handler without blocking the response: [`ingestWeb`](src/lib/ingest-web.ts), [`ingestPdf`](src/lib/ingest-pdf.ts), [`ingestYoutube`](src/lib/ingest-youtube.ts), or [`ingestAudio`](src/lib/ingest-audio.ts).
+5. **Pipeline** (each handler) — Set **`PROCESSING`** → fetch or extract plain text → split into chunks (with a synthetic **metadata** chunk first) → **OpenAI** embeddings → replace `LinkContent` rows and attach **pgvector** values → **`COMPLETED`**. Failures become **`FAILED`**. **Re-ingest** reuses the same pipeline without re-scraping listing metadata.
+
+**Web pages (`WEB`).** Article-style HTML is fetched with [`safeFetch`](src/lib/safe-outbound-fetch.ts), parsed in **jsdom**, and the main content is extracted with Mozilla’s [**Readability**](https://github.com/mozilla/readability) ([`scrapeWebContent`](src/lib/web-scraper.ts)). That matches how Firefox’s reader mode chooses “the article,” but it is **not universal**: many **SPAs** and other **client-rendered** sites return a thin HTML shell to crawlers, so Readability finds little or nothing and ingest may **`FAIL`**. A small set of hosts that need a full browser are rejected early (`UnsupportedSpaError` → ingest **`SKIPPED`**).
+
+Realtime subscribers get updates when ingestion finishes via [`notifyLinksAfterIngest`](src/lib/notify-links-after-ingest.ts) (which calls [`broadcastLinksChanged`](src/lib/realtime-broadcast.ts)).
+
+```mermaid
+flowchart TB
+  subgraph save["Save path (responds to client)"]
+    A(["URL or file upload"]) --> B["/api/links or /api/upload"]
+    B --> C["detectContentType + scrapeLinkMetadata (safeFetch)"]
+    C --> D["Insert Link — ingestStatus PENDING"]
+    D --> E["after() → dispatchIngest by contentType"]
+  end
+
+  subgraph work["Background ingest"]
+    E --> F["ingestStatus PROCESSING"]
+    F --> G{"Extract text"}
+    G --> W["WEB — jsdom + Mozilla Readability"]
+    G --> P["PDF — page text"]
+    G --> Y["YOUTUBE — transcript"]
+    G --> A2["AUDIO — transcription"]
+    W --> H["Chunk + metadata header"]
+    P --> H
+    Y --> H
+    A2 --> H
+    H --> I["OpenAI embeddings"]
+    I --> J["Write LinkContent + pgvector"]
+    J --> K{"Outcome"}
+    K --> K1["COMPLETED"]
+    K --> K2["FAILED"]
+    K --> K3["SKIPPED (known SPA hosts)"]
+  end
+
+  K1 --> R["Realtime: list refresh"]
+  K2 --> R
+  K3 --> R
+```
+
 ## Not implemented yet
 
 These are called out explicitly because the repo is going public:
