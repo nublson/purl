@@ -30,6 +30,7 @@ The product goal: one place to stash material you care about, then query it late
   - Multiple chats, titles, and message history stored in the database.
 - **Link actions** — Open original, copy URL, edit metadata, re-ingest, delete, add to chat context from the list.
 - **Operational extras** — Optional Upstash-backed API rate limiting, optional Sentry, Vitest coverage for critical paths.
+- **PWA (installable app)** — [Web App Manifest](public/manifest.json) plus a [Serwist](https://serwist.pages.dev/) service worker ([`src/app/sw.ts`](src/app/sw.ts)) that builds to **`public/sw.js`** (generated on `pnpm build`, gitignored). Enables **Install** in Chrome/Edge and similar where the platform supports it, with runtime caching via Serwist’s Next.js defaults and a static offline shell at [`/~offline`](src/app/~offline/page.tsx). **Serwist is disabled in `pnpm dev`** to avoid service-worker cache surprises during development—use **`pnpm build && pnpm start`** (or your production URL) to exercise installability and the SW.
 
 ## Ingestion flow
 
@@ -96,7 +97,8 @@ These are called out explicitly because the repo is going public:
 - **Database:** PostgreSQL + Prisma (with vector column for embeddings)  
 - **AI:** OpenAI (chat + embeddings) via the Vercel AI SDK  
 - **Email (optional in dev):** Resend for verification emails  
-- **Realtime:** Supabase client (anon + service role on server)
+- **Realtime:** Supabase client (anon + service role on server)  
+- **PWA:** [Serwist](https://serwist.pages.dev/) (`@serwist/next`), web manifest + precache / offline fallback
 
 ## CI / GitHub Actions
 
@@ -189,6 +191,8 @@ pnpm dev
 ```
 
 Open `http://localhost:3000`.
+
+**PWA / install:** With `pnpm dev`, the service worker is not active. After a production build, `public/sw.js` exists locally; run **`pnpm start`** and open the app in Chromium to use **Install** or to test offline navigation to `/~offline`.
 
 ## Testing
 
