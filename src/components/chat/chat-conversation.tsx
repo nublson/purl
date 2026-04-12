@@ -397,6 +397,8 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
 
   const wasLoadingRef = useRef(false);
   const summarizeInFlightRef = useRef(false);
+  /** Dedupes React Strict Mode's double effect run for the same pending summarize link id. */
+  const summarizeHandledLinkIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (wasLoadingRef.current && !isLoading && chatId) {
       void (async () => {
@@ -428,9 +430,14 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       needsInitialRestoreRef.current = false;
       return;
     }
+    if (pendingSummarize) {
+      // Do not hydrate from the server in parallel with summarize sendMessage (sync replaces messages).
+      needsInitialRestoreRef.current = false;
+      return;
+    }
     needsInitialRestoreRef.current = false;
     void syncChatFromServer(id);
-  }, [chatId, syncChatFromServer]);
+  }, [chatId, syncChatFromServer, pendingSummarize]);
 
   useEffect(() => {
     return () => {
@@ -452,9 +459,15 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
   }, [input, chatId]);
 
   useEffect(() => {
-    if (!pendingSummarize || summarizeInFlightRef.current) return;
+    if (!pendingSummarize) {
+      summarizeHandledLinkIdRef.current = null;
+      return;
+    }
+    if (summarizeInFlightRef.current) return;
+    if (summarizeHandledLinkIdRef.current === pendingSummarize.id) return;
 
     summarizeInFlightRef.current = true;
+    summarizeHandledLinkIdRef.current = pendingSummarize.id;
     const link = pendingSummarize;
     clearPendingSummarize();
 
