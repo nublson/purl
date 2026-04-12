@@ -14,6 +14,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "fix:prisma-types": "tsx fix-prisma-types.ts",
+    "generate:pwa-icons": "tsx scripts/generate-pwa-icons.ts",
     "dotenv": "npx dotenv-vault@latest"
   },
   "dependencies": {
@@ -71,6 +72,7 @@
     "eslint-config-next": "16.1.6",
     "prisma": "^7.5.0",
     "serwist": "^9.5.7",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
