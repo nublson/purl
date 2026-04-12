@@ -6,6 +6,8 @@
 
 **Save anything. Ask questions. Get answers.**
 
+**Live preview:** [https://purl.nublson.com](https://purl.nublson.com)
+
 Purl is an AI-powered read-it-later app and personal knowledge base. You paste URLs (or upload files): web pages, PDFs, YouTube videos, and audio. Purl ingests the content, stores chunked text with vector embeddings, and answers questions by searching what you saved—optionally scoped with `@` mentions to specific items.
 
 The product goal: one place to stash material you care about, then query it later with citations instead of digging through bookmarks.
