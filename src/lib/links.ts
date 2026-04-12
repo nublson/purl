@@ -20,6 +20,67 @@ import { safeFetch } from "@/lib/safe-outbound-fetch";
 
 const OGS_HTML_MAX_BYTES = 5 * 1024 * 1024;
 
+/**
+ * Normalizes a URL so we can tell if og:image mistakenly points at the HTML
+ * document (same as the page or og:url) instead of a real image asset.
+ */
+function normalizeOpenGraphResourceUrl(href: string): string {
+  const u = new URL(href);
+  u.hash = "";
+  let path = u.pathname;
+  if (path.length > 1 && path.endsWith("/")) {
+    path = path.slice(0, -1);
+  }
+  return `${u.protocol}//${u.host}${path}${u.search}`;
+}
+
+function collectOpenGraphPageIdentityUrls(
+  requestUrl: string,
+  responseUrl: string,
+  ogUrl: string | undefined,
+): Set<string> {
+  const set = new Set<string>();
+  const candidates = [requestUrl, ogUrl].filter(
+    (x): x is string => typeof x === "string" && x.length > 0,
+  );
+  if (responseUrl) {
+    candidates.push(responseUrl);
+  }
+  for (const raw of candidates) {
+    try {
+      const absolute = new URL(raw, requestUrl).href;
+      set.add(normalizeOpenGraphResourceUrl(absolute));
+    } catch {
+      // ignore invalid URLs from metadata
+    }
+  }
+  return set;
+}
+
+/** Returns null when og:image is the page URL / og:url (common misconfiguration). */
+function resolveWebOgThumbnail(
+  rawImageUrl: string | null | undefined,
+  requestUrl: string,
+  responseUrl: string,
+  ogUrl: string | undefined,
+): string | null {
+  const trimmed = rawImageUrl?.trim();
+  if (!trimmed) return null;
+  try {
+    const absoluteThumb = new URL(trimmed, requestUrl).href;
+    const normalizedThumb = normalizeOpenGraphResourceUrl(absoluteThumb);
+    const pageIds = collectOpenGraphPageIdentityUrls(
+      requestUrl,
+      responseUrl,
+      ogUrl,
+    );
+    if (pageIds.has(normalizedThumb)) return null;
+    return absoluteThumb;
+  } catch {
+    return null;
+  }
+}
+
 /** oEmbed JSON is small; cap avoids unbounded reads. */
 const YOUTUBE_OEMBED_MAX_BYTES = 256 * 1024;
 
@@ -213,7 +274,12 @@ export async function scrapeLinkMetadata(url: string): Promise<{
       (result.ogTitle ?? domain).replace(/\s+/g, " ").trim().slice(0, 500) ||
       domain;
     const description = result.ogDescription ?? null;
-    const thumbnail = result.ogImage?.[0]?.url ?? null;
+    const thumbnail = resolveWebOgThumbnail(
+      result.ogImage?.[0]?.url,
+      url,
+      pageResponse.url,
+      result.ogUrl,
+    );
     const favicon = result.favicon
       ? new URL(result.favicon, url).href
       : defaultFavicon;

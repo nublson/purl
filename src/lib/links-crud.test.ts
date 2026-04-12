@@ -119,6 +119,7 @@ function mockOgsSuccess(
     ogDescription?: string;
     ogImage?: Array<{ url: string }>;
     favicon?: string;
+    ogUrl?: string;
   } = {},
 ) {
   vi.mocked(ogs).mockResolvedValue({
@@ -128,6 +129,7 @@ function mockOgsSuccess(
       ogDescription: undefined,
       ogImage: undefined,
       favicon: undefined,
+      ogUrl: undefined,
       ...overrides,
     },
     html: "",
@@ -394,6 +396,31 @@ describe("scrapeLinkMetadata – web/OGS branch", () => {
     });
     const result = await scrapeLinkMetadata("https://example.com/page");
     expect(result.thumbnail).toBe("https://example.com/img.jpg");
+  });
+
+  it("returns null thumbnail when og:image is the page URL (not a real image)", async () => {
+    mockOgsSuccess({
+      ogImage: [{ url: "https://example.com/page" }],
+      ogUrl: "https://example.com/page",
+    });
+    const result = await scrapeLinkMetadata("https://example.com/page");
+    expect(result.thumbnail).toBeNull();
+  });
+
+  it("returns null thumbnail when og:image matches page after trailing-slash normalization", async () => {
+    mockOgsSuccess({
+      ogImage: [{ url: "https://example.com/page/" }],
+    });
+    const result = await scrapeLinkMetadata("https://example.com/page");
+    expect(result.thumbnail).toBeNull();
+  });
+
+  it("returns null when relative og:image resolves to the same document URL", async () => {
+    mockOgsSuccess({
+      ogImage: [{ url: "/page" }],
+    });
+    const result = await scrapeLinkMetadata("https://example.com/page");
+    expect(result.thumbnail).toBeNull();
   });
 
   it("returns null thumbnail when no ogImage is present", async () => {
