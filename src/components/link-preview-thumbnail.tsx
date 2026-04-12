@@ -5,15 +5,6 @@ import type { Link } from "@/utils/links";
 import { Globe } from "lucide-react";
 import * as React from "react";
 
-function imageThumbnailClass(contentType: Link["contentType"]) {
-  switch (contentType) {
-    case "YOUTUBE":
-      return "object-cover";
-    default:
-      return "object-contain";
-  }
-}
-
 export type LinkPreviewThumbnailProps = {
   link: Link;
   thumbnailSrc: string | null;
@@ -38,7 +29,6 @@ export function LinkPreviewThumbnail({
   const showThumb = Boolean(thumbnailSrc) && !thumbFailed;
   const showFavicon =
     !showThumb && Boolean(faviconSrc) && !faviconFailed;
-  const imgClass = imageThumbnailClass(link.contentType);
 
   return (
     <div className="relative w-full aspect-video overflow-hidden rounded-t-md bg-muted/30 flex items-center justify-center">
@@ -53,7 +43,7 @@ export function LinkPreviewThumbnail({
           loading={eagerThumbnail ? "eager" : "lazy"}
           referrerPolicy="strict-origin-when-cross-origin"
           onError={() => setThumbFailed(true)}
-          className={`absolute inset-0 h-full w-full ${imgClass}`}
+          className="absolute inset-0 h-full w-full object-cover"
         />
       ) : showFavicon && faviconSrc ? (
         // eslint-disable-next-line @next/next/no-img-element
