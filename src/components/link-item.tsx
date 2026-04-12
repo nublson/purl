@@ -27,6 +27,7 @@ import {
   ItemMedia,
   ItemTitle,
 } from "./ui/item";
+import { Spinner } from "./ui/spinner";
 
 const INGEST_POLL_INTERVAL_MS = 1200;
 const INGEST_POLL_MAX_ATTEMPTS = 45;
@@ -35,7 +36,7 @@ const INGEST_POLL_MAX_ATTEMPTS = 45;
 async function pollIngestUntilSettled(
   linkId: string,
   generation: number,
-  genRef: React.MutableRefObject<number>,
+  genRef: React.RefObject<number>,
   setStatus: React.Dispatch<React.SetStateAction<LinkType["ingestStatus"]>>,
 ) {
   for (let i = 0; i < INGEST_POLL_MAX_ATTEMPTS; i++) {
@@ -203,6 +204,52 @@ export const LinkItem = React.forwardRef<
     }
   }
 
+  function renderIngestOrChatAction(): React.ReactNode {
+    if (displayIngestStatus === "COMPLETED") {
+      if (!chatCtx) return null;
+      return (
+        <TooltipWrapper content="Add to chat">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            disabled={disableAddToChat}
+            data-add-to-chat=""
+            className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
+            onClick={() => {
+              chatCtx.addMention(linkForUi);
+              chatCtx.setIsWidgetOpen(true);
+            }}
+          >
+            <MessageCircle />
+          </Button>
+        </TooltipWrapper>
+      );
+    }
+    if (
+      displayIngestStatus === "PENDING" ||
+      displayIngestStatus === "PROCESSING"
+    ) {
+      return <Spinner className="size-4" />;
+    }
+    return (
+      <TooltipWrapper content="Refetch content">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          disabled={optimisticIngesting}
+          className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
+          onClick={() => {
+            void handleReingest();
+          }}
+        >
+          <ArrowDownToLine />
+        </Button>
+      </TooltipWrapper>
+    );
+  }
+
   if (deletePhase === "loading" || deletePhase === "exiting") {
     return (
       <LinkItemSkeleton
@@ -307,41 +354,7 @@ export const LinkItem = React.forwardRef<
             scheduleOpen();
           }}
         >
-          {displayIngestStatus === "FAILED" ? (
-            <TooltipWrapper content="Refetch content">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                disabled={optimisticIngesting}
-                className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
-                onClick={() => {
-                  void handleReingest();
-                }}
-              >
-                <ArrowDownToLine />
-              </Button>
-            </TooltipWrapper>
-          ) : (
-            chatCtx && (
-              <TooltipWrapper content="Add to chat">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={disableAddToChat}
-                  data-add-to-chat=""
-                  className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
-                  onClick={() => {
-                    chatCtx.addMention(linkForUi);
-                    chatCtx.setIsWidgetOpen(true);
-                  }}
-                >
-                  <MessageCircle />
-                </Button>
-              </TooltipWrapper>
-            )
-          )}
+          {renderIngestOrChatAction()}
           <LinkMenu
             link={linkForUi}
             onDeleteStart={() => {

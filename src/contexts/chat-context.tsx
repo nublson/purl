@@ -119,8 +119,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, [setChatId]);
 
   const triggerSummarize = useCallback((link: Link) => {
-    setPendingSummarize(link);
-    setIsWidgetOpen(true);
+    // Defer until after the link DropdownMenu finishes dismissing; otherwise Radix can
+    // treat the menu-close interaction as outside the chat Popover and close it immediately.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setPendingSummarize(link);
+        setIsWidgetOpen(true);
+      });
+    });
   }, []);
 
   const clearPendingSummarize = useCallback(() => {

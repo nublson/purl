@@ -119,6 +119,7 @@ function mockOgsSuccess(
     ogDescription?: string;
     ogImage?: Array<{ url: string }>;
     favicon?: string;
+    ogUrl?: string;
   } = {},
 ) {
   vi.mocked(ogs).mockResolvedValue({
@@ -128,6 +129,7 @@ function mockOgsSuccess(
       ogDescription: undefined,
       ogImage: undefined,
       favicon: undefined,
+      ogUrl: undefined,
       ...overrides,
     },
     html: "",
@@ -346,20 +348,52 @@ describe("scrapeLinkMetadata – YouTube branch", () => {
 });
 
 describe("scrapeLinkMetadata – web/OGS branch", () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  let safeFetchSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    fetchSpy = vi.spyOn(globalThis, "fetch");
-    fetchSpy.mockResolvedValue(
-      new Response("<html><head></head><body></body></html>", {
-        status: 200,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      }),
+    safeFetchSpy = vi.spyOn(safeOutbound, "safeFetch");
+    safeFetchSpy.mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const href = hrefFromSafeFetchInput(input);
+        const method = init?.method ?? "GET";
+
+        if (method === "HEAD") {
+          if (href === "https://example.com/img.jpg") {
+            return new Response(null, {
+              status: 200,
+              headers: { "content-type": "image/jpeg" },
+            });
+          }
+          if (href === "https://example.com/bogus.jpg") {
+            return new Response(null, {
+              status: 200,
+              headers: { "content-type": "text/html; charset=utf-8" },
+            });
+          }
+          if (href === "https://example.com/sniff.jpg") {
+            return new Response(null, { status: 405 });
+          }
+          return new Response(null, { status: 404 });
+        }
+
+        if (method === "GET" && href === "https://example.com/sniff.jpg") {
+          const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+          return new Response(jpeg, {
+            status: 200,
+            headers: { "content-type": "application/octet-stream" },
+          });
+        }
+
+        return new Response("<html><head></head><body></body></html>", {
+          status: 200,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        });
+      },
     );
   });
 
   afterEach(() => {
-    fetchSpy.mockRestore();
+    safeFetchSpy.mockRestore();
     vi.mocked(ogs).mockReset();
   });
 
@@ -394,6 +428,47 @@ describe("scrapeLinkMetadata – web/OGS branch", () => {
     });
     const result = await scrapeLinkMetadata("https://example.com/page");
     expect(result.thumbnail).toBe("https://example.com/img.jpg");
+  });
+
+  it("returns null thumbnail when HEAD reports a non-image Content-Type", async () => {
+    mockOgsSuccess({
+      ogImage: [{ url: "https://example.com/bogus.jpg" }],
+    });
+    const result = await scrapeLinkMetadata("https://example.com/page");
+    expect(result.thumbnail).toBeNull();
+  });
+
+  it("accepts thumbnail when HEAD is not allowed but GET body looks like JPEG", async () => {
+    mockOgsSuccess({
+      ogImage: [{ url: "https://example.com/sniff.jpg" }],
+    });
+    const result = await scrapeLinkMetadata("https://example.com/page");
+    expect(result.thumbnail).toBe("https://example.com/sniff.jpg");
+  });
+
+  it("returns null thumbnail when og:image is the page URL (not a real image)", async () => {
+    mockOgsSuccess({
+      ogImage: [{ url: "https://example.com/page" }],
+      ogUrl: "https://example.com/page",
+    });
+    const result = await scrapeLinkMetadata("https://example.com/page");
+    expect(result.thumbnail).toBeNull();
+  });
+
+  it("returns null thumbnail when og:image matches page after trailing-slash normalization", async () => {
+    mockOgsSuccess({
+      ogImage: [{ url: "https://example.com/page/" }],
+    });
+    const result = await scrapeLinkMetadata("https://example.com/page");
+    expect(result.thumbnail).toBeNull();
+  });
+
+  it("returns null when relative og:image resolves to the same document URL", async () => {
+    mockOgsSuccess({
+      ogImage: [{ url: "/page" }],
+    });
+    const result = await scrapeLinkMetadata("https://example.com/page");
+    expect(result.thumbnail).toBeNull();
   });
 
   it("returns null thumbnail when no ogImage is present", async () => {

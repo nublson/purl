@@ -5,10 +5,12 @@ import {
 } from "@/components/ui/hover-card";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import type { Link } from "@/utils/links";
+import type { ReactNode } from "react";
+import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
 import { PdfThumbnail } from "./pdf-thumbnail";
 
 type LinkPreviewProps = {
-  children: React.ReactNode;
+  children: ReactNode;
   link: Link;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -23,15 +25,6 @@ export function LinkPreview({
   onOpenChange,
   eagerThumbnail = false,
 }: LinkPreviewProps) {
-  const imageThumbnailClass = () => {
-    switch (link.contentType) {
-      case "YOUTUBE":
-        return "object-cover";
-      default:
-        return "object-fit";
-    }
-  };
-
   const thumbnailSrc = link.thumbnail
     ? safeRemoteImgSrc(link.thumbnail)
     : null;
@@ -51,19 +44,13 @@ export function LinkPreview({
       >
         {link.contentType === "PDF" ? (
           <PdfThumbnail url={link.url} />
-        ) : thumbnailSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element -- user-controlled OG URLs; avoid next/image optimizer SSRF
-          <img
-            src={thumbnailSrc}
-            alt={link.title}
-            width={200}
-            height={200}
-            sizes="256px"
-            loading={eagerThumbnail ? "eager" : "lazy"}
-            referrerPolicy="no-referrer"
-            className={`w-full h-full aspect-video rounded-t-md ${imageThumbnailClass()}`}
+        ) : (
+          <LinkPreviewThumbnail
+            link={link}
+            thumbnailSrc={thumbnailSrc}
+            eagerThumbnail={eagerThumbnail}
           />
-        ) : null}
+        )}
         <div className="p-4 flex flex-col gap-2">
           <p className="text-accent-foreground text-sm font-medium line-clamp-2">
             {link.title}
