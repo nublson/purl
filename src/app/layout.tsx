@@ -24,11 +24,20 @@ const description =
   "Purl is an AI-powered read-it-later app. Save any link, and Purl understands and remembers the content so you can ask questions and get answers with sources.";
 
 export const metadata: Metadata = {
+  applicationName: "Purl",
   title: {
     default: "Purl",
     template: "%s · Purl",
   },
   description,
+  appleWebApp: {
+    capable: true,
+    title: "Purl",
+    statusBarStyle: "default",
+  },
+  formatDetection: {
+    telephone: false,
+  },
   metadataBase: new URL("https://getpurl.vercel.app"),
   openGraph: {
     type: "website",
