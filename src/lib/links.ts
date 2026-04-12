@@ -16,6 +16,7 @@ import { ingestAudio } from "@/lib/ingest-audio";
 import { ingestPdf } from "@/lib/ingest-pdf";
 import { ingestWeb } from "@/lib/ingest-web";
 import { ingestYoutube } from "@/lib/ingest-youtube";
+import { validateOgThumbnailUrl } from "@/lib/og-thumbnail-probe";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
 
 const OGS_HTML_MAX_BYTES = 5 * 1024 * 1024;
@@ -274,12 +275,15 @@ export async function scrapeLinkMetadata(url: string): Promise<{
       (result.ogTitle ?? domain).replace(/\s+/g, " ").trim().slice(0, 500) ||
       domain;
     const description = result.ogDescription ?? null;
-    const thumbnail = resolveWebOgThumbnail(
+    let thumbnail = resolveWebOgThumbnail(
       result.ogImage?.[0]?.url,
       url,
       pageResponse.url,
       result.ogUrl,
     );
+    if (thumbnail && !(await validateOgThumbnailUrl(thumbnail))) {
+      thumbnail = null;
+    }
     const favicon = result.favicon
       ? new URL(result.favicon, url).href
       : defaultFavicon;
