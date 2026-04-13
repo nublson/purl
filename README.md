@@ -83,7 +83,7 @@ flowchart TB
 
 These are called out explicitly because the repo is going public:
 
-- **Settings** — The user menu includes a Settings item; it is **disabled** (no settings surface yet).
+- **Settings breadth** — Settings now include account deletion, but broader account preferences (profile edits, password change, notification settings, etc.) are not implemented yet.
 - **Subscriptions / billing** — Landing pricing is **not** connected to payments. The “Upgrade” menu item is **disabled**; there is no Stripe (or other) subscription integration, plan enforcement, or usage limits tied to a paid tier.
 
 **Marketing vs. product:** The landing page copy mentions ideas such as **collections** and a **weekly digest**. Those are **not** built in the current schema or app—treat them as roadmap, not shipped features.

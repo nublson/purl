@@ -9,6 +9,7 @@ import {
   SettingsIcon,
 } from "lucide-react";
 import { FeedbackDialog } from "./dialog-feedback";
+import { SettingsDialog } from "./dialog-settings";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
@@ -49,10 +50,17 @@ export function User() {
             Share feedback
           </DropdownMenuItem>
         </FeedbackDialog>
-        <DropdownMenuItem disabled>
-          <SettingsIcon />
-          Settings
-        </DropdownMenuItem>
+        <SettingsDialog>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              // Prevent Radix DropdownMenu from closing immediately, which unmounts SettingsDialog.
+              event.preventDefault();
+            }}
+          >
+            <SettingsIcon />
+            Settings
+          </DropdownMenuItem>
+        </SettingsDialog>
         <DropdownMenuItem disabled>
           <BadgeCheck />
           Upgrade
