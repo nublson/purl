@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     {
       from,
       to: to.length === 1 ? to[0]! : to,
-      reply_to: userEmail,
+      replyTo: userEmail,
       subject,
       text,
     },

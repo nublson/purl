@@ -247,7 +247,7 @@ describe("POST /api/feedback", () => {
     expect(sendMock).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "owner@example.com",
-        reply_to: "user@example.com",
+        replyTo: "user@example.com",
         subject: "[Purl feedback] from Test User",
         text: expect.stringContaining("Great app"),
       }),
