@@ -1,13 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import { Resend } from "resend";
 import prisma from "@/lib/prisma";
-
-function getResend() {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return null;
-  return new Resend(apiKey);
-}
+import { getResend } from "@/lib/resend";
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {

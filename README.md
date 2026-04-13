@@ -84,7 +84,7 @@ flowchart TB
 These are called out explicitly because the repo is going public:
 
 - **Settings** — The user menu includes a Settings item; it is **disabled** (no settings surface yet).
-- **Feedback** — “Share feedback” is a **disabled** placeholder (no form, email capture, or ticketing integration).
+- **Feedback** — “Share feedback” opens a dialog; submissions are emailed to **`FEEDBACK_TO_EMAIL`** via Resend, with the signed-in user’s identity in the message and **Reply-To** set to their address (configure `RESEND_API_KEY`, `RESEND_FROM`, and `FEEDBACK_TO_EMAIL`).
 - **Subscriptions / billing** — Landing pricing is **not** connected to payments. The “Upgrade” menu item is **disabled**; there is no Stripe (or other) subscription integration, plan enforcement, or usage limits tied to a paid tier.
 
 **Marketing vs. product:** The landing page copy mentions ideas such as **collections** and a **weekly digest**. Those are **not** built in the current schema or app—treat them as roadmap, not shipped features.

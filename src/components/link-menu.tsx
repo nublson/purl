@@ -6,8 +6,8 @@ import type { Link as LinkType } from "@/utils/links";
 import { Ellipsis, Link, Pencil, ScrollText, Trash } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { EditDialog } from "./dialog-edit-link";
 import { DropdownWrapper } from "./dropdown-wrapper";
-import { EditDialog } from "./edit-dialog";
 import { Button } from "./ui/button";
 import {
   DropdownMenuGroup,

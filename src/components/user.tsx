@@ -8,6 +8,7 @@ import {
   MessageCircleHeart,
   SettingsIcon,
 } from "lucide-react";
+import { FeedbackDialog } from "./dialog-feedback";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
@@ -37,10 +38,17 @@ export function User() {
       }
     >
       <DropdownMenuGroup>
-        <DropdownMenuItem disabled>
-          <MessageCircleHeart />
-          Share feedback
-        </DropdownMenuItem>
+        <FeedbackDialog>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              // Prevent Radix DropdownMenu from closing immediately, which unmounts EditDialog.
+              event.preventDefault();
+            }}
+          >
+            <MessageCircleHeart />
+            Share feedback
+          </DropdownMenuItem>
+        </FeedbackDialog>
         <DropdownMenuItem disabled>
           <SettingsIcon />
           Settings
