@@ -6,4 +6,5 @@ export const {
   signOut,
   useSession,
   sendVerificationEmail,
+  deleteUser,
 } = createAuthClient();

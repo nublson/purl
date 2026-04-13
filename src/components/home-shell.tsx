@@ -16,6 +16,7 @@ import type { LinkGroup as LinkGroupType } from "@/utils/links";
 import { PackageOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { LinkGroupEmpty } from "./link-group-empty";
 
 export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
   const router = useRouter();
@@ -108,9 +109,7 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
         onSaveError={onSaveError}
       />
       {!groups.length && !showSyntheticToday ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4">
-          <PackageOpen className="text-neutral-800 size-16" />
-        </div>
+        <LinkGroupEmpty />
       ) : (
         <>
           {showSyntheticToday && (
