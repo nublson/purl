@@ -1,25 +1,33 @@
-import prisma from "@/lib/prisma";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
 import { applyLinkContentEmbeddings } from "@/lib/ingest-link-content-embeddings";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
 import { skipIngest } from "@/lib/ingest-skip";
-import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import { buildMetadataText } from "@/lib/metadata-chunk";
+import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
+import prisma from "@/lib/prisma";
 import { scrapeWebContent, UnsupportedSpaError } from "@/lib/web-scraper";
+import { getDecryptedApiKey } from "./api-keys";
 
 type IngestWebInput = {
   linkId: string;
   url: string;
+  userId: string;
 };
 
-export async function ingestWeb({ linkId, url }: IngestWebInput): Promise<void> {
+export async function ingestWeb({
+  linkId,
+  url,
+  userId,
+}: IngestWebInput): Promise<void> {
   try {
     await prisma.link.update({
       where: { id: linkId },
       data: { ingestStatus: "PROCESSING" },
     });
     logIngestStart("WEB", linkId, url);
+
+    const apiKey = await getDecryptedApiKey(userId);
 
     const text = await scrapeWebContent(url);
     const contentChunks = chunkText(text);
@@ -50,7 +58,7 @@ export async function ingestWeb({ linkId, url }: IngestWebInput): Promise<void> 
       where: { linkId },
     });
 
-    const embeddings = await embedTextChunks(chunks);
+    const embeddings = await embedTextChunks(chunks, apiKey);
 
     await prisma.linkContent.createMany({
       data: chunks.map((content, index) => ({

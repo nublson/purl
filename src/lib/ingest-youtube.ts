@@ -1,20 +1,23 @@
-import prisma from "@/lib/prisma";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
 import { applyLinkContentEmbeddings } from "@/lib/ingest-link-content-embeddings";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
-import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import { buildMetadataText } from "@/lib/metadata-chunk";
+import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
+import prisma from "@/lib/prisma";
 import { fetchYouTubeTranscript } from "@/lib/youtube-transcriber";
+import { getDecryptedApiKey } from "./api-keys";
 
 type IngestYoutubeInput = {
   linkId: string;
   url: string;
+  userId: string;
 };
 
 export async function ingestYoutube({
   linkId,
   url,
+  userId,
 }: IngestYoutubeInput): Promise<void> {
   try {
     await prisma.link.update({
@@ -22,6 +25,8 @@ export async function ingestYoutube({
       data: { ingestStatus: "PROCESSING" },
     });
     logIngestStart("YOUTUBE", linkId, url);
+
+    const apiKey = await getDecryptedApiKey(userId);
 
     const transcript = await fetchYouTubeTranscript(url);
     const contentChunks = chunkText(transcript);
@@ -52,7 +57,7 @@ export async function ingestYoutube({
       where: { linkId },
     });
 
-    const embeddings = await embedTextChunks(chunks);
+    const embeddings = await embedTextChunks(chunks, apiKey);
 
     await prisma.linkContent.createMany({
       data: chunks.map((content, index) => ({

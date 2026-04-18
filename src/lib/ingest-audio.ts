@@ -1,24 +1,32 @@
-import prisma from "@/lib/prisma";
 import { transcribeAudio } from "@/lib/audio-transcriber";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
 import { applyLinkContentEmbeddings } from "@/lib/ingest-link-content-embeddings";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
-import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import { buildMetadataText } from "@/lib/metadata-chunk";
+import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
+import prisma from "@/lib/prisma";
+import { getDecryptedApiKey } from "./api-keys";
 
 type IngestAudioInput = {
   linkId: string;
   url: string;
+  userId: string;
 };
 
-export async function ingestAudio({ linkId, url }: IngestAudioInput): Promise<void> {
+export async function ingestAudio({
+  linkId,
+  url,
+  userId,
+}: IngestAudioInput): Promise<void> {
   try {
     await prisma.link.update({
       where: { id: linkId },
       data: { ingestStatus: "PROCESSING" },
     });
     logIngestStart("AUDIO", linkId, url);
+
+    const apiKey = await getDecryptedApiKey(userId);
 
     const transcript = await transcribeAudio(url);
     const contentChunks = chunkText(transcript);
@@ -49,7 +57,7 @@ export async function ingestAudio({ linkId, url }: IngestAudioInput): Promise<vo
       where: { linkId },
     });
 
-    const embeddings = await embedTextChunks(chunks);
+    const embeddings = await embedTextChunks(chunks, apiKey);
 
     await prisma.linkContent.createMany({
       data: chunks.map((content, index) => ({

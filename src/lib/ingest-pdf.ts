@@ -1,24 +1,32 @@
-import prisma from "@/lib/prisma";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
 import { applyLinkContentEmbeddings } from "@/lib/ingest-link-content-embeddings";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
-import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import { buildMetadataText } from "@/lib/metadata-chunk";
+import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import { extractPdfTextByPage } from "@/lib/pdf-extractor";
+import prisma from "@/lib/prisma";
+import { getDecryptedApiKey } from "./api-keys";
 
 type IngestPdfInput = {
   linkId: string;
   url: string;
+  userId: string;
 };
 
-export async function ingestPdf({ linkId, url }: IngestPdfInput): Promise<void> {
+export async function ingestPdf({
+  linkId,
+  url,
+  userId,
+}: IngestPdfInput): Promise<void> {
   try {
     await prisma.link.update({
       where: { id: linkId },
       data: { ingestStatus: "PROCESSING" },
     });
     logIngestStart("PDF", linkId, url);
+
+    const apiKey = await getDecryptedApiKey(userId);
 
     const pages = await extractPdfTextByPage(url);
     const contentChunks = chunkText(pages.join("\n\n"));
@@ -49,7 +57,7 @@ export async function ingestPdf({ linkId, url }: IngestPdfInput): Promise<void> 
       where: { linkId },
     });
 
-    const embeddings = await embedTextChunks(chunks);
+    const embeddings = await embedTextChunks(chunks, apiKey);
 
     await prisma.linkContent.createMany({
       data: chunks.map((content, index) => ({
