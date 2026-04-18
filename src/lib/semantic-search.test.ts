@@ -20,11 +20,8 @@ vi.mock("@/lib/prisma", () => ({
 
 const { embedQuery } = await import("@/lib/embeddings");
 const prisma = (await import("@/lib/prisma")).default;
-const {
-  semanticSearch,
-  SimilarityThreshold,
-  computeKeywordBoost,
-} = await import("./semantic-search");
+const { semanticSearch, SimilarityThreshold, computeKeywordBoost } =
+  await import("./semantic-search");
 
 describe("computeKeywordBoost", () => {
   const baseLink = {
@@ -134,7 +131,7 @@ describe("semanticSearch", () => {
 
     const result = await semanticSearch("deep work", "user-1");
 
-    expect(embedQuery).toHaveBeenCalledWith("deep work");
+    expect(embedQuery).toHaveBeenCalledWith("deep work", undefined);
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     expect(result).toEqual([
       { linkId: "a", similarity: 0.8, vectorSimilarity: 0.8 },
