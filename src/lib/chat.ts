@@ -384,12 +384,27 @@ export async function streamChatResponse(
     stopWhen: stepCountIs(5),
     onError: ({ error }) => {
       Sentry.captureException(error, {
-        tags: {
-          phase: "stream",
-          userId,
-          chatId,
-        },
+        tags: { phase: "stream", userId, chatId },
       });
+
+      const raw =
+        typeof error === "string"
+          ? error
+          : error instanceof Error
+            ? error.message
+            : JSON.stringify(error);
+
+      const isQuotaError = /insufficient_quota/i.test(raw);
+
+      if (isQuotaError) {
+        emitChatStreamProtocolError(streamWriter, {
+          code: CHAT_STREAM_ERROR_CODES.QUOTA_EXCEEDED,
+          userMessage: "Your OpenAI API key has run out of credits.",
+        });
+        streamFailureNotified = true;
+        return;
+      }
+
       notifyStreamFailure();
     },
     onFinish: async ({ text, finishReason }) => {

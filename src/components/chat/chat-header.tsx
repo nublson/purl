@@ -1,10 +1,7 @@
 "use client";
 
 import type { ChatFlowError } from "@/lib/chat-flow-error";
-import {
-  CHAT_ERROR_CODES,
-  parseChatErrorBody,
-} from "@/lib/chat-http-errors";
+import { CHAT_ERROR_CODES, parseChatErrorBody } from "@/lib/chat-http-errors";
 import { Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -73,7 +70,12 @@ function FlowErrorBanner({
         <Typography size="small" className="text-foreground">
           This chat is no longer available.
         </Typography>
-        <Button size="sm" variant="ghost" className="h-7 self-start px-2" onClick={onDismiss}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 self-start px-2"
+          onClick={onDismiss}
+        >
           Dismiss
         </Button>
       </div>
@@ -90,7 +92,12 @@ function FlowErrorBanner({
           <Button size="sm" variant="secondary" asChild>
             <Link href="/login">Sign in</Link>
           </Button>
-          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={onDismiss}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2"
+            onClick={onDismiss}
+          >
             Dismiss
           </Button>
         </div>
@@ -106,6 +113,57 @@ function FlowErrorBanner({
     );
   }
 
+  if (error.kind === "no_api_key") {
+    return (
+      <div className="flex w-full flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-2">
+        <Typography size="small" className="text-foreground">
+          Add your OpenAI API key to use the chat.
+        </Typography>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="secondary" asChild>
+            <Link href="/settings">Go to Settings</Link>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2"
+            onClick={onDismiss}
+          >
+            Dismiss
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (error.kind === "quota_exceeded") {
+    return (
+      <div className="flex w-full flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-2">
+        <Typography size="small" className="text-foreground">
+          Your OpenAI API key has run out of credits.
+        </Typography>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="secondary" asChild>
+            <Link
+              href="https://platform.openai.com/settings/organization/billing"
+              target="_blank"
+            >
+              Add credits
+            </Link>
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2"
+            onClick={onDismiss}
+          >
+            Dismiss
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex w-full flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-2">
       <Typography size="small" className="text-foreground">
@@ -117,7 +175,12 @@ function FlowErrorBanner({
             Try again
           </Button>
         ) : null}
-        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={onDismiss}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2"
+          onClick={onDismiss}
+        >
           Dismiss
         </Button>
       </div>
@@ -144,7 +207,12 @@ function HistoryErrorBanner({
           <Button size="sm" variant="secondary" asChild>
             <Link href="/login">Sign in</Link>
           </Button>
-          <Button size="sm" variant="ghost" className="h-7 px-2" onClick={onDismiss}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2"
+            onClick={onDismiss}
+          >
             Dismiss
           </Button>
         </div>
@@ -169,7 +237,12 @@ function HistoryErrorBanner({
         <Button size="sm" variant="secondary" onClick={onRetry}>
           Retry
         </Button>
-        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={onDismiss}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 px-2"
+          onClick={onDismiss}
+        >
           Dismiss
         </Button>
       </div>
@@ -210,16 +283,24 @@ export default function ChatHeader({
 
       if (!res.ok) {
         const parsed = parseChatErrorBody(body);
-        if (res.status === 401 || parsed?.code === CHAT_ERROR_CODES.SESSION_EXPIRED) {
+        if (
+          res.status === 401 ||
+          parsed?.code === CHAT_ERROR_CODES.SESSION_EXPIRED
+        ) {
           setHistoryError({ kind: "session" });
-        } else if (res.status === 429 || parsed?.code === CHAT_ERROR_CODES.RATE_LIMITED) {
+        } else if (
+          res.status === 429 ||
+          parsed?.code === CHAT_ERROR_CODES.RATE_LIMITED
+        ) {
           const sec = parsed?.retryAfterSeconds ?? 60;
-          setHistoryError({ kind: "rate_limit", untilMs: Date.now() + sec * 1000 });
+          setHistoryError({
+            kind: "rate_limit",
+            untilMs: Date.now() + sec * 1000,
+          });
         } else {
           setHistoryError({
             kind: "retry",
-            message:
-              parsed?.message?.trim() || "Could not load chat history.",
+            message: parsed?.message?.trim() || "Could not load chat history.",
           });
         }
         if (!silent) {

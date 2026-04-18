@@ -1,11 +1,16 @@
 import type { ParsedChatError } from "@/lib/chat-http-errors";
-import { CHAT_ERROR_CODES, type ChatRequestError } from "@/lib/chat-http-errors";
+import {
+  CHAT_ERROR_CODES,
+  type ChatRequestError,
+} from "@/lib/chat-http-errors";
 
 /** User-visible chat widget errors (load, send, stream). */
 export type ChatFlowError =
   | { kind: "session" }
   | { kind: "missing_chat" }
   | { kind: "rate_limit"; untilMs: number }
+  | { kind: "no_api_key" }
+  | { kind: "quota_exceeded" }
   | { kind: "retry"; message: string };
 
 export function chatFlowErrorFromHttp(
@@ -25,12 +30,13 @@ export function chatFlowErrorFromHttp(
   return {
     kind: "retry",
     message:
-      parsed?.message?.trim() ||
-      "Something went wrong. Please try again.",
+      parsed?.message?.trim() || "Something went wrong. Please try again.",
   };
 }
 
-export function chatFlowErrorFromRequestError(e: ChatRequestError): ChatFlowError {
+export function chatFlowErrorFromRequestError(
+  e: ChatRequestError,
+): ChatFlowError {
   return chatFlowErrorFromHttp(e.status, {
     code: e.code,
     message: e.message,

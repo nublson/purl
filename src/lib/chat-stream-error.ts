@@ -64,6 +64,12 @@ export function chatFlowErrorFromStreamPayload(
     const sec = payload.retryAfterSeconds ?? 60;
     return { kind: "rate_limit", untilMs: Date.now() + sec * 1000 };
   }
+  if (payload.code === CHAT_STREAM_ERROR_CODES.NO_API_KEY) {
+    return { kind: "no_api_key" };
+  }
+  if (payload.code === CHAT_STREAM_ERROR_CODES.QUOTA_EXCEEDED) {
+    return { kind: "quota_exceeded" };
+  }
   const msg = payload.userMessage.trim();
   return {
     kind: "retry",
