@@ -27,7 +27,9 @@ export const auth = betterAuth({
     sendVerificationEmail: async ({ user, url }) => {
       const resend = getResend();
       if (!resend) {
-        console.error("RESEND_API_KEY is not set; skipping verification email.");
+        console.error(
+          "RESEND_API_KEY is not set; skipping verification email.",
+        );
         return;
       }
       const { error } = await resend.emails.send(
@@ -37,7 +39,7 @@ export const auth = betterAuth({
           subject: "Verify your email address",
           html: `<p>Click the link to verify your email: <a href="${url}">${url}</a></p>`,
         },
-        { idempotencyKey: `verification-email/${user.id}/${Date.now()}` }
+        { idempotencyKey: `verification-email/${user.id}/${Date.now()}` },
       );
       if (error) {
         console.error("Failed to send verification email:", error.message);
