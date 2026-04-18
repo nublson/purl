@@ -1,4 +1,8 @@
+"use client";
+
+import { deleteApiKey, getApiKeyStatus, saveApiKey } from "@/lib/api-keys";
 import { useForm } from "@tanstack/react-form";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "./ui/field";
 import {
@@ -9,21 +13,36 @@ import {
 } from "./ui/input-group";
 
 const ApiKeyForm = () => {
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
+
   const form = useForm({
-    defaultValues: {
-      apiKey: "",
-    },
+    defaultValues: { apiKey: "" },
     onSubmit: async ({ value }) => {
       try {
-        console.log(value);
-
-        form.reset();
+        await saveApiKey(value.apiKey);
+        setHasKey(true);
+        form.reset({ apiKey: "" });
         toast.success("API key saved successfully");
       } catch {
         toast.error("Failed to save API key");
       }
     },
   });
+
+  const handleRevoke = async () => {
+    try {
+      await deleteApiKey();
+      setHasKey(false);
+      form.reset({ apiKey: "" });
+      toast.success("API key revoked");
+    } catch {
+      toast.error("Failed to revoke API key");
+    }
+  };
+
+  useEffect(() => {
+    getApiKeyStatus().then(({ hasKey }) => setHasKey(hasKey));
+  }, []);
 
   return (
     <form
@@ -49,29 +68,35 @@ const ApiKeyForm = () => {
                 <InputGroupInput
                   id={field.name}
                   name={field.name}
-                  value={field.state.value}
+                  value={hasKey ? "sk-this-is-your-api-key" : field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(e) => field.handleChange(e.target.value)}
                   autoComplete="off"
                   disabled={form.state.isSubmitting}
                   type="password"
-                  placeholder="sk-..."
+                  placeholder={hasKey ? "Update API key" : "sk-..."}
+                  readOnly={hasKey ?? false}
                 />
                 <InputGroupAddon align="inline-end">
                   <InputGroupButton
-                    type="submit"
-                    variant="default"
+                    onClick={hasKey ? handleRevoke : form.handleSubmit}
+                    variant={hasKey ? "destructive" : "default"}
                     disabled={
-                      form.state.isSubmitting || !field.state.value?.trim()
+                      !hasKey &&
+                      (form.state.isSubmitting || !field.state.value?.trim())
                     }
                   >
-                    {form.state.isSubmitting ? "Saving…" : "Save"}
+                    {hasKey ? "Revoke" : "Save"}
                   </InputGroupButton>
                 </InputGroupAddon>
               </InputGroup>
-              <FieldDescription>
-                Your API key is encrypted and stored securely.
-              </FieldDescription>
+              <div className="flex items-baseline justify-between gap-1">
+                <FieldDescription className="text-xs">
+                  {hasKey
+                    ? "Your API key is encrypted and stored securely."
+                    : "No API key found. Please save one to enable AI features."}
+                </FieldDescription>
+              </div>
               {field.state.meta.errors?.length ? (
                 <p
                   className="text-sm text-destructive"
