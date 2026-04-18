@@ -1,4 +1,8 @@
-import type { ContentType } from "@/generated/prisma/enums";
+import type {
+  ContentType,
+  IngestFailureReason,
+  IngestStatus,
+} from "@/generated/prisma/enums";
 import { auth } from "@/lib/auth";
 import { ingestAudio } from "@/lib/ingest-audio";
 import { ingestPdf } from "@/lib/ingest-pdf";
@@ -10,7 +14,7 @@ import { safeFetch } from "@/lib/safe-outbound-fetch";
 import { detectContentType } from "@/lib/server-detect-content-type";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
 import { getUrlDomain } from "@/utils/formatter";
-import type { IngestStatus, Link } from "@/utils/links";
+import type { Link } from "@/utils/links";
 import { isPdfUrl } from "@/utils/pdf";
 import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
 import { isYouTubeUrl } from "@/utils/youtube";
@@ -196,6 +200,7 @@ type LinkRow = {
   thumbnail: string | null;
   createdAt: Date;
   ingestStatus: IngestStatus;
+  ingestFailureReason: IngestFailureReason | null;
 };
 
 function mapRowToLink(row: LinkRow): Link {
@@ -209,6 +214,7 @@ function mapRowToLink(row: LinkRow): Link {
     domain: row.domain,
     contentType: row.contentType,
     ingestStatus: row.ingestStatus,
+    ingestFailureReason: row.ingestFailureReason,
     createdAt: row.createdAt,
   };
 }

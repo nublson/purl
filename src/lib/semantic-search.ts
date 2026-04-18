@@ -1,8 +1,6 @@
 import type { ContentType } from "@/generated/prisma/enums";
-import prisma, { Prisma } from "@/lib/prisma";
 import { embedQuery } from "@/lib/embeddings";
-
-export type LinkContentType = "WEB" | "PDF" | "AUDIO" | "YOUTUBE";
+import prisma, { Prisma } from "@/lib/prisma";
 
 export enum SimilarityThreshold {
   RELAXED = "0.25",
@@ -36,7 +34,10 @@ const DOMAIN_BOOST = 0.05;
 const TYPE_BOOST = 0.05;
 const DESCRIPTION_BOOST = 0.03;
 
-function typeMatchesQuery(normalizedQuery: string, contentType: ContentType): boolean {
+function typeMatchesQuery(
+  normalizedQuery: string,
+  contentType: ContentType,
+): boolean {
   const q = normalizedQuery;
   switch (contentType) {
     case "YOUTUBE":
@@ -60,7 +61,9 @@ function typeMatchesQuery(normalizedQuery: string, contentType: ContentType): bo
 }
 
 /** When the user query names a content kind, we can merge in all saved items of that type (not only SQL top-N). */
-function inferContentTypeHintFromQuery(normalizedQuery: string): ContentType | null {
+function inferContentTypeHintFromQuery(
+  normalizedQuery: string,
+): ContentType | null {
   const q = normalizedQuery.toLowerCase();
   if (q.includes("youtube") || q.includes("youtu")) return "YOUTUBE";
   if (q.includes("pdf")) return "PDF";
@@ -118,7 +121,7 @@ export async function semanticSearch(
   query: string,
   userId: string,
   options?: {
-    type?: LinkContentType;
+    type?: ContentType;
     matchCount?: number;
     similarityThreshold?: SimilarityThreshold;
     dateFrom?: Date;
@@ -134,7 +137,8 @@ export async function semanticSearch(
     const resultLimit = Math.max(1, Math.min(options?.matchCount ?? 20, 50));
     /** Wider pool so multiple same-type items (e.g. two YouTube saves) are not crowded out by unrelated links. */
     const vectorFetchLimit = 50;
-    const threshold = options?.similarityThreshold ?? SimilarityThreshold.BALANCED;
+    const threshold =
+      options?.similarityThreshold ?? SimilarityThreshold.BALANCED;
     const minSimilarity = Number(threshold);
     const contentType = options?.type ?? null;
     const dateFrom = options?.dateFrom ?? null;

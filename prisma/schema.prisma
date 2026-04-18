@@ -27,6 +27,13 @@ enum IngestStatus {
   SKIPPED
 }
 
+enum IngestFailureReason {
+  NO_API_KEY
+  SCRAPE_FAILED
+  LINK_NOT_FOUND
+  OTHER
+}
+
 enum MessageRole {
   USER
   ASSISTANT
@@ -62,6 +69,7 @@ model Link {
   thumbnail    String?
   createdAt    DateTime     @default(now())
   ingestStatus IngestStatus @default(PENDING)
+  ingestFailureReason IngestFailureReason?
   userId       String
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   contents     LinkContent[]
