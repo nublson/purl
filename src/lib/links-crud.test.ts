@@ -90,12 +90,7 @@ function makeRow(
     contentType: "WEB" | "YOUTUBE" | "PDF" | "AUDIO";
     createdAt: Date;
     userId: string;
-    ingestStatus:
-      | "PENDING"
-      | "PROCESSING"
-      | "COMPLETED"
-      | "FAILED"
-      | "SKIPPED";
+    ingestStatus: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "SKIPPED";
   }> = {},
 ) {
   return {
@@ -229,13 +224,12 @@ describe("scrapeLinkMetadata – PDF branch", () => {
       new Response(null, {
         status: 200,
         headers: {
-          "content-disposition": 'attachment; filename="Annual-Report-2024.pdf"',
+          "content-disposition":
+            'attachment; filename="Annual-Report-2024.pdf"',
         },
       }),
     );
-    const result = await scrapeLinkMetadata(
-      "https://example.com/download.pdf",
-    );
+    const result = await scrapeLinkMetadata("https://example.com/download.pdf");
     expect(result.title).toBe("Annual-Report-2024");
   });
 
@@ -298,18 +292,18 @@ describe("scrapeLinkMetadata – YouTube branch", () => {
   it("falls back to OGS when the oEmbed response is not ok", async () => {
     safeFetchSpy.mockImplementation(
       async (input: RequestInfo | URL, init?: RequestInit) => {
-      const href = hrefFromSafeFetchInput(input);
-      if (href.includes("youtube.com/oembed")) {
-        return new Response(null, { status: 404 });
-      }
-      if (href.includes("youtube.com/watch")) {
-        return new Response("<html><head><title>OG</title></head></html>", {
-          status: 200,
-          headers: { "content-type": "text/html; charset=utf-8" },
-        });
-      }
-      return realSafeFetch(input as string | URL, init!);
-    },
+        const href = hrefFromSafeFetchInput(input);
+        if (href.includes("youtube.com/oembed")) {
+          return new Response(null, { status: 404 });
+        }
+        if (href.includes("youtube.com/watch")) {
+          return new Response("<html><head><title>OG</title></head></html>", {
+            status: 200,
+            headers: { "content-type": "text/html; charset=utf-8" },
+          });
+        }
+        return realSafeFetch(input as string | URL, init!);
+      },
     );
     mockOgsSuccess({ ogTitle: "OGS Fallback Title" });
     const result = await scrapeLinkMetadata(
@@ -322,21 +316,21 @@ describe("scrapeLinkMetadata – YouTube branch", () => {
   it("falls back to OGS when the oEmbed title is empty", async () => {
     safeFetchSpy.mockImplementation(
       async (input: RequestInfo | URL, init?: RequestInit) => {
-      const href = hrefFromSafeFetchInput(input);
-      if (href.includes("youtube.com/oembed")) {
-        return new Response(JSON.stringify({ title: "" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      if (href.includes("youtube.com/watch")) {
-        return new Response("<html><head><title>OG</title></head></html>", {
-          status: 200,
-          headers: { "content-type": "text/html; charset=utf-8" },
-        });
-      }
-      return realSafeFetch(input as string | URL, init!);
-    },
+        const href = hrefFromSafeFetchInput(input);
+        if (href.includes("youtube.com/oembed")) {
+          return new Response(JSON.stringify({ title: "" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (href.includes("youtube.com/watch")) {
+          return new Response("<html><head><title>OG</title></head></html>", {
+            status: 200,
+            headers: { "content-type": "text/html; charset=utf-8" },
+          });
+        }
+        return realSafeFetch(input as string | URL, init!);
+      },
     );
     mockOgsSuccess({ ogTitle: "OGS Title" });
     const result = await scrapeLinkMetadata(
@@ -680,6 +674,7 @@ describe("createLink", () => {
     expect(vi.mocked(ingestWeb)).toHaveBeenCalledWith({
       linkId: row.id,
       url: row.url,
+      userId: "user-123",
     });
     expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
     expect(vi.mocked(ingestAudio)).not.toHaveBeenCalled();
@@ -700,6 +695,7 @@ describe("createLink", () => {
     expect(vi.mocked(ingestAudio)).toHaveBeenCalledWith({
       linkId: row.id,
       url: row.url,
+      userId: "user-123",
     });
     expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
     expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
@@ -720,6 +716,7 @@ describe("createLink", () => {
     expect(vi.mocked(ingestPdf)).toHaveBeenCalledWith({
       linkId: row.id,
       url: row.url,
+      userId: "user-123",
     });
     expect(vi.mocked(ingestAudio)).not.toHaveBeenCalled();
     expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
@@ -745,6 +742,7 @@ describe("createLink", () => {
     expect(vi.mocked(ingestYoutube)).toHaveBeenCalledWith({
       linkId: row.id,
       url: row.url,
+      userId: "user-123",
     });
     expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
     expect(vi.mocked(ingestAudio)).not.toHaveBeenCalled();
@@ -764,6 +762,7 @@ describe("createLink", () => {
     expect(vi.mocked(ingestWeb)).toHaveBeenCalledWith({
       linkId: bumped.id,
       url: bumped.url,
+      userId: "user-123",
     });
     expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
   });
@@ -788,6 +787,7 @@ describe("createLink", () => {
     expect(vi.mocked(ingestAudio)).toHaveBeenCalledWith({
       linkId: bumped.id,
       url: bumped.url,
+      userId: "user-123",
     });
     expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
   });
@@ -881,6 +881,7 @@ describe("refreshLink", () => {
     expect(vi.mocked(ingestYoutube)).toHaveBeenCalledWith({
       linkId: refreshed.id,
       url: refreshed.url,
+      userId: "user-123",
     });
     expect(result).toEqual(refreshed);
   });
@@ -938,6 +939,7 @@ describe("reingestLink", () => {
     expect(vi.mocked(ingestPdf)).toHaveBeenCalledWith({
       linkId: updated.id,
       url: updated.url,
+      userId: "user-123",
     });
     expect(result).toEqual(updated);
   });
@@ -1126,6 +1128,7 @@ describe("updateLink", () => {
     expect(vi.mocked(ingestAudio)).toHaveBeenCalledWith({
       linkId: updated.id,
       url: updated.url,
+      userId: "user-123",
     });
     expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
     expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
@@ -1134,7 +1137,10 @@ describe("updateLink", () => {
 
   it("does not dispatch ingest when only title changes", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-    const row = makeRow({ url: "https://example.com/article", contentType: "WEB" });
+    const row = makeRow({
+      url: "https://example.com/article",
+      contentType: "WEB",
+    });
     vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
     vi.mocked(prisma.link.update).mockResolvedValue({
       ...row,
@@ -1207,9 +1213,9 @@ describe("deleteLink", () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     const row = makeRow({ id: "link-42" });
     vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
-    vi.mocked(
-      prisma.link.delete as ReturnType<typeof vi.fn>,
-    ).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.delete as ReturnType<typeof vi.fn>).mockResolvedValue(
+      row as never,
+    );
 
     const result = await deleteLink("link-42");
 

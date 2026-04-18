@@ -35,6 +35,14 @@ vi.mock("@/lib/ingest-logger", () => ({
   logIngestFailure: vi.fn(),
 }));
 
+vi.mock("@/lib/ingest-fail", () => ({
+  failIngest: vi.fn(),
+}));
+
+vi.mock("./api-keys", () => ({
+  getDecryptedApiKey: vi.fn(),
+}));
+
 import { buildMetadataText } from "@/lib/metadata-chunk";
 
 const prisma = (await import("@/lib/prisma")).default;
@@ -46,11 +54,14 @@ const mockPdfLink = {
   contentType: "PDF" as const,
   description: null as string | null,
 };
+
 const { extractPdfTextByPage } = await import("@/lib/pdf-extractor");
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
 const { logIngestStart, logIngestFailure } =
   await import("@/lib/ingest-logger");
+const { failIngest } = await import("@/lib/ingest-fail");
+const { getDecryptedApiKey } = await import("./api-keys");
 const { ingestPdf } = await import("./ingest-pdf");
 
 describe("ingestPdf", () => {
@@ -66,8 +77,12 @@ describe("ingestPdf", () => {
     vi.mocked(embedTextChunks).mockReset();
     vi.mocked(logIngestStart).mockReset();
     vi.mocked(logIngestFailure).mockReset();
+    vi.mocked(failIngest).mockReset();
     vi.mocked(prisma.link.findUnique).mockReset();
     vi.mocked(prisma.link.findUnique).mockResolvedValue(mockPdfLink as never);
+
+    // Default: valid API key
+    vi.mocked(getDecryptedApiKey).mockResolvedValue("sk-test-key");
   });
 
   it("stores metadata chunk only when body produces no chunks", async () => {
@@ -86,14 +101,15 @@ describe("ingestPdf", () => {
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
       where: { id: "link-1" },
-      data: { ingestStatus: "PROCESSING" },
+      data: { ingestStatus: "PROCESSING", ingestFailureReason: null },
     });
     expect(prisma.linkContent.deleteMany).toHaveBeenCalledWith({
       where: { linkId: "link-1" },
     });
-    expect(embedTextChunks).toHaveBeenCalledWith([
-      buildMetadataText(mockPdfLink),
-    ]);
+    expect(embedTextChunks).toHaveBeenCalledWith(
+      [buildMetadataText(mockPdfLink)],
+      "sk-test-key",
+    );
     expect(logIngestStart).toHaveBeenCalledWith(
       "PDF",
       "link-1",
@@ -143,6 +159,19 @@ describe("ingestPdf", () => {
     });
   });
 
+  it("marks NO_API_KEY when user has no key configured", async () => {
+    vi.mocked(getDecryptedApiKey).mockRejectedValue(new Error("No API key"));
+
+    await ingestPdf({
+      linkId: "link-1",
+      url: "https://example.com/doc.pdf",
+      userId: "user-1",
+    });
+
+    expect(failIngest).toHaveBeenCalledWith("link-1", "NO_API_KEY");
+    expect(extractPdfTextByPage).not.toHaveBeenCalled();
+  });
+
   it("marks failed when extraction pipeline throws", async () => {
     vi.mocked(extractPdfTextByPage).mockRejectedValue(new Error("boom"));
 
@@ -156,17 +185,9 @@ describe("ingestPdf", () => {
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
       where: { id: "link-1" },
-      data: { ingestStatus: "PROCESSING" },
+      data: { ingestStatus: "PROCESSING", ingestFailureReason: null },
     });
-    expect(prisma.link.update).toHaveBeenLastCalledWith({
-      where: { id: "link-1" },
-      data: { ingestStatus: "FAILED" },
-    });
-    expect(logIngestStart).toHaveBeenCalledWith(
-      "PDF",
-      "link-1",
-      "https://example.com/doc.pdf",
-    );
+    expect(failIngest).toHaveBeenCalledWith("link-1", "SCRAPE_FAILED");
     expect(logIngestFailure).toHaveBeenCalledWith(
       "PDF",
       "link-1",
