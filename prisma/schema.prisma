@@ -155,13 +155,14 @@ model Verification {
 }
 
 model UserAPIKey {
-  id        String    @id
+  id        String    @id @default(cuid())
   userId    String
+  provider  String @default("openai")
   encryptedKey       String
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId])
+  @@unique([userId, provider])
   @@map("user_api_keys")
 }
