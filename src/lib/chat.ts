@@ -16,6 +16,7 @@ import {
   type ToolExecutionOptions,
   type UIMessageStreamWriter,
 } from "ai";
+import { getDecryptedApiKey } from "./api-keys";
 
 function buildSystemPrompt(context: string | null): string {
   const today = new Date().toLocaleDateString("en-US", {
@@ -98,6 +99,7 @@ export function buildChatTools(
     chatId: string;
     streamWriter?: UIMessageStreamWriter<PurlChatUIMessage>;
   },
+  apiKey?: string,
 ) {
   const toolCtx: ChatToolContext = {
     userId,
@@ -229,6 +231,7 @@ export function buildChatTools(
             type: contentType as ContentType | undefined,
             dateFrom: dateFrom ? new Date(dateFrom) : undefined,
             dateTo: dateTo ? new Date(dateTo) : undefined,
+            apiKey,
           });
 
           if (results.length === 0) return [];
@@ -345,13 +348,24 @@ export type StreamChatResponseOptions = {
   streamWriter?: UIMessageStreamWriter<PurlChatUIMessage>;
 };
 
-export function streamChatResponse(
+export async function streamChatResponse(
   messages: ModelMessage[],
   userId: string,
   context: string | null,
   options: StreamChatResponseOptions,
 ) {
   const { chatId, onAssistantText, streamWriter } = options;
+
+  const apiKey = await getDecryptedApiKey(userId).catch(() => null);
+
+  if (!apiKey) {
+    emitChatStreamProtocolError(streamWriter, {
+      code: CHAT_STREAM_ERROR_CODES.NO_API_KEY,
+      userMessage: "Add your OpenAI API key in Settings to use the chat.",
+    });
+    return;
+  }
+
   let streamFailureNotified = false;
   function notifyStreamFailure(): void {
     if (streamFailureNotified) return;
@@ -363,10 +377,10 @@ export function streamChatResponse(
   }
 
   return streamText({
-    model: getChatModel(),
+    model: getChatModel(apiKey),
     system: buildSystemPrompt(context),
     messages,
-    tools: buildChatTools(userId, { chatId, streamWriter }),
+    tools: buildChatTools(userId, { chatId, streamWriter }, apiKey),
     stopWhen: stepCountIs(5),
     onError: ({ error }) => {
       Sentry.captureException(error, {

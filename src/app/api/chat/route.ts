@@ -1,20 +1,20 @@
 import { auth } from "@/lib/auth";
+import { buildMentionContext, streamChatResponse } from "@/lib/chat";
 import { chatJsonError } from "@/lib/chat-api-error-response";
 import { CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
-import { buildMentionContext, streamChatResponse } from "@/lib/chat";
 import type { PurlChatUIMessage } from "@/lib/chat-stream-error";
 import {
   filterMentionLinkIdsForUser,
   saveMessage,
   verifyChatOwnership,
 } from "@/lib/chats";
+import * as Sentry from "@sentry/nextjs";
 import {
   convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
   type UIMessage,
 } from "ai";
-import * as Sentry from "@sentry/nextjs";
 import { headers } from "next/headers";
 
 export const maxDuration = 60;
@@ -43,9 +43,7 @@ function isRateLimitedError(err: unknown): boolean {
   const s = httpStatusFromUnknownError(err);
   if (s === 429) return true;
   const msg =
-    err instanceof Error
-      ? `${err.message} ${err.cause ?? ""}`
-      : String(err);
+    err instanceof Error ? `${err.message} ${err.cause ?? ""}` : String(err);
   return /rate\s*limit|429|too many requests/i.test(msg);
 }
 
@@ -121,10 +119,11 @@ export async function POST(request: Request) {
   const lastUserMessage = [...messages]
     .reverse()
     .find((m) => m.role === "user");
-  const query = lastUserMessage?.parts
-    ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
-    .map((p) => p.text)
-    .join(" ") ?? "";
+  const query =
+    lastUserMessage?.parts
+      ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+      .map((p) => p.text)
+      .join(" ") ?? "";
 
   let phase: ChatRoutePhase = "prepare_stream";
 
@@ -156,15 +155,22 @@ export async function POST(request: Request) {
 
     phase = "stream_start";
     const stream = createUIMessageStream<PurlChatUIMessage>({
-      execute: ({ writer }) => {
-        const result = streamChatResponse(modelMessages, userId, context, {
-          chatId,
-          streamWriter: writer,
-          onAssistantText: async (text) => {
-            await saveMessage(chatId, "ASSISTANT", text);
+      execute: async ({ writer }) => {
+        const result = await streamChatResponse(
+          modelMessages,
+          userId,
+          context,
+          {
+            chatId,
+            streamWriter: writer,
+            onAssistantText: async (text) => {
+              await saveMessage(chatId, "ASSISTANT", text);
+            },
           },
-        });
-        writer.merge(result.toUIMessageStream());
+        );
+        if (result) {
+          writer.merge(result.toUIMessageStream());
+        }
       },
     });
 
@@ -180,9 +186,14 @@ export async function POST(request: Request) {
     });
 
     if (isRateLimitedError(err)) {
-      return chatJsonError(429, CHAT_ERROR_CODES.RATE_LIMITED, "Too many requests. Try again shortly.", {
-        retryAfterSeconds: 60,
-      });
+      return chatJsonError(
+        429,
+        CHAT_ERROR_CODES.RATE_LIMITED,
+        "Too many requests. Try again shortly.",
+        {
+          retryAfterSeconds: 60,
+        },
+      );
     }
 
     return chatJsonError(

@@ -13,6 +13,7 @@ export const CHAT_HTTP_ERROR_CODES = {
 /** Transient `data-chat-protocol-error` parts only — never use in `chatJsonError`. */
 export const CHAT_STREAM_ERROR_CODES = {
   TOOL_FAILED: "TOOL_FAILED",
+  NO_API_KEY: "NO_API_KEY",
   STREAM_FAILED: "STREAM_FAILED",
 } as const;
 
@@ -62,7 +63,8 @@ export function isChatErrorBody(value: unknown): value is ChatErrorBody {
   return (
     typeof e.code === "string" &&
     typeof e.message === "string" &&
-    (e.retryAfterSeconds === undefined || typeof e.retryAfterSeconds === "number")
+    (e.retryAfterSeconds === undefined ||
+      typeof e.retryAfterSeconds === "number")
   );
 }
 
@@ -130,7 +132,9 @@ export async function throwIfChatErrorResponse(
 ): Promise<void> {
   if (response.ok) return;
   const parsed = await parseChatErrorFromResponse(response.clone());
-  const headerRetry = parseRetryAfterHeader(response.headers.get("Retry-After"));
+  const headerRetry = parseRetryAfterHeader(
+    response.headers.get("Retry-After"),
+  );
   if (parsed) {
     throw new ChatRequestError(
       response.status,
