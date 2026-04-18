@@ -1,20 +1,19 @@
 import { auth } from "@/lib/auth";
+import { ingestAudio } from "@/lib/ingest-audio";
+import { ingestPdf } from "@/lib/ingest-pdf";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
+import { serializeLink } from "@/lib/serialize-link";
 import {
   createLinkFromFile,
   InvalidUploadTypeError,
   UploadStorageError,
 } from "@/lib/upload-file";
-import { headers } from "next/headers";
-import { after } from "next/server";
-import { NextRequest, NextResponse } from "next/server";
-import { ingestAudio } from "@/lib/ingest-audio";
-import { ingestPdf } from "@/lib/ingest-pdf";
-import { serializeLink } from "@/lib/serialize-link";
 import {
   AUDIO_MAX_UPLOAD_BYTES,
   audioMaxSizeExceededMessage,
 } from "@/utils/upload-limits";
+import { headers } from "next/headers";
+import { after, NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({
@@ -50,10 +49,10 @@ export async function POST(request: NextRequest) {
       Number.isFinite(audioDurationSeconds) ? audioDurationSeconds : undefined,
     );
     if (link.contentType === "PDF") {
-      after(() => ingestPdf({ linkId: link.id, url: link.url }));
+      after(() => ingestPdf({ linkId: link.id, url: link.url, userId }));
     }
     if (link.contentType === "AUDIO") {
-      after(() => ingestAudio({ linkId: link.id, url: link.url }));
+      after(() => ingestAudio({ linkId: link.id, url: link.url, userId }));
     }
     await broadcastLinksChanged(userId);
     return NextResponse.json(serializeLink(link), { status: 201 });

@@ -11,12 +11,10 @@ vi.mock("@/lib/prisma", () => ({
     $executeRaw: vi.fn(),
   },
   Prisma: {
-    sql: vi.fn(
-      (strings: TemplateStringsArray, ...values: unknown[]) => ({
-        strings,
-        values,
-      }),
-    ),
+    sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+      strings,
+      values,
+    })),
   },
 }));
 
@@ -51,7 +49,8 @@ const mockPdfLink = {
 const { extractPdfTextByPage } = await import("@/lib/pdf-extractor");
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
-const { logIngestStart, logIngestFailure } = await import("@/lib/ingest-logger");
+const { logIngestStart, logIngestFailure } =
+  await import("@/lib/ingest-logger");
 const { ingestPdf } = await import("./ingest-pdf");
 
 describe("ingestPdf", () => {
@@ -79,7 +78,11 @@ describe("ingestPdf", () => {
       { id: "row-meta", chunkIndex: 0 },
     ] as never);
 
-    await ingestPdf({ linkId: "link-1", url: "https://example.com/doc.pdf" });
+    await ingestPdf({
+      linkId: "link-1",
+      url: "https://example.com/doc.pdf",
+      userId: "user-1",
+    });
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
       where: { id: "link-1" },
@@ -116,11 +119,19 @@ describe("ingestPdf", () => {
       { id: "row-3", chunkIndex: 2 },
     ] as never);
 
-    await ingestPdf({ linkId: "link-1", url: "https://example.com/doc.pdf" });
+    await ingestPdf({
+      linkId: "link-1",
+      url: "https://example.com/doc.pdf",
+      userId: "user-1",
+    });
 
     expect(prisma.linkContent.createMany).toHaveBeenCalledWith({
       data: [
-        { linkId: "link-1", content: buildMetadataText(mockPdfLink), chunkIndex: 0 },
+        {
+          linkId: "link-1",
+          content: buildMetadataText(mockPdfLink),
+          chunkIndex: 0,
+        },
         { linkId: "link-1", content: "chunk-a", chunkIndex: 1 },
         { linkId: "link-1", content: "chunk-b", chunkIndex: 2 },
       ],
@@ -136,7 +147,11 @@ describe("ingestPdf", () => {
     vi.mocked(extractPdfTextByPage).mockRejectedValue(new Error("boom"));
 
     await expect(
-      ingestPdf({ linkId: "link-1", url: "https://example.com/doc.pdf" }),
+      ingestPdf({
+        linkId: "link-1",
+        url: "https://example.com/doc.pdf",
+        userId: "user-1",
+      }),
     ).rejects.toThrow("boom");
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {

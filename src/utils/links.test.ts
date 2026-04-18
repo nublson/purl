@@ -12,6 +12,7 @@ function link(createdAt: Date, title: string): Link {
     description: null,
     thumbnail: null,
     ingestStatus: "COMPLETED",
+    ingestFailureReason: null,
     createdAt,
   };
 }
@@ -50,10 +51,7 @@ describe("groupLinksByDate", () => {
   it("sorts links within a group newest-first", () => {
     const today1 = new Date(2025, 5, 15, 10, 0);
     const today2 = new Date(2025, 5, 15, 12, 0);
-    const links: Link[] = [
-      link(today1, "first"),
-      link(today2, "second"),
-    ];
+    const links: Link[] = [link(today1, "first"), link(today2, "second")];
     const groups = groupLinksByDate(links);
     expect(groups[0].links.map((l) => l.title)).toEqual(["second", "first"]);
   });
@@ -74,9 +72,20 @@ describe("groupLinksByDate", () => {
     const groups = groupLinksByDate(links);
     const labels = groups.map((g) => g.label);
     expect(labels).toEqual(["Today", "Last Year"]);
-    const order = ["Today", "This Week", "Last Week", "This Month", "Last Month", "This Year", "Last Year", "Older"];
+    const order = [
+      "Today",
+      "This Week",
+      "Last Week",
+      "This Month",
+      "Last Month",
+      "This Year",
+      "Last Year",
+      "Older",
+    ];
     for (let i = 1; i < labels.length; i++) {
-      expect(order.indexOf(labels[i])).toBeGreaterThan(order.indexOf(labels[i - 1]));
+      expect(order.indexOf(labels[i])).toBeGreaterThan(
+        order.indexOf(labels[i - 1]),
+      );
     }
   });
 });

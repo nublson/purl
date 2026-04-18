@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock the link layer so this test focuses on route logic:
 // validation, status codes, and payload shaping.
@@ -42,10 +42,7 @@ const { GET, PATCH, DELETE: DELETE_HANDLER } = await import("./route");
 
 type NextRequestInit = ConstructorParameters<typeof NextRequest>[1];
 
-function createRequest(
-  pathname: string,
-  init?: NextRequestInit,
-): NextRequest {
+function createRequest(pathname: string, init?: NextRequestInit): NextRequest {
   return new NextRequest(`http://localhost${pathname}`, init);
 }
 
@@ -105,6 +102,7 @@ describe("links/[id] API route", () => {
         domain: "example.com",
         contentType: "WEB",
         ingestStatus: "COMPLETED",
+        ingestFailureReason: null,
         createdAt,
       });
 
@@ -146,12 +144,9 @@ describe("links/[id] API route", () => {
     });
 
     it("returns 400 when no updatable fields are provided", async () => {
-      const res = await PATCH(
-        patchRequest({}),
-        {
-          params: Promise.resolve({ id: ID }),
-        },
-      );
+      const res = await PATCH(patchRequest({}), {
+        params: Promise.resolve({ id: ID }),
+      });
 
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({
@@ -160,12 +155,9 @@ describe("links/[id] API route", () => {
     });
 
     it("returns 400 when url is invalid", async () => {
-      const res = await PATCH(
-        patchRequest({ url: "javascript:alert(1)" }),
-        {
-          params: Promise.resolve({ id: ID }),
-        },
-      );
+      const res = await PATCH(patchRequest({ url: "javascript:alert(1)" }), {
+        params: Promise.resolve({ id: ID }),
+      });
 
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({ error: "Invalid or missing URL" });
@@ -183,6 +175,7 @@ describe("links/[id] API route", () => {
         domain: "example.com",
         contentType: "WEB",
         ingestStatus: "PENDING",
+        ingestFailureReason: null,
         createdAt,
         userId: "user-123",
       });
@@ -212,16 +205,14 @@ describe("links/[id] API route", () => {
         domain: "example.com",
         contentType: "WEB",
         ingestStatus: "PENDING",
+        ingestFailureReason: null,
         createdAt: new Date("2025-06-15T10:00:00Z"),
         userId: "user-123",
       });
 
-      await PATCH(
-        patchRequest({ description: null }),
-        {
-          params: Promise.resolve({ id: ID }),
-        },
-      );
+      await PATCH(patchRequest({ description: null }), {
+        params: Promise.resolve({ id: ID }),
+      });
 
       expect(vi.mocked(updateLink)).toHaveBeenCalledWith(ID, {
         description: null,
@@ -231,12 +222,9 @@ describe("links/[id] API route", () => {
     it("returns 404 when updateLink returns null (not found/not owned)", async () => {
       vi.mocked(updateLink).mockResolvedValue(null);
 
-      const res = await PATCH(
-        patchRequest({ title: "New title" }),
-        {
-          params: Promise.resolve({ id: ID }),
-        },
-      );
+      const res = await PATCH(patchRequest({ title: "New title" }), {
+        params: Promise.resolve({ id: ID }),
+      });
 
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual({ error: "Not found" });
@@ -246,12 +234,9 @@ describe("links/[id] API route", () => {
     it("returns 401 when the link layer throws UnauthorizedError", async () => {
       vi.mocked(updateLink).mockRejectedValue(new UnauthorizedError());
 
-      const res = await PATCH(
-        patchRequest({ title: "New title" }),
-        {
-          params: Promise.resolve({ id: ID }),
-        },
-      );
+      const res = await PATCH(patchRequest({ title: "New title" }), {
+        params: Promise.resolve({ id: ID }),
+      });
 
       expect(res.status).toBe(401);
       expect(await res.json()).toEqual({ error: "Unauthorized" });
@@ -313,4 +298,3 @@ describe("links/[id] API route", () => {
     });
   });
 });
-

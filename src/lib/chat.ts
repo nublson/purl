@@ -1,24 +1,21 @@
-import {
-  streamText,
-  tool,
-  jsonSchema,
-  stepCountIs,
-  type ModelMessage,
-  type ToolExecutionOptions,
-  type UIMessageStreamWriter,
-} from "ai";
-import * as Sentry from "@sentry/nextjs";
 import { getChatModel } from "@/lib/ai";
 import { CHAT_STREAM_ERROR_CODES } from "@/lib/chat-http-errors";
 import type {
   ChatStreamErrorPayload,
   PurlChatUIMessage,
 } from "@/lib/chat-stream-error";
-import prisma from "@/lib/prisma";
+import prisma, { ContentType } from "@/lib/prisma";
+import { semanticSearch } from "@/lib/semantic-search";
+import * as Sentry from "@sentry/nextjs";
 import {
-  semanticSearch,
-  type LinkContentType,
-} from "@/lib/semantic-search";
+  jsonSchema,
+  stepCountIs,
+  streamText,
+  tool,
+  type ModelMessage,
+  type ToolExecutionOptions,
+  type UIMessageStreamWriter,
+} from "ai";
 
 function buildSystemPrompt(context: string | null): string {
   const today = new Date().toLocaleDateString("en-US", {
@@ -229,7 +226,7 @@ export function buildChatTools(
         try {
           const results = await semanticSearch(query, userId, {
             matchCount: Math.max(1, Math.min(limit ?? 10, 20)),
-            type: contentType as LinkContentType | undefined,
+            type: contentType as ContentType | undefined,
             dateFrom: dateFrom ? new Date(dateFrom) : undefined,
             dateTo: dateTo ? new Date(dateTo) : undefined,
           });
@@ -255,7 +252,12 @@ export function buildChatTools(
 
           const grouped = new Map<
             string,
-            { url: string; contentType: string; savedAt: string; texts: string[] }
+            {
+              url: string;
+              contentType: string;
+              savedAt: string;
+              texts: string[];
+            }
           >();
           for (const c of linkContents) {
             const existing = grouped.get(c.link.title);

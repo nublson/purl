@@ -11,12 +11,10 @@ vi.mock("@/lib/prisma", () => ({
     $executeRaw: vi.fn(),
   },
   Prisma: {
-    sql: vi.fn(
-      (strings: TemplateStringsArray, ...values: unknown[]) => ({
-        strings,
-        values,
-      }),
-    ),
+    sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+      strings,
+      values,
+    })),
   },
 }));
 
@@ -51,7 +49,8 @@ const mockAudioLink = {
 const { transcribeAudio } = await import("@/lib/audio-transcriber");
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
-const { logIngestStart, logIngestFailure } = await import("@/lib/ingest-logger");
+const { logIngestStart, logIngestFailure } =
+  await import("@/lib/ingest-logger");
 const { ingestAudio } = await import("./ingest-audio");
 
 describe("ingestAudio", () => {
@@ -79,7 +78,11 @@ describe("ingestAudio", () => {
       { id: "row-meta", chunkIndex: 0 },
     ] as never);
 
-    await ingestAudio({ linkId: "link-1", url: "https://example.com/a.mp3" });
+    await ingestAudio({
+      linkId: "link-1",
+      url: "https://example.com/a.mp3",
+      userId: "user-1",
+    });
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
       where: { id: "link-1" },
@@ -116,7 +119,11 @@ describe("ingestAudio", () => {
       { id: "row-3", chunkIndex: 2 },
     ] as never);
 
-    await ingestAudio({ linkId: "link-1", url: "https://example.com/a.mp3" });
+    await ingestAudio({
+      linkId: "link-1",
+      url: "https://example.com/a.mp3",
+      userId: "user-1",
+    });
 
     expect(prisma.linkContent.createMany).toHaveBeenCalledWith({
       data: [
@@ -140,7 +147,11 @@ describe("ingestAudio", () => {
     vi.mocked(transcribeAudio).mockRejectedValue(new Error("boom"));
 
     await expect(
-      ingestAudio({ linkId: "link-1", url: "https://example.com/a.mp3" }),
+      ingestAudio({
+        linkId: "link-1",
+        url: "https://example.com/a.mp3",
+        userId: "user-1",
+      }),
     ).rejects.toThrow("boom");
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {

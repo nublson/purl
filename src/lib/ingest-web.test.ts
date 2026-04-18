@@ -11,19 +11,18 @@ vi.mock("@/lib/prisma", () => ({
     $executeRaw: vi.fn(),
   },
   Prisma: {
-    sql: vi.fn(
-      (strings: TemplateStringsArray, ...values: unknown[]) => ({
-        strings,
-        values,
-      }),
-    ),
+    sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+      strings,
+      values,
+    })),
   },
 }));
 
 vi.mock("@/lib/web-scraper", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/web-scraper")>(
-    "@/lib/web-scraper",
-  );
+  const actual =
+    await vi.importActual<typeof import("@/lib/web-scraper")>(
+      "@/lib/web-scraper",
+    );
   return {
     ...actual,
     scrapeWebContent: vi.fn(),
@@ -58,12 +57,12 @@ const mockWebLink = {
   contentType: "WEB" as const,
   description: "OG description",
 };
-const { scrapeWebContent, UnsupportedSpaError } = await import(
-  "@/lib/web-scraper"
-);
+const { scrapeWebContent, UnsupportedSpaError } =
+  await import("@/lib/web-scraper");
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
-const { logIngestStart, logIngestFailure } = await import("@/lib/ingest-logger");
+const { logIngestStart, logIngestFailure } =
+  await import("@/lib/ingest-logger");
 const { skipIngest } = await import("@/lib/ingest-skip");
 const { ingestWeb } = await import("./ingest-web");
 
@@ -93,7 +92,11 @@ describe("ingestWeb", () => {
       { id: "row-meta", chunkIndex: 0 },
     ] as never);
 
-    await ingestWeb({ linkId: "link-1", url: "https://example.com/article" });
+    await ingestWeb({
+      linkId: "link-1",
+      url: "https://example.com/article",
+      userId: "user-1",
+    });
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
       where: { id: "link-1" },
@@ -130,11 +133,19 @@ describe("ingestWeb", () => {
       { id: "row-3", chunkIndex: 2 },
     ] as never);
 
-    await ingestWeb({ linkId: "link-1", url: "https://example.com/article" });
+    await ingestWeb({
+      linkId: "link-1",
+      url: "https://example.com/article",
+      userId: "user-1",
+    });
 
     expect(prisma.linkContent.createMany).toHaveBeenCalledWith({
       data: [
-        { linkId: "link-1", content: buildMetadataText(mockWebLink), chunkIndex: 0 },
+        {
+          linkId: "link-1",
+          content: buildMetadataText(mockWebLink),
+          chunkIndex: 0,
+        },
         { linkId: "link-1", content: "chunk-a", chunkIndex: 1 },
         { linkId: "link-1", content: "chunk-b", chunkIndex: 2 },
       ],
@@ -152,7 +163,11 @@ describe("ingestWeb", () => {
     vi.mocked(prisma.link.findUnique).mockResolvedValue(null);
 
     await expect(
-      ingestWeb({ linkId: "link-1", url: "https://example.com/article" }),
+      ingestWeb({
+        linkId: "link-1",
+        url: "https://example.com/article",
+        userId: "user-1",
+      }),
     ).rejects.toThrow("Link not found for ingest: link-1");
 
     expect(prisma.link.update).toHaveBeenLastCalledWith({
@@ -165,7 +180,11 @@ describe("ingestWeb", () => {
     vi.mocked(scrapeWebContent).mockRejectedValue(new Error("boom"));
 
     await expect(
-      ingestWeb({ linkId: "link-1", url: "https://example.com/article" }),
+      ingestWeb({
+        linkId: "link-1",
+        url: "https://example.com/article",
+        userId: "user-1",
+      }),
     ).rejects.toThrow("boom");
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
@@ -195,7 +214,11 @@ describe("ingestWeb", () => {
     );
 
     await expect(
-      ingestWeb({ linkId: "link-1", url: "https://x.com/centralreality" }),
+      ingestWeb({
+        linkId: "link-1",
+        url: "https://x.com/centralreality",
+        userId: "user-1",
+      }),
     ).resolves.toBeUndefined();
 
     expect(skipIngest).toHaveBeenCalledWith("link-1");
