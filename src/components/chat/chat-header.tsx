@@ -113,29 +113,6 @@ function FlowErrorBanner({
     );
   }
 
-  if (error.kind === "no_api_key") {
-    return (
-      <div className="flex w-full flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-2">
-        <Typography size="small" className="text-foreground">
-          Add your OpenAI API key to use the chat.
-        </Typography>
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" asChild>
-            <Link href="/settings">Go to Settings</Link>
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-7 px-2"
-            onClick={onDismiss}
-          >
-            Dismiss
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   if (error.kind === "quota_exceeded") {
     return (
       <div className="flex w-full flex-wrap items-center justify-between gap-2 border-b border-border bg-muted/40 px-4 py-2">

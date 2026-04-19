@@ -319,7 +319,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
         parts: [
           {
             type: "text",
-            text: "Chat is a Pro feature. Add your OpenAI API key in Settings to use it.",
+            text: "AI Chat is a Pro feature. Add your OpenAI API key in Settings to use it.",
           },
         ],
         createdAt: new Date(),

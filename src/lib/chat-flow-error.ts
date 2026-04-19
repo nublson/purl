@@ -9,7 +9,6 @@ export type ChatFlowError =
   | { kind: "session" }
   | { kind: "missing_chat" }
   | { kind: "rate_limit"; untilMs: number }
-  | { kind: "no_api_key" }
   | { kind: "quota_exceeded" }
   | { kind: "retry"; message: string };
 
