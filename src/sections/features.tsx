@@ -33,7 +33,7 @@ const features: Feature[] = (featuresData as FeatureData[]).map((feature) => ({
 
 export default function FeaturesSection() {
   return (
-    <SectionWrapper>
+    <SectionWrapper id="features">
       <div className="w-full flex flex-col items-center justify-start gap-8">
         <SectionTitle
           data={{

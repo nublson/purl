@@ -3,24 +3,21 @@
     {
       "name": "Free",
       "description": "Everything you need to start building your personal knowledge base.",
-      "price": 0,
-      "features": [
-        "Unlimited savings",
-        "5 PDFs per month",
-        "AI chat (limited)"
-      ],
+      "price": "$0",
+      "features": ["Unlimited savings", "Unlimited uploads"],
       "actionText": "Get started free",
       "popular": false
     },
     {
       "name": "Pro",
-      "description": "Unlimited everything, plus audio and video transcription.",
-      "price": 9,
+      "description": "Bring your OpenAI API key to unlock the full experience — no subscription needed.",
+      "price": "On demand",
       "features": [
         "Everything in Free",
-        "Unlimited PDFs",
+        "Web extraction",
         "Youtube transcripts",
-        "Audio transcription (120 min/month)",
+        "PDF parsing",
+        "Audio transcription",
         "Unlimited AI chat"
       ],
       "actionText": "Try for free",

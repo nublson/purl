@@ -5,7 +5,7 @@ import faqJson from "@/data/faq.json" with { type: "json" };
 
 export default function FAQSection() {
   return (
-    <SectionWrapper>
+    <SectionWrapper id="faq">
       <div className="w-full flex flex-col items-center justify-start gap-8">
         <SectionTitle
           data={{

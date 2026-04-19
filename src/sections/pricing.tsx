@@ -5,18 +5,19 @@ import pricingJson from "@/data/pricing.json" with { type: "json" };
 
 export const PricingSection = () => {
   return (
-    <SectionWrapper>
+    <SectionWrapper id="pricing">
       <div className="w-full flex flex-col items-center justify-start gap-8">
         <SectionTitle
           data={{
             label: "Pricing",
             title: (
               <>
-                Start free. <br /> Go deeper when ready.
+                Everything free. <br />
+                AI powered by you.
               </>
             ),
             description:
-              "No credit card required. Upgrade when you need more power.",
+              "Save and organize unlimited links, PDFs, and more — for free. Add your OpenAI API key to unlock AI features.",
           }}
         />
         <div className="flex flex-col md:flex-row items-center justify-center gap-4">

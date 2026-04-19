@@ -10,19 +10,19 @@
       "type": "PDFs",
       "description": "Upload or link, fully parsed",
       "icon": "FileText",
-      "access": "5 free / month"
+      "access": "Free"
     },
     {
       "type": "YouTube",
       "description": "Full transcripts extracted",
       "icon": "TvMinimalPlay",
-      "access": "Pro"
+      "access": "Free"
     },
     {
       "type": "Audio",
       "description": "Transcribed via Whisper",
       "icon": "Headphones",
-      "access": "Pro · 120 min/mo"
+      "access": "Free"
     }
   ]
 }

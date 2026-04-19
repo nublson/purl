@@ -38,7 +38,7 @@ const contentTypes: ContentTypeProps[] = (
 
 export default function ContentTypeSection() {
   return (
-    <SectionWrapper>
+    <SectionWrapper id="content-types">
       <div className="w-full flex flex-col lg:flex-row items-start justify-between gap-8">
         <SectionTitle
           data={{
