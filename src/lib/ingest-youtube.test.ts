@@ -11,12 +11,10 @@ vi.mock("@/lib/prisma", () => ({
     $executeRaw: vi.fn(),
   },
   Prisma: {
-    sql: vi.fn(
-      (strings: TemplateStringsArray, ...values: unknown[]) => ({
-        strings,
-        values,
-      }),
-    ),
+    sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+      strings,
+      values,
+    })),
   },
 }));
 
@@ -37,6 +35,14 @@ vi.mock("@/lib/ingest-logger", () => ({
   logIngestFailure: vi.fn(),
 }));
 
+vi.mock("@/lib/ingest-fail", () => ({
+  failIngest: vi.fn(),
+}));
+
+vi.mock("./api-keys", () => ({
+  getDecryptedApiKey: vi.fn(),
+}));
+
 import { buildMetadataText } from "@/lib/metadata-chunk";
 
 const prisma = (await import("@/lib/prisma")).default;
@@ -48,10 +54,14 @@ const mockYoutubeLink = {
   contentType: "YOUTUBE" as const,
   description: "Channel",
 };
+
 const { fetchYouTubeTranscript } = await import("@/lib/youtube-transcriber");
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
-const { logIngestStart, logIngestFailure } = await import("@/lib/ingest-logger");
+const { logIngestStart, logIngestFailure } =
+  await import("@/lib/ingest-logger");
+const { failIngest } = await import("@/lib/ingest-fail");
+const { getDecryptedApiKey } = await import("./api-keys");
 const { ingestYoutube } = await import("./ingest-youtube");
 
 describe("ingestYoutube", () => {
@@ -67,8 +77,14 @@ describe("ingestYoutube", () => {
     vi.mocked(embedTextChunks).mockReset();
     vi.mocked(logIngestStart).mockReset();
     vi.mocked(logIngestFailure).mockReset();
+    vi.mocked(failIngest).mockReset();
     vi.mocked(prisma.link.findUnique).mockReset();
-    vi.mocked(prisma.link.findUnique).mockResolvedValue(mockYoutubeLink as never);
+    vi.mocked(prisma.link.findUnique).mockResolvedValue(
+      mockYoutubeLink as never,
+    );
+
+    // Default: valid API key
+    vi.mocked(getDecryptedApiKey).mockResolvedValue("sk-test-key");
   });
 
   it("stores metadata chunk only when transcript produces no chunks", async () => {
@@ -79,18 +95,23 @@ describe("ingestYoutube", () => {
       { id: "row-meta", chunkIndex: 0 },
     ] as never);
 
-    await ingestYoutube({ linkId: "link-1", url: "https://youtu.be/abc123" });
+    await ingestYoutube({
+      linkId: "link-1",
+      url: "https://youtu.be/abc123",
+      userId: "user-1",
+    });
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
       where: { id: "link-1" },
-      data: { ingestStatus: "PROCESSING" },
+      data: { ingestStatus: "PROCESSING", ingestFailureReason: null },
     });
     expect(prisma.linkContent.deleteMany).toHaveBeenCalledWith({
       where: { linkId: "link-1" },
     });
-    expect(embedTextChunks).toHaveBeenCalledWith([
-      buildMetadataText(mockYoutubeLink),
-    ]);
+    expect(embedTextChunks).toHaveBeenCalledWith(
+      [buildMetadataText(mockYoutubeLink)],
+      "sk-test-key",
+    );
     expect(logIngestStart).toHaveBeenCalledWith(
       "YOUTUBE",
       "link-1",
@@ -116,7 +137,11 @@ describe("ingestYoutube", () => {
       { id: "row-3", chunkIndex: 2 },
     ] as never);
 
-    await ingestYoutube({ linkId: "link-1", url: "https://youtu.be/abc123" });
+    await ingestYoutube({
+      linkId: "link-1",
+      url: "https://youtu.be/abc123",
+      userId: "user-1",
+    });
 
     expect(prisma.linkContent.createMany).toHaveBeenCalledWith({
       data: [
@@ -136,26 +161,49 @@ describe("ingestYoutube", () => {
     });
   });
 
+  it("marks NO_API_KEY when user has no key configured", async () => {
+    vi.mocked(getDecryptedApiKey).mockRejectedValue(new Error("No API key"));
+
+    await ingestYoutube({
+      linkId: "link-1",
+      url: "https://youtu.be/abc123",
+      userId: "user-1",
+    });
+
+    expect(failIngest).toHaveBeenCalledWith("link-1", "NO_API_KEY");
+    expect(fetchYouTubeTranscript).not.toHaveBeenCalled();
+  });
+
+  it("marks LINK_NOT_FOUND when link row is missing after transcript", async () => {
+    vi.mocked(fetchYouTubeTranscript).mockResolvedValue("[00:00:01] hi");
+    vi.mocked(chunkText).mockReturnValue(["c"]);
+    vi.mocked(prisma.link.findUnique).mockResolvedValue(null);
+
+    await ingestYoutube({
+      linkId: "link-1",
+      url: "https://youtu.be/abc123",
+      userId: "user-1",
+    });
+
+    expect(failIngest).toHaveBeenCalledWith("link-1", "LINK_NOT_FOUND");
+  });
+
   it("marks failed when transcription pipeline throws", async () => {
     vi.mocked(fetchYouTubeTranscript).mockRejectedValue(new Error("boom"));
 
     await expect(
-      ingestYoutube({ linkId: "link-1", url: "https://youtu.be/abc123" }),
+      ingestYoutube({
+        linkId: "link-1",
+        url: "https://youtu.be/abc123",
+        userId: "user-1",
+      }),
     ).rejects.toThrow("boom");
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
       where: { id: "link-1" },
-      data: { ingestStatus: "PROCESSING" },
+      data: { ingestStatus: "PROCESSING", ingestFailureReason: null },
     });
-    expect(prisma.link.update).toHaveBeenLastCalledWith({
-      where: { id: "link-1" },
-      data: { ingestStatus: "FAILED" },
-    });
-    expect(logIngestStart).toHaveBeenCalledWith(
-      "YOUTUBE",
-      "link-1",
-      "https://youtu.be/abc123",
-    );
+    expect(failIngest).toHaveBeenCalledWith("link-1", "SCRAPE_FAILED");
     expect(logIngestFailure).toHaveBeenCalledWith(
       "YOUTUBE",
       "link-1",

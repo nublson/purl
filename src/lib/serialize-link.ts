@@ -1,4 +1,4 @@
-import type { IngestStatus } from "@/utils/links";
+import type { ContentType, IngestStatus } from "@/lib/prisma";
 
 type LinkLike = {
   id: string;
@@ -8,7 +8,7 @@ type LinkLike = {
   favicon: string;
   thumbnail: string | null;
   domain: string;
-  contentType?: "WEB" | "YOUTUBE" | "PDF" | "AUDIO";
+  contentType?: ContentType;
   createdAt: Date;
   ingestStatus: IngestStatus;
 };

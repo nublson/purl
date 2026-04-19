@@ -27,6 +27,13 @@ enum IngestStatus {
   SKIPPED
 }
 
+enum IngestFailureReason {
+  NO_API_KEY
+  SCRAPE_FAILED
+  LINK_NOT_FOUND
+  OTHER
+}
+
 enum MessageRole {
   USER
   ASSISTANT
@@ -44,9 +51,11 @@ model User {
   accounts      Account[]
   links         Link[]
   chats         Chat[]
+  userAPIKeys UserAPIKey[]
 
   @@unique([email])
   @@map("users")
+  
 }
 
 model Link {
@@ -60,6 +69,7 @@ model Link {
   thumbnail    String?
   createdAt    DateTime     @default(now())
   ingestStatus IngestStatus @default(PENDING)
+  ingestFailureReason IngestFailureReason?
   userId       String
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   contents     LinkContent[]
@@ -150,4 +160,17 @@ model Verification {
   updatedAt  DateTime?
 
   @@map("verifications")
+}
+
+model UserAPIKey {
+  id        String    @id @default(cuid())
+  userId    String
+  provider  String @default("openai")
+  encryptedKey       String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@map("user_api_keys")
 }

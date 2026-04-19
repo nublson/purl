@@ -1,23 +1,27 @@
+import type {
+  ContentType,
+  IngestFailureReason,
+  IngestStatus,
+} from "@/generated/prisma/enums";
 import { auth } from "@/lib/auth";
-import prisma from "@/lib/prisma";
-import type { ContentType } from "@/generated/prisma/enums";
-import { getDefaultFaviconUrl } from "@/utils/default-favicon";
-import { getUrlDomain } from "@/utils/formatter";
-import type { IngestStatus, Link } from "@/utils/links";
-import { detectContentType } from "@/lib/server-detect-content-type";
-import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
-import { isPdfUrl } from "@/utils/pdf";
-import { isYouTubeUrl } from "@/utils/youtube";
-import { headers } from "next/headers";
-import { after } from "next/server";
-import { cache } from "react";
-import ogs from "open-graph-scraper";
 import { ingestAudio } from "@/lib/ingest-audio";
 import { ingestPdf } from "@/lib/ingest-pdf";
 import { ingestWeb } from "@/lib/ingest-web";
 import { ingestYoutube } from "@/lib/ingest-youtube";
 import { validateOgThumbnailUrl } from "@/lib/og-thumbnail-probe";
+import prisma from "@/lib/prisma";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
+import { detectContentType } from "@/lib/server-detect-content-type";
+import { getDefaultFaviconUrl } from "@/utils/default-favicon";
+import { getUrlDomain } from "@/utils/formatter";
+import type { Link } from "@/utils/links";
+import { isPdfUrl } from "@/utils/pdf";
+import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
+import { isYouTubeUrl } from "@/utils/youtube";
+import { headers } from "next/headers";
+import { after } from "next/server";
+import ogs from "open-graph-scraper";
+import { cache } from "react";
 
 const OGS_HTML_MAX_BYTES = 5 * 1024 * 1024;
 
@@ -196,6 +200,7 @@ type LinkRow = {
   thumbnail: string | null;
   createdAt: Date;
   ingestStatus: IngestStatus;
+  ingestFailureReason: IngestFailureReason | null;
 };
 
 function mapRowToLink(row: LinkRow): Link {
@@ -209,6 +214,7 @@ function mapRowToLink(row: LinkRow): Link {
     domain: row.domain,
     contentType: row.contentType,
     ingestStatus: row.ingestStatus,
+    ingestFailureReason: row.ingestFailureReason,
     createdAt: row.createdAt,
   };
 }
@@ -359,25 +365,26 @@ export const getLinksForCurrentUser = cache(async (): Promise<Link[]> => {
 export type CreateLinkResult = Awaited<ReturnType<typeof prisma.link.create>>;
 export type RefreshLinkResult = Awaited<ReturnType<typeof prisma.link.update>>;
 
-type IngestInput = { linkId: string; url: string };
+type IngestInput = { linkId: string; url: string; userId: string };
 type IngestHandler = (input: IngestInput) => Promise<void>;
 
 const ingestHandlers: Record<ContentType, IngestHandler | null> = {
-  PDF: ({ linkId, url }) => ingestPdf({ linkId, url }),
-  AUDIO: ({ linkId, url }) => ingestAudio({ linkId, url }),
-  YOUTUBE: ({ linkId, url }) => ingestYoutube({ linkId, url }),
-  WEB: ({ linkId, url }) => ingestWeb({ linkId, url }),
+  PDF: ({ linkId, url, userId }) => ingestPdf({ linkId, url, userId }),
+  AUDIO: ({ linkId, url, userId }) => ingestAudio({ linkId, url, userId }),
+  YOUTUBE: ({ linkId, url, userId }) => ingestYoutube({ linkId, url, userId }),
+  WEB: ({ linkId, url, userId }) => ingestWeb({ linkId, url, userId }),
 };
 
 function dispatchIngest(link: {
   id: string;
   url: string;
   contentType: ContentType;
+  userId: string;
 }): void {
   const handler = ingestHandlers[link.contentType];
   if (!handler) return;
 
-  after(() => handler({ linkId: link.id, url: link.url }));
+  after(() => handler({ linkId: link.id, url: link.url, userId: link.userId }));
 }
 
 /** Re-scrapes link metadata and re-dispatches ingestion for the current user. */

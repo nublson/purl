@@ -11,19 +11,18 @@ vi.mock("@/lib/prisma", () => ({
     $executeRaw: vi.fn(),
   },
   Prisma: {
-    sql: vi.fn(
-      (strings: TemplateStringsArray, ...values: unknown[]) => ({
-        strings,
-        values,
-      }),
-    ),
+    sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+      strings,
+      values,
+    })),
   },
 }));
 
 vi.mock("@/lib/web-scraper", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/web-scraper")>(
-    "@/lib/web-scraper",
-  );
+  const actual =
+    await vi.importActual<typeof import("@/lib/web-scraper")>(
+      "@/lib/web-scraper",
+    );
   return {
     ...actual,
     scrapeWebContent: vi.fn(),
@@ -47,6 +46,14 @@ vi.mock("@/lib/ingest-skip", () => ({
   skipIngest: vi.fn(),
 }));
 
+vi.mock("@/lib/ingest-fail", () => ({
+  failIngest: vi.fn(),
+}));
+
+vi.mock("./api-keys", () => ({
+  getDecryptedApiKey: vi.fn(),
+}));
+
 import { buildMetadataText } from "@/lib/metadata-chunk";
 
 const prisma = (await import("@/lib/prisma")).default;
@@ -58,13 +65,16 @@ const mockWebLink = {
   contentType: "WEB" as const,
   description: "OG description",
 };
-const { scrapeWebContent, UnsupportedSpaError } = await import(
-  "@/lib/web-scraper"
-);
+
+const { scrapeWebContent, UnsupportedSpaError } =
+  await import("@/lib/web-scraper");
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
-const { logIngestStart, logIngestFailure } = await import("@/lib/ingest-logger");
+const { logIngestStart, logIngestFailure } =
+  await import("@/lib/ingest-logger");
 const { skipIngest } = await import("@/lib/ingest-skip");
+const { failIngest } = await import("@/lib/ingest-fail");
+const { getDecryptedApiKey } = await import("./api-keys");
 const { ingestWeb } = await import("./ingest-web");
 
 describe("ingestWeb", () => {
@@ -81,8 +91,12 @@ describe("ingestWeb", () => {
     vi.mocked(logIngestStart).mockReset();
     vi.mocked(logIngestFailure).mockReset();
     vi.mocked(skipIngest).mockReset();
+    vi.mocked(failIngest).mockReset();
     vi.mocked(prisma.link.findUnique).mockReset();
     vi.mocked(prisma.link.findUnique).mockResolvedValue(mockWebLink as never);
+
+    // Default: valid API key
+    vi.mocked(getDecryptedApiKey).mockResolvedValue("sk-test-key");
   });
 
   it("stores metadata chunk only when body produces no chunks", async () => {
@@ -93,18 +107,23 @@ describe("ingestWeb", () => {
       { id: "row-meta", chunkIndex: 0 },
     ] as never);
 
-    await ingestWeb({ linkId: "link-1", url: "https://example.com/article" });
+    await ingestWeb({
+      linkId: "link-1",
+      url: "https://example.com/article",
+      userId: "user-1",
+    });
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
       where: { id: "link-1" },
-      data: { ingestStatus: "PROCESSING" },
+      data: { ingestStatus: "PROCESSING", ingestFailureReason: null },
     });
     expect(prisma.linkContent.deleteMany).toHaveBeenCalledWith({
       where: { linkId: "link-1" },
     });
-    expect(embedTextChunks).toHaveBeenCalledWith([
-      buildMetadataText(mockWebLink),
-    ]);
+    expect(embedTextChunks).toHaveBeenCalledWith(
+      [buildMetadataText(mockWebLink)],
+      "sk-test-key",
+    );
     expect(logIngestStart).toHaveBeenCalledWith(
       "WEB",
       "link-1",
@@ -130,11 +149,19 @@ describe("ingestWeb", () => {
       { id: "row-3", chunkIndex: 2 },
     ] as never);
 
-    await ingestWeb({ linkId: "link-1", url: "https://example.com/article" });
+    await ingestWeb({
+      linkId: "link-1",
+      url: "https://example.com/article",
+      userId: "user-1",
+    });
 
     expect(prisma.linkContent.createMany).toHaveBeenCalledWith({
       data: [
-        { linkId: "link-1", content: buildMetadataText(mockWebLink), chunkIndex: 0 },
+        {
+          linkId: "link-1",
+          content: buildMetadataText(mockWebLink),
+          chunkIndex: 0,
+        },
         { linkId: "link-1", content: "chunk-a", chunkIndex: 1 },
         { linkId: "link-1", content: "chunk-b", chunkIndex: 2 },
       ],
@@ -146,41 +173,49 @@ describe("ingestWeb", () => {
     });
   });
 
-  it("marks failed when link row is missing after scrape", async () => {
+  it("marks NO_API_KEY when user has no key configured", async () => {
+    vi.mocked(getDecryptedApiKey).mockRejectedValue(new Error("No API key"));
+
+    await ingestWeb({
+      linkId: "link-1",
+      url: "https://example.com/article",
+      userId: "user-1",
+    });
+
+    expect(failIngest).toHaveBeenCalledWith("link-1", "NO_API_KEY");
+    expect(scrapeWebContent).not.toHaveBeenCalled();
+  });
+
+  it("marks LINK_NOT_FOUND when link row is missing after scrape", async () => {
     vi.mocked(scrapeWebContent).mockResolvedValue("body");
     vi.mocked(chunkText).mockReturnValue(["c"]);
     vi.mocked(prisma.link.findUnique).mockResolvedValue(null);
 
-    await expect(
-      ingestWeb({ linkId: "link-1", url: "https://example.com/article" }),
-    ).rejects.toThrow("Link not found for ingest: link-1");
-
-    expect(prisma.link.update).toHaveBeenLastCalledWith({
-      where: { id: "link-1" },
-      data: { ingestStatus: "FAILED" },
+    await ingestWeb({
+      linkId: "link-1",
+      url: "https://example.com/article",
+      userId: "user-1",
     });
+
+    expect(failIngest).toHaveBeenCalledWith("link-1", "LINK_NOT_FOUND");
   });
 
   it("marks failed when scraper pipeline throws", async () => {
     vi.mocked(scrapeWebContent).mockRejectedValue(new Error("boom"));
 
     await expect(
-      ingestWeb({ linkId: "link-1", url: "https://example.com/article" }),
+      ingestWeb({
+        linkId: "link-1",
+        url: "https://example.com/article",
+        userId: "user-1",
+      }),
     ).rejects.toThrow("boom");
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
       where: { id: "link-1" },
-      data: { ingestStatus: "PROCESSING" },
+      data: { ingestStatus: "PROCESSING", ingestFailureReason: null },
     });
-    expect(prisma.link.update).toHaveBeenLastCalledWith({
-      where: { id: "link-1" },
-      data: { ingestStatus: "FAILED" },
-    });
-    expect(logIngestStart).toHaveBeenCalledWith(
-      "WEB",
-      "link-1",
-      "https://example.com/article",
-    );
+    expect(failIngest).toHaveBeenCalledWith("link-1", "SCRAPE_FAILED");
     expect(logIngestFailure).toHaveBeenCalledWith(
       "WEB",
       "link-1",
@@ -195,7 +230,11 @@ describe("ingestWeb", () => {
     );
 
     await expect(
-      ingestWeb({ linkId: "link-1", url: "https://x.com/centralreality" }),
+      ingestWeb({
+        linkId: "link-1",
+        url: "https://x.com/centralreality",
+        userId: "user-1",
+      }),
     ).resolves.toBeUndefined();
 
     expect(skipIngest).toHaveBeenCalledWith("link-1");

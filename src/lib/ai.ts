@@ -1,17 +1,24 @@
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI, openai } from "@ai-sdk/openai";
 
 export const CHAT_MODEL = "gpt-5.4-mini";
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const TRANSCRIPTION_MODEL = "whisper-1";
 
-export function getChatModel() {
-  return openai(CHAT_MODEL);
+function getOpenAIClient(apiKey?: string) {
+  if (apiKey) {
+    return createOpenAI({ apiKey });
+  }
+  return openai;
 }
 
-export function getEmbeddingModel() {
-  return openai.embedding(EMBEDDING_MODEL);
+export function getChatModel(apiKey?: string) {
+  return getOpenAIClient(apiKey)(CHAT_MODEL);
 }
 
-export function getTranscriptionModel() {
-  return openai.transcription(TRANSCRIPTION_MODEL);
+export function getEmbeddingModel(apiKey?: string) {
+  return getOpenAIClient(apiKey).embedding(EMBEDDING_MODEL);
+}
+
+export function getTranscriptionModel(apiKey?: string) {
+  return getOpenAIClient(apiKey).transcription(TRANSCRIPTION_MODEL);
 }

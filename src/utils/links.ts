@@ -1,11 +1,9 @@
+import type {
+  ContentType,
+  IngestFailureReason,
+  IngestStatus,
+} from "@/generated/prisma/enums";
 import { getRelativeDateLabel } from "./formatter";
-
-export type IngestStatus =
-  | "PENDING"
-  | "PROCESSING"
-  | "COMPLETED"
-  | "FAILED"
-  | "SKIPPED";
 
 export type Link = {
   id: string;
@@ -15,8 +13,9 @@ export type Link = {
   thumbnail: string | null;
   url: string;
   domain: string;
-  contentType: "WEB" | "YOUTUBE" | "PDF" | "AUDIO";
+  contentType: ContentType;
   ingestStatus: IngestStatus;
+  ingestFailureReason: IngestFailureReason | null;
   createdAt: Date;
 };
 
@@ -38,7 +37,7 @@ const LABEL_ORDER = [
 
 export function groupLinksByDate(links: Link[]): LinkGroup[] {
   const sorted = [...links].sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
   );
   const byLabel = new Map<string, Link[]>();
   for (const label of LABEL_ORDER) {

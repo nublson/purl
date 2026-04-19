@@ -13,9 +13,8 @@ vi.mock("@/lib/notify-links-after-ingest", () => ({
 }));
 
 const prisma = (await import("@/lib/prisma")).default;
-const { notifyLinksAfterIngest } = await import(
-  "@/lib/notify-links-after-ingest"
-);
+const { notifyLinksAfterIngest } =
+  await import("@/lib/notify-links-after-ingest");
 const { skipIngest } = await import("./ingest-skip");
 
 describe("skipIngest", () => {
@@ -31,7 +30,7 @@ describe("skipIngest", () => {
 
     expect(prisma.link.update).toHaveBeenCalledWith({
       where: { id: "link-1" },
-      data: { ingestStatus: "SKIPPED" },
+      data: { ingestStatus: "SKIPPED", ingestFailureReason: null },
     });
   });
 
@@ -44,10 +43,10 @@ describe("skipIngest", () => {
   it("calls prisma update before notifyLinksAfterIngest", async () => {
     await skipIngest("link-3");
 
-    const updateCallOrder = vi.mocked(prisma.link.update).mock.invocationCallOrder[0];
-    const notifyCallOrder = vi
-      .mocked(notifyLinksAfterIngest)
-      .mock.invocationCallOrder[0];
+    const updateCallOrder = vi.mocked(prisma.link.update).mock
+      .invocationCallOrder[0];
+    const notifyCallOrder = vi.mocked(notifyLinksAfterIngest).mock
+      .invocationCallOrder[0];
 
     expect(updateCallOrder).toBeLessThan(notifyCallOrder);
   });

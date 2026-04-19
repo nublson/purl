@@ -11,12 +11,10 @@ vi.mock("@/lib/prisma", () => ({
     $executeRaw: vi.fn(),
   },
   Prisma: {
-    sql: vi.fn(
-      (strings: TemplateStringsArray, ...values: unknown[]) => ({
-        strings,
-        values,
-      }),
-    ),
+    sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+      strings,
+      values,
+    })),
   },
 }));
 
@@ -37,6 +35,14 @@ vi.mock("@/lib/ingest-logger", () => ({
   logIngestFailure: vi.fn(),
 }));
 
+vi.mock("@/lib/ingest-fail", () => ({
+  failIngest: vi.fn(),
+}));
+
+vi.mock("./api-keys", () => ({
+  getDecryptedApiKey: vi.fn(),
+}));
+
 import { buildMetadataText } from "@/lib/metadata-chunk";
 
 const prisma = (await import("@/lib/prisma")).default;
@@ -48,10 +54,14 @@ const mockAudioLink = {
   contentType: "AUDIO" as const,
   description: null as string | null,
 };
+
 const { transcribeAudio } = await import("@/lib/audio-transcriber");
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
-const { logIngestStart, logIngestFailure } = await import("@/lib/ingest-logger");
+const { logIngestStart, logIngestFailure } =
+  await import("@/lib/ingest-logger");
+const { failIngest } = await import("@/lib/ingest-fail");
+const { getDecryptedApiKey } = await import("./api-keys");
 const { ingestAudio } = await import("./ingest-audio");
 
 describe("ingestAudio", () => {
@@ -67,8 +77,12 @@ describe("ingestAudio", () => {
     vi.mocked(embedTextChunks).mockReset();
     vi.mocked(logIngestStart).mockReset();
     vi.mocked(logIngestFailure).mockReset();
+    vi.mocked(failIngest).mockReset();
     vi.mocked(prisma.link.findUnique).mockReset();
     vi.mocked(prisma.link.findUnique).mockResolvedValue(mockAudioLink as never);
+
+    // Default: valid API key
+    vi.mocked(getDecryptedApiKey).mockResolvedValue("sk-test-key");
   });
 
   it("stores metadata chunk only when transcript produces no chunks", async () => {
@@ -79,18 +93,23 @@ describe("ingestAudio", () => {
       { id: "row-meta", chunkIndex: 0 },
     ] as never);
 
-    await ingestAudio({ linkId: "link-1", url: "https://example.com/a.mp3" });
+    await ingestAudio({
+      linkId: "link-1",
+      url: "https://example.com/a.mp3",
+      userId: "user-1",
+    });
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
       where: { id: "link-1" },
-      data: { ingestStatus: "PROCESSING" },
+      data: { ingestStatus: "PROCESSING", ingestFailureReason: null },
     });
     expect(prisma.linkContent.deleteMany).toHaveBeenCalledWith({
       where: { linkId: "link-1" },
     });
-    expect(embedTextChunks).toHaveBeenCalledWith([
-      buildMetadataText(mockAudioLink),
-    ]);
+    expect(embedTextChunks).toHaveBeenCalledWith(
+      [buildMetadataText(mockAudioLink)],
+      "sk-test-key",
+    );
     expect(logIngestStart).toHaveBeenCalledWith(
       "AUDIO",
       "link-1",
@@ -116,7 +135,11 @@ describe("ingestAudio", () => {
       { id: "row-3", chunkIndex: 2 },
     ] as never);
 
-    await ingestAudio({ linkId: "link-1", url: "https://example.com/a.mp3" });
+    await ingestAudio({
+      linkId: "link-1",
+      url: "https://example.com/a.mp3",
+      userId: "user-1",
+    });
 
     expect(prisma.linkContent.createMany).toHaveBeenCalledWith({
       data: [
@@ -136,26 +159,35 @@ describe("ingestAudio", () => {
     });
   });
 
+  it("marks NO_API_KEY when user has no key configured", async () => {
+    vi.mocked(getDecryptedApiKey).mockRejectedValue(new Error("No API key"));
+
+    await ingestAudio({
+      linkId: "link-1",
+      url: "https://example.com/a.mp3",
+      userId: "user-1",
+    });
+
+    expect(failIngest).toHaveBeenCalledWith("link-1", "NO_API_KEY");
+    expect(transcribeAudio).not.toHaveBeenCalled();
+  });
+
   it("marks failed when transcription pipeline throws", async () => {
     vi.mocked(transcribeAudio).mockRejectedValue(new Error("boom"));
 
     await expect(
-      ingestAudio({ linkId: "link-1", url: "https://example.com/a.mp3" }),
+      ingestAudio({
+        linkId: "link-1",
+        url: "https://example.com/a.mp3",
+        userId: "user-1",
+      }),
     ).rejects.toThrow("boom");
 
     expect(prisma.link.update).toHaveBeenNthCalledWith(1, {
       where: { id: "link-1" },
-      data: { ingestStatus: "PROCESSING" },
+      data: { ingestStatus: "PROCESSING", ingestFailureReason: null },
     });
-    expect(prisma.link.update).toHaveBeenLastCalledWith({
-      where: { id: "link-1" },
-      data: { ingestStatus: "FAILED" },
-    });
-    expect(logIngestStart).toHaveBeenCalledWith(
-      "AUDIO",
-      "link-1",
-      "https://example.com/a.mp3",
-    );
+    expect(failIngest).toHaveBeenCalledWith("link-1", "SCRAPE_FAILED");
     expect(logIngestFailure).toHaveBeenCalledWith(
       "AUDIO",
       "link-1",

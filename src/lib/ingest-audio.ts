@@ -1,24 +1,38 @@
-import prisma from "@/lib/prisma";
 import { transcribeAudio } from "@/lib/audio-transcriber";
 import { chunkText } from "@/lib/chunk-text";
 import { embedTextChunks } from "@/lib/embeddings";
+import { failIngest } from "@/lib/ingest-fail";
 import { applyLinkContentEmbeddings } from "@/lib/ingest-link-content-embeddings";
 import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
-import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import { buildMetadataText } from "@/lib/metadata-chunk";
+import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
+import prisma from "@/lib/prisma";
+import { getDecryptedApiKey } from "./api-keys";
 
 type IngestAudioInput = {
   linkId: string;
   url: string;
+  userId: string;
 };
 
-export async function ingestAudio({ linkId, url }: IngestAudioInput): Promise<void> {
+export async function ingestAudio({
+  linkId,
+  url,
+  userId,
+}: IngestAudioInput): Promise<void> {
   try {
     await prisma.link.update({
       where: { id: linkId },
-      data: { ingestStatus: "PROCESSING" },
+      data: { ingestStatus: "PROCESSING", ingestFailureReason: null },
     });
     logIngestStart("AUDIO", linkId, url);
+
+    const apiKey = await getDecryptedApiKey(userId).catch(() => null);
+
+    if (!apiKey) {
+      await failIngest(linkId, "NO_API_KEY");
+      return;
+    }
 
     const transcript = await transcribeAudio(url);
     const contentChunks = chunkText(transcript);
@@ -34,12 +48,8 @@ export async function ingestAudio({ linkId, url }: IngestAudioInput): Promise<vo
       },
     });
     if (!link) {
-      await prisma.link.update({
-        where: { id: linkId },
-        data: { ingestStatus: "FAILED" },
-      });
-      await notifyLinksAfterIngest(linkId);
-      throw new Error(`Link not found for ingest: ${linkId}`);
+      await failIngest(linkId, "LINK_NOT_FOUND");
+      return;
     }
 
     const metadataChunk = buildMetadataText(link);
@@ -49,7 +59,7 @@ export async function ingestAudio({ linkId, url }: IngestAudioInput): Promise<vo
       where: { linkId },
     });
 
-    const embeddings = await embedTextChunks(chunks);
+    const embeddings = await embedTextChunks(chunks, apiKey);
 
     await prisma.linkContent.createMany({
       data: chunks.map((content, index) => ({
@@ -73,11 +83,7 @@ export async function ingestAudio({ linkId, url }: IngestAudioInput): Promise<vo
     });
     await notifyLinksAfterIngest(linkId);
   } catch (error) {
-    await prisma.link.update({
-      where: { id: linkId },
-      data: { ingestStatus: "FAILED" },
-    });
-    await notifyLinksAfterIngest(linkId);
+    await failIngest(linkId, "SCRAPE_FAILED");
     logIngestFailure("AUDIO", linkId, url, error);
     throw error;
   }

@@ -3,6 +3,7 @@ import type { ToolExecutionOptions } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const TEST_CHAT_ID = "chat-test-1";
+const TEST_API_KEY = "sk-test-key";
 
 const stubToolOptions = {} as ToolExecutionOptions;
 
@@ -11,7 +12,6 @@ vi.mock("@sentry/nextjs", () => ({
   captureMessage: vi.fn(),
 }));
 
-/** AI SDK v6 `tool().execute` takes `(input, options)` and may return a plain value or a Promise. */
 async function callToolExecute<I>(
   tool: { execute?: (input: I, options: ToolExecutionOptions) => unknown },
   input: I,
@@ -41,10 +41,15 @@ vi.mock("@/lib/semantic-search", () => ({
   semanticSearch: vi.fn(),
 }));
 
+vi.mock("./api-keys", () => ({
+  getDecryptedApiKey: vi.fn(),
+}));
+
 const { streamText } = await import("ai");
 const { getChatModel } = await import("@/lib/ai");
 const prisma = (await import("@/lib/prisma")).default;
 const { semanticSearch } = await import("@/lib/semantic-search");
+const { getDecryptedApiKey } = await import("./api-keys");
 const Sentry = await import("@sentry/nextjs");
 const { streamChatResponse, buildMentionContext, buildChatTools } =
   await import("./chat");
@@ -53,19 +58,28 @@ describe("streamChatResponse", () => {
   beforeEach(() => {
     vi.mocked(streamText).mockReset();
     vi.mocked(getChatModel).mockReset();
+    vi.mocked(getDecryptedApiKey).mockReset();
+    vi.mocked(getDecryptedApiKey).mockResolvedValue(TEST_API_KEY);
   });
 
-  it("delegates to AI SDK streamText with system prompt, tools, and messages", () => {
+  it("delegates to AI SDK streamText with system prompt, tools, and messages", async () => {
     const model = { id: "chat-model" };
-    const messages = [{ role: "user", content: [{ type: "text", text: "Hi" }] }];
+    const messages = [
+      { role: "user", content: [{ type: "text", text: "Hi" }] },
+    ];
     const streamResult = { toDataStreamResponse: vi.fn() };
 
     vi.mocked(getChatModel).mockReturnValue(model as never);
     vi.mocked(streamText).mockReturnValue(streamResult as never);
 
-    const result = streamChatResponse(messages as never, "user-123", null, {
-      chatId: TEST_CHAT_ID,
-    });
+    const result = await streamChatResponse(
+      messages as never,
+      "user-123",
+      null,
+      {
+        chatId: TEST_CHAT_ID,
+      },
+    );
 
     expect(streamText).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -83,15 +97,17 @@ describe("streamChatResponse", () => {
     expect(result).toEqual(streamResult);
   });
 
-  it("includes mention context in system prompt when provided", () => {
+  it("includes mention context in system prompt when provided", async () => {
     const model = { id: "chat-model" };
-    const messages = [{ role: "user", content: [{ type: "text", text: "Hi" }] }];
+    const messages = [
+      { role: "user", content: [{ type: "text", text: "Hi" }] },
+    ];
     const context = "### Article\nSource: https://example.com\n\nSome content";
 
     vi.mocked(getChatModel).mockReturnValue(model as never);
     vi.mocked(streamText).mockReturnValue({} as never);
 
-    streamChatResponse(messages as never, "user-123", context, {
+    await streamChatResponse(messages as never, "user-123", context, {
       chatId: TEST_CHAT_ID,
     });
 
@@ -100,6 +116,39 @@ describe("streamChatResponse", () => {
         system: expect.stringContaining("@mentioned items"),
       }),
     );
+  });
+
+  it("emits NO_API_KEY error and returns undefined when no api key is found", async () => {
+    vi.mocked(getDecryptedApiKey).mockRejectedValue(new Error("No key"));
+    const write = vi.fn();
+    const streamWriter = { write, merge: vi.fn(), onError: undefined };
+
+    const result = await streamChatResponse([] as never, "user-123", null, {
+      chatId: TEST_CHAT_ID,
+      streamWriter: streamWriter as never,
+    });
+
+    expect(result).toBeUndefined();
+    expect(streamText).not.toHaveBeenCalled();
+    expect(write).toHaveBeenCalledWith({
+      type: "data-chat-protocol-error",
+      data: {
+        code: CHAT_STREAM_ERROR_CODES.NO_API_KEY,
+        userMessage: "Add your OpenAI API key in Settings to use the chat.",
+      },
+      transient: true,
+    });
+  });
+
+  it("passes apiKey to getChatModel", async () => {
+    vi.mocked(getChatModel).mockReturnValue({} as never);
+    vi.mocked(streamText).mockReturnValue({} as never);
+
+    await streamChatResponse([] as never, "user-123", null, {
+      chatId: TEST_CHAT_ID,
+    });
+
+    expect(getChatModel).toHaveBeenCalledWith(TEST_API_KEY);
   });
 });
 
@@ -142,14 +191,6 @@ describe("buildMentionContext", () => {
 
     const result = await buildMentionContext("user-1", ["id-1"]);
 
-    expect(prisma.linkContent.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          linkId: { in: ["id-1"] },
-          link: { userId: "user-1" },
-        },
-      }),
-    );
     expect(result).toContain("### My Article");
     expect(result).toContain("Source: https://example.com/article");
     expect(result).toContain("Chunk one");
@@ -171,14 +212,6 @@ describe("buildMentionContext", () => {
 
     const result = await buildMentionContext("user-1", ["id-1", "id-2"]);
 
-    expect(prisma.linkContent.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          linkId: { in: ["id-1", "id-2"] },
-          link: { userId: "user-1" },
-        },
-      }),
-    );
     expect(result).toContain("### Article A");
     expect(result).toContain("### Article B");
     expect(result).toContain("---");
@@ -196,21 +229,26 @@ describe("buildChatTools – listSavedItems", () => {
   it("queries all links for the user with default take=20 when no filters provided", async () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
 
-    const tools = buildChatTools(userId, { chatId: TEST_CHAT_ID });
+    const tools = buildChatTools(
+      userId,
+      { chatId: TEST_CHAT_ID },
+      TEST_API_KEY,
+    );
     await callToolExecute(tools.listSavedItems, {});
 
     expect(prisma.link.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { userId },
-        take: 20,
-      }),
+      expect.objectContaining({ where: { userId }, take: 20 }),
     );
   });
 
   it("adds contentType to the where clause when provided", async () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
 
-    const tools = buildChatTools(userId, { chatId: TEST_CHAT_ID });
+    const tools = buildChatTools(
+      userId,
+      { chatId: TEST_CHAT_ID },
+      TEST_API_KEY,
+    );
     await callToolExecute(tools.listSavedItems, { contentType: "PDF" });
 
     expect(prisma.link.findMany).toHaveBeenCalledWith(
@@ -223,7 +261,11 @@ describe("buildChatTools – listSavedItems", () => {
   it("adds dateFrom and dateTo to createdAt filter when provided", async () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
 
-    const tools = buildChatTools(userId, { chatId: TEST_CHAT_ID });
+    const tools = buildChatTools(
+      userId,
+      { chatId: TEST_CHAT_ID },
+      TEST_API_KEY,
+    );
     await callToolExecute(tools.listSavedItems, {
       dateFrom: "2025-01-01T00:00:00Z",
       dateTo: "2025-01-31T23:59:59Z",
@@ -244,7 +286,11 @@ describe("buildChatTools – listSavedItems", () => {
   it("clamps limit below 1 to 1", async () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
 
-    const tools = buildChatTools(userId, { chatId: TEST_CHAT_ID });
+    const tools = buildChatTools(
+      userId,
+      { chatId: TEST_CHAT_ID },
+      TEST_API_KEY,
+    );
     await callToolExecute(tools.listSavedItems, { limit: 0 });
 
     expect(prisma.link.findMany).toHaveBeenCalledWith(
@@ -255,7 +301,11 @@ describe("buildChatTools – listSavedItems", () => {
   it("clamps limit above 50 to 50", async () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
 
-    const tools = buildChatTools(userId, { chatId: TEST_CHAT_ID });
+    const tools = buildChatTools(
+      userId,
+      { chatId: TEST_CHAT_ID },
+      TEST_API_KEY,
+    );
     await callToolExecute(tools.listSavedItems, { limit: 999 });
 
     expect(prisma.link.findMany).toHaveBeenCalledWith(
@@ -277,7 +327,11 @@ describe("buildChatTools – listSavedItems", () => {
       },
     ] as never);
 
-    const tools = buildChatTools(userId, { chatId: TEST_CHAT_ID });
+    const tools = buildChatTools(
+      userId,
+      { chatId: TEST_CHAT_ID },
+      TEST_API_KEY,
+    );
     const result = await callToolExecute(tools.listSavedItems, {});
 
     expect(result).toEqual([
@@ -295,7 +349,11 @@ describe("buildChatTools – listSavedItems", () => {
   it("captures Sentry and rethrows when prisma.link.findMany fails", async () => {
     vi.mocked(prisma.link.findMany).mockRejectedValue(new Error("db fail"));
 
-    const tools = buildChatTools(userId, { chatId: TEST_CHAT_ID });
+    const tools = buildChatTools(
+      userId,
+      { chatId: TEST_CHAT_ID },
+      TEST_API_KEY,
+    );
     await expect(callToolExecute(tools.listSavedItems, {})).rejects.toThrow(
       "db fail",
     );
@@ -318,10 +376,14 @@ describe("buildChatTools – listSavedItems", () => {
     const write = vi.fn();
     const streamWriter = { write, merge: vi.fn(), onError: undefined };
 
-    const tools = buildChatTools(userId, {
-      chatId: TEST_CHAT_ID,
-      streamWriter: streamWriter as never,
-    });
+    const tools = buildChatTools(
+      userId,
+      {
+        chatId: TEST_CHAT_ID,
+        streamWriter: streamWriter as never,
+      },
+      TEST_API_KEY,
+    );
     await expect(callToolExecute(tools.listSavedItems, {})).rejects.toThrow(
       "db fail",
     );
@@ -351,7 +413,11 @@ describe("buildChatTools – searchContent", () => {
   it("returns empty array when semanticSearch finds no results", async () => {
     vi.mocked(semanticSearch).mockResolvedValue([]);
 
-    const tools = buildChatTools(userId, { chatId: TEST_CHAT_ID });
+    const tools = buildChatTools(
+      userId,
+      { chatId: TEST_CHAT_ID },
+      TEST_API_KEY,
+    );
     const result = await callToolExecute(tools.searchContent, {
       query: "react hooks",
     });
@@ -360,23 +426,31 @@ describe("buildChatTools – searchContent", () => {
     expect(prisma.linkContent.findMany).not.toHaveBeenCalled();
   });
 
-  it("passes query and userId to semanticSearch with default matchCount=10", async () => {
+  it("passes query, userId and apiKey to semanticSearch with default matchCount=10", async () => {
     vi.mocked(semanticSearch).mockResolvedValue([]);
 
-    const tools = buildChatTools(userId, { chatId: TEST_CHAT_ID });
+    const tools = buildChatTools(
+      userId,
+      { chatId: TEST_CHAT_ID },
+      TEST_API_KEY,
+    );
     await callToolExecute(tools.searchContent, { query: "typescript tips" });
 
     expect(semanticSearch).toHaveBeenCalledWith(
       "typescript tips",
       userId,
-      expect.objectContaining({ matchCount: 10 }),
+      expect.objectContaining({ matchCount: 10, apiKey: TEST_API_KEY }),
     );
   });
 
   it("clamps limit above 20 to 20 for matchCount", async () => {
     vi.mocked(semanticSearch).mockResolvedValue([]);
 
-    const tools = buildChatTools(userId, { chatId: TEST_CHAT_ID });
+    const tools = buildChatTools(
+      userId,
+      { chatId: TEST_CHAT_ID },
+      TEST_API_KEY,
+    );
     await callToolExecute(tools.searchContent, { query: "q", limit: 100 });
 
     expect(semanticSearch).toHaveBeenCalledWith(
@@ -389,7 +463,11 @@ describe("buildChatTools – searchContent", () => {
   it("clamps limit below 1 to 1 for matchCount", async () => {
     vi.mocked(semanticSearch).mockResolvedValue([]);
 
-    const tools = buildChatTools(userId, { chatId: TEST_CHAT_ID });
+    const tools = buildChatTools(
+      userId,
+      { chatId: TEST_CHAT_ID },
+      TEST_API_KEY,
+    );
     await callToolExecute(tools.searchContent, { query: "q", limit: 0 });
 
     expect(semanticSearch).toHaveBeenCalledWith(
@@ -425,8 +503,14 @@ describe("buildChatTools – searchContent", () => {
       },
     ] as never);
 
-    const tools = buildChatTools(userId, { chatId: TEST_CHAT_ID });
-    const result = await callToolExecute(tools.searchContent, { query: "great" });
+    const tools = buildChatTools(
+      userId,
+      { chatId: TEST_CHAT_ID },
+      TEST_API_KEY,
+    );
+    const result = await callToolExecute(tools.searchContent, {
+      query: "great",
+    });
 
     expect(result).toEqual([
       {

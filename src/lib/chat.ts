@@ -1,24 +1,22 @@
-import {
-  streamText,
-  tool,
-  jsonSchema,
-  stepCountIs,
-  type ModelMessage,
-  type ToolExecutionOptions,
-  type UIMessageStreamWriter,
-} from "ai";
-import * as Sentry from "@sentry/nextjs";
 import { getChatModel } from "@/lib/ai";
 import { CHAT_STREAM_ERROR_CODES } from "@/lib/chat-http-errors";
 import type {
   ChatStreamErrorPayload,
   PurlChatUIMessage,
 } from "@/lib/chat-stream-error";
-import prisma from "@/lib/prisma";
+import prisma, { ContentType } from "@/lib/prisma";
+import { semanticSearch } from "@/lib/semantic-search";
+import * as Sentry from "@sentry/nextjs";
 import {
-  semanticSearch,
-  type LinkContentType,
-} from "@/lib/semantic-search";
+  jsonSchema,
+  stepCountIs,
+  streamText,
+  tool,
+  type ModelMessage,
+  type ToolExecutionOptions,
+  type UIMessageStreamWriter,
+} from "ai";
+import { getDecryptedApiKey } from "./api-keys";
 
 function buildSystemPrompt(context: string | null): string {
   const today = new Date().toLocaleDateString("en-US", {
@@ -101,6 +99,7 @@ export function buildChatTools(
     chatId: string;
     streamWriter?: UIMessageStreamWriter<PurlChatUIMessage>;
   },
+  apiKey?: string,
 ) {
   const toolCtx: ChatToolContext = {
     userId,
@@ -229,9 +228,10 @@ export function buildChatTools(
         try {
           const results = await semanticSearch(query, userId, {
             matchCount: Math.max(1, Math.min(limit ?? 10, 20)),
-            type: contentType as LinkContentType | undefined,
+            type: contentType as ContentType | undefined,
             dateFrom: dateFrom ? new Date(dateFrom) : undefined,
             dateTo: dateTo ? new Date(dateTo) : undefined,
+            apiKey,
           });
 
           if (results.length === 0) return [];
@@ -255,7 +255,12 @@ export function buildChatTools(
 
           const grouped = new Map<
             string,
-            { url: string; contentType: string; savedAt: string; texts: string[] }
+            {
+              url: string;
+              contentType: string;
+              savedAt: string;
+              texts: string[];
+            }
           >();
           for (const c of linkContents) {
             const existing = grouped.get(c.link.title);
@@ -343,13 +348,24 @@ export type StreamChatResponseOptions = {
   streamWriter?: UIMessageStreamWriter<PurlChatUIMessage>;
 };
 
-export function streamChatResponse(
+export async function streamChatResponse(
   messages: ModelMessage[],
   userId: string,
   context: string | null,
   options: StreamChatResponseOptions,
 ) {
   const { chatId, onAssistantText, streamWriter } = options;
+
+  const apiKey = await getDecryptedApiKey(userId).catch(() => null);
+
+  if (!apiKey) {
+    emitChatStreamProtocolError(streamWriter, {
+      code: CHAT_STREAM_ERROR_CODES.NO_API_KEY,
+      userMessage: "Add your OpenAI API key in Settings to use the chat.",
+    });
+    return;
+  }
+
   let streamFailureNotified = false;
   function notifyStreamFailure(): void {
     if (streamFailureNotified) return;
@@ -361,19 +377,34 @@ export function streamChatResponse(
   }
 
   return streamText({
-    model: getChatModel(),
+    model: getChatModel(apiKey),
     system: buildSystemPrompt(context),
     messages,
-    tools: buildChatTools(userId, { chatId, streamWriter }),
+    tools: buildChatTools(userId, { chatId, streamWriter }, apiKey),
     stopWhen: stepCountIs(5),
     onError: ({ error }) => {
       Sentry.captureException(error, {
-        tags: {
-          phase: "stream",
-          userId,
-          chatId,
-        },
+        tags: { phase: "stream", userId, chatId },
       });
+
+      const raw =
+        typeof error === "string"
+          ? error
+          : error instanceof Error
+            ? error.message
+            : JSON.stringify(error);
+
+      const isQuotaError = /insufficient_quota/i.test(raw);
+
+      if (isQuotaError) {
+        emitChatStreamProtocolError(streamWriter, {
+          code: CHAT_STREAM_ERROR_CODES.QUOTA_EXCEEDED,
+          userMessage: "Your OpenAI API key has run out of credits.",
+        });
+        streamFailureNotified = true;
+        return;
+      }
+
       notifyStreamFailure();
     },
     onFinish: async ({ text, finishReason }) => {

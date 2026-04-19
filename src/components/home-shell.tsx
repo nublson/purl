@@ -5,6 +5,7 @@ import { LinkInput } from "@/components/link-input";
 import { PasteHandler } from "@/components/paste-handler";
 import { LinkItemSkeleton } from "@/components/skeletons";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
+import type { LinkGroup as LinkGroupType } from "@/utils/links";
 import {
   UPLOAD_ERROR_EVENT,
   UPLOAD_START_EVENT,
@@ -12,8 +13,6 @@ import {
   type UploadStartDetail,
   type UploadSuccessDetail,
 } from "@/utils/upload-events";
-import type { LinkGroup as LinkGroupType } from "@/utils/links";
-import { PackageOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { LinkGroupEmpty } from "./link-group-empty";

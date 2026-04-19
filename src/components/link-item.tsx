@@ -57,14 +57,15 @@ async function pollIngestUntilSettled(
   }
 }
 
+interface LinkItemProps {
+  link: LinkType;
+  preview?: boolean;
+  eagerFavicon?: boolean;
+}
+
 export const LinkItem = React.forwardRef<
   HTMLDivElement,
-  {
-    link: LinkType;
-    preview?: boolean;
-    /** First above-the-fold row: eager-load favicon to satisfy LCP when src is large. */
-    eagerFavicon?: boolean;
-  } & React.ComponentPropsWithoutRef<typeof Item>
+  LinkItemProps & React.ComponentPropsWithoutRef<typeof Item>
 >(function LinkItem(
   {
     link,
@@ -79,6 +80,7 @@ export const LinkItem = React.forwardRef<
 ) {
   const chatCtx = useChatContextSafe();
   const router = useRouter();
+
   const ingestPollGenRef = React.useRef(0);
   const lastLinkIdRef = React.useRef(link.id);
   const [displayIngestStatus, setDisplayIngestStatus] = React.useState<

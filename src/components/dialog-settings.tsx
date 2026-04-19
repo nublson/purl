@@ -4,6 +4,7 @@ import { deleteUser } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
+import ApiKeyForm from "./api-key-form";
 import { DialogWrapper } from "./dialog-wrapper";
 import {
   AlertDialog,
@@ -17,15 +18,15 @@ import {
 } from "./ui/alert-dialog";
 import { Button } from "./ui/button";
 import { Field, FieldGroup, FieldLabel } from "./ui/field";
+import { Input } from "./ui/input";
 import {
   Item,
   ItemActions,
   ItemContent,
   ItemDescription,
-  ItemGroup,
   ItemTitle,
 } from "./ui/item";
-import { Input } from "./ui/input";
+import { Separator } from "./ui/separator";
 
 interface SettingsDialogProps {
   children: React.ReactNode;
@@ -53,8 +54,10 @@ interface SettingsContentProps {
 
 function SettingsContent({ onAccountDeleted }: SettingsContentProps) {
   return (
-    <ItemGroup className="w-full">
+    <div className="w-full flex flex-col gap-4">
+      <ApiKeyForm />
       <Item className="px-0">
+        <Separator />
         <ItemContent>
           <ItemTitle>Delete account</ItemTitle>
           <ItemDescription>
@@ -65,7 +68,7 @@ function SettingsContent({ onAccountDeleted }: SettingsContentProps) {
           <DeleteAccountButton onAccountDeleted={onAccountDeleted} />
         </ItemActions>
       </Item>
-    </ItemGroup>
+    </div>
   );
 }
 

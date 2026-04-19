@@ -15,17 +15,19 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 
+interface LinkMenuProps {
+  link: LinkType;
+  onDeleteStart?: () => void;
+  onDeleteSuccess?: () => void;
+  onDeleteError?: () => void;
+}
+
 export function LinkMenu({
   link,
   onDeleteStart,
   onDeleteSuccess,
   onDeleteError,
-}: {
-  link: LinkType;
-  onDeleteStart?: () => void;
-  onDeleteSuccess?: () => void;
-  onDeleteError?: () => void;
-}) {
+}: LinkMenuProps) {
   const router = useRouter();
   const chatCtx = useChatContextSafe();
 
