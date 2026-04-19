@@ -1,6 +1,5 @@
 "use client";
 
-import { useHasApiKey } from "@/contexts/api-key-context";
 import { useChatContextSafe } from "@/contexts/chat-context";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { Link as LinkType } from "@/utils/links";
@@ -31,7 +30,6 @@ export function LinkMenu({
 }: LinkMenuProps) {
   const router = useRouter();
   const chatCtx = useChatContextSafe();
-  const hasApiKey = useHasApiKey();
 
   async function handleCopyLink() {
     try {
@@ -79,7 +77,7 @@ export function LinkMenu({
     >
       <DropdownMenuGroup>
         <DropdownMenuItem
-          disabled={link.ingestStatus !== "COMPLETED" || !hasApiKey}
+          disabled={link.ingestStatus !== "COMPLETED"}
           onSelect={() => {
             chatCtx?.triggerSummarize(link);
           }}

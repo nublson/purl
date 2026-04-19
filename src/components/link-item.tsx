@@ -1,6 +1,5 @@
 "use client";
 
-import { useHasApiKey } from "@/contexts/api-key-context";
 import { useChatContextSafe } from "@/contexts/chat-context";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
@@ -81,7 +80,6 @@ export const LinkItem = React.forwardRef<
 ) {
   const chatCtx = useChatContextSafe();
   const router = useRouter();
-  const hasApiKey = useHasApiKey();
 
   const ingestPollGenRef = React.useRef(0);
   const lastLinkIdRef = React.useRef(link.id);
@@ -217,7 +215,7 @@ export const LinkItem = React.forwardRef<
             type="button"
             variant="ghost"
             size="icon-sm"
-            disabled={disableAddToChat || !hasApiKey}
+            disabled={disableAddToChat}
             data-add-to-chat=""
             className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
             onClick={() => {
