@@ -92,9 +92,7 @@ const ApiKeyForm = () => {
               </InputGroup>
               <div className="flex items-baseline justify-between gap-1">
                 <FieldDescription className="text-xs">
-                  {hasKey
-                    ? "Your API key is encrypted and stored securely."
-                    : "No API key found. Please save one to enable AI features."}
+                  Your API key is encrypted and stored securely.
                 </FieldDescription>
               </div>
               {field.state.meta.errors?.length ? (
