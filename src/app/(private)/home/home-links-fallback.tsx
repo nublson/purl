@@ -1,9 +1,14 @@
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function HomeLinksFallback() {
   return (
-    <div className="flex min-h-[200px] flex-1 flex-col items-center justify-center gap-8">
-      <Spinner className="size-8 text-muted-foreground" />
+    <div className="space-y-4 w-full">
+      <Skeleton className="h-4 w-8" />
+      <div className="flex flex-col gap-2">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-12 w-full py-2" />
+        ))}
+      </div>
     </div>
   );
 }

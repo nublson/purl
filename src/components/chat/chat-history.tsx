@@ -53,7 +53,7 @@ export function ChatHistory({
           <ChevronDown />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-2xs max-h-52" align="end">
+      <DropdownMenuContent className="w-2xs max-h-52" align="center">
         {isLoading && (
           <div className="px-2 py-3 text-center">
             <Typography size="small" className="text-muted-foreground">

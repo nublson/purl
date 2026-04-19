@@ -1,8 +1,8 @@
 import Header from "@/components/header";
 import { HeaderSearchLinks } from "@/components/header-search-links";
+import { HeaderActionsFallback } from "@/components/skeletons";
 import { UploadFile } from "@/components/upload-file";
 import { User } from "@/components/user";
-import { HeaderActionsFallback } from "@/components/skeletons";
 import { getLinksForCurrentUser } from "@/lib/links";
 import type { Metadata } from "next";
 import { Fragment, Suspense } from "react";
