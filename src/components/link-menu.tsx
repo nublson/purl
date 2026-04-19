@@ -1,5 +1,6 @@
 "use client";
 
+import { useHasApiKey } from "@/contexts/api-key-context";
 import { useChatContextSafe } from "@/contexts/chat-context";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { Link as LinkType } from "@/utils/links";
@@ -15,19 +16,22 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 
+interface LinkMenuProps {
+  link: LinkType;
+  onDeleteStart?: () => void;
+  onDeleteSuccess?: () => void;
+  onDeleteError?: () => void;
+}
+
 export function LinkMenu({
   link,
   onDeleteStart,
   onDeleteSuccess,
   onDeleteError,
-}: {
-  link: LinkType;
-  onDeleteStart?: () => void;
-  onDeleteSuccess?: () => void;
-  onDeleteError?: () => void;
-}) {
+}: LinkMenuProps) {
   const router = useRouter();
   const chatCtx = useChatContextSafe();
+  const hasApiKey = useHasApiKey();
 
   async function handleCopyLink() {
     try {
@@ -75,7 +79,7 @@ export function LinkMenu({
     >
       <DropdownMenuGroup>
         <DropdownMenuItem
-          disabled={link.ingestStatus !== "COMPLETED"}
+          disabled={link.ingestStatus !== "COMPLETED" || !hasApiKey}
           onSelect={() => {
             chatCtx?.triggerSummarize(link);
           }}
