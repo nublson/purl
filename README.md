@@ -8,9 +8,8 @@
 
 **Live preview:** [https://purl.nublson.com](https://purl.nublson.com)
 
-Purl is an AI-powered read-it-later app and personal knowledge base. You paste URLs (or upload files): web pages, PDFs, YouTube videos, and audio. Purl ingests the content, stores chunked text with vector embeddings, and answers questions by searching what you saved—optionally scoped with `@` mentions to specific items.
-
-The product goal: one place to stash material you care about, then query it later with citations instead of digging through bookmarks.
+Purl is a free, AI-powered read-it-later app and personal knowledge base. You paste URLs (or upload files): web pages, PDFs, YouTube videos, and audio. Purl ingests the content, stores chunked text with vector embeddings, and answers questions by searching what you saved—optionally scoped with @ mentions to specific items.
+Bring your own OpenAI API key to unlock AI chat, content extraction, YouTube and audio transcription. The product goal: one place to stash material you care about, then query it later with citations instead of digging through bookmarks.
 
 ## Implemented today
 
@@ -21,7 +20,7 @@ The product goal: one place to stash material you care about, then query it late
   - **File upload** for PDF and audio (size limits enforced server-side).
   - Links grouped by relative time (e.g. Today, This Week, Last Month).
   - Preview metadata (title, description, favicon, thumbnail where available).
-- **Ingestion pipeline** — Fetches or extracts text (including transcripts for YouTube/audio), chunks it, embeds with OpenAI, stores in Postgres with **pgvector**; tracks per-link ingest status (pending, processing, completed, failed, skipped for edge cases like heavy SPAs).
+- **Ingestion pipeline** — Fetches or extracts text (including transcripts for YouTube/audio), chunks it, embeds with the user's OpenAI API key, stores in Postgres with **pgvector**; tracks per-link ingest status (pending, processing, completed, failed, skipped for edge cases like heavy SPAs).
 - **Hardened outbound fetch** — Server-side `safeFetch` with optional proxy/DNS controls (see `AGENTS.md`).
 - **Realtime list sync** — Supabase Realtime so saves and updates propagate across tabs/devices quickly.
 - **AI chat**
@@ -84,19 +83,18 @@ flowchart TB
 These are called out explicitly because the repo is going public:
 
 - **Settings breadth** — Settings now include account deletion, but broader account preferences (profile edits, password change, notification settings, etc.) are not implemented yet.
-- **Subscriptions / billing** — Landing pricing is **not** connected to payments. The “Upgrade” menu item is **disabled**; there is no Stripe (or other) subscription integration, plan enforcement, or usage limits tied to a paid tier.
 
 **Marketing vs. product:** The landing page copy mentions ideas such as **collections** and a **weekly digest**. Those are **not** built in the current schema or app—treat them as roadmap, not shipped features.
 
 ## Tech stack
 
-- **Web:** Next.js (App Router), React, TypeScript  
-- **UI:** Tailwind CSS, shadcn/ui  
-- **Auth:** Better Auth  
-- **Database:** PostgreSQL + Prisma (with vector column for embeddings)  
-- **AI:** OpenAI (chat + embeddings) via the Vercel AI SDK  
-- **Email (optional in dev):** Resend for verification emails  
-- **Realtime:** Supabase client (anon + service role on server)  
+- **Web:** Next.js (App Router), React, TypeScript
+- **UI:** Tailwind CSS, shadcn/ui
+- **Auth:** Better Auth
+- **Database:** PostgreSQL + Prisma (with vector column for embeddings)
+- **AI:** OpenAI (chat + embeddings) via the Vercel AI SDK
+- **Email (optional in dev):** Resend for verification emails
+- **Realtime:** Supabase client (anon + service role on server)
 - **PWA:** [Serwist](https://serwist.pages.dev/) (`@serwist/next`), web manifest + precache / offline fallback
 
 ## CI / GitHub Actions
@@ -127,7 +125,7 @@ Purl is built around **untrusted input** (arbitrary URLs and uploaded files). A 
 - **Authentication & route gating** — [Better Auth](https://www.better-auth.com/) sessions; Next.js [`proxy`](src/proxy.ts) redirects unauthenticated users away from private routes and can require **email verification** before app access.
 - **API authorization** — Sensitive routes (`/api/chat`, `/api/links`, `/api/upload`, chats, etc.) resolve the session server-side and scope work to the signed-in user (e.g. chat mention IDs are validated against ownership).
 - **Rate limiting** — When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set, the proxy applies per-IP limits to **`/api/auth/*`**, **`POST /api/chat`**, **`POST /api/links`**, and **`POST /api/upload`** (see [`proxy-rate-limit.ts`](src/lib/proxy-rate-limit.ts)). Without Upstash, limits are disabled—fine locally, not ideal for production.
-- **Secrets & client exposure** — `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, and similar values are **server-only**. The browser uses the Supabase **anon** key for Realtime only; `.env` stays gitignored.
+- **Secrets & client exposure** — `SUPABASE_SERVICE_ROLE_KEY`, and similar values are server-only. Per-user OpenAI API keys are encrypted at rest using AES-256-GCM and decrypted server-side only at ingest/chat time — never exposed to the client. The browser uses the Supabase **anon** key for Realtime only; `.env` stays gitignored.
 - **Upload bounds** — Audio uploads enforce a maximum size server-side; PDF proxy streaming is capped (see `safe-outbound-fetch` / upload limits in code).
 
 **Reporting a vulnerability:** use [GitHub Security Advisories](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability) for this repository so details stay private until patched.
@@ -136,8 +134,8 @@ Purl is built around **untrusted input** (arbitrary URLs and uploaded files). A 
 
 ### Prerequisites
 
-- **Node.js:** recent LTS  
-- **Package manager:** `pnpm` (this repo includes `pnpm-lock.yaml`)  
+- **Node.js:** recent LTS
+- **Package manager:** `pnpm` (this repo includes `pnpm-lock.yaml`)
 - **Postgres:** local or hosted (Supabase works well with pgvector)
 
 ### 1) Install dependencies
@@ -152,7 +150,6 @@ Create a `.env` file in the repo root. See `.env.example` for the full list; min
 
 ```bash
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME"
-OPENAI_API_KEY="sk-..."
 
 # Supabase Realtime — cross-device instant link list sync (same project as Postgres)
 NEXT_PUBLIC_SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
