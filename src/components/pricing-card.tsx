@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import Link from "next/link";
 import { Typography } from "./typography";
 import { Button } from "./ui/button";
 import {
@@ -72,8 +73,9 @@ export const PricingCard = ({
           variant={popular ? "default" : "outline"}
           size={"lg"}
           className="w-full"
+          asChild
         >
-          {actionText}
+          <Link href="/signup">{actionText}</Link>
         </Button>
       </CardFooter>
     </Card>
