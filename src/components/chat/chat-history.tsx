@@ -14,7 +14,7 @@ import {
   formatChatHistoryTime,
   groupChatsByChatHistoryDate,
 } from "@/utils/formatter";
-import { History } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Typography } from "../typography";
 
@@ -49,12 +49,8 @@ export function ChatHistory({
   return (
     <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="cursor-pointer text-muted-foreground"
-        >
-          <History />
+        <Button variant="ghost" size="icon-sm" className="cursor-pointer">
+          <ChevronDown />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-2xs max-h-52" align="end">

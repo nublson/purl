@@ -317,7 +317,7 @@ export default function ChatHeader({
   );
 
   return (
-    <header className="flex w-full flex-col border-b border-border">
+    <header className="flex w-full flex-col">
       {flowError && onDismissFlowError ? (
         <FlowErrorBanner
           error={flowError}
@@ -336,21 +336,23 @@ export default function ChatHeader({
         {isLoadingChat ? (
           <Skeleton className="h-3.5 w-32" />
         ) : (
-          <Typography
-            component="h3"
-            size="small"
-            className="text-accent-foreground line-clamp-1 font-medium break-all"
-          >
-            {label}
-          </Typography>
+          <div className="flex items-center justify-start gap-1">
+            <Typography
+              component="h3"
+              size="small"
+              className="text-accent-foreground line-clamp-1 font-medium break-all"
+            >
+              {label}
+            </Typography>
+            <ChatHistory
+              chats={chats}
+              isLoading={isLoading}
+              onSelectChat={onSelectChat}
+              onOpenChange={handleHistoryOpenChange}
+            />
+          </div>
         )}
         <div className="flex items-center justify-center gap-2">
-          <ChatHistory
-            chats={chats}
-            isLoading={isLoading}
-            onSelectChat={onSelectChat}
-            onOpenChange={handleHistoryOpenChange}
-          />
           <Button
             size="icon-sm"
             variant="ghost"
