@@ -3,7 +3,7 @@ import SectionWrapper from "@/components/section-wrapper";
 
 export const AskPurlSection = () => {
   return (
-    <SectionWrapper>
+    <SectionWrapper id="ask-purl">
       <div className="w-full flex flex-col items-center justify-start gap-8">
         <SectionTitle
           data={{

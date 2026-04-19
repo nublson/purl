@@ -13,7 +13,7 @@
     {
       "value": "free-vs-pro",
       "title": "What's the difference between Free and Pro?",
-      "content": "The Free plan includes unlimited link saving, 5 PDFs per month, and limited AI chat. The Pro plan ($9/month) includes everything in Free plus unlimited PDFs, YouTube transcript extraction, audio transcription (120 minutes per month), and unlimited AI chat. No credit card is required to start."
+      "content": "The Free plan lets you save unlimited links and upload PDFs and audio files. Pro unlocks AI chat and transcript extraction for all your saved content — powered by your own OpenAI API key. There's no monthly subscription for Pro; just add your key in Settings and you only pay OpenAI directly for what you use."
     },
     {
       "value": "is-my-data-private",
@@ -21,9 +21,9 @@
       "content": "Yes. Your library is private to you — only you can see what you've saved and the answers you receive. Purl does not share your content with other users or use it to train AI models."
     },
     {
-      "value": "can-i-cancel",
-      "title": "Can I cancel my subscription at any time?",
-      "content": "Absolutely. You can cancel your Pro subscription at any time from your account settings. You'll retain access to Pro features until the end of your current billing period, and your saved content will remain accessible on the Free plan."
+      "value": "do-i-need-an-openai-account",
+      "title": "Do I need an OpenAI account?",
+      "content": "Only if you want to use AI chat or transcript extraction. Create a free account at platform.openai.com, generate an API key, and add it in your Purl Settings. You'll be billed directly by OpenAI based on your usage — typically a few cents per conversation."
     }
   ]
 }

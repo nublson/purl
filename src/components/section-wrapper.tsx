@@ -1,12 +1,16 @@
 import SectionSeparator from "./section-separator";
 
-export default function SectionWrapper({
-  children,
-}: {
+interface SectionWrapperProps {
   children: React.ReactNode;
-}) {
+  id?: string;
+}
+
+export default function SectionWrapper({ children, id }: SectionWrapperProps) {
   return (
-    <section className="w-full flex flex-col items-center justify-start gap-20 pt-[100px]">
+    <section
+      id={id}
+      className="w-full flex flex-col items-center justify-start gap-20 pt-[100px]"
+    >
       {children}
       <SectionSeparator />
     </section>

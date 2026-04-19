@@ -40,14 +40,14 @@ export const PricingCard = ({
         </Typography>
         <CardTitle>
           <Typography component="h3" variant="h2" className="text-5xl mb-2">
-            ${price}{" "}
-            <Typography
+            {price}
+            {/* <Typography
               component="span"
               size="small"
               className="text-neutral-600 font-sans"
             >
               /month
-            </Typography>
+            </Typography> */}
           </Typography>
         </CardTitle>
         <CardDescription className="line-clamp-2">
