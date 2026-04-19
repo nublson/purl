@@ -310,22 +310,35 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     void regenerate();
   }, [clearError, regenerate]);
 
-  const injectNoApiKeyMessage = useCallback(() => {
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        parts: [
-          {
-            type: "text",
-            text: "AI Chat is a Pro feature. Add your OpenAI API key in Settings to use it.",
-          },
-        ],
-        createdAt: new Date(),
-      } as UIMessage,
-    ]);
-  }, [setMessages]);
+  const injectNoApiKeyMessage = useCallback(
+    (text?: string) => {
+      setMessages((prev) => [
+        ...prev,
+        ...(text
+          ? [
+              {
+                id: crypto.randomUUID(),
+                role: "user" as const,
+                parts: [{ type: "text" as const, text }],
+                createdAt: new Date(),
+              } as UIMessage,
+            ]
+          : []),
+        {
+          id: crypto.randomUUID(),
+          role: "assistant" as const,
+          parts: [
+            {
+              type: "text" as const,
+              text: "AI Chat is a Pro feature. Add your OpenAI API key in Settings to use it.",
+            },
+          ],
+          createdAt: new Date(),
+        } as UIMessage,
+      ]);
+    },
+    [setMessages],
+  );
 
   const syncChatFromServer = useCallback(
     async (id: string) => {
@@ -506,7 +519,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     void (async () => {
       try {
         if (!hasApiKey) {
-          injectNoApiKeyMessage();
+          injectNoApiKeyMessage(`Summarize @${link.title}`);
           return;
         }
 
@@ -567,7 +580,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       if (!text) return;
 
       if (!hasApiKey) {
-        injectNoApiKeyMessage();
+        injectNoApiKeyMessage(text);
         setInput("");
         return;
       }
@@ -627,7 +640,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
   const handleSuggestion = useCallback(
     async (text: string) => {
       if (!hasApiKey) {
-        injectNoApiKeyMessage();
+        injectNoApiKeyMessage(text);
         return;
       }
 
