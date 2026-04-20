@@ -3,7 +3,14 @@
 import { useChatContextSafe } from "@/contexts/chat-context";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { Link as LinkType } from "@/utils/links";
-import { Ellipsis, Link, Pencil, ScrollText, Trash } from "lucide-react";
+import {
+  Ellipsis,
+  Link,
+  Pencil,
+  ScrollText,
+  Trash,
+  ExternalLink,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { EditDialog } from "./dialog-edit-link";
@@ -30,6 +37,10 @@ export function LinkMenu({
 }: LinkMenuProps) {
   const router = useRouter();
   const chatCtx = useChatContextSafe();
+
+  async function handleOpenInNewTab() {
+    window.open(link.url, "_blank");
+  }
 
   async function handleCopyLink() {
     try {
@@ -85,6 +96,13 @@ export function LinkMenu({
           <ScrollText /> Summarize with AI
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={() => {
+            void handleOpenInNewTab();
+          }}
+        >
+          <ExternalLink /> Open in new tab
+        </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() => {
             void handleCopyLink();
