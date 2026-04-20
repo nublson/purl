@@ -1,7 +1,7 @@
-import { LinkContentTypeIcon } from "@/components/link-content-type-icon";
+import { LinkIcon } from "@/components/link-icon";
 import { Link } from "@/utils/links";
 import { X } from "lucide-react";
-import { Button } from "../ui/button";
+import { Typography } from "../typography";
 
 interface ChatMentionProps {
   link: Link;
@@ -10,16 +10,17 @@ interface ChatMentionProps {
 
 export default function ChatMention({ link, onRemove }: ChatMentionProps) {
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="xs"
-      className="cursor-pointer"
-      onClick={onRemove}
-    >
-      <LinkContentTypeIcon contentType={link.contentType} />
-      {link.title}
-      <X />
-    </Button>
+    <div className="flex items-center justify-between gap-2 min-w-36 max-w-64 rounded-full bg-muted px-2 py-1 overflow-hidden">
+      <div className="flex items-center gap-1">
+        <LinkIcon link={link} size="mini" />
+        <Typography size="mini" className="w-full line-clamp-1 break-all">
+          {link.title}
+        </Typography>
+      </div>
+      <X
+        className="size-3 shrink-0 cursor-pointer text-muted-foreground hover:text-foreground"
+        onClick={onRemove}
+      />
+    </div>
   );
 }
