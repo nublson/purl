@@ -42,7 +42,6 @@ export function User() {
         <FeedbackDialog>
           <DropdownMenuItem
             onSelect={(event) => {
-              // Prevent Radix DropdownMenu from closing immediately, which unmounts EditDialog.
               event.preventDefault();
             }}
           >
@@ -53,7 +52,6 @@ export function User() {
         <SettingsDialog>
           <DropdownMenuItem
             onSelect={(event) => {
-              // Prevent Radix DropdownMenu from closing immediately, which unmounts SettingsDialog.
               event.preventDefault();
             }}
           >
