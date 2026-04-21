@@ -38,13 +38,13 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
-  metadataBase: new URL("https://getpurl.vercel.app"),
+  metadataBase: new URL(process.env.BASE_URL as string),
   openGraph: {
     type: "website",
     siteName: "Purl",
     title: "Purl",
     description,
-    url: "https://getpurl.vercel.app",
+    url: process.env.BASE_URL as string,
   },
   twitter: {
     card: "summary_large_image",

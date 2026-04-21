@@ -5,11 +5,11 @@ import { copyToClipboard } from "@/lib/clipboard";
 import type { Link as LinkType } from "@/utils/links";
 import {
   Ellipsis,
+  ExternalLink,
   Link,
   Pencil,
   ScrollText,
   Trash,
-  ExternalLink,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -76,6 +76,7 @@ export function LinkMenu({
     <DropdownWrapper
       trigger={
         <Button
+          aria-label="Open link menu"
           variant="ghost"
           size="icon-sm"
           className="cursor-pointer text-muted-foreground"

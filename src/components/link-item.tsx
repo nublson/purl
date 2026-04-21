@@ -210,6 +210,7 @@ export const LinkItem = React.forwardRef<
     return (
       <TooltipWrapper content="Add to chat">
         <Button
+          aria-label="Add to chat"
           type="button"
           variant="ghost"
           size="icon-sm"
@@ -272,6 +273,7 @@ export const LinkItem = React.forwardRef<
     >
       <a
         href={link.url}
+        aria-label={link.title}
         target="_blank"
         rel="noopener noreferrer"
         className="absolute inset-0 z-0 w-full"

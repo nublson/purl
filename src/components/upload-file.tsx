@@ -40,6 +40,7 @@ export function UploadFile() {
         onChange={handleFileChange}
       />
       <Button
+        aria-label="Upload file"
         type="button"
         variant="ghost"
         size="icon-sm"

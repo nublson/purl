@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
 
-const baseUrl = "https://getpurl.vercel.app";
+const baseUrl = process.env.BASE_URL;
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
     {
-      url: baseUrl,
+      url: baseUrl as string,
       lastModified: new Date(),
       changeFrequency: "monthly",
       priority: 1,

@@ -2,9 +2,7 @@ import { HeroPreviewApp } from "@/components/hero-preview-app";
 import SectionSeparator from "@/components/section-separator";
 import { Typography } from "@/components/typography";
 import { Button } from "@/components/ui/button";
-import previewLinksJson from "@/data/preview-links.json" with {
-  type: "json",
-};
+import previewLinksJson from "@/data/preview-links.json" with { type: "json" };
 import type { Link as LinkType } from "@/utils/links";
 import Link from "next/link";
 
@@ -37,8 +35,8 @@ export default function HeroSection() {
           <Button asChild>
             <Link href="/signup">Try for free</Link>
           </Button>
-          <Button variant="outline">
-            <Link href={"#"}>See how it works</Link>
+          <Button asChild variant="outline">
+            <Link href={"#pricing"}>See how it works</Link>
           </Button>
         </div>
       </div>

@@ -12,6 +12,7 @@ import { FeedbackDialog } from "./dialog-feedback";
 import { SettingsDialog } from "./dialog-settings";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Button } from "./ui/button";
 import {
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -28,14 +29,16 @@ export function User() {
       className="w-44"
       align="end"
       trigger={
-        <Avatar>
-          <AvatarImage
-            className="rounded-full"
-            src={user?.image ?? ""}
-            alt={user?.name ?? ""}
-          />
-          <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
-        </Avatar>
+        <Button variant="ghost" size="icon-sm" className="rounded-full">
+          <Avatar>
+            <AvatarImage
+              className="rounded-full"
+              src={user?.image ?? ""}
+              alt={user?.name ?? ""}
+            />
+            <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
+          </Avatar>
+        </Button>
       }
     >
       <DropdownMenuGroup>

@@ -38,6 +38,7 @@ export default function SearchLinks({ links: linksProp }: { links: Link[] }) {
   return (
     <div className="flex items-center gap-2">
       <Button
+        aria-label="Search links"
         onClick={() => setOpen(true)}
         variant="ghost"
         size="icon-sm"
