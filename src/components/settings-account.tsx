@@ -13,7 +13,10 @@ export function SettingsAccount({ closeDialog }: { closeDialog: () => void }) {
         title="Email"
         description="The email address for your account"
         actions={
-          <Typography size="sm" className="font-medium text-muted-foreground">
+          <Typography
+            size="small"
+            className="font-medium text-muted-foreground"
+          >
             {email}
           </Typography>
         }
