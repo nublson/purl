@@ -8,13 +8,8 @@ import Image from "next/image";
 import { Suspense, lazy } from "react";
 import { Typography } from "../typography";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import {
-  Item,
-  ItemContent,
-  ItemDescription,
-  ItemMedia,
-  ItemTitle,
-} from "../ui/item";
+import { Item, ItemContent, ItemMedia, ItemTitle } from "../ui/item";
+import ChatMention from "./chat-mention";
 
 const ChatMarkdownBody = lazy(() =>
   import("./chat-markdown-body").then((m) => ({
@@ -52,8 +47,7 @@ export default function ChatMessage({
   userAvatarUrl,
   userDisplayName,
 }: ChatMessageProps) {
-  const userInitial =
-    userDisplayName?.trim().charAt(0)?.toUpperCase() ?? "?";
+  const userInitial = userDisplayName?.trim().charAt(0)?.toUpperCase() ?? "?";
 
   const media =
     role === "user" ? (
@@ -99,21 +93,11 @@ export default function ChatMessage({
           )}
         </ItemTitle>
         {role === "user" && mentions && mentions.length > 0 && (
-          <ItemDescription className="text-xs">
-            {mentions.map((link, index) => (
-              <span key={link.id}>
-                {index > 0 ? ", " : ""}
-                <a
-                  href={link.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline underline-offset-2 hover:text-foreground"
-                >
-                  @{link.title}
-                </a>
-              </span>
+          <div className="w-full overflow-x-auto no-scrollbar">
+            {mentions.map((link) => (
+              <ChatMention key={link.id} link={link} />
             ))}
-          </ItemDescription>
+          </div>
         )}
       </ItemContent>
     </Item>

@@ -5,7 +5,7 @@ import { Typography } from "../typography";
 
 interface ChatMentionProps {
   link: Link;
-  onRemove: () => void;
+  onRemove?: () => void;
 }
 
 export default function ChatMention({ link, onRemove }: ChatMentionProps) {
@@ -17,10 +17,12 @@ export default function ChatMention({ link, onRemove }: ChatMentionProps) {
           {link.title}
         </Typography>
       </div>
-      <X
-        className="size-3 shrink-0 cursor-pointer text-muted-foreground hover:text-foreground"
-        onClick={onRemove}
-      />
+      {onRemove && (
+        <X
+          className="size-3 shrink-0 cursor-pointer text-muted-foreground hover:text-foreground"
+          onClick={onRemove}
+        />
+      )}
     </div>
   );
 }
