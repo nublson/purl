@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
+import { UpgradeDialog } from "./dialog-upgrade";
 
 export function User() {
   const { data: session } = useSession();
@@ -62,10 +63,16 @@ export function User() {
             Settings
           </DropdownMenuItem>
         </SettingsDialog>
-        <DropdownMenuItem disabled>
-          <BadgeCheck />
-          Upgrade
-        </DropdownMenuItem>
+        <UpgradeDialog>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+            }}
+          >
+            <BadgeCheck />
+            Upgrade
+          </DropdownMenuItem>
+        </UpgradeDialog>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
 

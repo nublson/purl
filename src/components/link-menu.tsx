@@ -89,7 +89,6 @@ export function LinkMenu({
     >
       <DropdownMenuGroup>
         <DropdownMenuItem
-          disabled={link.ingestStatus !== "COMPLETED"}
           onSelect={() => {
             chatCtx?.triggerSummarize(link);
           }}
