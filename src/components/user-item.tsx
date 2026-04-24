@@ -1,4 +1,3 @@
-import type { User } from "@prisma/client";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
   Item,
@@ -9,7 +8,11 @@ import {
 } from "./ui/item";
 
 interface UserItemProps {
-  user: User;
+  user: {
+    name: string;
+    email: string;
+    image?: string;
+  };
 }
 
 export function UserItem({ user }: UserItemProps) {

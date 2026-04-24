@@ -2,7 +2,6 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useSession } from "@/lib/auth-client";
-import { User as PrismaUser } from "@prisma/client";
 import {
   BadgeCheck,
   LogOut,
@@ -46,7 +45,13 @@ export function User() {
     >
       <DropdownMenuGroup>
         <DropdownMenuItem>
-          <UserItem user={user as PrismaUser} />
+          <UserItem
+            user={{
+              image: user?.image ?? "",
+              name: user?.name ?? "",
+              email: user?.email ?? "",
+            }}
+          />
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <FeedbackDialog>
