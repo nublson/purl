@@ -35,7 +35,7 @@ export const PricingCard = ({
         <Typography
           component="span"
           size="mini"
-          className="text-neutral-600 uppercase font-medium mb-5"
+          className="text-muted-foreground uppercase font-medium mb-5"
         >
           {name}
         </Typography>
@@ -52,7 +52,7 @@ export const PricingCard = ({
           </Typography>
         </CardTitle>
         <CardDescription className="line-clamp-2">
-          <Typography size="small" className="text-neutral-600">
+          <Typography size="small" className="text-muted-foreground">
             {description}
           </Typography>
         </CardDescription>

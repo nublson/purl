@@ -9,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/home", "/api/"],
       },
     ],
-    sitemap: "https://getpurl.vercel.app/sitemap.xml",
+    sitemap: `${process.env.BASE_URL as string}/sitemap.xml`,
   };
 }

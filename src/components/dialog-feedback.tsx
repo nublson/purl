@@ -79,7 +79,7 @@ const FeedbackForm = ({ onSuccess }: FeedbackFormProps) => {
 
   return (
     <form
-      className=" flex flex-col gap-6"
+      className=" flex flex-col gap-6 px-6 pt-6"
       onSubmit={async (e) => {
         e.preventDefault();
         e.stopPropagation();

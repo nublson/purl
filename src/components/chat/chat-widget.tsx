@@ -24,6 +24,7 @@ export default function ChatWidget() {
     <Popover open={isWidgetOpen} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
+          aria-label="Open chat"
           size="icon-lg"
           variant="default"
           className={cn("cursor-pointer rounded-full")}
@@ -42,7 +43,10 @@ export default function ChatWidget() {
         )}
         onInteractOutside={(event) => {
           const target = event.target;
-          if (target instanceof Element && target.closest("[data-add-to-chat]")) {
+          if (
+            target instanceof Element &&
+            target.closest("[data-add-to-chat]")
+          ) {
             event.preventDefault();
           }
         }}

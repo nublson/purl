@@ -10,7 +10,10 @@ export type Feature = {
 
 export default function FeaturesGrid({ features }: { features: Feature[] }) {
   return (
-    <ItemGroup className="grid grid-cols-1 gap-0 overflow-hidden rounded-2xl border border-border bg-transparent md:grid-cols-2 lg:grid-cols-3">
+    <ItemGroup
+      role="none"
+      className="grid grid-cols-1 gap-0 overflow-hidden rounded-2xl border border-border bg-transparent md:grid-cols-2 lg:grid-cols-3"
+    >
       {features.map((feature, index) => (
         <FeatureItem
           key={feature.title}

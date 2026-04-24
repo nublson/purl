@@ -72,6 +72,7 @@ jobs:
           BETTER_AUTH_SECRET: "ci-build-placeholder-min-32-chars-do-not-use"
           BETTER_AUTH_URL: "http://localhost:3000"
           RESEND_API_KEY: "ci-placeholder"
+          BASE_URL: "http://localhost:3000"
 
       - name: Publish deploy gate status for Vercel
         if: always()

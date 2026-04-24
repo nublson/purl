@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  ChatRequestError,
   CHAT_ERROR_CODES,
+  ChatRequestError,
   parseChatErrorBody,
 } from "@/lib/chat-http-errors";
 import {

@@ -10,13 +10,16 @@ import {
 } from "lucide-react";
 import { FeedbackDialog } from "./dialog-feedback";
 import { SettingsDialog } from "./dialog-settings";
+import { UpgradeDialog } from "./dialog-upgrade";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
+import { Button } from "./ui/button";
 import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
+import { UserItem } from "./user-item";
 
 export function User() {
   const { data: session } = useSession();
@@ -25,24 +28,35 @@ export function User() {
 
   return (
     <DropdownWrapper
-      className="w-44"
+      className="w-52"
       align="end"
       trigger={
-        <Avatar>
-          <AvatarImage
-            className="rounded-full"
-            src={user?.image ?? ""}
-            alt={user?.name ?? ""}
-          />
-          <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
-        </Avatar>
+        <Button variant="ghost" size="icon-sm" className="rounded-full">
+          <Avatar>
+            <AvatarImage
+              className="rounded-full"
+              src={user?.image ?? ""}
+              alt={user?.name ?? ""}
+            />
+            <AvatarFallback>{user?.name?.charAt(0)}</AvatarFallback>
+          </Avatar>
+        </Button>
       }
     >
       <DropdownMenuGroup>
+        <DropdownMenuItem>
+          <UserItem
+            user={{
+              image: user?.image ?? "",
+              name: user?.name ?? "",
+              email: user?.email ?? "",
+            }}
+          />
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <FeedbackDialog>
           <DropdownMenuItem
             onSelect={(event) => {
-              // Prevent Radix DropdownMenu from closing immediately, which unmounts EditDialog.
               event.preventDefault();
             }}
           >
@@ -53,7 +67,6 @@ export function User() {
         <SettingsDialog>
           <DropdownMenuItem
             onSelect={(event) => {
-              // Prevent Radix DropdownMenu from closing immediately, which unmounts SettingsDialog.
               event.preventDefault();
             }}
           >
@@ -61,10 +74,16 @@ export function User() {
             Settings
           </DropdownMenuItem>
         </SettingsDialog>
-        <DropdownMenuItem disabled>
-          <BadgeCheck />
-          Upgrade
-        </DropdownMenuItem>
+        <UpgradeDialog>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+            }}
+          >
+            <BadgeCheck />
+            Upgrade
+          </DropdownMenuItem>
+        </UpgradeDialog>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
 

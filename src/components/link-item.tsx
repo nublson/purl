@@ -1,20 +1,14 @@
 "use client";
 
 import { useChatContextSafe } from "@/contexts/chat-context";
-import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import { Link as LinkType } from "@/utils/links";
-import {
-  ArrowDownToLine,
-  FileMusic,
-  FileText,
-  Globe,
-  MessageCircle,
-} from "lucide-react";
+import { MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 import { X } from "./animate-ui/icons/x";
+import { LinkIcon } from "./link-icon";
 import { LinkMenu } from "./link-menu";
 import { LinkPreview } from "./link-preview";
 import { LinkItemSkeleton } from "./skeletons";
@@ -173,8 +167,6 @@ export const LinkItem = React.forwardRef<
     displayIngestStatus === "PENDING" ||
     displayIngestStatus === "PROCESSING";
 
-  const disableAddToChat = displayIngestStatus !== "COMPLETED";
-
   async function handleReingest() {
     setOptimisticIngesting(true);
     try {
@@ -207,46 +199,29 @@ export const LinkItem = React.forwardRef<
   }
 
   function renderIngestOrChatAction(): React.ReactNode {
-    if (displayIngestStatus === "COMPLETED") {
-      if (!chatCtx) return null;
-      return (
-        <TooltipWrapper content="Add to chat">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            disabled={disableAddToChat}
-            data-add-to-chat=""
-            className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
-            onClick={() => {
-              chatCtx.addMention(linkForUi);
-              chatCtx.setIsWidgetOpen(true);
-            }}
-          >
-            <MessageCircle />
-          </Button>
-        </TooltipWrapper>
-      );
-    }
     if (
       displayIngestStatus === "PENDING" ||
       displayIngestStatus === "PROCESSING"
     ) {
       return <Spinner className="size-4" />;
     }
+
+    if (!chatCtx) return null;
     return (
-      <TooltipWrapper content="Refetch content">
+      <TooltipWrapper content="Add to chat">
         <Button
+          aria-label="Add to chat"
           type="button"
           variant="ghost"
           size="icon-sm"
-          disabled={optimisticIngesting}
+          data-add-to-chat=""
           className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
           onClick={() => {
-            void handleReingest();
+            chatCtx.addMention(linkForUi);
+            chatCtx.setIsWidgetOpen(true);
           }}
         >
-          <ArrowDownToLine />
+          <MessageCircle />
         </Button>
       </TooltipWrapper>
     );
@@ -266,33 +241,6 @@ export const LinkItem = React.forwardRef<
       />
     );
   }
-
-  const media = (() => {
-    switch (link.contentType) {
-      case "PDF":
-        return <FileText className="size-5" />;
-      case "AUDIO":
-        return <FileMusic className="size-5" />;
-      default: {
-        const faviconSrc = safeRemoteImgSrc(link.favicon);
-        return faviconSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element -- user-controlled favicon URLs; avoid next/image optimizer SSRF
-          <img
-            src={faviconSrc}
-            alt={link.title}
-            width={20}
-            height={20}
-            sizes="20px"
-            loading={eagerFavicon ? "eager" : undefined}
-            referrerPolicy="no-referrer"
-            className="aspect-square object-contain size-5"
-          />
-        ) : (
-          <Globe className="size-5 text-muted-foreground" aria-hidden />
-        );
-      }
-    }
-  })();
 
   const content = (
     <Item
@@ -325,12 +273,13 @@ export const LinkItem = React.forwardRef<
     >
       <a
         href={link.url}
+        aria-label={link.title}
         target="_blank"
         rel="noopener noreferrer"
         className="absolute inset-0 z-0 w-full"
       />
       <ItemMedia variant="image" className={cn("relative size-5 rounded")}>
-        {media}
+        <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
       </ItemMedia>
       <ItemContent>
         <ItemTitle>

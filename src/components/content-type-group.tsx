@@ -11,7 +11,7 @@ export default function ContentTypeGroup({
   contentTypes,
 }: ContentTypeGroupProps) {
   return (
-    <ItemGroup className="w-full lg:max-w-lg">
+    <ItemGroup role="none" className="w-full lg:max-w-lg">
       {contentTypes.map((contentType) => (
         <ContentTypeItem key={contentType.type} contentType={contentType} />
       ))}
