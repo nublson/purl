@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useSession } from "@/lib/auth-client";
+import { User as PrismaUser } from "@prisma/client";
 import {
   BadgeCheck,
   LogOut,
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 import { FeedbackDialog } from "./dialog-feedback";
 import { SettingsDialog } from "./dialog-settings";
+import { UpgradeDialog } from "./dialog-upgrade";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
@@ -18,7 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
-import { UpgradeDialog } from "./dialog-upgrade";
+import { UserItem } from "./user-item";
 
 export function User() {
   const { data: session } = useSession();
@@ -27,7 +29,7 @@ export function User() {
 
   return (
     <DropdownWrapper
-      className="w-44"
+      className="w-52"
       align="end"
       trigger={
         <Button variant="ghost" size="icon-sm" className="rounded-full">
@@ -43,6 +45,10 @@ export function User() {
       }
     >
       <DropdownMenuGroup>
+        <DropdownMenuItem>
+          <UserItem user={user as PrismaUser} />
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <FeedbackDialog>
           <DropdownMenuItem
             onSelect={(event) => {
