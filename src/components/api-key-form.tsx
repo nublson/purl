@@ -2,6 +2,7 @@
 
 import { deleteApiKey, getApiKeyStatus, saveApiKey } from "@/lib/api-keys";
 import { useForm } from "@tanstack/react-form";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "./ui/field";
@@ -14,6 +15,7 @@ import {
 
 const ApiKeyForm = () => {
   const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const router = useRouter();
 
   const form = useForm({
     defaultValues: { apiKey: "" },
@@ -23,6 +25,7 @@ const ApiKeyForm = () => {
         setHasKey(true);
         form.reset({ apiKey: "" });
         toast.success("API key saved successfully");
+        router.refresh();
       } catch {
         toast.error("Failed to save API key");
       }
@@ -35,6 +38,7 @@ const ApiKeyForm = () => {
       setHasKey(false);
       form.reset({ apiKey: "" });
       toast.success("API key revoked");
+      router.refresh();
     } catch {
       toast.error("Failed to revoke API key");
     }
