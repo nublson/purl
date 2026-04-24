@@ -259,8 +259,8 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
   const isLoading = status === "submitted" || status === "streaming";
 
   useLayoutEffect(() => {
-    if (!chatId) return;
-    const snap = getChatSnapshot(chatId);
+    const id = chatId ?? DRAFT_NEW_CHAT_KEY;
+    const snap = getChatSnapshot(id);
     if (!snap?.messages.length) return;
     setMessages(snap.messages as UIMessage[]);
     setMessageMentions(snap.messageMentions);
@@ -274,9 +274,9 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
   }, [messages, messageMentions, chatTitle]);
 
   useEffect(() => {
-    if (!chatId) return;
+    const id = chatId ?? DRAFT_NEW_CHAT_KEY;
     const t = window.setTimeout(() => {
-      setChatSnapshot(chatId, {
+      setChatSnapshot(id, {
         v: 1,
         title: chatTitle,
         messages: messages as unknown[],
@@ -288,8 +288,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
 
   useEffect(() => {
     return () => {
-      const id = chatIdRef.current;
-      if (!id) return;
+      const id = chatIdRef.current ?? DRAFT_NEW_CHAT_KEY;
       setChatSnapshot(id, {
         v: 1,
         title: chatTitleForSnapshotRef.current,
@@ -520,6 +519,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       try {
         if (!hasApiKey) {
           injectNoApiKeyMessage(`Summarize @${link.title}`);
+          setMessageMentions((prev) => [...prev, [link]]);
           return;
         }
 
@@ -581,7 +581,9 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
 
       if (!hasApiKey) {
         injectNoApiKeyMessage(text);
+        setMessageMentions((prev) => [...prev, [...mentionsRef.current]]);
         setInput("");
+        clearMentions();
         return;
       }
 
@@ -641,6 +643,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     async (text: string) => {
       if (!hasApiKey) {
         injectNoApiKeyMessage(text);
+        setMessageMentions((prev) => [...prev, [...mentionsRef.current]]);
         return;
       }
 
