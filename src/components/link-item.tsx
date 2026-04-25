@@ -53,8 +53,8 @@ async function pollIngestUntilSettled(
 
 interface LinkItemProps {
   link: LinkType;
-  preview?: boolean;
   eagerFavicon?: boolean;
+  mode?: "default" | "preview" | "search";
 }
 
 export const LinkItem = React.forwardRef<
@@ -66,7 +66,7 @@ export const LinkItem = React.forwardRef<
     className,
     onMouseEnter,
     onMouseLeave,
-    preview,
+    mode = "default",
     eagerFavicon,
     ...rest
   },
@@ -198,7 +198,7 @@ export const LinkItem = React.forwardRef<
     }
   }
 
-  function renderIngestOrChatAction(): React.ReactNode {
+  function renderLoadingOrChatAction(): React.ReactNode {
     if (
       displayIngestStatus === "PENDING" ||
       displayIngestStatus === "PROCESSING"
@@ -215,7 +215,7 @@ export const LinkItem = React.forwardRef<
           variant="ghost"
           size="icon-sm"
           data-add-to-chat=""
-          className="cursor-pointer text-muted-foreground [@media(hover:none)]:hidden"
+          className="cursor-pointer text-muted-foreground"
           onClick={() => {
             chatCtx.addMention(linkForUi);
             chatCtx.setIsWidgetOpen(true);
@@ -250,7 +250,9 @@ export const LinkItem = React.forwardRef<
       className={cn(
         "w-full p-2 gap-4 grid relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
         showIngestPulse && "animate-pulse",
-        preview ? "grid-cols-[20px_1fr]" : "grid-cols-[20px_1fr_auto]",
+        mode === "preview"
+          ? "grid-cols-[20px_1fr]"
+          : "grid-cols-[20px_1fr_auto]",
         deletePhase === "animating" &&
           "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
         className,
@@ -291,7 +293,7 @@ export const LinkItem = React.forwardRef<
           </p>
         </ItemTitle>
       </ItemContent>
-      {!preview && (
+      {mode !== "preview" && (
         <ItemActions
           className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100 transition-opacity duration-200"
           onMouseEnter={() => {
@@ -305,7 +307,7 @@ export const LinkItem = React.forwardRef<
             scheduleOpen();
           }}
         >
-          {renderIngestOrChatAction()}
+          {renderLoadingOrChatAction()}
           <LinkMenu
             link={linkForUi}
             onDeleteStart={() => {
@@ -327,7 +329,7 @@ export const LinkItem = React.forwardRef<
     <LinkPreview
       link={linkForUi}
       eagerThumbnail={Boolean(eagerFavicon)}
-      open={!preview && previewOpen}
+      open={mode === "default" && previewOpen}
       onOpenChange={() => {
         // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.
       }}

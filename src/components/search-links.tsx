@@ -72,7 +72,7 @@ export default function SearchLinks({ links: linksProp }: { links: Link[] }) {
                   <LinkItem
                     link={link}
                     key={link.id}
-                    preview
+                    mode="search"
                     className="w-full border-0 bg-transparent shadow-none hover:bg-transparent"
                   />
                 </CommandItem>
