@@ -95,7 +95,14 @@ export default function ChatMessage({
         {role === "user" && mentions && mentions.length > 0 && (
           <div className="w-full flex items-center justify-start gap-1 no-scrollbar overflow-x-auto overflow-y-hidden">
             {mentions.map((link) => (
-              <ChatMention key={link.id} link={link} />
+              <a
+                key={link.id}
+                href={link.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <ChatMention link={link} />
+              </a>
             ))}
           </div>
         )}
