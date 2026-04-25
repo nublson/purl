@@ -25,9 +25,7 @@ export function LinkPreview({
   onOpenChange,
   eagerThumbnail = false,
 }: LinkPreviewProps) {
-  const thumbnailSrc = link.thumbnail
-    ? safeRemoteImgSrc(link.thumbnail)
-    : null;
+  const thumbnailSrc = link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
 
   return (
     <HoverCard
@@ -40,7 +38,7 @@ export function LinkPreview({
       <HoverCardContent
         side="right"
         align="start"
-        className="p-0 flex-col hidden md:[@media(hover:hover)]:flex"
+        className="p-0 flex-col hidden md:[@media(hover:hover)]:flex z-40"
       >
         {link.contentType === "PDF" ? (
           <PdfThumbnail url={link.url} />

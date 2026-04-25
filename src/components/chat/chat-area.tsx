@@ -95,8 +95,8 @@ export default function ChatArea({
   const mentionsPerMessage = getMentionsPerMessage(messages, messageMentions);
 
   return (
-    <ScrollArea className="flex-1 w-full h-20 p-4 pb-0 overflow-hidden">
-      <div className="flex w-full min-w-0 flex-col items-stretch justify-start gap-4 h-full">
+    <ScrollArea className="flex-1 w-full h-20 p-4 pb-0">
+      <div className="flex w-full flex-col items-stretch justify-start gap-4 h-full">
         {messages.map((message, index) => (
           <ChatMessage
             key={message.id}

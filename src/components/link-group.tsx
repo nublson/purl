@@ -4,20 +4,22 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { LinkItem } from "./link-item";
 import { ItemGroup } from "./ui/item";
 
-export const LinkGroup = ({
-  label,
-  links,
-  prependItems,
-  preview,
-  eagerFirstLinkFavicon = false,
-}: {
+interface LinkGroupProps {
   label: string;
   links: Link[];
   newLinkId?: string | null;
   prependItems?: ReactNode;
-  preview?: boolean;
   eagerFirstLinkFavicon?: boolean;
-}) => {
+  mode?: "default" | "preview" | "search";
+}
+
+export const LinkGroup = ({
+  label,
+  links,
+  prependItems,
+  eagerFirstLinkFavicon = false,
+  mode = "default",
+}: LinkGroupProps) => {
   const prevIdsRef = useRef<string[]>([]);
   const initializedRef = useRef(false);
 
@@ -49,7 +51,7 @@ export const LinkGroup = ({
             >
               <LinkItem
                 link={link}
-                preview={preview}
+                mode={mode}
                 eagerFavicon={eagerFirstLinkFavicon && index === 0}
               />
             </motion.div>

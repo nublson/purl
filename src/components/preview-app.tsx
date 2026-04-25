@@ -197,7 +197,7 @@ export default function PreviewApp({
         <LinkGroup
           label="Today"
           links={completedLinks}
-          preview
+          mode="preview"
           eagerFirstLinkFavicon={completedLinks.length > 0}
           prependItems={
             isSaving && pendingUrl ? (
