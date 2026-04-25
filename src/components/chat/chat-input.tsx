@@ -43,7 +43,7 @@ export default function ChatInput({
         {mentions.length > 0 && (
           <InputGroupAddon
             align="block-start"
-            className="flex items-center justify-start no-scrollbar gap-1 overflow-x-auto overflow-y-hidden"
+            className="flex items-center justify-start gap-1 no-scrollbar overflow-x-auto overflow-y-hidden"
           >
             {mentions.map((link) => (
               <ChatMention
