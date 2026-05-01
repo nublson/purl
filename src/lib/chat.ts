@@ -352,6 +352,12 @@ export async function streamChatResponse(
   options: StreamChatResponseOptions,
 ) {
   const { chatId, onAssistantText, streamWriter } = options;
+  const anthropicThinkingOptions = {
+    thinking: {
+      type: "enabled" as const,
+      budgetTokens: 2048,
+    },
+  };
 
   let streamFailureNotified = false;
   function notifyStreamFailure(): void {
@@ -368,6 +374,9 @@ export async function streamChatResponse(
     system: buildSystemPrompt(context),
     messages,
     tools: buildChatTools(userId, { chatId, streamWriter }),
+    providerOptions: {
+      anthropic: anthropicThinkingOptions,
+    },
     stopWhen: stepCountIs(5),
     onError: ({ error }) => {
       Sentry.captureException(error, {

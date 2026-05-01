@@ -2,7 +2,7 @@
 
 import type { ChatFlowError } from "@/lib/chat-flow-error";
 import { CHAT_ERROR_CODES, parseChatErrorBody } from "@/lib/chat-http-errors";
-import { ChevronDown, Plus, X, Minus } from "lucide-react";
+import { ChevronDown, Minus, Plus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Typography } from "../typography";
@@ -336,23 +336,25 @@ export default function ChatHeader({
         {isLoadingChat ? (
           <Skeleton className="h-3.5 w-32" />
         ) : (
-          <ChatHistory
-            chats={chats}
-            isLoading={isLoading}
-            onSelectChat={onSelectChat}
-            onOpenChange={handleHistoryOpenChange}
-          >
-            <Button variant="ghost" className="cursor-pointer">
-              <Typography
-                component="h3"
-                size="small"
-                className="text-accent-foreground line-clamp-1 font-medium break-all"
-              >
-                {label}
-              </Typography>
-              <ChevronDown />
-            </Button>
-          </ChatHistory>
+          <div className="max-w-72 flex items-center justify-start gap-1">
+            <Typography
+              component="h3"
+              size="small"
+              className="text-accent-foreground font-medium line-clamp-1 break-all"
+            >
+              {label}
+            </Typography>
+            <ChatHistory
+              chats={chats}
+              isLoading={isLoading}
+              onSelectChat={onSelectChat}
+              onOpenChange={handleHistoryOpenChange}
+            >
+              <Button variant="ghost" size="icon-sm" className="cursor-pointer">
+                <ChevronDown />
+              </Button>
+            </ChatHistory>
+          </div>
         )}
         <div className="flex items-center justify-center gap-2">
           <Button

@@ -102,22 +102,25 @@ export default function ChatMessage({
           ) : (
             <div className={cn("min-w-0 max-w-full text-sm wrap-anywhere")}>
               {role === "assistant" && hasReasoning && (
-                <Reasoning className="w-full" isStreaming={isReasoningStreaming}>
+                <Reasoning
+                  className="w-full"
+                  isStreaming={isReasoningStreaming}
+                >
                   <ReasoningTrigger />
                   <ReasoningContent>{reasoningText}</ReasoningContent>
                 </Reasoning>
               )}
-              {role === "assistant" && content
-                ? assistantContentLikelyUsesMarkdown(content) ? (
-                    <Suspense
-                      fallback={<AssistantMarkdownFallback content={content} />}
-                    >
-                      <ChatMarkdownBody content={content} />
-                    </Suspense>
-                  ) : (
-                    <AssistantMarkdownFallback content={content} />
-                  )
-                : null}
+              {role === "assistant" && content ? (
+                assistantContentLikelyUsesMarkdown(content) ? (
+                  <Suspense
+                    fallback={<AssistantMarkdownFallback content={content} />}
+                  >
+                    <ChatMarkdownBody content={content} />
+                  </Suspense>
+                ) : (
+                  <AssistantMarkdownFallback content={content} />
+                )
+              ) : null}
               {role === "user" && (
                 <Typography
                   size="small"
