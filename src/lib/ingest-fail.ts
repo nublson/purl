@@ -2,7 +2,6 @@ import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import prisma from "@/lib/prisma";
 
 export type IngestFailureReason =
-  | "NO_API_KEY"
   | "SCRAPE_FAILED"
   | "LINK_NOT_FOUND"
   | "OTHER";

@@ -1,24 +1,18 @@
-import { createOpenAI, openai } from "@ai-sdk/openai";
+import { anthropic } from "@ai-sdk/anthropic";
+import { openai } from "@ai-sdk/openai";
 
-export const CHAT_MODEL = "gpt-5.4-mini";
+export const CHAT_MODEL = "claude-sonnet-4-6";
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const TRANSCRIPTION_MODEL = "whisper-1";
 
-function getOpenAIClient(apiKey?: string) {
-  if (apiKey) {
-    return createOpenAI({ apiKey });
-  }
-  return openai;
+export function getChatModel() {
+  return anthropic(CHAT_MODEL);
 }
 
-export function getChatModel(apiKey?: string) {
-  return getOpenAIClient(apiKey)(CHAT_MODEL);
+export function getEmbeddingModel() {
+  return openai.embedding(EMBEDDING_MODEL);
 }
 
-export function getEmbeddingModel(apiKey?: string) {
-  return getOpenAIClient(apiKey).embedding(EMBEDDING_MODEL);
-}
-
-export function getTranscriptionModel(apiKey?: string) {
-  return getOpenAIClient(apiKey).transcription(TRANSCRIPTION_MODEL);
+export function getTranscriptionModel() {
+  return openai.transcription(TRANSCRIPTION_MODEL);
 }

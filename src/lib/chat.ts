@@ -16,7 +16,6 @@ import {
   type ToolExecutionOptions,
   type UIMessageStreamWriter,
 } from "ai";
-import { getDecryptedApiKey } from "./api-keys";
 
 function buildSystemPrompt(context: string | null): string {
   const today = new Date().toLocaleDateString("en-US", {
@@ -99,7 +98,6 @@ export function buildChatTools(
     chatId: string;
     streamWriter?: UIMessageStreamWriter<PurlChatUIMessage>;
   },
-  apiKey?: string,
 ) {
   const toolCtx: ChatToolContext = {
     userId,
@@ -231,7 +229,6 @@ export function buildChatTools(
             type: contentType as ContentType | undefined,
             dateFrom: dateFrom ? new Date(dateFrom) : undefined,
             dateTo: dateTo ? new Date(dateTo) : undefined,
-            apiKey,
           });
 
           if (results.length === 0) return [];
@@ -356,16 +353,6 @@ export async function streamChatResponse(
 ) {
   const { chatId, onAssistantText, streamWriter } = options;
 
-  const apiKey = await getDecryptedApiKey(userId).catch(() => null);
-
-  if (!apiKey) {
-    emitChatStreamProtocolError(streamWriter, {
-      code: CHAT_STREAM_ERROR_CODES.NO_API_KEY,
-      userMessage: "Add your OpenAI API key in Settings to use the chat.",
-    });
-    return;
-  }
-
   let streamFailureNotified = false;
   function notifyStreamFailure(): void {
     if (streamFailureNotified) return;
@@ -377,10 +364,10 @@ export async function streamChatResponse(
   }
 
   return streamText({
-    model: getChatModel(apiKey),
+    model: getChatModel(),
     system: buildSystemPrompt(context),
     messages,
-    tools: buildChatTools(userId, { chatId, streamWriter }, apiKey),
+    tools: buildChatTools(userId, { chatId, streamWriter }),
     stopWhen: stepCountIs(5),
     onError: ({ error }) => {
       Sentry.captureException(error, {
@@ -399,7 +386,8 @@ export async function streamChatResponse(
       if (isQuotaError) {
         emitChatStreamProtocolError(streamWriter, {
           code: CHAT_STREAM_ERROR_CODES.QUOTA_EXCEEDED,
-          userMessage: "Your OpenAI API key has run out of credits.",
+          userMessage:
+            "The AI service reported insufficient quota. Please try again later.",
         });
         streamFailureNotified = true;
         return;

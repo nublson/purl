@@ -7,7 +7,6 @@ import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
 import { buildMetadataText } from "@/lib/metadata-chunk";
 import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import prisma from "@/lib/prisma";
-import { getDecryptedApiKey } from "./api-keys";
 
 type IngestAudioInput = {
   linkId: string;
@@ -20,19 +19,13 @@ export async function ingestAudio({
   url,
   userId,
 }: IngestAudioInput): Promise<void> {
+  void userId;
   try {
     await prisma.link.update({
       where: { id: linkId },
       data: { ingestStatus: "PROCESSING", ingestFailureReason: null },
     });
     logIngestStart("AUDIO", linkId, url);
-
-    const apiKey = await getDecryptedApiKey(userId).catch(() => null);
-
-    if (!apiKey) {
-      await failIngest(linkId, "NO_API_KEY");
-      return;
-    }
 
     const transcript = await transcribeAudio(url);
     const contentChunks = chunkText(transcript);
@@ -59,7 +52,7 @@ export async function ingestAudio({
       where: { linkId },
     });
 
-    const embeddings = await embedTextChunks(chunks, apiKey);
+    const embeddings = await embedTextChunks(chunks);
 
     await prisma.linkContent.createMany({
       data: chunks.map((content, index) => ({

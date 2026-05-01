@@ -8,7 +8,6 @@ import { buildMetadataText } from "@/lib/metadata-chunk";
 import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import prisma from "@/lib/prisma";
 import { scrapeWebContent, UnsupportedSpaError } from "@/lib/web-scraper";
-import { getDecryptedApiKey } from "./api-keys";
 
 type IngestWebInput = {
   linkId: string;
@@ -21,19 +20,13 @@ export async function ingestWeb({
   url,
   userId,
 }: IngestWebInput): Promise<void> {
+  void userId;
   try {
     await prisma.link.update({
       where: { id: linkId },
       data: { ingestStatus: "PROCESSING", ingestFailureReason: null },
     });
     logIngestStart("WEB", linkId, url);
-
-    const apiKey = await getDecryptedApiKey(userId).catch(() => null);
-
-    if (!apiKey) {
-      await failIngest(linkId, "NO_API_KEY");
-      return;
-    }
 
     const text = await scrapeWebContent(url);
     const contentChunks = chunkText(text);
@@ -60,7 +53,7 @@ export async function ingestWeb({
       where: { linkId },
     });
 
-    const embeddings = await embedTextChunks(chunks, apiKey);
+    const embeddings = await embedTextChunks(chunks);
 
     await prisma.linkContent.createMany({
       data: chunks.map((content, index) => ({

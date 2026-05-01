@@ -13,7 +13,6 @@ export const CHAT_HTTP_ERROR_CODES = {
 /** Transient `data-chat-protocol-error` parts only — never use in `chatJsonError`. */
 export const CHAT_STREAM_ERROR_CODES = {
   TOOL_FAILED: "TOOL_FAILED",
-  NO_API_KEY: "NO_API_KEY",
   QUOTA_EXCEEDED: "QUOTA_EXCEEDED",
   STREAM_FAILED: "STREAM_FAILED",
 } as const;

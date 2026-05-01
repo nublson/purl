@@ -1,6 +1,5 @@
 "use client";
 
-import { useHasApiKey } from "@/contexts/api-key-context";
 import { useChatContext } from "@/contexts/chat-context";
 import { useSession } from "@/lib/auth-client";
 import {
@@ -80,7 +79,6 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
   const messagesForSnapshotRef = useRef<UIMessage[]>([]);
   const messageMentionsForSnapshotRef = useRef<Link[][]>([]);
   const chatTitleForSnapshotRef = useRef<string | null>(null);
-  const hasApiKey = useHasApiKey();
 
   /** When true, a valid `data-chat-protocol-error` already drove UX for this send. */
   const protocolStreamErrorHandledRef = useRef(false);
@@ -309,36 +307,6 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     void regenerate();
   }, [clearError, regenerate]);
 
-  const injectNoApiKeyMessage = useCallback(
-    (text?: string) => {
-      setMessages((prev) => [
-        ...prev,
-        ...(text
-          ? [
-              {
-                id: crypto.randomUUID(),
-                role: "user" as const,
-                parts: [{ type: "text" as const, text }],
-                createdAt: new Date(),
-              } as UIMessage,
-            ]
-          : []),
-        {
-          id: crypto.randomUUID(),
-          role: "assistant" as const,
-          parts: [
-            {
-              type: "text" as const,
-              text: "AI Chat is a Pro feature. Add your OpenAI API key in Settings to use it.",
-            },
-          ],
-          createdAt: new Date(),
-        } as UIMessage,
-      ]);
-    },
-    [setMessages],
-  );
-
   const syncChatFromServer = useCallback(
     async (id: string) => {
       const previousId = chatIdRef.current;
@@ -517,12 +485,6 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
 
     void (async () => {
       try {
-        if (!hasApiKey) {
-          injectNoApiKeyMessage(`Summarize @${link.title}`);
-          setMessageMentions((prev) => [...prev, [link]]);
-          return;
-        }
-
         let id = chatIdRef.current;
         if (!id) {
           try {
@@ -569,8 +531,6 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
     createNewChat,
     sendMessage,
     sentryUserId,
-    hasApiKey,
-    injectNoApiKeyMessage,
   ]);
 
   const handleSubmit = useCallback(
@@ -578,14 +538,6 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       e?.preventDefault();
       const text = input.trim();
       if (!text) return;
-
-      if (!hasApiKey) {
-        injectNoApiKeyMessage(text);
-        setMessageMentions((prev) => [...prev, [...mentionsRef.current]]);
-        setInput("");
-        clearMentions();
-        return;
-      }
 
       let id = chatIdRef.current;
       if (!id) {
@@ -634,19 +586,11 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       sendMessage,
       clearMentions,
       sentryUserId,
-      hasApiKey,
-      injectNoApiKeyMessage,
     ],
   );
 
   const handleSuggestion = useCallback(
     async (text: string) => {
-      if (!hasApiKey) {
-        injectNoApiKeyMessage(text);
-        setMessageMentions((prev) => [...prev, [...mentionsRef.current]]);
-        return;
-      }
-
       let id = chatIdRef.current;
       if (!id) {
         try {
@@ -679,8 +623,6 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       createNewChat,
       sendMessage,
       sentryUserId,
-      hasApiKey,
-      injectNoApiKeyMessage,
     ],
   );
 

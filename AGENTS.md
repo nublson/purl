@@ -4,7 +4,7 @@
 
 ### Overview
 
-Purl is a single Next.js (App Router) application — **not** a monorepo. It uses Prisma with PostgreSQL (Supabase-hosted, with pgvector), Better Auth for authentication, and OpenAI for AI features.
+Purl is a single Next.js (App Router) application — **not** a monorepo. It uses Prisma with PostgreSQL (Supabase-hosted, with pgvector), Better Auth for authentication, **Anthropic** for chat, and **OpenAI** for embeddings and transcription.
 
 ### Environment variables
 
