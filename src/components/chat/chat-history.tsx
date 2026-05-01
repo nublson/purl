@@ -29,6 +29,7 @@ interface ChatHistoryProps {
   isLoading: boolean;
   onSelectChat: (id: string) => void;
   onOpenChange?: (open: boolean) => void;
+  children: React.ReactNode;
 }
 
 export function ChatHistory({
@@ -36,6 +37,7 @@ export function ChatHistory({
   isLoading,
   onSelectChat,
   onOpenChange,
+  children,
 }: ChatHistoryProps) {
   const [open, setOpen] = useState(false);
 
@@ -48,12 +50,8 @@ export function ChatHistory({
 
   return (
     <DropdownMenu open={open} onOpenChange={handleOpenChange}>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-sm" className="cursor-pointer">
-          <ChevronDown />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-2xs max-h-52" align="center">
+      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuContent className="w-2xs max-h-52" align="start">
         {isLoading && (
           <div className="px-2 py-3 text-center">
             <Typography size="small" className="text-muted-foreground">

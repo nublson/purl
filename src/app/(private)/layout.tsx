@@ -30,11 +30,14 @@ export default function PrivateLayout({
 }>) {
   return (
     <ChatProvider>
-      <Header pathname="/home">
-        <Suspense fallback={<HeaderActionsFallback variant="private" />}>
-          <HeaderActions />
-        </Suspense>
-      </Header>
+      <Header
+        pathname="/home"
+        actions={
+          <Suspense fallback={<HeaderActionsFallback variant="private" />}>
+            <HeaderActions />
+          </Suspense>
+        }
+      />
       <main className="flex-1 flex flex-col items-center justify-start pt-6 overflow-y-auto px-4 md:px-0">
         {children}
       </main>

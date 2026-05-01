@@ -1,14 +1,20 @@
 "use client";
 
+import { Message, MessageContent } from "@/components/ai-elements/message";
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@/components/ai-elements/reasoning";
 import { cn } from "@/lib/utils";
 import { assistantContentLikelyUsesMarkdown } from "@/utils/assistant-markdown-heuristic";
 import type { Link } from "@/utils/links";
+import type { UIMessage } from "ai";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import { Suspense, lazy } from "react";
 import { Typography } from "../typography";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { Item, ItemContent, ItemMedia, ItemTitle } from "../ui/item";
 import ChatMention from "./chat-mention";
 
 const ChatMarkdownBody = lazy(() =>
@@ -17,9 +23,17 @@ const ChatMarkdownBody = lazy(() =>
   })),
 );
 
+function getMessageText(message: UIMessage): string {
+  return (
+    message.parts
+      ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+      .map((p) => p.text)
+      .join("") ?? ""
+  );
+}
+
 interface ChatMessageProps {
-  content: string;
-  role: "user" | "assistant";
+  message: UIMessage;
   isLoading?: boolean;
   mentions?: Link[];
   /** Session profile image for user messages */
@@ -40,13 +54,26 @@ function AssistantMarkdownFallback({ content }: { content: string }) {
 }
 
 export default function ChatMessage({
-  content,
-  role,
+  message,
   isLoading,
   mentions,
   userAvatarUrl,
   userDisplayName,
 }: ChatMessageProps) {
+  const role = message.role as "user" | "assistant";
+  const content = getMessageText(message);
+
+  const reasoningParts =
+    message.parts?.filter(
+      (p): p is { type: "reasoning"; text: string } => p.type === "reasoning",
+    ) ?? [];
+  const reasoningText = reasoningParts.map((p) => p.text).join("\n\n");
+  const hasReasoning = reasoningParts.length > 0;
+
+  const lastPart = message.parts?.at(-1);
+  const isReasoningStreaming =
+    Boolean(isLoading) && lastPart?.type === "reasoning";
+
   const userInitial = userDisplayName?.trim().charAt(0)?.toUpperCase() ?? "?";
 
   const media =
@@ -62,16 +89,45 @@ export default function ChatMessage({
       <Image src="/logo.svg" alt="Purl" width={20} height={20} priority />
     );
 
+  const showAssistantSpinner =
+    role === "assistant" &&
+    isLoading &&
+    !content &&
+    !hasReasoning;
+
   return (
-    <Item className="min-w-0 w-full p-0 gap-2 items-start">
-      <ItemMedia>{media}</ItemMedia>
-      <ItemContent className="min-w-0">
-        <ItemTitle className="line-clamp-none w-full min-w-0 max-w-full">
-          {isLoading && !content ? (
+    <Message
+      className={cn(
+        "min-w-0 w-full max-w-full flex-row items-start gap-2 p-0",
+        // Keep list layout: avatar + body left-aligned (Message defaults user to ml-auto / flex-col).
+        role === "user" && "ml-0 justify-start",
+      )}
+      from={role}
+    >
+      <div className="shrink-0">{media}</div>
+      <MessageContent
+        className={cn(
+          "min-w-0 w-full flex-1 gap-0",
+          // Match prior Item layout: no user bubble / no content shift-right.
+          "group-[.is-user]:ml-0 group-[.is-user]:rounded-none group-[.is-user]:bg-transparent group-[.is-user]:px-0 group-[.is-user]:py-0",
+          "group-[.is-assistant]:w-full",
+        )}
+      >
+        <div className="line-clamp-none w-full min-w-0 max-w-full">
+          {showAssistantSpinner ? (
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
           ) : (
             <div className={cn("min-w-0 max-w-full text-sm wrap-anywhere")}>
-              {role === "assistant" ? (
+              {role === "assistant" && hasReasoning && (
+                <Reasoning
+                  className="w-full"
+                  isStreaming={isReasoningStreaming}
+                >
+                  <ReasoningTrigger />
+                  <ReasoningContent>{reasoningText}</ReasoningContent>
+                </Reasoning>
+              )}
+              {role === "assistant" && content ? (
                 assistantContentLikelyUsesMarkdown(content) ? (
                   <Suspense
                     fallback={<AssistantMarkdownFallback content={content} />}
@@ -81,7 +137,8 @@ export default function ChatMessage({
                 ) : (
                   <AssistantMarkdownFallback content={content} />
                 )
-              ) : (
+              ) : null}
+              {role === "user" && (
                 <Typography
                   size="small"
                   className="text-accent-foreground wrap-anywhere"
@@ -91,7 +148,7 @@ export default function ChatMessage({
               )}
             </div>
           )}
-        </ItemTitle>
+        </div>
         {role === "user" && mentions && mentions.length > 0 && (
           <div className="w-full flex items-center justify-start gap-1 no-scrollbar overflow-x-auto overflow-y-hidden">
             {mentions.map((link) => (
@@ -106,7 +163,7 @@ export default function ChatMessage({
             ))}
           </div>
         )}
-      </ItemContent>
-    </Item>
+      </MessageContent>
+    </Message>
   );
 }

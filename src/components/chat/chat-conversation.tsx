@@ -580,13 +580,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       setInput("");
       clearMentions();
     },
-    [
-      input,
-      createNewChat,
-      sendMessage,
-      clearMentions,
-      sentryUserId,
-    ],
+    [input, createNewChat, sendMessage, clearMentions, sentryUserId],
   );
 
   const handleSuggestion = useCallback(
@@ -619,11 +613,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
       sendMessage({ text }, { body: { chatId: id, requestId } });
       setMessageMentions((prev) => [...prev, []]);
     },
-    [
-      createNewChat,
-      sendMessage,
-      sentryUserId,
-    ],
+    [createNewChat, sendMessage, sentryUserId],
   );
 
   const handleNewChat = useCallback(() => {
@@ -646,7 +636,7 @@ export default function ChatConversation({ onClose }: ChatConversationProps) {
   );
 
   return (
-    <div className="relative flex h-full min-h-0 w-full flex-col justify-start md:w-96">
+    <div className="relative flex h-full min-h-0 w-full flex-col justify-start">
       <ChatHeader
         title={chatTitle}
         onClose={onClose}

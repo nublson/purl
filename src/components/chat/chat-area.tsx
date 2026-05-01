@@ -44,15 +44,6 @@ function ChatAreaSkeleton() {
   );
 }
 
-function getMessageText(message: UIMessage): string {
-  return (
-    message.parts
-      ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
-      .map((p) => p.text)
-      .join("") ?? ""
-  );
-}
-
 /** Aligns `messageMentions[i]` with the i-th user message in order. */
 function getMentionsPerMessage(
   messages: UIMessage[],
@@ -100,8 +91,7 @@ export default function ChatArea({
         {messages.map((message, index) => (
           <ChatMessage
             key={message.id}
-            content={getMessageText(message)}
-            role={message.role as "user" | "assistant"}
+            message={message}
             mentions={mentionsPerMessage[index] ?? []}
             userAvatarUrl={userAvatarUrl}
             userDisplayName={userDisplayName}
@@ -113,7 +103,14 @@ export default function ChatArea({
           />
         ))}
         {isLoading && messages[messages.length - 1]?.role === "user" && (
-          <ChatMessage content="" role="assistant" isLoading />
+          <ChatMessage
+            message={{
+              id: "pending-assistant",
+              role: "assistant",
+              parts: [],
+            }}
+            isLoading
+          />
         )}
         <div ref={bottomRef} />
       </div>
