@@ -39,10 +39,6 @@ vi.mock("@/lib/ingest-fail", () => ({
   failIngest: vi.fn(),
 }));
 
-vi.mock("./api-keys", () => ({
-  getDecryptedApiKey: vi.fn(),
-}));
-
 import { buildMetadataText } from "@/lib/metadata-chunk";
 
 const prisma = (await import("@/lib/prisma")).default;
@@ -61,7 +57,6 @@ const { embedTextChunks } = await import("@/lib/embeddings");
 const { logIngestStart, logIngestFailure } =
   await import("@/lib/ingest-logger");
 const { failIngest } = await import("@/lib/ingest-fail");
-const { getDecryptedApiKey } = await import("./api-keys");
 const { ingestYoutube } = await import("./ingest-youtube");
 
 describe("ingestYoutube", () => {
@@ -82,9 +77,6 @@ describe("ingestYoutube", () => {
     vi.mocked(prisma.link.findUnique).mockResolvedValue(
       mockYoutubeLink as never,
     );
-
-    // Default: valid API key
-    vi.mocked(getDecryptedApiKey).mockResolvedValue("sk-test-key");
   });
 
   it("stores metadata chunk only when transcript produces no chunks", async () => {
@@ -108,10 +100,9 @@ describe("ingestYoutube", () => {
     expect(prisma.linkContent.deleteMany).toHaveBeenCalledWith({
       where: { linkId: "link-1" },
     });
-    expect(embedTextChunks).toHaveBeenCalledWith(
-      [buildMetadataText(mockYoutubeLink)],
-      "sk-test-key",
-    );
+    expect(embedTextChunks).toHaveBeenCalledWith([
+      buildMetadataText(mockYoutubeLink),
+    ]);
     expect(logIngestStart).toHaveBeenCalledWith(
       "YOUTUBE",
       "link-1",
@@ -159,19 +150,6 @@ describe("ingestYoutube", () => {
       where: { id: "link-1" },
       data: { ingestStatus: "COMPLETED" },
     });
-  });
-
-  it("marks NO_API_KEY when user has no key configured", async () => {
-    vi.mocked(getDecryptedApiKey).mockRejectedValue(new Error("No API key"));
-
-    await ingestYoutube({
-      linkId: "link-1",
-      url: "https://youtu.be/abc123",
-      userId: "user-1",
-    });
-
-    expect(failIngest).toHaveBeenCalledWith("link-1", "NO_API_KEY");
-    expect(fetchYouTubeTranscript).not.toHaveBeenCalled();
   });
 
   it("marks LINK_NOT_FOUND when link row is missing after transcript", async () => {

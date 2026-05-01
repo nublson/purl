@@ -50,10 +50,6 @@ vi.mock("@/lib/ingest-fail", () => ({
   failIngest: vi.fn(),
 }));
 
-vi.mock("./api-keys", () => ({
-  getDecryptedApiKey: vi.fn(),
-}));
-
 import { buildMetadataText } from "@/lib/metadata-chunk";
 
 const prisma = (await import("@/lib/prisma")).default;
@@ -74,7 +70,6 @@ const { logIngestStart, logIngestFailure } =
   await import("@/lib/ingest-logger");
 const { skipIngest } = await import("@/lib/ingest-skip");
 const { failIngest } = await import("@/lib/ingest-fail");
-const { getDecryptedApiKey } = await import("./api-keys");
 const { ingestWeb } = await import("./ingest-web");
 
 describe("ingestWeb", () => {
@@ -94,9 +89,6 @@ describe("ingestWeb", () => {
     vi.mocked(failIngest).mockReset();
     vi.mocked(prisma.link.findUnique).mockReset();
     vi.mocked(prisma.link.findUnique).mockResolvedValue(mockWebLink as never);
-
-    // Default: valid API key
-    vi.mocked(getDecryptedApiKey).mockResolvedValue("sk-test-key");
   });
 
   it("stores metadata chunk only when body produces no chunks", async () => {
@@ -120,10 +112,9 @@ describe("ingestWeb", () => {
     expect(prisma.linkContent.deleteMany).toHaveBeenCalledWith({
       where: { linkId: "link-1" },
     });
-    expect(embedTextChunks).toHaveBeenCalledWith(
-      [buildMetadataText(mockWebLink)],
-      "sk-test-key",
-    );
+    expect(embedTextChunks).toHaveBeenCalledWith([
+      buildMetadataText(mockWebLink),
+    ]);
     expect(logIngestStart).toHaveBeenCalledWith(
       "WEB",
       "link-1",
@@ -171,19 +162,6 @@ describe("ingestWeb", () => {
       where: { id: "link-1" },
       data: { ingestStatus: "COMPLETED" },
     });
-  });
-
-  it("marks NO_API_KEY when user has no key configured", async () => {
-    vi.mocked(getDecryptedApiKey).mockRejectedValue(new Error("No API key"));
-
-    await ingestWeb({
-      linkId: "link-1",
-      url: "https://example.com/article",
-      userId: "user-1",
-    });
-
-    expect(failIngest).toHaveBeenCalledWith("link-1", "NO_API_KEY");
-    expect(scrapeWebContent).not.toHaveBeenCalled();
   });
 
   it("marks LINK_NOT_FOUND when link row is missing after scrape", async () => {

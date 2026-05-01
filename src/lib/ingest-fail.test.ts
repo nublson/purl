@@ -45,7 +45,7 @@ describe("failIngest", () => {
   });
 
   it("calls notifyLinksAfterIngest with the link id after updating", async () => {
-    await failIngest("link-3", "NO_API_KEY");
+    await failIngest("link-3", "LINK_NOT_FOUND");
 
     expect(notifyLinksAfterIngest).toHaveBeenCalledWith("link-3");
   });
@@ -70,7 +70,6 @@ describe("failIngest", () => {
 
   it("supports all IngestFailureReason values", async () => {
     const reasons = [
-      "NO_API_KEY",
       "SCRAPE_FAILED",
       "LINK_NOT_FOUND",
       "OTHER",

@@ -2,7 +2,7 @@
   "contentTypes": [
     {
       "type": "Links",
-      "description": "Any URL, fully extracted",
+      "description": "Any URL",
       "icon": "Link",
       "access": "Free"
     },
@@ -16,13 +16,13 @@
       "type": "YouTube",
       "description": "Full transcripts extracted",
       "icon": "TvMinimalPlay",
-      "access": "Free"
+      "access": "Pro"
     },
     {
       "type": "Audio",
       "description": "Transcribed via Whisper",
       "icon": "Headphones",
-      "access": "Free"
+      "access": "Pro"
     }
   ]
 }

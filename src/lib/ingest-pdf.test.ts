@@ -39,10 +39,6 @@ vi.mock("@/lib/ingest-fail", () => ({
   failIngest: vi.fn(),
 }));
 
-vi.mock("./api-keys", () => ({
-  getDecryptedApiKey: vi.fn(),
-}));
-
 import { buildMetadataText } from "@/lib/metadata-chunk";
 
 const prisma = (await import("@/lib/prisma")).default;
@@ -61,7 +57,6 @@ const { embedTextChunks } = await import("@/lib/embeddings");
 const { logIngestStart, logIngestFailure } =
   await import("@/lib/ingest-logger");
 const { failIngest } = await import("@/lib/ingest-fail");
-const { getDecryptedApiKey } = await import("./api-keys");
 const { ingestPdf } = await import("./ingest-pdf");
 
 describe("ingestPdf", () => {
@@ -80,9 +75,6 @@ describe("ingestPdf", () => {
     vi.mocked(failIngest).mockReset();
     vi.mocked(prisma.link.findUnique).mockReset();
     vi.mocked(prisma.link.findUnique).mockResolvedValue(mockPdfLink as never);
-
-    // Default: valid API key
-    vi.mocked(getDecryptedApiKey).mockResolvedValue("sk-test-key");
   });
 
   it("stores metadata chunk only when body produces no chunks", async () => {
@@ -106,10 +98,9 @@ describe("ingestPdf", () => {
     expect(prisma.linkContent.deleteMany).toHaveBeenCalledWith({
       where: { linkId: "link-1" },
     });
-    expect(embedTextChunks).toHaveBeenCalledWith(
-      [buildMetadataText(mockPdfLink)],
-      "sk-test-key",
-    );
+    expect(embedTextChunks).toHaveBeenCalledWith([
+      buildMetadataText(mockPdfLink),
+    ]);
     expect(logIngestStart).toHaveBeenCalledWith(
       "PDF",
       "link-1",
@@ -157,19 +148,6 @@ describe("ingestPdf", () => {
       where: { id: "link-1" },
       data: { ingestStatus: "COMPLETED" },
     });
-  });
-
-  it("marks NO_API_KEY when user has no key configured", async () => {
-    vi.mocked(getDecryptedApiKey).mockRejectedValue(new Error("No API key"));
-
-    await ingestPdf({
-      linkId: "link-1",
-      url: "https://example.com/doc.pdf",
-      userId: "user-1",
-    });
-
-    expect(failIngest).toHaveBeenCalledWith("link-1", "NO_API_KEY");
-    expect(extractPdfTextByPage).not.toHaveBeenCalled();
   });
 
   it("marks failed when extraction pipeline throws", async () => {
