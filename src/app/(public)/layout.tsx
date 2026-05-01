@@ -12,9 +12,7 @@ export default function PublicLayout({
 }>) {
   return (
     <Fragment>
-      <Header>
-        <PublicHeaderActions />
-      </Header>
+      <Header actions={<PublicHeaderActions />} />
       <main className="wrapper-public flex-1 flex flex-col items-center justify-start px-4 md:px-6 lg:px-12">
         {children}
       </main>

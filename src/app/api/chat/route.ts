@@ -169,7 +169,7 @@ export async function POST(request: Request) {
           },
         );
         if (result) {
-          writer.merge(result.toUIMessageStream());
+          writer.merge(result.toUIMessageStream({ sendReasoning: true }));
         }
       },
     });

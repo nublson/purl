@@ -2,7 +2,7 @@
 
 import type { ChatFlowError } from "@/lib/chat-flow-error";
 import { CHAT_ERROR_CODES, parseChatErrorBody } from "@/lib/chat-http-errors";
-import { Plus, X } from "lucide-react";
+import { ChevronDown, Plus, X, Minus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Typography } from "../typography";
@@ -336,21 +336,23 @@ export default function ChatHeader({
         {isLoadingChat ? (
           <Skeleton className="h-3.5 w-32" />
         ) : (
-          <div className="flex items-center justify-start gap-1">
-            <Typography
-              component="h3"
-              size="small"
-              className="text-accent-foreground line-clamp-1 font-medium break-all"
-            >
-              {label}
-            </Typography>
-            <ChatHistory
-              chats={chats}
-              isLoading={isLoading}
-              onSelectChat={onSelectChat}
-              onOpenChange={handleHistoryOpenChange}
-            />
-          </div>
+          <ChatHistory
+            chats={chats}
+            isLoading={isLoading}
+            onSelectChat={onSelectChat}
+            onOpenChange={handleHistoryOpenChange}
+          >
+            <Button variant="ghost" className="cursor-pointer">
+              <Typography
+                component="h3"
+                size="small"
+                className="text-accent-foreground line-clamp-1 font-medium break-all"
+              >
+                {label}
+              </Typography>
+              <ChevronDown />
+            </Button>
+          </ChatHistory>
         )}
         <div className="flex items-center justify-center gap-2">
           <Button
@@ -364,10 +366,10 @@ export default function ChatHeader({
           <Button
             size="icon-sm"
             variant="ghost"
-            className="cursor-pointer md:hidden"
+            className="cursor-pointer"
             onClick={onClose}
           >
-            <X />
+            <Minus />
           </Button>
         </div>
       </div>

@@ -1,8 +1,14 @@
 "use client";
 
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@/components/ai-elements/reasoning";
 import { cn } from "@/lib/utils";
 import { assistantContentLikelyUsesMarkdown } from "@/utils/assistant-markdown-heuristic";
 import type { Link } from "@/utils/links";
+import type { UIMessage } from "ai";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
 import { Suspense, lazy } from "react";
@@ -17,9 +23,17 @@ const ChatMarkdownBody = lazy(() =>
   })),
 );
 
+function getMessageText(message: UIMessage): string {
+  return (
+    message.parts
+      ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+      .map((p) => p.text)
+      .join("") ?? ""
+  );
+}
+
 interface ChatMessageProps {
-  content: string;
-  role: "user" | "assistant";
+  message: UIMessage;
   isLoading?: boolean;
   mentions?: Link[];
   /** Session profile image for user messages */
@@ -40,13 +54,26 @@ function AssistantMarkdownFallback({ content }: { content: string }) {
 }
 
 export default function ChatMessage({
-  content,
-  role,
+  message,
   isLoading,
   mentions,
   userAvatarUrl,
   userDisplayName,
 }: ChatMessageProps) {
+  const role = message.role as "user" | "assistant";
+  const content = getMessageText(message);
+
+  const reasoningParts =
+    message.parts?.filter(
+      (p): p is { type: "reasoning"; text: string } => p.type === "reasoning",
+    ) ?? [];
+  const reasoningText = reasoningParts.map((p) => p.text).join("\n\n");
+  const hasReasoning = reasoningParts.length > 0;
+
+  const lastPart = message.parts?.at(-1);
+  const isReasoningStreaming =
+    Boolean(isLoading) && lastPart?.type === "reasoning";
+
   const userInitial = userDisplayName?.trim().charAt(0)?.toUpperCase() ?? "?";
 
   const media =
@@ -62,26 +89,36 @@ export default function ChatMessage({
       <Image src="/logo.svg" alt="Purl" width={20} height={20} priority />
     );
 
+  const showAssistantSpinner =
+    role === "assistant" && isLoading && !content && !hasReasoning;
+
   return (
     <Item className="min-w-0 w-full p-0 gap-2 items-start">
       <ItemMedia>{media}</ItemMedia>
       <ItemContent className="min-w-0">
         <ItemTitle className="line-clamp-none w-full min-w-0 max-w-full">
-          {isLoading && !content ? (
+          {showAssistantSpinner ? (
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
           ) : (
             <div className={cn("min-w-0 max-w-full text-sm wrap-anywhere")}>
-              {role === "assistant" ? (
-                assistantContentLikelyUsesMarkdown(content) ? (
-                  <Suspense
-                    fallback={<AssistantMarkdownFallback content={content} />}
-                  >
-                    <ChatMarkdownBody content={content} />
-                  </Suspense>
-                ) : (
-                  <AssistantMarkdownFallback content={content} />
-                )
-              ) : (
+              {role === "assistant" && hasReasoning && (
+                <Reasoning className="w-full" isStreaming={isReasoningStreaming}>
+                  <ReasoningTrigger />
+                  <ReasoningContent>{reasoningText}</ReasoningContent>
+                </Reasoning>
+              )}
+              {role === "assistant" && content
+                ? assistantContentLikelyUsesMarkdown(content) ? (
+                    <Suspense
+                      fallback={<AssistantMarkdownFallback content={content} />}
+                    >
+                      <ChatMarkdownBody content={content} />
+                    </Suspense>
+                  ) : (
+                    <AssistantMarkdownFallback content={content} />
+                  )
+                : null}
+              {role === "user" && (
                 <Typography
                   size="small"
                   className="text-accent-foreground wrap-anywhere"
