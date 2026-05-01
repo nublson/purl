@@ -10,21 +10,22 @@
 
 Purl is a free, AI-powered read-it-later app and personal knowledge base. You paste URLs (or upload files): web pages, PDFs, YouTube videos, and audio. Purl ingests the content, stores chunked text with vector embeddings, and answers questions by searching what you saved — optionally scoped with `@` mentions to specific items.
 
-**Purl is free to use** during development; the app uses **server-managed AI keys** (`OPENAI_API_KEY` for embeddings and transcription, `ANTHROPIC_API_KEY` for chat). **Subscription plans** for a managed, multi-tenant experience are planned.
+**Purl core is free to use**. AI capabilities are positioned as **Pro features** (AI Chat, YouTube transcript extraction, and Audio transcription). The app currently uses **server-managed AI keys** (`OPENAI_API_KEY` for embeddings/transcription and `ANTHROPIC_API_KEY` for chat) while subscription and entitlement enforcement are still in progress.
 
 The product goal: one place to stash material you care about, then query it later with citations instead of digging through bookmarks.
 
-## AI features
+## AI features (planned packaging)
 
-| Feature                       | Provider        | Notes                                      |
-| ----------------------------- | --------------- | ------------------------------------------ |
-| Save unlimited links          | —               | Free                                       |
-| Save unlimited PDFs           | —               | Free                                       |
-| Web content extraction        | Server OpenAI   | Embeddings for search                      |
-| YouTube transcript extraction | —               | Transcript fetch; embeddings via OpenAI    |
-| Audio transcription (Whisper) | Server OpenAI   |                                            |
-| Semantic search               | Server OpenAI   | Embeddings                                 |
-| AI chat                       | Server Anthropic| Claude via AI SDK                            |
+| Feature                       | Planned tier |
+| ----------------------------- | ------------ |
+| Save unlimited links          | Free         |
+| Save unlimited PDFs and audio | Free         |
+| Content extraction (web and pdf) | Pro          |
+| YouTube transcript extraction | Pro          |
+| Audio transcription (Whisper) | Pro          |
+| AI chat                       | Pro          |
+
+These tiers describe the intended packaging. Entitlement checks for Pro features are still in progress.
 
 ## Implemented today
 
@@ -40,7 +41,7 @@ The product goal: one place to stash material you care about, then query it late
 - **Hardened outbound fetch** — Server-side `safeFetch` with optional proxy/DNS controls (see `AGENTS.md`).
 - **Realtime list sync** — Supabase Realtime so saves and updates propagate across tabs/devices quickly.
 - **AI chat**
-  - Streaming replies (**Anthropic Claude**) with tool use: list saved items (filters by date/type) and **semantic search** over stored chunks.
+  - Streaming replies (**Anthropic Claude**) with tool use: list saved items (filters by date/type) and search over stored chunks.
   - **`@` mentions** to focus the model on specific saved links; mentions persist on messages.
   - Multiple chats, titles, and message history stored in the database.
 - **Link actions** — Open original, copy URL, edit metadata, re-ingest, delete, add to chat context from the list.
@@ -100,6 +101,7 @@ These are called out explicitly because the repo is going public:
 
 - **Settings breadth** — Settings include account deletion; broader account preferences (profile edits, password change, notification settings, etc.) are not implemented yet.
 - **Subscription plans** — Usage limits, billing, and plan enforcement are planned but not yet implemented.
+- **Pro gating** — AI Chat, YouTube transcript extraction, and Audio transcription are intended to be Pro-only, but entitlement checks are not fully enforced yet.
 
 **Marketing vs. product:** The landing page copy mentions ideas such as **collections** and a **weekly digest**. Those are **not** built in the current schema or app — treat them as roadmap, not shipped features.
 
@@ -141,7 +143,7 @@ Purl is built around **untrusted input** (arbitrary URLs and uploaded files). A 
 - **SSRF-aware outbound fetches** — User-supplied URLs are not passed to raw `fetch`. Ingest, OG/thumbnail probes, PDF fetch, content-type sniffing, and similar paths go through [`safeFetch`](src/lib/safe-outbound-fetch.ts): HTTP(S) only, blocked private/link-local/reserved targets, redirect handling with per-hop host checks, DNS resolution pinned before connect (mitigates classic DNS rebinding against the pre-check), optional response size caps (e.g. PDF proxy). Optional **egress proxy** and custom DNS servers are documented in [`AGENTS.md`](AGENTS.md).
 - **Authentication & route gating** — [Better Auth](https://www.better-auth.com/) sessions; Next.js [`proxy`](src/proxy.ts) redirects unauthenticated users away from private routes and can require **email verification** before app access.
 - **API authorization** — Sensitive routes (`/api/chat`, `/api/links`, `/api/upload`, chats, etc.) resolve the session server-side and scope work to the signed-in user (e.g. chat mention IDs are validated against ownership).
-- **Per-user API key encryption** — OpenAI API keys are encrypted at rest using AES-256-GCM with a server-side `ENCRYPTION_KEY`. Keys are decrypted only when needed (ingest, chat) and never returned to the client. The client only receives a boolean `hasKey` status.
+- **Server-managed AI keys** — The app uses server environment variables for providers: `ANTHROPIC_API_KEY` for chat and `OPENAI_API_KEY` for embeddings/transcription. These keys are never exposed to the client.
 - **Rate limiting** — When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set, the proxy applies per-IP limits to **`/api/auth/*`**, **`POST /api/chat`**, **`POST /api/links`**, and **`POST /api/upload`** (see [`proxy-rate-limit.ts`](src/lib/proxy-rate-limit.ts)). Without Upstash, limits are disabled — fine locally, not ideal for production.
 - **Secrets & client exposure** — `SUPABASE_SERVICE_ROLE_KEY` and similar values are server-only. The browser uses the Supabase **anon** key for Realtime only; `.env` stays gitignored.
 - **Upload bounds** — Audio uploads enforce a maximum size server-side; PDF proxy streaming is capped (see `safe-outbound-fetch` / upload limits in code).
@@ -169,8 +171,9 @@ Create a `.env` file in the repo root. See `.env.example` for the full list; min
 ```bash
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME"
 
-# Required for per-user API key encryption — generate with: openssl rand -hex 32
-ENCRYPTION_KEY="your_64_char_hex_string_here"
+# AI providers (server-side only)
+ANTHROPIC_API_KEY="sk-ant-..."
+OPENAI_API_KEY="sk-proj-..."
 
 # Supabase Realtime — cross-device instant link list sync (same project as Postgres)
 NEXT_PUBLIC_SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
@@ -185,8 +188,8 @@ RESEND_FROM="Purl <onboarding@resend.dev>"
 Notes:
 
 - **`DATABASE_URL`** is required (Prisma + Better Auth).
-- **`ENCRYPTION_KEY`** is required for encrypting user API keys. Generate with `openssl rand -hex 32`.
-- **`OPENAI_API_KEY`** is no longer set at the app level — each user provides their own key via Settings.
+- **`ANTHROPIC_API_KEY`** is required for chat generation.
+- **`OPENAI_API_KEY`** is required for embeddings and transcription.
 - **Supabase** env vars are required for realtime link list sync. Use **Project Settings → API** in the Supabase dashboard. The service role key must stay server-only.
 - **Resend** is optional for local dev: if `RESEND_API_KEY` is not set, signup can still work, but verification emails will not send.
 - **Better Auth** secrets and URLs are in `.env.example` — copy those keys for a working auth setup.
