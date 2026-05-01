@@ -10,17 +10,16 @@
     },
     {
       "name": "Pro",
-      "description": "Bring your OpenAI API key to unlock the full experience — no subscription needed.",
-      "price": "On demand",
+      "description": "Advanced AI features for deeper understanding and retrieval.",
+      "price": "Coming soon",
       "features": [
         "Everything in Free",
-        "Web extraction",
+        "Web/PDF extraction",
         "Youtube transcripts",
-        "PDF parsing",
         "Audio transcription",
         "Unlimited AI chat"
       ],
-      "actionText": "Try for free",
+      "actionText": "Join waitlist",
       "popular": true
     }
   ]

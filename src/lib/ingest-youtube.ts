@@ -7,7 +7,6 @@ import { buildMetadataText } from "@/lib/metadata-chunk";
 import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import prisma from "@/lib/prisma";
 import { fetchYouTubeTranscript } from "@/lib/youtube-transcriber";
-import { getDecryptedApiKey } from "./api-keys";
 
 type IngestYoutubeInput = {
   linkId: string;
@@ -20,19 +19,13 @@ export async function ingestYoutube({
   url,
   userId,
 }: IngestYoutubeInput): Promise<void> {
+  void userId;
   try {
     await prisma.link.update({
       where: { id: linkId },
       data: { ingestStatus: "PROCESSING", ingestFailureReason: null },
     });
     logIngestStart("YOUTUBE", linkId, url);
-
-    const apiKey = await getDecryptedApiKey(userId).catch(() => null);
-
-    if (!apiKey) {
-      await failIngest(linkId, "NO_API_KEY");
-      return;
-    }
 
     const transcript = await fetchYouTubeTranscript(url);
     const contentChunks = chunkText(transcript);
@@ -59,7 +52,7 @@ export async function ingestYoutube({
       where: { linkId },
     });
 
-    const embeddings = await embedTextChunks(chunks, apiKey);
+    const embeddings = await embedTextChunks(chunks);
 
     await prisma.linkContent.createMany({
       data: chunks.map((content, index) => ({

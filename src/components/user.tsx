@@ -76,6 +76,7 @@ export function User() {
         </SettingsDialog>
         <UpgradeDialog>
           <DropdownMenuItem
+            disabled
             onSelect={(event) => {
               event.preventDefault();
             }}

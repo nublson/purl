@@ -7,7 +7,6 @@ import { buildMetadataText } from "@/lib/metadata-chunk";
 import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import { extractPdfTextByPage } from "@/lib/pdf-extractor";
 import prisma from "@/lib/prisma";
-import { getDecryptedApiKey } from "./api-keys";
 
 type IngestPdfInput = {
   linkId: string;
@@ -20,19 +19,13 @@ export async function ingestPdf({
   url,
   userId,
 }: IngestPdfInput): Promise<void> {
+  void userId;
   try {
     await prisma.link.update({
       where: { id: linkId },
       data: { ingestStatus: "PROCESSING", ingestFailureReason: null },
     });
     logIngestStart("PDF", linkId, url);
-
-    const apiKey = await getDecryptedApiKey(userId).catch(() => null);
-
-    if (!apiKey) {
-      await failIngest(linkId, "NO_API_KEY");
-      return;
-    }
 
     const pages = await extractPdfTextByPage(url);
     const contentChunks = chunkText(pages.join("\n\n"));
@@ -59,7 +52,7 @@ export async function ingestPdf({
       where: { linkId },
     });
 
-    const embeddings = await embedTextChunks(chunks, apiKey);
+    const embeddings = await embedTextChunks(chunks);
 
     await prisma.linkContent.createMany({
       data: chunks.map((content, index) => ({

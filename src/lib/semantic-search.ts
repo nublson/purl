@@ -126,14 +126,13 @@ export async function semanticSearch(
     similarityThreshold?: SimilarityThreshold;
     dateFrom?: Date;
     dateTo?: Date;
-    apiKey?: string;
   },
 ): Promise<LinkSearchResult[]> {
   const normalizedQuery = query.trim();
   if (!normalizedQuery) return [];
 
   try {
-    const embedding = await embedQuery(normalizedQuery, options?.apiKey);
+    const embedding = await embedQuery(normalizedQuery);
     const embeddingVector = JSON.stringify(embedding);
     const resultLimit = Math.max(1, Math.min(options?.matchCount ?? 20, 50));
     /** Wider pool so multiple same-type items (e.g. two YouTube saves) are not crowded out by unrelated links. */

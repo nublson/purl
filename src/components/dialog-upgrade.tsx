@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import ApiKeyForm from "./api-key-form";
 import { DialogWrapper } from "./dialog-wrapper";
 
 interface UpgradeDialogProps {
@@ -14,10 +13,9 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
   return (
     <DialogWrapper
       title="Upgrade"
-      description="Enable Pro features by adding your OpenAI API key."
+      description="Paid plans and subscription options are coming soon."
       open={open}
       onOpenChange={setOpen}
-      content={<ApiKeyForm />}
     >
       {children}
     </DialogWrapper>
