@@ -15,13 +15,37 @@ vi.mock("@/lib/prisma", () => ({
       strings,
       values,
     })),
+    PrismaClientKnownRequestError: class extends Error {
+      code: string;
+      constructor(message: string, info: { code: string }) {
+        super(message);
+        this.code = info.code;
+      }
+    },
   },
 }));
 
 const { embedQuery } = await import("@/lib/embeddings");
-const prisma = (await import("@/lib/prisma")).default;
+const prismaModule = await import("@/lib/prisma");
+const prisma = prismaModule.default;
+const { Prisma } = prismaModule;
 const { semanticSearch, SimilarityThreshold, computeKeywordBoost } =
   await import("./semantic-search");
+
+type MockPrismaClientKnownRequestError = Error & { code: string };
+const MockP2010Error = (
+  message: string,
+): MockPrismaClientKnownRequestError => {
+  const Cls = (
+    Prisma as {
+      PrismaClientKnownRequestError: new (
+        msg: string,
+        info: { code: string },
+      ) => MockPrismaClientKnownRequestError;
+    }
+  ).PrismaClientKnownRequestError;
+  return new Cls(message, { code: "P2010" });
+};
 
 describe("computeKeywordBoost", () => {
   const baseLink = {
@@ -280,5 +304,93 @@ describe("semanticSearch", () => {
     expect(result).toEqual([
       { linkId: "b", similarity: 0.45, vectorSimilarity: 0.45 },
     ]);
+  });
+});
+
+describe("semanticSearch – legacy 4-arg SQL fallback", () => {
+  beforeEach(() => {
+    vi.mocked(embedQuery).mockReset();
+    vi.mocked(prisma.$queryRaw).mockReset();
+    vi.mocked(prisma.link.findMany).mockReset();
+  });
+
+  it("retries with 4-arg SQL when the 6-arg function is missing (P2010/42883) and no date range", async () => {
+    vi.mocked(embedQuery).mockResolvedValue([0.5]);
+
+    const p2010 = MockP2010Error(
+      'Raw query failed. Code: `42883`. Message: `function match_link_chunks(vector, text, integer, text, timestamptz, timestamptz) does not exist`',
+    );
+    vi.mocked(prisma.$queryRaw)
+      .mockRejectedValueOnce(p2010)
+      .mockResolvedValueOnce([{ link_id: "lx", similarity: 0.8 }]);
+
+    vi.mocked(prisma.link.findMany).mockResolvedValue([
+      {
+        id: "lx",
+        title: "Legacy",
+        domain: "x.com",
+        description: null,
+        contentType: "WEB",
+        createdAt: new Date(),
+      },
+    ] as never);
+
+    const result = await semanticSearch("fallback query", "u1");
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.linkId).toBe("lx");
+  });
+
+  it("does not fall back when P2010/42883 is thrown but dateFrom is set", async () => {
+    vi.mocked(embedQuery).mockResolvedValue([0.5]);
+
+    const p2010 = MockP2010Error(
+      'Raw query failed. Code: `42883`. Message: `function does not exist`',
+    );
+    vi.mocked(prisma.$queryRaw).mockRejectedValue(p2010);
+
+    await expect(
+      semanticSearch("q", "u1", { dateFrom: new Date("2025-01-01") }),
+    ).rejects.toThrow();
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fall back when P2010/42883 is thrown but dateTo is set", async () => {
+    vi.mocked(embedQuery).mockResolvedValue([0.5]);
+
+    const p2010 = MockP2010Error(
+      'Raw query failed. Code: `42883`. Message: `function does not exist`',
+    );
+    vi.mocked(prisma.$queryRaw).mockRejectedValue(p2010);
+
+    await expect(
+      semanticSearch("q", "u1", { dateTo: new Date("2025-12-31") }),
+    ).rejects.toThrow();
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("propagates non-P2010 errors without retrying", async () => {
+    vi.mocked(embedQuery).mockResolvedValue([0.5]);
+    vi.mocked(prisma.$queryRaw).mockRejectedValue(new Error("connection lost"));
+
+    await expect(semanticSearch("q", "u1")).rejects.toThrow("connection lost");
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("propagates P2010 with a different error code (not 42883) without retrying", async () => {
+    vi.mocked(embedQuery).mockResolvedValue([0.5]);
+
+    const otherP2010 = MockP2010Error(
+      "Raw query failed. Code: `99999`. Message: `some other error`",
+    );
+    vi.mocked(prisma.$queryRaw).mockRejectedValue(otherP2010);
+
+    await expect(semanticSearch("q", "u1")).rejects.toThrow();
+
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
   });
 });

@@ -329,6 +329,223 @@ describe("buildChatTools – listSavedItems", () => {
   });
 });
 
+describe("streamChatResponse – providerOptions and callbacks", () => {
+  const userId = "user-cb";
+  const messages = [
+    { role: "user", content: [{ type: "text", text: "Hello" }] },
+  ];
+
+  function captureStreamTextArgs() {
+    const call = vi.mocked(streamText).mock.calls[0];
+    if (!call) throw new Error("streamText was not called");
+    return call[0] as Record<string, unknown>;
+  }
+
+  beforeEach(() => {
+    vi.mocked(streamText).mockReset();
+    vi.mocked(getChatModel).mockReset();
+    vi.mocked(getChatModel).mockReturnValue({ id: "claude" } as never);
+    vi.mocked(streamText).mockReturnValue({} as never);
+  });
+
+  it("passes anthropic thinking providerOptions with budgetTokens 2048", async () => {
+    await streamChatResponse(messages as never, userId, null, {
+      chatId: TEST_CHAT_ID,
+    });
+
+    const args = captureStreamTextArgs();
+    expect(args.providerOptions).toEqual({
+      anthropic: {
+        thinking: { type: "enabled", budgetTokens: 2048 },
+      },
+    });
+  });
+
+  it("passes stopWhen stepCountIs(5)", async () => {
+    await streamChatResponse(messages as never, userId, null, {
+      chatId: TEST_CHAT_ID,
+    });
+
+    const args = captureStreamTextArgs();
+    expect(args.stopWhen).toBe(5);
+  });
+
+  it("onError with Error containing insufficient_quota emits QUOTA_EXCEEDED", async () => {
+    const write = vi.fn();
+    const streamWriter = { write, merge: vi.fn(), onError: undefined };
+
+    await streamChatResponse(messages as never, userId, null, {
+      chatId: TEST_CHAT_ID,
+      streamWriter: streamWriter as never,
+    });
+
+    const { onError } = captureStreamTextArgs() as {
+      onError: (args: { error: unknown }) => void;
+    };
+    onError({ error: new Error("insufficient_quota exceeded for model") });
+
+    expect(write).toHaveBeenCalledWith({
+      type: "data-chat-protocol-error",
+      data: {
+        code: CHAT_STREAM_ERROR_CODES.QUOTA_EXCEEDED,
+        userMessage:
+          "The AI service reported insufficient quota. Please try again later.",
+      },
+      transient: true,
+    });
+  });
+
+  it("onError with a string containing INSUFFICIENT_QUOTA (case-insensitive) emits QUOTA_EXCEEDED", async () => {
+    const write = vi.fn();
+    const streamWriter = { write, merge: vi.fn(), onError: undefined };
+
+    await streamChatResponse(messages as never, userId, null, {
+      chatId: TEST_CHAT_ID,
+      streamWriter: streamWriter as never,
+    });
+
+    const { onError } = captureStreamTextArgs() as {
+      onError: (args: { error: unknown }) => void;
+    };
+    onError({ error: "INSUFFICIENT_QUOTA" });
+
+    expect(write).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          code: CHAT_STREAM_ERROR_CODES.QUOTA_EXCEEDED,
+        }),
+      }),
+    );
+  });
+
+  it("onError with an unrecognised error emits STREAM_FAILED", async () => {
+    const write = vi.fn();
+    const streamWriter = { write, merge: vi.fn(), onError: undefined };
+
+    await streamChatResponse(messages as never, userId, null, {
+      chatId: TEST_CHAT_ID,
+      streamWriter: streamWriter as never,
+    });
+
+    const { onError } = captureStreamTextArgs() as {
+      onError: (args: { error: unknown }) => void;
+    };
+    onError({ error: new Error("network timeout") });
+
+    expect(write).toHaveBeenCalledWith({
+      type: "data-chat-protocol-error",
+      data: {
+        code: CHAT_STREAM_ERROR_CODES.STREAM_FAILED,
+        userMessage: "Something went wrong. Please try again.",
+      },
+      transient: true,
+    });
+  });
+
+  it("onError is a no-op for stream failure when streamWriter is absent", async () => {
+    await streamChatResponse(messages as never, userId, null, {
+      chatId: TEST_CHAT_ID,
+    });
+
+    const { onError } = captureStreamTextArgs() as {
+      onError: (args: { error: unknown }) => void;
+    };
+    expect(() => onError({ error: new Error("boom") })).not.toThrow();
+  });
+
+  it("onError deduplication: second generic error does not write twice", async () => {
+    const write = vi.fn();
+    const streamWriter = { write, merge: vi.fn(), onError: undefined };
+
+    await streamChatResponse(messages as never, userId, null, {
+      chatId: TEST_CHAT_ID,
+      streamWriter: streamWriter as never,
+    });
+
+    const { onError } = captureStreamTextArgs() as {
+      onError: (args: { error: unknown }) => void;
+    };
+    onError({ error: new Error("first") });
+    onError({ error: new Error("second") });
+
+    expect(write).toHaveBeenCalledTimes(1);
+  });
+
+  it("onFinish with finishReason=error emits STREAM_FAILED and captures Sentry message", async () => {
+    const write = vi.fn();
+    const streamWriter = { write, merge: vi.fn(), onError: undefined };
+    vi.mocked(Sentry.captureMessage).mockReset();
+
+    await streamChatResponse(messages as never, userId, null, {
+      chatId: TEST_CHAT_ID,
+      streamWriter: streamWriter as never,
+    });
+
+    const { onFinish } = captureStreamTextArgs() as {
+      onFinish: (args: { text: string; finishReason: string }) => Promise<void>;
+    };
+    await onFinish({ text: "", finishReason: "error" });
+
+    expect(write).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          code: CHAT_STREAM_ERROR_CODES.STREAM_FAILED,
+        }),
+      }),
+    );
+    expect(Sentry.captureMessage).toHaveBeenCalledWith(
+      "Chat stream finished with error finishReason",
+      expect.objectContaining({ level: "error" }),
+    );
+  });
+
+  it("onFinish with finishReason=stop does not emit an error", async () => {
+    const write = vi.fn();
+    const streamWriter = { write, merge: vi.fn(), onError: undefined };
+
+    await streamChatResponse(messages as never, userId, null, {
+      chatId: TEST_CHAT_ID,
+      streamWriter: streamWriter as never,
+    });
+
+    const { onFinish } = captureStreamTextArgs() as {
+      onFinish: (args: { text: string; finishReason: string }) => Promise<void>;
+    };
+    await onFinish({ text: "Hello", finishReason: "stop" });
+
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("onFinish calls onAssistantText with the streamed text", async () => {
+    const onAssistantText = vi.fn();
+
+    await streamChatResponse(messages as never, userId, null, {
+      chatId: TEST_CHAT_ID,
+      onAssistantText,
+    });
+
+    const { onFinish } = captureStreamTextArgs() as {
+      onFinish: (args: { text: string; finishReason: string }) => Promise<void>;
+    };
+    await onFinish({ text: "The answer is 42", finishReason: "stop" });
+
+    expect(onAssistantText).toHaveBeenCalledWith("The answer is 42");
+  });
+
+  it("onFinish skips onAssistantText when not provided", async () => {
+    await streamChatResponse(messages as never, userId, null, {
+      chatId: TEST_CHAT_ID,
+    });
+
+    const { onFinish } = captureStreamTextArgs() as {
+      onFinish: (args: { text: string; finishReason: string }) => Promise<void>;
+    };
+    await expect(
+      onFinish({ text: "Some text", finishReason: "stop" }),
+    ).resolves.toBeUndefined();
+  });
+});
+
 describe("buildChatTools – searchContent", () => {
   const userId = "user-456";
 
