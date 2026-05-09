@@ -2,8 +2,22 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import prisma from "@/lib/prisma";
 import { getResend } from "@/lib/resend";
+import { createTrialSubscriptionForNewUser } from "@/lib/subscription-utils";
 
 export const auth = betterAuth({
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          try {
+            await createTrialSubscriptionForNewUser(user.id);
+          } catch (e) {
+            console.error("createTrialSubscriptionForNewUser failed", e);
+          }
+        },
+      },
+    },
+  },
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
