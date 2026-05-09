@@ -1,8 +1,6 @@
 "use client";
 
 import { LimitBanner } from "@/components/limit-banner";
-import type { UsageMeterData } from "@/components/usage-meter";
-import { UsageMeter } from "@/components/usage-meter";
 import { LinkGroup } from "@/components/link-group";
 import { LinkInput } from "@/components/link-input";
 import { PasteHandler } from "@/components/paste-handler";
@@ -20,13 +18,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { LinkGroupEmpty } from "./link-group-empty";
 
-export function HomeShell({
-  groups,
-  usageSummary,
-}: {
-  groups: LinkGroupType[];
-  usageSummary?: UsageMeterData | null;
-}) {
+export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   useRealtimeSync(startTransition);
@@ -115,7 +107,6 @@ export function HomeShell({
 
   return (
     <>
-      {usageSummary ? <UsageMeter data={usageSummary} /> : null}
       {limitMessage ? (
         <div className="mb-4 w-full max-w-2xl self-center">
           <LimitBanner

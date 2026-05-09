@@ -26,7 +26,7 @@ export default function FeatureItem({
     <Item
       variant="outline"
       className={cn(
-        "flex-col items-start gap-5 rounded-none border-0 border-border/70 bg-transparent px-8 py-9",
+        "flex-col items-start gap-5 rounded-none border-0 border-border/70 bg-transparent px-6 md:px-8 py-7 md:py-9",
         index < length - 1 && "border-b",
         index < 4 && "md:border-b",
         index >= 4 && "md:border-b-0",

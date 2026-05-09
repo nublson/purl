@@ -68,7 +68,12 @@ export const PricingCard = ({
       {actionText}
     </Button>
   ) : (
-    <Button variant={popular ? "default" : "outline"} size="lg" className="w-full" asChild>
+    <Button
+      variant={popular ? "default" : "outline"}
+      size="lg"
+      className="w-full"
+      asChild
+    >
       <Link href={ctaHref}>{actionText}</Link>
     </Button>
   );
@@ -96,7 +101,7 @@ export const PricingCard = ({
   return (
     <Card
       className={cn(
-        "min-h-[544px] w-full border-none bg-transparent px-8 py-9 md:w-[352px]",
+        "w-full h-full min-h-min border-none bg-transparent px-6 lg:px-8 py-7 lg:py-9]",
         className,
       )}
     >
@@ -143,7 +148,9 @@ export const PricingCard = ({
           ))}
         </ul>
       </CardContent>
-      {hideFooter ? null : <CardFooter className="p-0">{footerInner}</CardFooter>}
+      {hideFooter ? null : (
+        <CardFooter className="p-0">{footerInner}</CardFooter>
+      )}
     </Card>
   );
 };

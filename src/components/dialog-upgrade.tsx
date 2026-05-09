@@ -1,13 +1,13 @@
 "use client";
 
-import { DialogWrapper } from "./dialog-wrapper";
-import { PricingCard } from "./pricing-card";
-import { Typography } from "./typography";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { useSession } from "@/lib/auth-client";
 import { publicPlans } from "@/lib/plans";
 import * as React from "react";
 import { toast } from "sonner";
+import { DialogWrapper } from "./dialog-wrapper";
+import { PricingCard } from "./pricing-card";
+import { Typography } from "./typography";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 
 function formatMoney(cents: number) {
   return new Intl.NumberFormat("en-US", {
@@ -85,8 +85,9 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
       billing === "month" ? formatMoney(monthly) : formatMoney(annual);
     const priceSubLabel =
       billing === "month" ? "/month" : "/year (~17% vs monthly)";
+
     return (
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch sm:justify-center">
+      <div className="grid grid-cols-1 gap-4 min-h-0 md:grid-cols-2">
         {freePlan ? (
           <PricingCard
             key={freePlan.id}
@@ -98,7 +99,7 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
             actionText={freePlan.actionText}
             popular={freePlan.popular}
             hideFooter
-            className="h-full min-h-0 w-full rounded-lg border border-border bg-card/40 px-6 py-6 sm:max-w-none sm:flex-1 sm:w-0! md:w-full!"
+            className="h-full min-h-0 w-full min-w-0 rounded-lg border border-border bg-card/40 px-6 py-6"
           />
         ) : null}
         {proPlan ? (
@@ -131,7 +132,7 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
                 </Typography>
               )
             }
-            className="h-full min-h-0 w-full rounded-lg border border-primary/30 bg-primary/5 px-6 py-6 sm:max-w-none sm:flex-1 sm:w-0! md:w-full!"
+            className="h-full min-h-0 w-full min-w-0 rounded-lg border border-primary/30 bg-primary/5 px-6 py-6"
           />
         ) : null}
       </div>
@@ -139,7 +140,7 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
   }
 
   const content = (
-    <div className="flex flex-col gap-4 px-6 pb-6">
+    <div className="flex min-h-0 flex-col gap-4 px-6 pb-6">
       <Tabs
         value={interval}
         onValueChange={(v) => {
@@ -178,7 +179,7 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
       title="Plans & billing"
       description="Upgrade for full AI ingest, semantic search, and unlimited chat."
       content={content}
-      className="md:min-w-3xl"
+      className="min-w-sm md:min-w-2xl lg:min-w-3xl max-h-[90vh] md:max-h-none"
     >
       {children}
     </DialogWrapper>
