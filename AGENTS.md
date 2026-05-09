@@ -46,6 +46,9 @@ See `README.md` and `package.json` scripts for the full list. Quick reference:
 - **Email verification on signup**: Resend sends a real email. For local dev/testing, manually set `emailVerified = true` on the user record in the database if you can't receive the verification email.
 - **The chat input bar at `/home`** is for saving URLs, not asking questions. AI chat questions are handled differently (via the chat interface, not the URL input bar).
 - **`.env` is gitignored** — never commit it.
+- **Stripe billing**: Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and both `STRIPE_PRICE_PRO_*` price IDs for Checkout to work. Webhook processing uses idempotent `ProcessedStripeEvent` rows; configure a webhook URL that receives `checkout.session.completed`, `customer.subscription.*`, and `invoice.payment_*`. Trial is **internal** (7 days on signup); upgrading goes through Checkout. For local dev, use `stripe listen` and paste the CLI webhook secret into `STRIPE_WEBHOOK_SECRET`.
+- **Billing & limits reference**: When changing plans, caps, or in-app copy, treat [`docs/commercial-model.md`](docs/commercial-model.md) as canonical.
+- **Vitest and Prisma**: `src/vitest.setup.ts` sets a placeholder `DATABASE_URL` when unset so modules that initialize Prisma can load in unit tests before per-file mocks apply.
 
 ### Outbound URL fetching (`safeFetch`)
 
