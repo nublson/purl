@@ -87,6 +87,7 @@
   },
   "pnpm": {
     "overrides": {
+      "fast-uri": "3.1.2",
       "jsdom": "25.0.1"
     },
     "onlyBuiltDependencies": [
