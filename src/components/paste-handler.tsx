@@ -10,7 +10,7 @@ export function PasteHandler({
 }: {
   onPasteStart?: (url: string) => void;
   onSaveSuccess?: (newLinkId: string) => void;
-  onSaveError?: () => void;
+  onSaveError?: (detail: { limit?: boolean; message?: string } | null) => void;
 }) {
   const handlePaste = useCallback(
     async (e: ClipboardEvent) => {
@@ -29,8 +29,12 @@ export function PasteHandler({
       onPasteStart?.(text);
 
       const result = await saveLink(text);
-      if (!result) {
-        onSaveError?.();
+      if (!result || !("id" in result)) {
+        onSaveError?.(
+          result && "error" in result
+            ? { limit: result.limit, message: result.error }
+            : null,
+        );
         return;
       }
 

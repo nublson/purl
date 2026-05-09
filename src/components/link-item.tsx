@@ -6,7 +6,6 @@ import { Link as LinkType } from "@/utils/links";
 import { MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
-import { toast } from "sonner";
 import { X } from "./animate-ui/icons/x";
 import { LinkIcon } from "./link-icon";
 import { LinkMenu } from "./link-menu";
@@ -22,34 +21,6 @@ import {
   ItemTitle,
 } from "./ui/item";
 import { Spinner } from "./ui/spinner";
-
-const INGEST_POLL_INTERVAL_MS = 1200;
-const INGEST_POLL_MAX_ATTEMPTS = 45;
-
-/** Poll until ingest leaves PENDING/PROCESSING so UI matches DB when RSC refresh fails or lags. */
-async function pollIngestUntilSettled(
-  linkId: string,
-  generation: number,
-  genRef: React.RefObject<number>,
-  setStatus: React.Dispatch<React.SetStateAction<LinkType["ingestStatus"]>>,
-) {
-  for (let i = 0; i < INGEST_POLL_MAX_ATTEMPTS; i++) {
-    await new Promise((r) => setTimeout(r, INGEST_POLL_INTERVAL_MS));
-    if (genRef.current !== generation) return;
-    try {
-      const r = await fetch(`/api/links/${linkId}`);
-      if (!r.ok) continue;
-      const j = (await r.json()) as { ingestStatus: LinkType["ingestStatus"] };
-      if (genRef.current !== generation) return;
-      setStatus(j.ingestStatus);
-      if (j.ingestStatus !== "PENDING" && j.ingestStatus !== "PROCESSING") {
-        return;
-      }
-    } catch {
-      /* ignore transient network errors */
-    }
-  }
-}
 
 interface LinkItemProps {
   link: LinkType;
@@ -75,7 +46,6 @@ export const LinkItem = React.forwardRef<
   const chatCtx = useChatContextSafe();
   const router = useRouter();
 
-  const ingestPollGenRef = React.useRef(0);
   const lastLinkIdRef = React.useRef(link.id);
   const [displayIngestStatus, setDisplayIngestStatus] = React.useState<
     LinkType["ingestStatus"]
@@ -108,7 +78,6 @@ export const LinkItem = React.forwardRef<
     "idle" | "animating" | "loading" | "exiting"
   >("idle");
   const [previewOpen, setPreviewOpen] = React.useState(false);
-  const [optimisticIngesting, setOptimisticIngesting] = React.useState(false);
   const hoveringActionsRef = React.useRef(false);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
@@ -150,53 +119,9 @@ export const LinkItem = React.forwardRef<
     };
   }, [clearCloseTimer, clearOpenTimer]);
 
-  React.useEffect(() => {
-    if (
-      displayIngestStatus === "PENDING" ||
-      displayIngestStatus === "PROCESSING" ||
-      displayIngestStatus === "COMPLETED" ||
-      displayIngestStatus === "FAILED" ||
-      displayIngestStatus === "SKIPPED"
-    ) {
-      setOptimisticIngesting(false);
-    }
-  }, [link.id, displayIngestStatus]);
-
   const showIngestPulse =
-    optimisticIngesting ||
     displayIngestStatus === "PENDING" ||
     displayIngestStatus === "PROCESSING";
-
-  async function handleReingest() {
-    setOptimisticIngesting(true);
-    try {
-      const res = await fetch(`/api/links/${link.id}/reingest`, {
-        method: "POST",
-      });
-      if (res.ok) {
-        const body = (await res.json()) as LinkType;
-        setDisplayIngestStatus(body.ingestStatus);
-        toast.success("Re-ingesting…");
-        router.refresh();
-        const gen = ++ingestPollGenRef.current;
-        void pollIngestUntilSettled(
-          link.id,
-          gen,
-          ingestPollGenRef,
-          setDisplayIngestStatus,
-        );
-      } else {
-        setOptimisticIngesting(false);
-        const data = (await res.json().catch(() => ({}))) as {
-          error?: string;
-        };
-        toast.error(data?.error ?? "Failed to re-ingest");
-      }
-    } catch {
-      setOptimisticIngesting(false);
-      toast.error("Failed to re-ingest");
-    }
-  }
 
   function renderLoadingOrChatAction(): React.ReactNode {
     if (

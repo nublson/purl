@@ -10,9 +10,12 @@ export function chatJsonError(
   status: number,
   code: ChatHttpErrorCode,
   message: string,
-  options?: { retryAfterSeconds?: number },
+  options?: { retryAfterSeconds?: number; feature?: string },
 ): NextResponse {
-  const body = buildChatErrorBody(code, message, options?.retryAfterSeconds);
+  const body = buildChatErrorBody(code, message, {
+    retryAfterSeconds: options?.retryAfterSeconds,
+    feature: options?.feature,
+  });
   const headers: Record<string, string> = {};
   if (options?.retryAfterSeconds != null) {
     headers["Retry-After"] = String(options.retryAfterSeconds);

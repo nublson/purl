@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +13,6 @@ import {
   formatChatHistoryTime,
   groupChatsByChatHistoryDate,
 } from "@/utils/formatter";
-import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { Typography } from "../typography";
 

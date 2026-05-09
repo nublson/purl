@@ -1,7 +1,6 @@
-import { PricingCard } from "@/components/pricing-card";
+import { PricingPlans } from "@/components/pricing-plans";
 import SectionTitle from "@/components/section-title";
 import SectionWrapper from "@/components/section-wrapper";
-import pricingJson from "@/data/pricing.json" with { type: "json" };
 
 export const PricingSection = () => {
   return (
@@ -12,27 +11,15 @@ export const PricingSection = () => {
             label: "Pricing",
             title: (
               <>
-                Everything free. <br />
-                AI powered by you.
+                Start free. <br />
+                Upgrade when you want AI memory.
               </>
             ),
             description:
-              "Save and organize unlimited links, PDFs, and more — for free. Add your OpenAI API key to unlock AI features.",
+              "Save links and search them for free. Pro turns your stash into an AI knowledge base with extractions, embeddings, and unlimited chat.",
           }}
         />
-        <div className="flex flex-col md:flex-row items-center justify-center gap-4">
-          {pricingJson.plans.map((plan) => (
-            <PricingCard
-              key={plan.name}
-              name={plan.name}
-              description={plan.description}
-              price={plan.price.toString()}
-              features={plan.features}
-              actionText={plan.actionText}
-              popular={plan.popular}
-            />
-          ))}
-        </div>
+        <PricingPlans />
       </div>
     </SectionWrapper>
   );

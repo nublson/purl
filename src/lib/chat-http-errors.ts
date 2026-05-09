@@ -5,6 +5,7 @@ export const CHAT_HTTP_ERROR_CODES = {
   SESSION_EXPIRED: "SESSION_EXPIRED",
   CHAT_NOT_FOUND: "CHAT_NOT_FOUND",
   RATE_LIMITED: "RATE_LIMITED",
+  LIMIT_REACHED: "LIMIT_REACHED",
   BAD_REQUEST: "BAD_REQUEST",
   UPSTREAM_ERROR: "UPSTREAM_ERROR",
   INTERNAL_ERROR: "INTERNAL_ERROR",
@@ -36,19 +37,23 @@ export type ChatErrorBody = {
     code: ChatHttpErrorCode;
     message: string;
     retryAfterSeconds?: number;
+    feature?: string;
   };
 };
 
 export function buildChatErrorBody(
   code: ChatHttpErrorCode,
   message: string,
-  retryAfterSeconds?: number,
+  options?: { retryAfterSeconds?: number; feature?: string },
 ): ChatErrorBody {
   const body: ChatErrorBody = {
     error: { code, message },
   };
-  if (retryAfterSeconds != null) {
-    body.error.retryAfterSeconds = retryAfterSeconds;
+  if (options?.retryAfterSeconds != null) {
+    body.error.retryAfterSeconds = options.retryAfterSeconds;
+  }
+  if (options?.feature != null) {
+    body.error.feature = options.feature;
   }
   return body;
 }
@@ -64,7 +69,8 @@ export function isChatErrorBody(value: unknown): value is ChatErrorBody {
     typeof e.code === "string" &&
     typeof e.message === "string" &&
     (e.retryAfterSeconds === undefined ||
-      typeof e.retryAfterSeconds === "number")
+      typeof e.retryAfterSeconds === "number") &&
+    (e.feature === undefined || typeof e.feature === "string")
   );
 }
 
@@ -72,6 +78,7 @@ export type ParsedChatError = {
   code: ChatHttpErrorCode | string;
   message: string;
   retryAfterSeconds?: number;
+  feature?: string;
 };
 
 export function parseChatErrorBody(body: unknown): ParsedChatError | null {
@@ -80,6 +87,7 @@ export function parseChatErrorBody(body: unknown): ParsedChatError | null {
     code: body.error.code,
     message: body.error.message,
     retryAfterSeconds: body.error.retryAfterSeconds,
+    feature: body.error.feature,
   };
 }
 
@@ -88,18 +96,21 @@ export class ChatRequestError extends Error {
   readonly status: number;
   readonly code: ChatHttpErrorCode | string;
   readonly retryAfterSeconds?: number;
+  readonly feature?: string;
 
   constructor(
     status: number,
     code: ChatHttpErrorCode | string,
     message: string,
     retryAfterSeconds?: number,
+    feature?: string,
   ) {
     super(message);
     this.name = "ChatRequestError";
     this.status = status;
     this.code = code;
     this.retryAfterSeconds = retryAfterSeconds;
+    this.feature = feature;
   }
 }
 
@@ -141,6 +152,7 @@ export async function throwIfChatErrorResponse(
       parsed.code,
       parsed.message,
       parsed.retryAfterSeconds ?? headerRetry,
+      parsed.feature,
     );
   }
   throw new ChatRequestError(

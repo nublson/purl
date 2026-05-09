@@ -12,7 +12,9 @@ import {
 
 describe("chat-http-errors", () => {
   it("buildChatErrorBody includes optional retryAfterSeconds", () => {
-    expect(buildChatErrorBody(CHAT_ERROR_CODES.RATE_LIMITED, "Slow down", 30)).toEqual({
+    expect(buildChatErrorBody(CHAT_ERROR_CODES.RATE_LIMITED, "Slow down", {
+      retryAfterSeconds: 30,
+    })).toEqual({
       error: {
         code: "RATE_LIMITED",
         message: "Slow down",
@@ -36,6 +38,7 @@ describe("chat-http-errors", () => {
       code: "CHAT_NOT_FOUND",
       message: "Missing",
       retryAfterSeconds: undefined,
+      feature: undefined,
     });
   });
 
@@ -187,7 +190,7 @@ describe("throwIfChatErrorResponse", () => {
     const body = buildChatErrorBody(
       CHAT_ERROR_CODES.RATE_LIMITED,
       "Slow down",
-      30,
+      { retryAfterSeconds: 30 },
     );
     const res = new Response(JSON.stringify(body), {
       status: 429,

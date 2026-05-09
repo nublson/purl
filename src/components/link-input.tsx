@@ -19,7 +19,7 @@ export function LinkInput({
 }: {
   onSaveStart?: (url: string) => void;
   onSaveSuccess?: (id: string) => void;
-  onSaveError?: () => void;
+  onSaveError?: (detail: { limit?: boolean; message?: string } | null) => void;
 }) {
   const router = useRouter();
   const form = useForm({
@@ -29,8 +29,12 @@ export function LinkInput({
     onSubmit: async ({ value, formApi }) => {
       onSaveStart?.(value.url);
       const result = await saveLink(value.url);
-      if (!result) {
-        onSaveError?.();
+      if (!result || !("id" in result)) {
+        onSaveError?.(
+          result && "error" in result
+            ? { limit: result.limit, message: result.error }
+            : null,
+        );
         return;
       }
 
