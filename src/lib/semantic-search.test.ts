@@ -37,7 +37,7 @@ const MockP2010Error = (
   message: string,
 ): MockPrismaClientKnownRequestError => {
   const Cls = (
-    Prisma as {
+    Prisma as unknown as {
       PrismaClientKnownRequestError: new (
         msg: string,
         info: { code: string },
