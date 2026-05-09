@@ -19,6 +19,10 @@ vi.mock("@/lib/auth", () => ({
   },
 }));
 
+vi.mock("@/lib/entitlements", () => ({
+  assertCanUploadFiles: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("next/headers", () => ({
   headers: vi.fn().mockResolvedValue(new Headers()),
 }));

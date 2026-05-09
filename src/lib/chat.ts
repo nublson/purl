@@ -1,3 +1,4 @@
+import { getEntitlementContext } from "@/lib/entitlements";
 import { getChatModel } from "@/lib/ai";
 import { CHAT_STREAM_ERROR_CODES } from "@/lib/chat-http-errors";
 import type {
@@ -224,6 +225,10 @@ export function buildChatTools(
       ) => {
         void options;
         try {
+          const { entitlements } = await getEntitlementContext(userId);
+          if (!entitlements.aiFullAccess) {
+            return [];
+          }
           const results = await semanticSearch(query, userId, {
             matchCount: Math.max(1, Math.min(limit ?? 10, 20)),
             type: contentType as ContentType | undefined,

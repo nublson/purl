@@ -4,8 +4,11 @@ import { HeaderActionsFallback } from "@/components/skeletons";
 import { UploadFile } from "@/components/upload-file";
 import { User } from "@/components/user";
 import { ChatProvider } from "@/contexts/chat-context";
+import { auth } from "@/lib/auth";
 import { getLinksForCurrentUser } from "@/lib/links";
+import { getUsageSummaryForUser } from "@/lib/usage-summary";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Suspense } from "react";
 
 export const metadata: Metadata = {
@@ -13,12 +16,20 @@ export const metadata: Metadata = {
 };
 
 async function HeaderActions() {
-  const links = await getLinksForCurrentUser();
+  const [links, session] = await Promise.all([
+    getLinksForCurrentUser(),
+    auth.api.getSession({ headers: await headers() }),
+  ]);
+  const userId = session?.user?.id;
+  const usageSummary = userId
+    ? await getUsageSummaryForUser(userId)
+    : null;
+
   return (
     <div className="flex items-center justify-end gap-2">
       <HeaderSearchLinks links={links} />
       <UploadFile />
-      <User />
+      <User usageSummary={usageSummary} />
     </div>
   );
 }

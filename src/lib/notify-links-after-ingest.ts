@@ -1,3 +1,4 @@
+import { recordUsage } from "@/lib/usage";
 import prisma from "@/lib/prisma";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 
@@ -9,9 +10,13 @@ export async function notifyLinksAfterIngest(linkId: string): Promise<void> {
   try {
     const row = await prisma.link.findUnique({
       where: { id: linkId },
-      select: { userId: true },
+      select: { userId: true, ingestStatus: true },
     });
-    if (row?.userId) await broadcastLinksChanged(row.userId);
+    if (!row?.userId) return;
+    if (row.ingestStatus === "COMPLETED") {
+      await recordUsage(row.userId, "EXTRACT", { linkId });
+    }
+    await broadcastLinksChanged(row.userId);
   } catch {
     // Never break ingest if realtime lookup or broadcast fails
   }

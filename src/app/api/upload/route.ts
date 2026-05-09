@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { BillingLimitError, assertCanUploadFiles } from "@/lib/entitlements";
 import { ingestAudio } from "@/lib/ingest-audio";
 import { ingestPdf } from "@/lib/ingest-pdf";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
@@ -22,6 +23,18 @@ export async function POST(request: NextRequest) {
   const userId = session?.user?.id;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    await assertCanUploadFiles(userId);
+  } catch (e) {
+    if (e instanceof BillingLimitError) {
+      return NextResponse.json(
+        { error: e.message, code: "LIMIT_REACHED", feature: e.feature },
+        { status: 402 },
+      );
+    }
+    throw e;
   }
 
   const formData = await request.formData();

@@ -10,6 +10,7 @@ export type ChatFlowError =
   | { kind: "missing_chat" }
   | { kind: "rate_limit"; untilMs: number }
   | { kind: "quota_exceeded" }
+  | { kind: "limit_reached"; message: string; feature?: string }
   | { kind: "retry"; message: string };
 
 export function chatFlowErrorFromHttp(
@@ -26,6 +27,15 @@ export function chatFlowErrorFromHttp(
     const sec = parsed?.retryAfterSeconds ?? 60;
     return { kind: "rate_limit", untilMs: Date.now() + sec * 1000 };
   }
+  if (status === 402 || parsed?.code === CHAT_ERROR_CODES.LIMIT_REACHED) {
+    return {
+      kind: "limit_reached",
+      message:
+        parsed?.message?.trim() ||
+        "You've reached your plan limit. Upgrade to continue.",
+      feature: typeof parsed?.feature === "string" ? parsed.feature : undefined,
+    };
+  }
   return {
     kind: "retry",
     message:
@@ -40,5 +50,6 @@ export function chatFlowErrorFromRequestError(
     code: e.code,
     message: e.message,
     retryAfterSeconds: e.retryAfterSeconds,
+    feature: e.feature,
   });
 }

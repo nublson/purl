@@ -30,6 +30,7 @@ enum IngestStatus {
 enum IngestFailureReason {
   SCRAPE_FAILED
   LINK_NOT_FOUND
+  EXTRACTION_LIMIT
   OTHER
 }
 
@@ -38,8 +39,28 @@ enum MessageRole {
   ASSISTANT
 }
 
+enum PlanKey {
+  FREE
+  PRO
+  PRO_TRIAL
+}
+
+enum SubStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
+enum UsageKind {
+  SAVE
+  EXTRACT
+  CHAT_MSG
+}
+
 model User {
-  id            String    @id
+  id            String        @id
   name          String
   email         String
   emailVerified Boolean
@@ -50,10 +71,49 @@ model User {
   accounts      Account[]
   links         Link[]
   chats         Chat[]
+  subscription  Subscription?
 
   @@unique([email])
   @@map("users")
-  
+}
+
+model Subscription {
+  id                   String        @id @default(cuid())
+  userId               String        @unique
+  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planKey              PlanKey       @default(FREE)
+  status               SubStatus     @default(ACTIVE)
+  stripeCustomerId     String?       @unique
+  stripeSubscriptionId String?       @unique
+  stripePriceId        String?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean       @default(false)
+  trialEndsAt          DateTime?
+  trialEndingNotifiedAt DateTime?
+  compUntil            DateTime?
+  updatedAt            DateTime      @updatedAt
+
+  @@map("subscriptions")
+}
+
+model UsageEvent {
+  id        String    @id @default(cuid())
+  userId    String
+  kind      UsageKind
+  createdAt DateTime  @default(now())
+  meta      Json?
+
+  @@index([userId, kind, createdAt])
+  @@map("usage_events")
+}
+
+model ProcessedStripeEvent {
+  id         String   @id
+  type       String
+  receivedAt DateTime @default(now())
+
+  @@map("processed_stripe_events")
 }
 
 model Link {

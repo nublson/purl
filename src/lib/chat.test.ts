@@ -33,7 +33,15 @@ vi.mock("@/lib/ai", () => ({
 }));
 
 vi.mock("@/lib/prisma", () => ({
-  default: { linkContent: { findMany: vi.fn() }, link: { findMany: vi.fn() } },
+  default: {
+    linkContent: { findMany: vi.fn() },
+    link: { findMany: vi.fn() },
+    subscription: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+    },
+    usageEvent: { count: vi.fn(), create: vi.fn() },
+  },
 }));
 
 vi.mock("@/lib/semantic-search", () => ({
@@ -553,6 +561,23 @@ describe("buildChatTools – searchContent", () => {
     vi.mocked(semanticSearch).mockReset();
     vi.mocked(prisma.linkContent.findMany).mockReset();
     vi.mocked(Sentry.captureException).mockReset();
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({
+      id: "sub-1",
+      userId,
+      planKey: "PRO",
+      status: "ACTIVE",
+      trialEndsAt: null,
+      compUntil: null,
+      currentPeriodStart: new Date("2025-06-01"),
+      currentPeriodEnd: new Date("2025-07-01"),
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      stripePriceId: null,
+      cancelAtPeriodEnd: false,
+      trialEndingNotifiedAt: null,
+      updatedAt: new Date(),
+    } as never);
+    vi.mocked(prisma.usageEvent.count).mockResolvedValue(0);
   });
 
   it("returns empty array when semanticSearch finds no results", async () => {

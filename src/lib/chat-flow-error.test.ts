@@ -47,6 +47,7 @@ describe("chatFlowErrorFromHttp", () => {
       code: CHAT_ERROR_CODES.RATE_LIMITED,
       message: "",
       retryAfterSeconds: 30,
+      feature: undefined,
     });
     const after = Date.now();
 
@@ -55,6 +56,20 @@ describe("chatFlowErrorFromHttp", () => {
       expect(result.untilMs).toBeGreaterThanOrEqual(before + 30_000);
       expect(result.untilMs).toBeLessThanOrEqual(after + 30_000);
     }
+  });
+
+  it("returns limit_reached for 402 or LIMIT_REACHED code", () => {
+    expect(
+      chatFlowErrorFromHttp(402, {
+        code: CHAT_ERROR_CODES.LIMIT_REACHED,
+        message: "Chat cap",
+        feature: "CHAT_LIMIT",
+      }),
+    ).toEqual({
+      kind: "limit_reached",
+      message: "Chat cap",
+      feature: "CHAT_LIMIT",
+    });
   });
 
   it("returns retry kind with parsed message for other status codes", () => {

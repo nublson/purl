@@ -10,22 +10,22 @@
 
 Purl is a free, AI-powered read-it-later app and personal knowledge base. You paste URLs (or upload files): web pages, PDFs, YouTube videos, and audio. Purl ingests the content, stores chunked text with vector embeddings, and answers questions by searching what you saved — optionally scoped with `@` mentions to specific items.
 
-**Purl core is free to use**. AI capabilities are positioned as **Pro features** (AI Chat, YouTube transcript extraction, and Audio transcription). The app currently uses **server-managed AI keys** (`OPENAI_API_KEY` for embeddings/transcription and `ANTHROPIC_API_KEY` for chat) while subscription and entitlement enforcement are still in progress.
+**Plans:** **Free** and **Pro** are enforced server-side (see [`docs/commercial-model.md`](docs/commercial-model.md)). New signups get a **7-day Pro trial** (no card). **Stripe Checkout** handles subscriptions; **webhooks** sync status to Postgres. Usage meters and limits apply to saved links, AI extractions, and chat messages on the free tier.
 
 The product goal: one place to stash material you care about, then query it later with citations instead of digging through bookmarks.
 
-## AI features (planned packaging)
+## Plans (summary)
 
-| Feature                       | Planned tier |
-| ----------------------------- | ------------ |
-| Save unlimited links          | Free         |
-| Save unlimited PDFs and audio | Free         |
-| Content extraction (web and pdf) | Pro          |
-| YouTube transcript extraction | Pro          |
-| Audio transcription (Whisper) | Pro          |
-| AI chat                       | Pro          |
+| Feature                       | Free | Pro |
+| ----------------------------- | ---- | --- |
+| Save links (cap on free)      | Yes  | Yes |
+| Full-text search              | Yes  | Yes |
+| AI extraction & embeddings    | No   | Yes |
+| Semantic search in chat       | No   | Yes |
+| PDF/audio **upload**          | No   | Yes |
+| AI chat                       | Limited | Unlimited |
 
-These tiers describe the intended packaging. Entitlement checks for Pro features are still in progress.
+Exact limits are in [`docs/commercial-model.md`](docs/commercial-model.md).
 
 ## Implemented today
 
@@ -55,7 +55,7 @@ Saving a link is **synchronous** through metadata resolution and the database ro
 1. **Input** — `POST /api/links` with a URL, or `POST /api/upload` with a PDF/audio file (files go to Supabase Storage; the `Link` stores the public URL).
 2. **Classify & decorate** — Server-side [`detectContentType`](src/lib/server-detect-content-type.ts) (SSRF-safe `HEAD` / sniff) plus [`scrapeLinkMetadata`](src/lib/links.ts) (Open Graph HTML, PDF `Content-Disposition` / size, YouTube oEmbed). Duplicates of the same URL **refresh** metadata and reset ingestion.
 3. **Persist** — A `Link` row is created (default **`PENDING`**) with title, favicon, thumbnail, domain, and `contentType` (`WEB`, `PDF`, `YOUTUBE`, or `AUDIO`).
-4. **Schedule** — [`dispatchIngest`](src/lib/links.ts) uses Next.js [`after()`](https://nextjs.org/docs/app/api-reference/functions/after) to run the right handler without blocking the response: [`ingestWeb`](src/lib/ingest-web.ts), [`ingestPdf`](src/lib/ingest-pdf.ts), [`ingestYoutube`](src/lib/ingest-youtube.ts), or [`ingestAudio`](src/lib/ingest-audio.ts).
+4. **Schedule** — [`prepareIngestForLink`](src/lib/links.ts) enforces plan limits, then uses Next.js [`after()`](https://nextjs.org/docs/app/api-reference/functions/after) to run the right handler: [`ingestWeb`](src/lib/ingest-web.ts), [`ingestPdf`](src/lib/ingest-pdf.ts), [`ingestYoutube`](src/lib/ingest-youtube.ts), or [`ingestAudio`](src/lib/ingest-audio.ts). Free accounts skip extraction (metadata-only; ingest **`SKIPPED`**).
 5. **Pipeline** (each handler) — Set **`PROCESSING`** → fetch or extract plain text → split into chunks (with a synthetic **metadata** chunk first) → **OpenAI** embeddings (`text-embedding-3-small`) → replace `LinkContent` rows and attach **pgvector** values → **`COMPLETED`**. Failures set `ingestFailureReason` (`SCRAPE_FAILED`, `LINK_NOT_FOUND`, `OTHER`, etc.) alongside **`FAILED`**. **Re-ingest** reuses the same pipeline without re-scraping listing metadata.
 
 **Web pages (`WEB`).** Article-style HTML is fetched with [`safeFetch`](src/lib/safe-outbound-fetch.ts), parsed in **jsdom**, and the main content is extracted with Mozilla's [**Readability**](https://github.com/mozilla/readability) ([`scrapeWebContent`](src/lib/web-scraper.ts)). That matches how Firefox's reader mode chooses "the article," but it is **not universal**: many **SPAs** and other **client-rendered** sites return a thin HTML shell to crawlers, so Readability finds little or nothing and ingest may **`FAIL`**. A small set of hosts that need a full browser are rejected early (`UnsupportedSpaError` → ingest **`SKIPPED`**).
@@ -68,7 +68,7 @@ flowchart TB
     A(["URL or file upload"]) --> B["/api/links or /api/upload"]
     B --> C["detectContentType + scrapeLinkMetadata (safeFetch)"]
     C --> D["Insert Link — ingestStatus PENDING"]
-    D --> E["after() → dispatchIngest by contentType"]
+    D --> E["after() → prepareIngestForLink by contentType"]
   end
 
   subgraph work["Background ingest"]
@@ -149,6 +149,20 @@ Purl is built around **untrusted input** (arbitrary URLs and uploaded files). A 
 - **Upload bounds** — Audio uploads enforce a maximum size server-side; PDF proxy streaming is capped (see `safe-outbound-fetch` / upload limits in code).
 
 **Reporting a vulnerability:** use [GitHub Security Advisories](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability) for this repository so details stay private until patched.
+
+## Stripe (subscriptions)
+
+Billing uses **Stripe Checkout** (`POST /api/billing/checkout`), **Customer Portal** (`POST /api/billing/portal`), and **webhooks** (`POST /api/billing/webhook`). Plan entitlements and usage limits are enforced in-app from Postgres (see [`src/lib/entitlements.ts`](src/lib/entitlements.ts)); webhooks keep the [`Subscription`](prisma/schema.prisma) row in sync.
+
+**Env (see `.env.example`):** `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` (server-only for now), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_ANNUAL`, optional `ADMIN_TOKEN` for `POST /api/admin/grants`.
+
+**Local webhook testing:** create Pro prices in [Stripe Test mode](https://dashboard.stripe.com/test/products), put the price IDs in `.env`, then:
+
+```bash
+stripe listen --forward-to localhost:3000/api/billing/webhook
+```
+
+Copy the CLI signing secret into `STRIPE_WEBHOOK_SECRET` for that shell session. Trigger flows with `stripe trigger checkout.session.completed` (and exercise checkout from the app). **Go-live:** recreate products and a Live webhook endpoint; rotate keys and webhook secret per environment.
 
 ## Setup (local development)
 

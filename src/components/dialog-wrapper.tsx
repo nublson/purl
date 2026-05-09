@@ -37,12 +37,22 @@ export function DialogWrapper({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className={cn("gap-2 px-0", className)}>
-        <DialogHeader className="px-6">
+      <DialogContent
+        className={cn(
+          "gap-4 px-0",
+          content && "flex min-h-0 flex-col overflow-hidden",
+          className,
+        )}
+      >
+        <DialogHeader className="shrink-0 px-6">
           <DialogTitle className="text-lg font-medium">{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        {content}
+        {content ? (
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+            {content}
+          </div>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

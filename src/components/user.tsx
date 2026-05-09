@@ -19,9 +19,14 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
+import type { UsageMeterData } from "./usage-item";
 import { UserItem } from "./user-item";
 
-export function User() {
+export function User({
+  usageSummary = null,
+}: {
+  usageSummary?: UsageMeterData | null;
+}) {
   const { data: session } = useSession();
   const { signOut } = useAuth();
   const user = session?.user ?? null;
@@ -64,7 +69,7 @@ export function User() {
             Share feedback
           </DropdownMenuItem>
         </FeedbackDialog>
-        <SettingsDialog>
+        <SettingsDialog usageSummary={usageSummary}>
           <DropdownMenuItem
             onSelect={(event) => {
               event.preventDefault();
@@ -76,7 +81,6 @@ export function User() {
         </SettingsDialog>
         <UpgradeDialog>
           <DropdownMenuItem
-            disabled
             onSelect={(event) => {
               event.preventDefault();
             }}

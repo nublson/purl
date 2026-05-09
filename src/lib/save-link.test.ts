@@ -27,34 +27,46 @@ describe("saveLink", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("returns null and shows API error message when response is not ok", async () => {
+  it("returns error object and shows API error message when response is not ok", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ error: "Boom" }), { status: 400 }),
     );
 
     const result = await saveLink("https://example.com");
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ error: "Boom" });
     expect(errorMock).toHaveBeenCalledWith("Boom");
   });
 
-  it("returns null and shows fallback API error when response body is invalid", async () => {
+  it("returns error with limit flag on 402", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "Cap", code: "LIMIT_REACHED" }), {
+        status: 402,
+      }),
+    );
+
+    const result = await saveLink("https://example.com");
+
+    expect(result).toEqual({ error: "Cap", limit: true });
+  });
+
+  it("returns error and shows fallback API error when response body is invalid", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response("invalid-json", { status: 500 }),
     );
 
     const result = await saveLink("https://example.com");
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ error: "Failed to save link" });
     expect(errorMock).toHaveBeenCalledWith("Failed to save link");
   });
 
-  it("returns null and shows error toast when request throws", async () => {
+  it("returns error when request throws", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network down"));
 
     const result = await saveLink("https://example.com");
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ error: "Network error" });
     expect(errorMock).toHaveBeenCalledWith("Failed to save link");
   });
 

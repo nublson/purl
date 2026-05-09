@@ -1,5 +1,6 @@
 "use client";
 
+import { LimitBanner } from "@/components/limit-banner";
 import { LinkGroup } from "@/components/link-group";
 import { LinkInput } from "@/components/link-input";
 import { PasteHandler } from "@/components/paste-handler";
@@ -23,6 +24,7 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
   useRealtimeSync(startTransition);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [prevTodayCount, setPrevTodayCount] = useState(0);
+  const [limitMessage, setLimitMessage] = useState<string | null>(null);
   const [newLinkId, setNewLinkId] = useState<string | null>(null);
 
   const onPasteStart = useCallback((url: string) => {
@@ -39,9 +41,17 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
     [router],
   );
 
-  const onSaveError = useCallback(() => {
-    setPendingUrl(null);
-  }, []);
+  const onSaveError = useCallback(
+    (
+      detail: { limit?: boolean; message?: string } | null,
+    ) => {
+      setPendingUrl(null);
+      if (detail?.limit && detail.message) {
+        setLimitMessage(detail.message);
+      }
+    },
+    [],
+  );
 
   const todayGroup = groups.find((g) => g.label === "Today");
   const todayLinksCount = todayGroup?.links.length ?? 0;
@@ -81,7 +91,7 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
       });
     };
     const onUploadError = () => {
-      onSaveError();
+      onSaveError(null);
     };
 
     window.addEventListener(UPLOAD_START_EVENT, onUploadStart);
@@ -97,6 +107,14 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
 
   return (
     <>
+      {limitMessage ? (
+        <div className="mb-4 w-full max-w-2xl self-center">
+          <LimitBanner
+            message={limitMessage}
+            onDismiss={() => setLimitMessage(null)}
+          />
+        </div>
+      ) : null}
       <LinkInput
         onSaveStart={onPasteStart}
         onSaveSuccess={onSaveSuccess}
