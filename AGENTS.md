@@ -49,6 +49,7 @@ See `README.md` and `package.json` scripts for the full list. Quick reference:
 - **Stripe billing**: Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and both `STRIPE_PRICE_PRO_*` price IDs for Checkout to work. Webhook processing uses idempotent `ProcessedStripeEvent` rows; configure a webhook URL that receives `checkout.session.completed`, `customer.subscription.*`, and `invoice.payment_*`. Trial is **internal** (7 days on signup); upgrading goes through Checkout. For local dev, use `stripe listen` and paste the CLI webhook secret into `STRIPE_WEBHOOK_SECRET`.
 - **Billing & limits reference**: When changing plans, caps, or in-app copy, treat [`docs/commercial-model.md`](docs/commercial-model.md) as canonical.
 - **Vitest and Prisma**: `src/vitest.setup.ts` sets a placeholder `DATABASE_URL` when unset so modules that initialize Prisma can load in unit tests before per-file mocks apply.
+- **Plan usage UI**: Usage caps and progress for the signed-in user live in **Settings → Usage**, not on `/home`. The private app layout loads them with `getUsageSummaryForUser` and passes the result into the settings dialog (`src/app/(private)/layout.tsx`, `src/lib/usage-summary.ts`, `src/components/dialog-settings.tsx`).
 
 ### Outbound URL fetching (`safeFetch`)
 
