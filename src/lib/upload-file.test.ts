@@ -19,22 +19,30 @@ const { createLinkFromFile, InvalidUploadTypeError, UploadStorageError } =
 
 const uploadMock = vi.fn();
 const createBucketMock = vi.fn();
-const getPublicUrlMock = vi.fn();
+const createSignedUrlMock = vi.fn();
 const fromMock = vi.fn();
+const getBucketMock = vi.fn();
+const updateBucketMock = vi.fn();
 
-function setupSupabaseSuccess(publicUrl = "https://files.example.com/file") {
+function setupSupabaseSuccess(signedUrl = "https://files.example.com/file") {
+  getBucketMock.mockResolvedValue({ data: { public: false }, error: null });
   uploadMock.mockResolvedValue({ data: {}, error: null });
-  getPublicUrlMock.mockReturnValue({ data: { publicUrl } });
+  createSignedUrlMock.mockResolvedValue({
+    data: { signedUrl },
+    error: null,
+  });
   createBucketMock.mockResolvedValue({ data: {}, error: null });
   fromMock.mockReturnValue({
     upload: uploadMock,
-    getPublicUrl: getPublicUrlMock,
+    createSignedUrl: createSignedUrlMock,
   });
 
   vi.mocked(getAdminSupabase).mockReturnValue({
     storage: {
       from: fromMock,
+      getBucket: getBucketMock,
       createBucket: createBucketMock,
+      updateBucket: updateBucketMock,
     },
   } as never);
 }
@@ -45,8 +53,10 @@ describe("createLinkFromFile", () => {
     vi.mocked(getAdminSupabase).mockReset();
     uploadMock.mockReset();
     createBucketMock.mockReset();
-    getPublicUrlMock.mockReset();
+    createSignedUrlMock.mockReset();
     fromMock.mockReset();
+    getBucketMock.mockReset();
+    updateBucketMock.mockReset();
     vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("uuid-fixed");
     vi.mocked(prisma.link.create).mockResolvedValue({
       id: "link-1",
@@ -68,6 +78,8 @@ describe("createLinkFromFile", () => {
           contentType: "PDF",
           domain: ".pdf",
           description: "PDF Document - 2 KB",
+          storagePath: "user-1/uuid-fixed.pdf",
+          url: "https://files.example.com/u/doc.pdf",
         }),
       }),
     );
@@ -166,25 +178,27 @@ describe("createLinkFromFile", () => {
     );
   });
 
-  it("creates bucket and retries upload when bucket is missing", async () => {
-    getPublicUrlMock.mockReturnValue({
-      data: { publicUrl: "https://files.example.com/u/doc.pdf" },
+  it("creates a private bucket before upload when bucket is missing", async () => {
+    getBucketMock.mockResolvedValue({
+      data: null,
+      error: { message: "Bucket not found" },
     });
-    uploadMock
-      .mockResolvedValueOnce({
-        data: null,
-        error: { message: "Bucket not found" },
-      })
-      .mockResolvedValueOnce({ data: {}, error: null });
+    createSignedUrlMock.mockResolvedValue({
+      data: { signedUrl: "https://files.example.com/u/doc.pdf" },
+      error: null,
+    });
+    uploadMock.mockResolvedValue({ data: {}, error: null });
     createBucketMock.mockResolvedValue({ data: {}, error: null });
     fromMock.mockReturnValue({
       upload: uploadMock,
-      getPublicUrl: getPublicUrlMock,
+      createSignedUrl: createSignedUrlMock,
     });
     vi.mocked(getAdminSupabase).mockReturnValue({
       storage: {
         from: fromMock,
+        getBucket: getBucketMock,
         createBucket: createBucketMock,
+        updateBucket: updateBucketMock,
       },
     } as never);
     const file = new File([new Uint8Array(10)], "doc.pdf", {
@@ -194,9 +208,9 @@ describe("createLinkFromFile", () => {
     await createLinkFromFile(file, "user-1");
 
     expect(createBucketMock).toHaveBeenCalledWith("user-uploads", {
-      public: true,
+      public: false,
     });
-    expect(uploadMock).toHaveBeenCalledTimes(2);
+    expect(uploadMock).toHaveBeenCalledTimes(1);
     expect(prisma.link.create).toHaveBeenCalledTimes(1);
   });
 });

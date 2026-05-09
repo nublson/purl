@@ -65,6 +65,7 @@ model Link {
   contentType  ContentType  @default(WEB)
   description  String?
   thumbnail    String?
+  storagePath  String?
   createdAt    DateTime     @default(now())
   ingestStatus IngestStatus @default(PENDING)
   ingestFailureReason IngestFailureReason?
