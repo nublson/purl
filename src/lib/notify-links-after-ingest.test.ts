@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/lib/usage", () => ({
+  recordUsage: vi.fn(),
+}));
+
 vi.mock("@/lib/prisma", () => ({
   default: {
     link: {
@@ -24,7 +28,7 @@ describe("notifyLinksAfterIngest", () => {
 
   it("broadcasts to the link owner when the link is found", async () => {
     vi.mocked(prisma.link.findUnique).mockResolvedValue(
-      { userId: "user-123" } as never,
+      { userId: "user-123", ingestStatus: "COMPLETED" } as never,
     );
     vi.mocked(broadcastLinksChanged).mockResolvedValue(undefined);
 
@@ -32,7 +36,7 @@ describe("notifyLinksAfterIngest", () => {
 
     expect(prisma.link.findUnique).toHaveBeenCalledWith({
       where: { id: "link-1" },
-      select: { userId: true },
+      select: { userId: true, ingestStatus: true },
     });
     expect(broadcastLinksChanged).toHaveBeenCalledWith("user-123");
   });

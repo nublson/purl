@@ -30,6 +30,21 @@ vi.mock("@/lib/chats", () => ({
   verifyChatOwnership: vi.fn(),
 }));
 
+vi.mock("@/lib/entitlements", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/lib/entitlements")>(
+      "@/lib/entitlements",
+    );
+  return {
+    ...actual,
+    assertCanChat: vi.fn(),
+  };
+});
+
+vi.mock("@/lib/usage", () => ({
+  recordUsage: vi.fn(),
+}));
+
 vi.mock("ai", async (importOriginal) => {
   const actual = await importOriginal<typeof import("ai")>();
   return {
@@ -42,6 +57,8 @@ const { auth } = await import("@/lib/auth");
 const { buildMentionContext, streamChatResponse } = await import("@/lib/chat");
 const { filterMentionLinkIdsForUser, saveMessage, verifyChatOwnership } =
   await import("@/lib/chats");
+const { assertCanChat } = await import("@/lib/entitlements");
+const { recordUsage } = await import("@/lib/usage");
 const { convertToModelMessages } = await import("ai");
 const Sentry = await import("@sentry/nextjs");
 
@@ -83,6 +100,10 @@ describe("POST /api/chat", () => {
     vi.mocked(buildMentionContext).mockReset();
     vi.mocked(streamChatResponse).mockReset();
     vi.mocked(saveMessage).mockReset();
+    vi.mocked(recordUsage).mockReset();
+    vi.mocked(assertCanChat).mockReset();
+    vi.mocked(assertCanChat).mockResolvedValue(undefined);
+    vi.mocked(recordUsage).mockResolvedValue(undefined);
     vi.mocked(verifyChatOwnership).mockReset();
     vi.mocked(filterMentionLinkIdsForUser).mockReset();
     vi.mocked(convertToModelMessages).mockReset();
@@ -272,7 +293,7 @@ describe("POST /api/chat", () => {
         buildChatErrorBody(
           CHAT_ERROR_CODES.RATE_LIMITED,
           "Too many requests. Try again shortly.",
-          60,
+          { retryAfterSeconds: 60 },
         ),
       );
     });

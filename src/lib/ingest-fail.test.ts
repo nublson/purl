@@ -72,6 +72,7 @@ describe("failIngest", () => {
     const reasons = [
       "SCRAPE_FAILED",
       "LINK_NOT_FOUND",
+      "EXTRACTION_LIMIT",
       "OTHER",
     ] as const;
 

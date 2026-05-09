@@ -1,5 +1,11 @@
 import { vi } from "vitest";
 
+/** Dummy URL so `@/lib/prisma` can initialize when tests import real modules (DB is not connected in unit tests). */
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL =
+    "postgresql://vitest:vitest@127.0.0.1:5432/vitest?schema=public";
+}
+
 /** Lets tests import modules that transitively pull in `server-only` (e.g. ingest → notify → realtime-broadcast). */
 vi.mock("server-only", () => ({}));
 

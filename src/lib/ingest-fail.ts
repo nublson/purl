@@ -1,10 +1,6 @@
 import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
+import type { IngestFailureReason } from "@/generated/prisma/enums";
 import prisma from "@/lib/prisma";
-
-export type IngestFailureReason =
-  | "SCRAPE_FAILED"
-  | "LINK_NOT_FOUND"
-  | "OTHER";
 
 export async function failIngest(
   linkId: string,

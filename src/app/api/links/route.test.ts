@@ -33,6 +33,14 @@ vi.mock("@/lib/prisma", () => ({
       create: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
+      count: vi.fn(),
+    },
+    subscription: {
+      findUnique: vi.fn(),
+      create: vi.fn(),
+    },
+    usageEvent: {
+      count: vi.fn(),
     },
   },
 }));
@@ -58,6 +66,24 @@ let safeFetchSpy: ReturnType<typeof vi.spyOn>;
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 const CREATED_AT = new Date("2025-06-15T10:00:00Z");
+
+/** Pro subscription so save + ingest paths pass entitlement checks in API tests. */
+const MOCK_PRO_SUBSCRIPTION = {
+  id: "sub-1",
+  userId: "user-123",
+  planKey: "PRO" as const,
+  status: "ACTIVE" as const,
+  trialEndsAt: null,
+  compUntil: null,
+  currentPeriodStart: new Date("2025-06-01T00:00:00Z"),
+  currentPeriodEnd: new Date("2025-07-01T00:00:00Z"),
+  stripeCustomerId: null as string | null,
+  stripeSubscriptionId: null as string | null,
+  stripePriceId: null as string | null,
+  cancelAtPeriodEnd: false,
+  trialEndingNotifiedAt: null as Date | null,
+  updatedAt: CREATED_AT,
+};
 const MOCK_LINK = {
   id: "link-1",
   url: "https://example.com",
@@ -118,6 +144,12 @@ describe("POST /api/links", () => {
     vi.mocked(auth.api.getSession).mockReset();
     vi.mocked(prisma.link.create).mockReset();
     vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.link.count).mockResolvedValue(0);
+    vi.mocked(prisma.usageEvent.count).mockResolvedValue(0);
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      MOCK_PRO_SUBSCRIPTION as never,
+    );
+    vi.mocked(prisma.subscription.create).mockReset();
     vi.mocked(prisma.link.update).mockReset();
     vi.mocked(ogs).mockReset();
     vi.mocked(broadcastLinksChanged).mockClear();

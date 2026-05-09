@@ -1,4 +1,5 @@
 import { createLink, UnauthorizedError } from "@/lib/links";
+import { BillingLimitError } from "@/lib/entitlements";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { serializeLink } from "@/lib/serialize-link";
 import { isValidUrl } from "@/utils/url";
@@ -27,6 +28,16 @@ export async function POST(request: NextRequest) {
   } catch (e) {
     if (e instanceof UnauthorizedError) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (e instanceof BillingLimitError) {
+      return NextResponse.json(
+        {
+          error: e.message,
+          code: "LIMIT_REACHED",
+          feature: e.feature,
+        },
+        { status: 402 },
+      );
     }
     throw e;
   }

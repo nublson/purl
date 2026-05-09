@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { BillingLimitError, assertCanChat } from "@/lib/entitlements";
 import { buildMentionContext, streamChatResponse } from "@/lib/chat";
 import { chatJsonError } from "@/lib/chat-api-error-response";
 import { CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
@@ -8,6 +9,7 @@ import {
   saveMessage,
   verifyChatOwnership,
 } from "@/lib/chats";
+import { recordUsage } from "@/lib/usage";
 import * as Sentry from "@sentry/nextjs";
 import {
   convertToModelMessages,
@@ -128,6 +130,20 @@ export async function POST(request: Request) {
   let phase: ChatRoutePhase = "prepare_stream";
 
   try {
+    try {
+      await assertCanChat(userId);
+    } catch (err) {
+      if (err instanceof BillingLimitError) {
+        return chatJsonError(
+          402,
+          CHAT_ERROR_CODES.LIMIT_REACHED,
+          err.message,
+          { feature: err.feature },
+        );
+      }
+      throw err;
+    }
+
     const ownedIds = ownedMentionLinkIds;
     const hasMentionContext = Boolean(ownedIds?.length);
 
@@ -152,6 +168,7 @@ export async function POST(request: Request) {
         ? ownedMentionLinkIds
         : undefined,
     );
+    await recordUsage(userId, "CHAT_MSG", { chatId });
 
     phase = "stream_start";
     const stream = createUIMessageStream<PurlChatUIMessage>({

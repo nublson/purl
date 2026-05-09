@@ -4,11 +4,14 @@ import type {
   IngestStatus,
 } from "@/generated/prisma/enums";
 import { auth } from "@/lib/auth";
+import { assertCanSaveLink, shouldRunIngest } from "@/lib/entitlements";
 import { ingestAudio } from "@/lib/ingest-audio";
+import { skipIngest } from "@/lib/ingest-skip";
 import { ingestPdf } from "@/lib/ingest-pdf";
 import { ingestWeb } from "@/lib/ingest-web";
 import { ingestYoutube } from "@/lib/ingest-youtube";
 import { validateOgThumbnailUrl } from "@/lib/og-thumbnail-probe";
+import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import prisma from "@/lib/prisma";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
 import { detectContentType } from "@/lib/server-detect-content-type";
@@ -374,7 +377,7 @@ const ingestHandlers: Record<ContentType, IngestHandler | null> = {
   WEB: ({ linkId, url, userId }) => ingestWeb({ linkId, url, userId }),
 };
 
-function dispatchIngest(link: {
+function dispatchIngestHandler(link: {
   id: string;
   url: string;
   contentType: ContentType;
@@ -382,8 +385,32 @@ function dispatchIngest(link: {
 }): void {
   const handler = ingestHandlers[link.contentType];
   if (!handler) return;
-
   after(() => handler({ linkId: link.id, url: link.url, userId: link.userId }));
+}
+
+async function prepareIngestForLink(link: {
+  id: string;
+  url: string;
+  contentType: ContentType;
+  userId: string;
+}): Promise<void> {
+  const decision = await shouldRunIngest(link.userId);
+  if (!decision.run) {
+    if (decision.skipReason === "extraction_cap") {
+      await prisma.link.update({
+        where: { id: link.id },
+        data: {
+          ingestStatus: "SKIPPED",
+          ingestFailureReason: "EXTRACTION_LIMIT",
+        },
+      });
+    } else {
+      await skipIngest(link.id);
+    }
+    await notifyLinksAfterIngest(link.id);
+    return;
+  }
+  dispatchIngestHandler(link);
 }
 
 /** Re-scrapes link metadata and re-dispatches ingestion for the current user. */
@@ -411,7 +438,7 @@ export async function refreshLink(
     },
   });
 
-  dispatchIngest(refreshed);
+  await prepareIngestForLink(refreshed);
   return refreshed;
 }
 
@@ -434,11 +461,11 @@ export async function reingestLink(
     data: { ingestStatus: "PENDING" },
   });
 
-  const ingestUrl = existing.storagePath
+  const urlForIngest = existing.storagePath
     ? await createSignedUploadUrl(existing.storagePath, 3600)
     : updated.url;
 
-  dispatchIngest({ ...updated, url: ingestUrl });
+  await prepareIngestForLink({ ...updated, url: urlForIngest });
   return updated;
 }
 
@@ -451,6 +478,8 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
   if (existing) {
     return (await refreshLink(existing.id)) ?? existing;
   }
+
+  await assertCanSaveLink(userId);
 
   const resolved = await resolveLinkFromUrl(url);
 
@@ -466,7 +495,7 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
       userId,
     },
   });
-  dispatchIngest(link);
+  await prepareIngestForLink(link);
   return link;
 }
 
@@ -531,7 +560,7 @@ export async function updateLink(
   });
 
   if (urlChanged) {
-    dispatchIngest(updated);
+    await prepareIngestForLink(updated);
   }
 
   return updated;
