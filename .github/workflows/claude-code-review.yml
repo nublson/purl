@@ -35,6 +35,8 @@ jobs:
         id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
+          # Allow Cursor Cloud / automation PRs (actor "cursor") to run this job.
+          allowed_bots: "cursor"
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
           plugins: 'code-review@claude-code-plugins'
