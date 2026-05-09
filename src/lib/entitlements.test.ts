@@ -1,3 +1,4 @@
+import type { Prisma } from "@/generated/prisma/client";
 import type { PlanKey } from "@/generated/prisma/enums";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -58,13 +59,18 @@ describe("entitlements", () => {
     vi.mocked(prisma.link.count).mockReset();
     vi.mocked(prisma.usageEvent.count).mockReset();
 
-    vi.mocked(prisma.subscription.findUnique).mockImplementation(async () => null);
-    vi.mocked(prisma.subscription.create).mockImplementation(async ({ data }) =>
-      mockSub({
-        planKey: data.planKey as PlanKey,
-        status: data.status as "ACTIVE",
-        trialEndsAt: data.trialEndsAt as Date | null,
-      }),
+    vi.mocked(prisma.subscription.findUnique).mockImplementation(
+      (async () => null) as unknown as typeof prisma.subscription.findUnique,
+    );
+    vi.mocked(prisma.subscription.create).mockImplementation(
+      (async (args: Prisma.SubscriptionCreateArgs) => {
+        const { data } = args;
+        return mockSub({
+          planKey: data.planKey as PlanKey,
+          status: data.status as "ACTIVE",
+          trialEndsAt: data.trialEndsAt as Date | null,
+        });
+      }) as unknown as typeof prisma.subscription.create,
     );
   });
 
