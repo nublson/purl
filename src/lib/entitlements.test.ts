@@ -58,13 +58,18 @@ describe("entitlements", () => {
     vi.mocked(prisma.link.count).mockReset();
     vi.mocked(prisma.usageEvent.count).mockReset();
 
-    vi.mocked(prisma.subscription.findUnique).mockImplementation(async () => null);
-    vi.mocked(prisma.subscription.create).mockImplementation(async ({ data }) =>
-      mockSub({
-        planKey: data.planKey as PlanKey,
-        status: data.status as "ACTIVE",
-        trialEndsAt: data.trialEndsAt as Date | null,
-      }),
+    const subFindUnique = prisma.subscription.findUnique as ReturnType<
+      typeof vi.fn
+    >;
+    const subCreate = prisma.subscription.create as ReturnType<typeof vi.fn>;
+    subFindUnique.mockImplementation(async () => null);
+    subCreate.mockImplementation(
+      async ({ data }: { data: Record<string, unknown> }) =>
+        mockSub({
+          planKey: data.planKey as PlanKey,
+          status: data.status as "ACTIVE",
+          trialEndsAt: data.trialEndsAt as Date | null,
+        }),
     );
   });
 
