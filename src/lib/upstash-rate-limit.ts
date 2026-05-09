@@ -2,7 +2,6 @@ import { Ratelimit } from "@upstash/ratelimit";
 import { Redis } from "@upstash/redis";
 
 let redisSingleton: Redis | null | undefined;
-let warnedMissingCredentials = false;
 
 function getRedis(): Redis | null {
   if (redisSingleton !== undefined) {
@@ -11,13 +10,12 @@ function getRedis(): Redis | null {
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) {
-    redisSingleton = null;
-    if (process.env.NODE_ENV === "production" && !warnedMissingCredentials) {
-      warnedMissingCredentials = true;
-      console.warn(
-        "[rate-limit] UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are not set; rate limiting is disabled.",
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "[rate-limit] UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set in production.",
       );
     }
+    redisSingleton = null;
     return null;
   }
   redisSingleton = new Redis({ url, token });

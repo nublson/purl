@@ -22,7 +22,7 @@ vi.mock("@/lib/prisma", () => ({
 
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
-const { getLinksForCurrentUser } = await import("./links");
+const { getLinksForCurrentUser, UnauthorizedError } = await import("./links");
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 
@@ -111,18 +111,14 @@ describe("getLinksForCurrentUser", () => {
     expect(result[1].id).toBe("link-1");
   });
 
-  it("passes undefined as userId to the query when there is no active session", async () => {
+  it("throws and does not query links when there is no active session", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
     vi.mocked(prisma.link.findMany).mockResolvedValue([]);
 
-    await getLinksForCurrentUser();
+    await expect(getLinksForCurrentUser()).rejects.toBeInstanceOf(
+      UnauthorizedError,
+    );
 
-    // When session is null, session?.user.id resolves to undefined.
-    // Prisma treats { where: { userId: undefined } } as no filter, returning
-    // all rows. This test documents that behaviour so any change is intentional.
-    expect(vi.mocked(prisma.link.findMany)).toHaveBeenCalledWith({
-      where: { userId: undefined },
-      orderBy: { createdAt: "desc" },
-    });
+    expect(vi.mocked(prisma.link.findMany)).not.toHaveBeenCalled();
   });
 });

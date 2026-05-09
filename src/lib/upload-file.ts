@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { getAdminSupabase } from "@/lib/supabase-admin";
 import type { ContentType } from "@/generated/prisma/enums";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const UPLOAD_BUCKET = "user-uploads";
 
@@ -68,46 +69,81 @@ export class UploadStorageError extends Error {
   readonly name = "UploadStorageError";
 }
 
-async function uploadToStorage(
-  path: string,
-  bytes: ArrayBuffer,
-  mimeType: string,
-) {
+function getRequiredAdminSupabase(): SupabaseClient {
   const supabase = getAdminSupabase();
   if (!supabase) {
     throw new UploadStorageError(
       "Supabase admin client is not configured. Set SUPABASE_SERVICE_ROLE_KEY and NEXT_PUBLIC_SUPABASE_URL (or SUPABASE_URL).",
     );
   }
+  return supabase;
+}
 
-  const attemptUpload = async () =>
-    supabase.storage.from(UPLOAD_BUCKET).upload(path, bytes, {
-      contentType: mimeType || undefined,
-      upsert: false,
-    });
+async function ensurePrivateUploadBucket(
+  supabase: SupabaseClient,
+): Promise<void> {
+  const bucket = await supabase.storage.getBucket(UPLOAD_BUCKET);
+  if (bucket.error) {
+    if (!bucket.error.message.toLowerCase().includes("not found")) {
+      throw new UploadStorageError(bucket.error.message);
+    }
 
-  let uploadResult = await attemptUpload();
-  if (uploadResult.error?.message?.toLowerCase().includes("bucket not found")) {
     const createdBucket = await supabase.storage.createBucket(UPLOAD_BUCKET, {
-      public: true,
+      public: false,
     });
     if (createdBucket.error && !createdBucket.error.message.includes("exists")) {
       throw new UploadStorageError(createdBucket.error.message);
     }
-    uploadResult = await attemptUpload();
+    return;
   }
+
+  if (bucket.data.public) {
+    const updatedBucket = await supabase.storage.updateBucket(UPLOAD_BUCKET, {
+      public: false,
+    });
+    if (updatedBucket.error) {
+      throw new UploadStorageError(updatedBucket.error.message);
+    }
+  }
+}
+
+export async function createSignedUploadUrl(
+  storagePath: string,
+  expiresInSeconds: number,
+): Promise<string> {
+  const supabase = getRequiredAdminSupabase();
+  const { data, error } = await supabase.storage
+    .from(UPLOAD_BUCKET)
+    .createSignedUrl(storagePath, expiresInSeconds);
+  if (error) {
+    throw new UploadStorageError(error.message);
+  }
+  if (!data?.signedUrl) {
+    throw new UploadStorageError("Failed to create signed upload URL.");
+  }
+  return data.signedUrl;
+}
+
+async function uploadToStorage(
+  path: string,
+  bytes: ArrayBuffer,
+  mimeType: string,
+): Promise<string> {
+  const supabase = getRequiredAdminSupabase();
+  await ensurePrivateUploadBucket(supabase);
+
+  const uploadResult = await supabase.storage
+    .from(UPLOAD_BUCKET)
+    .upload(path, bytes, {
+      contentType: mimeType || undefined,
+      upsert: false,
+    });
 
   if (uploadResult.error) {
     throw new UploadStorageError(uploadResult.error.message);
   }
 
-  const publicUrlResult = supabase.storage.from(UPLOAD_BUCKET).getPublicUrl(path);
-  const publicUrl = publicUrlResult.data.publicUrl;
-  if (!publicUrl) {
-    throw new UploadStorageError("Failed to resolve uploaded file URL.");
-  }
-
-  return publicUrl;
+  return path;
 }
 
 export async function createLinkFromFile(
@@ -135,17 +171,19 @@ export async function createLinkFromFile(
           return duration ? `Audio File - ${duration}` : "Audio File";
         })();
 
-  const publicUrl = await uploadToStorage(filePath, bytes, file.type);
+  const storagePath = await uploadToStorage(filePath, bytes, file.type);
+  const signedUrl = await createSignedUploadUrl(storagePath, 3600);
 
   return prisma.link.create({
     data: {
-      url: publicUrl,
+      url: signedUrl,
       title,
       description,
       favicon: getDefaultFaviconUrl("upload"),
       thumbnail: null,
       domain: extension ? `.${extension}` : ".audio",
       contentType,
+      storagePath,
       userId,
     },
   });

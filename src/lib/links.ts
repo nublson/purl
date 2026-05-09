@@ -12,6 +12,7 @@ import { validateOgThumbnailUrl } from "@/lib/og-thumbnail-probe";
 import prisma from "@/lib/prisma";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
 import { detectContentType } from "@/lib/server-detect-content-type";
+import { createSignedUploadUrl } from "@/lib/upload-file";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
 import { getUrlDomain } from "@/utils/formatter";
 import type { Link } from "@/utils/links";
@@ -350,12 +351,10 @@ async function getCurrentUserId(): Promise<string> {
 
 /** Fetches links for the currently authenticated user (server-only). Deduplicated per request via React cache(). */
 export const getLinksForCurrentUser = cache(async (): Promise<Link[]> => {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const userId = await getCurrentUserId();
 
   const rows = await prisma.link.findMany({
-    where: { userId: session?.user.id },
+    where: { userId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -435,7 +434,11 @@ export async function reingestLink(
     data: { ingestStatus: "PENDING" },
   });
 
-  dispatchIngest(updated);
+  const ingestUrl = existing.storagePath
+    ? await createSignedUploadUrl(existing.storagePath, 3600)
+    : updated.url;
+
+  dispatchIngest({ ...updated, url: ingestUrl });
   return updated;
 }
 
