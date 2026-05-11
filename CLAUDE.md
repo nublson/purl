@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is Purl
 
-AI-powered read-it-later app and personal knowledge base. Users save URLs (web, PDF, YouTube, audio); Purl ingests the content, stores chunked text with pgvector embeddings, and answers questions over what was saved. **Vercel AI Gateway** serves **Claude** for streaming chat and **OpenAI** embeddings (`text-embedding-3-small`); **OpenAI Whisper** handles transcription (direct API).
+AI-powered read-it-later app and personal knowledge base. Users save URLs (web, PDF, YouTube, audio); Purl ingests the content, stores chunked text with pgvector embeddings, and answers questions over what was saved. **Vercel AI Gateway** serves **Claude** for streaming chat and **OpenAI** embeddings (`openai/text-embedding-3-small`); **OpenAI Whisper** handles transcription (direct API). Gateway calls attach **`providerOptions.gateway`** with **`user`** and **`tags`** for observability (`feature:chat`, `feature:ingest`, `feature:semantic-search`).
 
 Plans: Free (limited) and Pro ($9/month). New signups get a 7-day Pro trial. Exact caps live in [`docs/commercial-model.md`](docs/commercial-model.md) — treat it as canonical when touching plan logic.
 
@@ -48,7 +48,7 @@ Business logic. Key modules:
 | `server-detect-content-type.ts` | SSRF-safe HEAD/sniff to classify URL |
 | `safe-outbound-fetch.ts` | SSRF-hardened fetch wrapper — **all outbound HTTP must go through this** |
 | `chat.ts`, `chat-storage.ts`, `chats.ts` | AI chat with streaming + tool use |
-| `semantic-search.ts`, `embeddings.ts` | pgvector search + embeddings via AI Gateway |
+| `semantic-search.ts`, `embeddings.ts` | pgvector search + embeddings via AI Gateway (per-user `user` + `feature:…` tags on embed calls) |
 | `entitlements.ts`, `usage.ts`, `usage-summary.ts` | Plan enforcement and usage metering |
 | `auth.ts`, `prisma.ts` | Better Auth and Prisma client singletons |
 | `stripe.ts` | Stripe Checkout, Customer Portal, webhook handling |
@@ -97,7 +97,7 @@ Vitest, node environment. Test files: `src/**/*.test.ts`.
 - Mocks `undici` fetch to respect `globalThis.fetch` stubs
 - Mocks `node:dns/promises` to return a public IP (passes SSRF guards)
 
-Test patterns: mock `globalThis.fetch`, mock Prisma client calls, mock Anthropic/OpenAI/Stripe clients. Tests focus on business logic — avoid shallow UI-only wrappers.
+Test patterns: mock `globalThis.fetch`, mock Prisma client calls, mock AI SDK / gateway / OpenAI (Whisper) / Stripe clients. Tests focus on business logic — avoid shallow UI-only wrappers.
 
 ## Key gotchas
 

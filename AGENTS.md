@@ -4,7 +4,7 @@
 
 ### Overview
 
-Purl is a single Next.js (App Router) application — **not** a monorepo. It uses Prisma with PostgreSQL (Supabase-hosted, with pgvector), Better Auth for authentication, **Vercel AI Gateway** (Claude chat + OpenAI embeddings), and **OpenAI** (Whisper transcription only).
+Purl is a single Next.js (App Router) application — **not** a monorepo. It uses Prisma with PostgreSQL (Supabase-hosted, with pgvector), Better Auth for authentication, **Vercel AI Gateway** (Claude chat + OpenAI embeddings), and **OpenAI** (Whisper transcription only). Gateway requests include **`user`** (Better Auth id) and **`tags`** (`feature:chat`, `feature:ingest`, `feature:semantic-search`, plus `env:…` on chat) for Vercel AI usage dashboards and optional per-user rate limits.
 
 ### Environment variables
 
@@ -41,6 +41,7 @@ See `README.md` and `package.json` scripts for the full list. Quick reference:
 
 ### Gotchas
 
+- **AI Gateway tagging**: Chat uses [`src/lib/chat.ts`](src/lib/chat.ts) (`feature:chat`, `user`). Embeddings use [`src/lib/embeddings.ts`](src/lib/embeddings.ts) via [`src/lib/semantic-search.ts`](src/lib/semantic-search.ts) and ingest handlers (`feature:semantic-search` vs `feature:ingest`, `user`). Whisper stays on `OPENAI_API_KEY` only — not routed through the gateway.
 - **Prisma client must be generated** before `pnpm dev` or `pnpm build` will work. The build script (`pnpm build`) already includes `prisma generate`, but `pnpm dev` does not — run `pnpm prisma generate` first if `src/generated/prisma` is missing.
 - **Sentry build plugin**: The `@sentry/cli` build script is ignored by pnpm. This is expected and does not affect local dev. The warning about `pnpm approve-builds` can be safely ignored.
 - **Email verification on signup**: Resend sends a real email. For local dev/testing, manually set `emailVerified = true` on the user record in the database if you can't receive the verification email.

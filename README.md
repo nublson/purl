@@ -38,6 +38,7 @@ Exact limits are in [`docs/commercial-model.md`](docs/commercial-model.md).
   - Preview metadata (title, description, favicon, thumbnail where available).
 - **Ingestion pipeline** — Fetches or extracts text (including transcripts for YouTube/audio), chunks it, embeds via **Vercel AI Gateway** (`openai/text-embedding-3-small`), stores in Postgres with **pgvector**; tracks per-link ingest status (pending, processing, completed, failed, skipped for edge cases like heavy SPAs).
 - **AI providers** — **Vercel AI Gateway** for streaming chat (Claude) and **embeddings** (`openai/text-embedding-3-small`). **OpenAI** directly for **Whisper** transcription only (`OPENAI_API_KEY`). Keys live in server environment variables only.
+- **AI Gateway observability** — Chat, ingest embeddings, and the chat tool’s semantic search send `providerOptions.gateway` with the signed-in **`user`** id and **`tags`** so the [Vercel AI](https://vercel.com/docs/ai-gateway) dashboard can filter spend and usage by person and surface (`feature:chat`, `env:…` from `VERCEL_ENV` / `NODE_ENV`; `feature:ingest` on save pipelines; `feature:semantic-search` when the model runs vector search over saved chunks).
 - **Hardened outbound fetch** — Server-side `safeFetch` with optional proxy/DNS controls (see `AGENTS.md`).
 - **Realtime list sync** — Supabase Realtime so saves and updates propagate across tabs/devices quickly.
 - **AI chat**
@@ -202,7 +203,7 @@ RESEND_FROM="Purl <onboarding@resend.dev>"
 Notes:
 
 - **`DATABASE_URL`** is required (Prisma + Better Auth).
-- **`AI_GATEWAY_API_KEY`** (or **`VERCEL_OIDC_TOKEN`** on Vercel / after `vercel env pull`) is required for **chat** and **embeddings** (ingest + semantic search) via AI Gateway. Enable **AI Gateway** in the Vercel project settings for OIDC-based auth.
+- **`AI_GATEWAY_API_KEY`** (or **`VERCEL_OIDC_TOKEN`** on Vercel / after `vercel env pull`) is required for **chat** and **embeddings** (ingest + semantic search) via AI Gateway. Enable **AI Gateway** in the Vercel project settings for OIDC-based auth. Optional: configure **per-user** limits in the project AI Gateway settings; the app passes the Better Auth user id on gateway calls.
 - **`OPENAI_API_KEY`** is required for **Whisper** transcription (audio ingest / URLs). Omit only if you do not use audio transcription.
 - **Supabase** env vars are required for realtime link list sync. Use **Project Settings → API** in the Supabase dashboard. The service role key must stay server-only.
 - **Resend** is optional for local dev: if `RESEND_API_KEY` is not set, signup can still work, but verification emails will not send.
