@@ -112,9 +112,10 @@ describe("ingestWeb", () => {
     expect(prisma.linkContent.deleteMany).toHaveBeenCalledWith({
       where: { linkId: "link-1" },
     });
-    expect(embedTextChunks).toHaveBeenCalledWith([
-      buildMetadataText(mockWebLink),
-    ]);
+    expect(embedTextChunks).toHaveBeenCalledWith(
+      [buildMetadataText(mockWebLink)],
+      { user: "user-1", tags: ["feature:ingest"] },
+    );
     expect(logIngestStart).toHaveBeenCalledWith(
       "WEB",
       "link-1",

@@ -98,9 +98,10 @@ describe("ingestPdf", () => {
     expect(prisma.linkContent.deleteMany).toHaveBeenCalledWith({
       where: { linkId: "link-1" },
     });
-    expect(embedTextChunks).toHaveBeenCalledWith([
-      buildMetadataText(mockPdfLink),
-    ]);
+    expect(embedTextChunks).toHaveBeenCalledWith(
+      [buildMetadataText(mockPdfLink)],
+      { user: "user-1", tags: ["feature:ingest"] },
+    );
     expect(logIngestStart).toHaveBeenCalledWith(
       "PDF",
       "link-1",

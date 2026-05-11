@@ -98,9 +98,10 @@ describe("ingestAudio", () => {
     expect(prisma.linkContent.deleteMany).toHaveBeenCalledWith({
       where: { linkId: "link-1" },
     });
-    expect(embedTextChunks).toHaveBeenCalledWith([
-      buildMetadataText(mockAudioLink),
-    ]);
+    expect(embedTextChunks).toHaveBeenCalledWith(
+      [buildMetadataText(mockAudioLink)],
+      { user: "user-1", tags: ["feature:ingest"] },
+    );
     expect(logIngestStart).toHaveBeenCalledWith(
       "AUDIO",
       "link-1",

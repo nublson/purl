@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is Purl
 
-AI-powered read-it-later app and personal knowledge base. Users save URLs (web, PDF, YouTube, audio); Purl ingests the content, stores chunked text with pgvector embeddings, and answers questions over what was saved. **Anthropic Claude** handles streaming chat; **OpenAI** handles embeddings and Whisper transcription.
+AI-powered read-it-later app and personal knowledge base. Users save URLs (web, PDF, YouTube, audio); Purl ingests the content, stores chunked text with pgvector embeddings, and answers questions over what was saved. **Vercel AI Gateway** serves **Claude** for streaming chat and **OpenAI** embeddings (`text-embedding-3-small`); **OpenAI Whisper** handles transcription (direct API).
 
 Plans: Free (limited) and Pro ($9/month). New signups get a 7-day Pro trial. Exact caps live in [`docs/commercial-model.md`](docs/commercial-model.md) — treat it as canonical when touching plan logic.
 
@@ -48,7 +48,7 @@ Business logic. Key modules:
 | `server-detect-content-type.ts` | SSRF-safe HEAD/sniff to classify URL |
 | `safe-outbound-fetch.ts` | SSRF-hardened fetch wrapper — **all outbound HTTP must go through this** |
 | `chat.ts`, `chat-storage.ts`, `chats.ts` | AI chat with streaming + tool use |
-| `semantic-search.ts`, `embeddings.ts` | pgvector search + OpenAI embeddings |
+| `semantic-search.ts`, `embeddings.ts` | pgvector search + embeddings via AI Gateway |
 | `entitlements.ts`, `usage.ts`, `usage-summary.ts` | Plan enforcement and usage metering |
 | `auth.ts`, `prisma.ts` | Better Auth and Prisma client singletons |
 | `stripe.ts` | Stripe Checkout, Customer Portal, webhook handling |
@@ -62,7 +62,7 @@ Saving is **synchronous** through metadata + DB insert; heavy work is **async** 
 1. `POST /api/links` or `POST /api/upload` → `detectContentType` + `scrapeLinkMetadata`
 2. Insert `Link` row with `ingestStatus: PENDING`
 3. `after()` → `prepareIngestForLink` (plan check) → handler (`ingestWeb/Pdf/Youtube/Audio`)
-4. Handler: set `PROCESSING` → extract text → chunk → OpenAI embeddings → upsert `LinkContent` with pgvector → `COMPLETED` or `FAILED`
+4. Handler: set `PROCESSING` → extract text → chunk → AI Gateway embeddings → upsert `LinkContent` with pgvector → `COMPLETED` or `FAILED`
 5. `notifyLinksAfterIngest` → `broadcastLinksChanged` → Supabase Realtime → client refresh
 
 Free accounts skip extraction (ingest status: `SKIPPED`, metadata only).

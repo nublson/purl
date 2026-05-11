@@ -155,7 +155,10 @@ describe("semanticSearch", () => {
 
     const result = await semanticSearch("deep work", "user-1");
 
-    expect(embedQuery).toHaveBeenCalledWith("deep work");
+    expect(embedQuery).toHaveBeenCalledWith("deep work", {
+      user: "user-1",
+      tags: ["feature:semantic-search"],
+    });
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
     expect(result).toEqual([
       { linkId: "a", similarity: 0.8, vectorSimilarity: 0.8 },

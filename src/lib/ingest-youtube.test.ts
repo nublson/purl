@@ -100,9 +100,10 @@ describe("ingestYoutube", () => {
     expect(prisma.linkContent.deleteMany).toHaveBeenCalledWith({
       where: { linkId: "link-1" },
     });
-    expect(embedTextChunks).toHaveBeenCalledWith([
-      buildMetadataText(mockYoutubeLink),
-    ]);
+    expect(embedTextChunks).toHaveBeenCalledWith(
+      [buildMetadataText(mockYoutubeLink)],
+      { user: "user-1", tags: ["feature:ingest"] },
+    );
     expect(logIngestStart).toHaveBeenCalledWith(
       "YOUTUBE",
       "link-1",
