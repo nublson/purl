@@ -2,7 +2,9 @@
 
 Vercel functions use datacenter IPs. YouTube often omits caption tracks in player responses for those IPs, so transcript ingestion can fail while the same video works locally (see [`src/lib/youtube-transcriber.ts`](../src/lib/youtube-transcriber.ts)).
 
-**No app code changes are required.** [`safeFetch`](../src/lib/safe-outbound-fetch.ts) reads `SAFE_OUTBOUND_HTTP_PROXY` at process startup and routes all outbound HTTP(S) through an HTTP CONNECT proxy, including YouTube oEmbed, transcript fetches, and general link ingest.
+**Caption pipeline:** [`fetchYouTubeTranscript`](../src/lib/youtube-transcriber.ts) uses `youtube-transcript`, then — when that fails with a retryable library error — tries **each caption track’s XML URL** from InnerTube / watch-page discovery and cycles common **`lang`** codes. That fixes cases where the first track’s timedtext request fails (`No transcripts are available for this video`) while another language still works.
+
+**Proxy:** [`safeFetch`](../src/lib/safe-outbound-fetch.ts) reads `SAFE_OUTBOUND_HTTP_PROXY` at process startup and routes outbound HTTP(S) through HTTP CONNECT when set, including YouTube oEmbed and caption requests.
 
 ## 1. Get a proxy URL (HTTP CONNECT)
 

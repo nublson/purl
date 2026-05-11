@@ -18,9 +18,13 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-vi.mock("@/lib/youtube-transcriber", () => ({
-  fetchYouTubeTranscript: vi.fn(),
-}));
+vi.mock("@/lib/youtube-transcriber", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/youtube-transcriber")>();
+  return {
+    ...actual,
+    fetchYouTubeTranscript: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/chunk-text", () => ({
   chunkText: vi.fn(),
@@ -77,6 +81,36 @@ describe("ingestYoutube", () => {
     vi.mocked(prisma.link.findUnique).mockResolvedValue(
       mockYoutubeLink as never,
     );
+  });
+
+  it("stores metadata chunk only when transcript library reports captions disabled", async () => {
+    vi.mocked(fetchYouTubeTranscript).mockRejectedValue(
+      new Error(
+        "[YoutubeTranscript] 🚨 Transcript is disabled on this video (abc123)",
+      ),
+    );
+    vi.mocked(embedTextChunks).mockResolvedValue([[0.1, 0.2]]);
+    vi.mocked(prisma.linkContent.findMany).mockResolvedValue([
+      { id: "row-meta", chunkIndex: 0 },
+    ] as never);
+
+    await ingestYoutube({
+      linkId: "link-1",
+      url: "https://youtu.be/abc123",
+      userId: "user-1",
+    });
+
+    expect(fetchYouTubeTranscript).toHaveBeenCalledWith("https://youtu.be/abc123");
+    expect(embedTextChunks).toHaveBeenCalledWith(
+      [buildMetadataText(mockYoutubeLink)],
+      { user: "user-1", tags: ["feature:ingest"] },
+    );
+    expect(prisma.link.update).toHaveBeenLastCalledWith({
+      where: { id: "link-1" },
+      data: { ingestStatus: "COMPLETED" },
+    });
+    expect(failIngest).not.toHaveBeenCalled();
+    expect(logIngestFailure).not.toHaveBeenCalled();
   });
 
   it("stores metadata chunk only when transcript produces no chunks", async () => {
