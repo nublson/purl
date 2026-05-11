@@ -111,6 +111,7 @@ Test patterns: mock `globalThis.fetch`, mock Prisma client calls, mock AI SDK / 
 - **Stripe local dev**: run `stripe listen --forward-to localhost:3000/api/billing/webhook` and copy the CLI signing secret into `STRIPE_WEBHOOK_SECRET`.
 - **`SUPABASE_SERVICE_ROLE_KEY`** is server-only. The browser uses only the anon key for Realtime.
 - **All user-supplied URLs must go through `safeFetch`** — never raw `fetch` — to prevent SSRF.
+- **YouTube transcripts on Vercel**: optional `SAFE_OUTBOUND_HTTP_PROXY` — see [`docs/production-outbound-proxy.md`](docs/production-outbound-proxy.md).
 
 ## CI
 
