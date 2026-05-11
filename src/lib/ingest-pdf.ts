@@ -19,7 +19,6 @@ export async function ingestPdf({
   url,
   userId,
 }: IngestPdfInput): Promise<void> {
-  void userId;
   try {
     await prisma.link.update({
       where: { id: linkId },
@@ -52,7 +51,10 @@ export async function ingestPdf({
       where: { linkId },
     });
 
-    const embeddings = await embedTextChunks(chunks);
+    const embeddings = await embedTextChunks(chunks, {
+      user: userId,
+      tags: ["feature:ingest"],
+    });
 
     await prisma.linkContent.createMany({
       data: chunks.map((content, index) => ({
