@@ -143,7 +143,7 @@ Purl is built around **untrusted input** (arbitrary URLs and uploaded files). A 
 - **SSRF-aware outbound fetches** — User-supplied URLs are not passed to raw `fetch`. Ingest, OG/thumbnail probes, PDF fetch, content-type sniffing, and similar paths go through [`safeFetch`](src/lib/safe-outbound-fetch.ts): HTTP(S) only, blocked private/link-local/reserved targets, redirect handling with per-hop host checks, DNS resolution pinned before connect (mitigates classic DNS rebinding against the pre-check), optional response size caps (e.g. PDF proxy). Optional **egress proxy** and custom DNS servers are documented in [`AGENTS.md`](AGENTS.md).
 - **Authentication & route gating** — [Better Auth](https://www.better-auth.com/) sessions; Next.js [`proxy`](src/proxy.ts) redirects unauthenticated users away from private routes and can require **email verification** before app access.
 - **API authorization** — Sensitive routes (`/api/chat`, `/api/links`, `/api/upload`, chats, etc.) resolve the session server-side and scope work to the signed-in user (e.g. chat mention IDs are validated against ownership).
-- **Server-managed AI keys** — The app uses server environment variables for providers: `ANTHROPIC_API_KEY` for chat and `OPENAI_API_KEY` for embeddings/transcription. These keys are never exposed to the client.
+- **Server-managed AI keys** — Chat routes through **Vercel AI Gateway** (`AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN` after `vercel env pull`). Embeddings and transcription still call **OpenAI** directly via `OPENAI_API_KEY`. These keys are never exposed to the client.
 - **Rate limiting** — When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set, the proxy applies per-IP limits to **`/api/auth/*`**, **`POST /api/chat`**, **`POST /api/links`**, and **`POST /api/upload`** (see [`proxy-rate-limit.ts`](src/lib/proxy-rate-limit.ts)). Without Upstash, limits are disabled — fine locally, not ideal for production.
 - **Secrets & client exposure** — `SUPABASE_SERVICE_ROLE_KEY` and similar values are server-only. The browser uses the Supabase **anon** key for Realtime only; `.env` stays gitignored.
 - **Upload bounds** — Audio uploads enforce a maximum size server-side; PDF proxy streaming is capped (see `safe-outbound-fetch` / upload limits in code).
@@ -185,8 +185,8 @@ Create a `.env` file in the repo root. See `.env.example` for the full list; min
 ```bash
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME"
 
-# AI providers (server-side only)
-ANTHROPIC_API_KEY="sk-ant-..."
+# AI (server-side only): gateway for chat; OpenAI for embeddings + transcription
+AI_GATEWAY_API_KEY="..." # or use VERCEL_OIDC_TOKEN from `vercel env pull`
 OPENAI_API_KEY="sk-proj-..."
 
 # Supabase Realtime — cross-device instant link list sync (same project as Postgres)
@@ -202,7 +202,7 @@ RESEND_FROM="Purl <onboarding@resend.dev>"
 Notes:
 
 - **`DATABASE_URL`** is required (Prisma + Better Auth).
-- **`ANTHROPIC_API_KEY`** is required for chat generation.
+- **`AI_GATEWAY_API_KEY`** (or **`VERCEL_OIDC_TOKEN`** on Vercel / after `vercel env pull`) is required for chat generation via AI Gateway. Enable **AI Gateway** in the Vercel project settings for OIDC-based auth.
 - **`OPENAI_API_KEY`** is required for embeddings and transcription.
 - **Supabase** env vars are required for realtime link list sync. Use **Project Settings → API** in the Supabase dashboard. The service role key must stay server-only.
 - **Resend** is optional for local dev: if `RESEND_API_KEY` is not set, signup can still work, but verification emails will not send.
