@@ -30,6 +30,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 .cursor/*.log
+# Cursor hook ephemeral state (per-machine; do not commit)
+.cursor/hooks/state/
 
 # env files (can opt-in for committing if needed)
 .env*
