@@ -356,15 +356,26 @@ describe("streamChatResponse – providerOptions and callbacks", () => {
     vi.mocked(streamText).mockReturnValue({} as never);
   });
 
-  it("passes anthropic thinking providerOptions with budgetTokens 2048", async () => {
+  it("passes anthropic thinking and gateway providerOptions", async () => {
     await streamChatResponse(messages as never, userId, null, {
       chatId: TEST_CHAT_ID,
     });
+
+    const gatewayEnvTag =
+      process.env.VERCEL_ENV ??
+      (process.env.NODE_ENV === "production"
+        ? "production"
+        : "development");
 
     const args = captureStreamTextArgs();
     expect(args.providerOptions).toEqual({
       anthropic: {
         thinking: { type: "enabled", budgetTokens: 2048 },
+      },
+      gateway: {
+        order: ["anthropic"],
+        tags: ["feature:chat", `env:${gatewayEnvTag}`],
+        user: userId,
       },
     });
   });

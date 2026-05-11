@@ -374,6 +374,10 @@ export async function streamChatResponse(
     });
   }
 
+  const gatewayEnvTag =
+    process.env.VERCEL_ENV ??
+    (process.env.NODE_ENV === "production" ? "production" : "development");
+
   return streamText({
     model: getChatModel(),
     system: buildSystemPrompt(context),
@@ -381,6 +385,11 @@ export async function streamChatResponse(
     tools: buildChatTools(userId, { chatId, streamWriter }),
     providerOptions: {
       anthropic: anthropicThinkingOptions,
+      gateway: {
+        order: ["anthropic"],
+        tags: ["feature:chat", `env:${gatewayEnvTag}`],
+        user: userId,
+      },
     },
     stopWhen: stepCountIs(5),
     onError: ({ error }) => {
