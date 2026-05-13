@@ -50,8 +50,7 @@ export const publicPlans: PublicPlan[] = [
   {
     id: "FREE",
     name: "Base",
-    description:
-      "A clean, fast home for everything you want to read later.",
+    description: "A clean, fast home for everything you want to read later.",
     priceLabel: "Free",
     monthlyAmountCents: null,
     annualAmountCents: null,
@@ -66,12 +65,11 @@ export const publicPlans: PublicPlan[] = [
   {
     id: "PRO",
     name: "Pro",
-    description:
-      "Turn your saved content into a searchable AI knowledge base.",
-    priceLabel: "$9",
+    description: "Turn your saved content into a searchable AI knowledge base.",
+    priceLabel: "$5",
     priceSubLabel: "/month",
-    monthlyAmountCents: 900,
-    annualAmountCents: 8900,
+    monthlyAmountCents: 500,
+    annualAmountCents: 4900,
     features: [
       "Unlimited saved links",
       "400 AI content extractions / month",
@@ -101,7 +99,9 @@ export type EffectiveEntitlements = {
  * Effective limits for a stored plan key (before comp/trial expiry logic).
  * PRO_TRIAL is treated like PRO in entitlements; trial window is subscription.trialEndsAt.
  */
-export function entitlementsForPlanKey(planKey: PlanKey): EffectiveEntitlements {
+export function entitlementsForPlanKey(
+  planKey: PlanKey,
+): EffectiveEntitlements {
   switch (planKey) {
     case "FREE":
       return {
