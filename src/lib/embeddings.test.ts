@@ -33,6 +33,30 @@ describe("embedQuery", () => {
     expect(result).toEqual([0.1, 0.2, 0.3]);
   });
 
+  it("forwards AI Gateway attribution on embed() when user and tags are provided", async () => {
+    const model = { id: "text-embedding-3-small" };
+    vi.mocked(getEmbeddingModel).mockReturnValue(model as never);
+    vi.mocked(embed).mockResolvedValue({
+      embedding: [0.9],
+    } as never);
+
+    await embedQuery("q", {
+      user: "user-42",
+      tags: ["feature:semantic-search"],
+    });
+
+    expect(embed).toHaveBeenCalledWith({
+      model,
+      value: "q",
+      providerOptions: {
+        gateway: {
+          user: "user-42",
+          tags: ["feature:semantic-search"],
+        },
+      },
+    });
+  });
+
   it("propagates errors from the embedding provider", async () => {
     vi.mocked(getEmbeddingModel).mockReturnValue({} as never);
     vi.mocked(embed).mockRejectedValue(new Error("provider error"));
@@ -75,5 +99,29 @@ describe("embedTextChunks", () => {
       [0.1, 0.2],
       [0.3, 0.4],
     ]);
+  });
+
+  it("forwards AI Gateway attribution on embedMany() when user and tags are provided", async () => {
+    const model = { id: "model" };
+    vi.mocked(getEmbeddingModel).mockReturnValue(model as never);
+    vi.mocked(embedMany).mockResolvedValue({
+      embeddings: [[1]],
+    } as never);
+
+    await embedTextChunks(["chunk"], {
+      user: "user-7",
+      tags: ["feature:ingest"],
+    });
+
+    expect(embedMany).toHaveBeenCalledWith({
+      model,
+      values: ["chunk"],
+      providerOptions: {
+        gateway: {
+          user: "user-7",
+          tags: ["feature:ingest"],
+        },
+      },
+    });
   });
 });
