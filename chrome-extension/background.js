@@ -97,7 +97,9 @@ async function handleMessage(msg) {
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  handleMessage(msg).then(sendResponse);
+  handleMessage(msg)
+    .then(sendResponse)
+    .catch((err) => sendResponse({ type: "ERROR", error: err?.message ?? "Unknown error" }));
   return true;
 });
 

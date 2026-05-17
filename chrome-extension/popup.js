@@ -1,7 +1,17 @@
 let baseUrl = "https://purl.nublson.com";
 
 function sendMessage(msg) {
-  return new Promise((resolve) => chrome.runtime.sendMessage(msg, resolve));
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), 10_000);
+    chrome.runtime.sendMessage(msg, (response) => {
+      clearTimeout(timer);
+      if (chrome.runtime.lastError) {
+        resolve(null);
+        return;
+      }
+      resolve(response);
+    });
+  });
 }
 
 function setIcon(type) {
@@ -27,6 +37,12 @@ async function run() {
   baseUrl = configResult?.baseUrl ?? baseUrl;
 
   const result = await sendMessage({ type: "SAVE_LINK", url });
+
+  if (!result) {
+    setIcon("error");
+    setLabel("Something went wrong");
+    return;
+  }
 
   if (result.ok) {
     setIcon("success");
