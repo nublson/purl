@@ -39,18 +39,24 @@ function resultToStatus(result: { ok: boolean; code?: string }) {
 
 async function showBadge(tabId: number, ok: boolean) {
   browser.action.setBadgeText({ text: ok ? "✓" : "✗", tabId });
-  browser.action.setBadgeBackgroundColor({ color: ok ? "#16a34a" : "#dc2626", tabId });
+  browser.action.setBadgeBackgroundColor({
+    color: ok ? "#16a34a" : "#dc2626",
+    tabId,
+  });
   setTimeout(() => browser.action.setBadgeText({ text: "", tabId }), 2000);
 }
 
-async function handleSave(tab: chrome.tabs.Tab) {
+async function handleSave(tab: Browser.tabs.Tab) {
   if (!tab?.url || !tab?.id) return;
   const tabId = tab.id;
   const baseUrl = await getBaseUrl();
 
   // Show spinner toast immediately, then update with result
   try {
-    await browser.tabs.sendMessage(tabId, { type: "SHOW_TOAST", status: "saving" });
+    await browser.tabs.sendMessage(tabId, {
+      type: "SHOW_TOAST",
+      status: "saving",
+    });
   } catch {
     // chrome:// or other restricted page — skip toast, use badge instead
     const result = await saveLink(baseUrl, tab.url);
@@ -75,7 +81,10 @@ export default defineBackground(() => {
   // Keyboard shortcut → same flow
   browser.commands.onCommand.addListener(async (command) => {
     if (command !== "save-current-page") return;
-    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    const [tab] = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
     if (tab) await handleSave(tab);
   });
 });
