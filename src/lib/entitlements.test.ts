@@ -107,6 +107,56 @@ describe("entitlements", () => {
     expect(r.skipReason).toBe("free_metadata_only");
   });
 
+  it("shouldRunIngest for PRO counts extractions within the Stripe billing period", async () => {
+    const uid = "user-pro-ingest-window";
+    const periodStart = new Date("2026-04-01T00:00:00.000Z");
+    const periodEnd = new Date("2026-05-01T00:00:00.000Z");
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      {
+        ...mockSub({
+          planKey: "PRO",
+          status: "ACTIVE",
+          currentPeriodStart: periodStart,
+          currentPeriodEnd: periodEnd,
+        }),
+        userId: uid,
+      } as never,
+    );
+    vi.mocked(prisma.usageEvent.count).mockResolvedValue(0);
+
+    const r = await shouldRunIngest(uid);
+    expect(r.run).toBe(true);
+    expect(prisma.usageEvent.count).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: uid,
+          kind: "EXTRACT",
+          createdAt: { gte: periodStart, lt: periodEnd },
+        }),
+      }),
+    );
+  });
+
+  it("shouldRunIngest skips PRO users who hit the extraction cap for the current period", async () => {
+    const uid = "user-pro-extract-cap";
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      {
+        ...mockSub({
+          planKey: "PRO",
+          status: "ACTIVE",
+          currentPeriodStart: new Date("2026-04-01T00:00:00.000Z"),
+          currentPeriodEnd: new Date("2026-05-01T00:00:00.000Z"),
+        }),
+        userId: uid,
+      } as never,
+    );
+    vi.mocked(prisma.usageEvent.count).mockResolvedValue(400);
+
+    const r = await shouldRunIngest(uid);
+    expect(r.run).toBe(false);
+    expect(r.skipReason).toBe("extraction_cap");
+  });
+
   it("assertCanChat enforces free tier message cap", async () => {
     const uid = "user-chat-cap";
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
