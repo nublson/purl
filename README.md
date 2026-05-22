@@ -39,7 +39,7 @@ Exact limits are in [`docs/commercial-model.md`](docs/commercial-model.md).
 - **Ingestion pipeline** — Fetches or extracts text (including transcripts for YouTube/audio), chunks it, embeds via **Vercel AI Gateway** (`openai/text-embedding-3-small`), stores in Postgres with **pgvector**; tracks per-link ingest status (pending, processing, completed, failed, skipped for edge cases like heavy SPAs).
 - **AI providers** — **Vercel AI Gateway** for streaming chat (Claude) and **embeddings** (`openai/text-embedding-3-small`). **OpenAI** directly for **Whisper** transcription only (`OPENAI_API_KEY`). Keys live in server environment variables only.
 - **AI Gateway observability** — Chat, ingest embeddings, and the chat tool’s semantic search send `providerOptions.gateway` with the signed-in **`user`** id and **`tags`** so the [Vercel AI](https://vercel.com/docs/ai-gateway) dashboard can filter spend and usage by person and surface (`feature:chat`, `env:…` from `VERCEL_ENV` / `NODE_ENV`; `feature:ingest` on save pipelines; `feature:semantic-search` when the model runs vector search over saved chunks).
-- **Hardened outbound fetch** — Server-side `safeFetch` with optional proxy/DNS controls (see `AGENTS.md`).
+- **Hardened outbound fetch** — Server-side `safeFetch` with optional proxy/DNS controls (see `AGENTS.md`). For reliable **YouTube transcripts on Vercel**, configure [`SAFE_OUTBOUND_HTTP_PROXY`](docs/production-outbound-proxy.md) in production.
 - **Realtime list sync** — Supabase Realtime so saves and updates propagate across tabs/devices quickly.
 - **AI chat**
   - Streaming replies (**Anthropic Claude**) with tool use: list saved items (filters by date/type) and search over stored chunks.

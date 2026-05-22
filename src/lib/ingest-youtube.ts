@@ -6,7 +6,10 @@ import { logIngestFailure, logIngestStart } from "@/lib/ingest-logger";
 import { buildMetadataText } from "@/lib/metadata-chunk";
 import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import prisma from "@/lib/prisma";
-import { fetchYouTubeTranscript } from "@/lib/youtube-transcriber";
+import {
+  fetchYouTubeTranscript,
+  isRecoverableYoutubeTranscriptError,
+} from "@/lib/youtube-transcriber";
 
 type IngestYoutubeInput = {
   linkId: string;
@@ -26,9 +29,6 @@ export async function ingestYoutube({
     });
     logIngestStart("YOUTUBE", linkId, url);
 
-    const transcript = await fetchYouTubeTranscript(url);
-    const contentChunks = chunkText(transcript);
-
     const link = await prisma.link.findUnique({
       where: { id: linkId },
       select: {
@@ -42,6 +42,28 @@ export async function ingestYoutube({
     if (!link) {
       await failIngest(linkId, "LINK_NOT_FOUND");
       return;
+    }
+
+    let contentChunks: string[] = [];
+    try {
+      const transcript = await fetchYouTubeTranscript(url);
+      contentChunks = chunkText(transcript);
+    } catch (error) {
+      if (isRecoverableYoutubeTranscriptError(error)) {
+        console.log(
+          JSON.stringify({
+            event: "youtube_transcript_skipped",
+            linkId,
+            url,
+            errorName: error instanceof Error ? error.name : "UnknownError",
+            errorMessage:
+              error instanceof Error ? error.message : String(error),
+          }),
+        );
+        contentChunks = [];
+      } else {
+        throw error;
+      }
     }
 
     const metadataChunk = buildMetadataText(link);

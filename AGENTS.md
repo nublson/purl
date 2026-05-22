@@ -63,3 +63,14 @@ Link ingest, OG scraping, PDF/audio fetch, and related paths use [`src/lib/safe-
 | `SAFE_OUTBOUND_DNS_SERVERS` | Comma-separated resolvers passed to `dns.setServers` (e.g. `1.1.1.1,8.8.8.8`). Reduces reliance on the platform default resolver; does not replace DoH or an egress proxy. |
 
 **Staging / production:** The proxy must be reachable from your deployment regions (e.g. Vercel). Configure the proxy to refuse private/upstream SSRF targets where possible. After enabling, smoke-test saving a normal HTTPS link, a PDF URL, and YouTube/audio flows. Proxy auth belongs only in server env, never in client-exposed vars.
+
+**Production setup (Webshare / Vercel env / redeploy / smoke-test):** See [`docs/production-outbound-proxy.md`](docs/production-outbound-proxy.md).
+
+## Learned User Preferences
+
+- When implementing an attached plan, treat the plan file as read-only, use the already-created todos instead of creating new ones, mark todos in progress as work advances, and continue until all todos are complete.
+- When the user asks for a branch or PR after implementation, follow the project Git workflow: short-lived feature/fix branches from `develop`, target PRs to `develop`, and avoid direct commits to `main` or `develop`.
+
+## Learned Workspace Facts
+
+- `SKIPPED` ingest status covers metadata-only skips such as free-plan extraction limits and known unsupported SPA/full-browser hosts; use `skipIngest` for reusable skip behavior.
