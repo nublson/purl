@@ -13,6 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "cypress run",
+    "test:e2e:open": "cypress open",
     "fix:prisma-types": "tsx fix-prisma-types.ts",
     "dotenv": "npx dotenv-vault@latest"
   },
@@ -74,6 +76,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.1",
+    "cypress": "^15.15.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "prisma": "^7.5.0",
@@ -93,6 +96,7 @@
     "onlyBuiltDependencies": [
       "@prisma/engines",
       "@sentry/cli",
+      "cypress",
       "esbuild",
       "msw",
       "prisma"

@@ -36,7 +36,7 @@ export function User({
       className="w-52"
       align="end"
       trigger={
-        <Button variant="ghost" size="icon-sm" className="rounded-full">
+        <Button data-cy="user-menu-button" variant="ghost" size="icon-sm" className="rounded-full">
           <Avatar>
             <AvatarImage
               className="rounded-full"
@@ -92,7 +92,7 @@ export function User({
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
 
-      <DropdownMenuItem onClick={() => signOut()}>
+      <DropdownMenuItem data-cy="sign-out-menu-item" onClick={() => signOut()}>
         <LogOut />
         Sign out
       </DropdownMenuItem>

@@ -69,6 +69,7 @@ export default function Login() {
                 <div className="space-y-2">
                   <Label htmlFor={field.name}>Email</Label>
                   <Input
+                    data-cy="email-input"
                     id={field.name}
                     name={field.name}
                     type="email"
@@ -98,6 +99,7 @@ export default function Login() {
                 <div className="space-y-2">
                   <Label htmlFor={field.name}>Password</Label>
                   <Input
+                    data-cy="password-input"
                     id={field.name}
                     name={field.name}
                     type="password"
@@ -118,6 +120,7 @@ export default function Login() {
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button
+              data-cy="sign-in-button"
               type="submit"
               className="w-full"
               disabled={form.state.isSubmitting}

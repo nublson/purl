@@ -66,6 +66,7 @@ export default function Signup() {
                 <div className="space-y-2">
                   <Label htmlFor={field.name}>Name</Label>
                   <Input
+                    data-cy="name-input"
                     id={field.name}
                     name={field.name}
                     type="text"
@@ -90,6 +91,7 @@ export default function Signup() {
                 <div className="space-y-2">
                   <Label htmlFor={field.name}>Email</Label>
                   <Input
+                    data-cy="email-input"
                     id={field.name}
                     name={field.name}
                     type="email"
@@ -123,6 +125,7 @@ export default function Signup() {
                 <div className="space-y-2">
                   <Label htmlFor={field.name}>Password</Label>
                   <Input
+                    data-cy="password-input"
                     id={field.name}
                     name={field.name}
                     type="password"
@@ -156,6 +159,7 @@ export default function Signup() {
                 <div className="space-y-2">
                   <Label htmlFor={field.name}>Confirm password</Label>
                   <Input
+                    data-cy="confirm-password-input"
                     id={field.name}
                     name={field.name}
                     type="password"
@@ -176,6 +180,7 @@ export default function Signup() {
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button
+              data-cy="sign-up-button"
               type="submit"
               className="w-full"
               disabled={form.state.isSubmitting}

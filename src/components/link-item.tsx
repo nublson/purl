@@ -170,6 +170,7 @@ export const LinkItem = React.forwardRef<
   const content = (
     <Item
       ref={ref}
+      data-cy="link-item"
       role="listitem"
       aria-busy={showIngestPulse}
       className={cn(
@@ -210,10 +211,10 @@ export const LinkItem = React.forwardRef<
       </ItemMedia>
       <ItemContent>
         <ItemTitle>
-          <p className="text-accent-foreground text-sm font-medium line-clamp-1 break-all">
+          <p data-cy="link-title" className="text-accent-foreground text-sm font-medium line-clamp-1 break-all">
             {link.title}
           </p>
-          <p className="text-muted-foreground text-sm font-normal hidden md:block">
+          <p data-cy="link-domain" className="text-muted-foreground text-sm font-normal hidden md:block">
             {link.domain}
           </p>
         </ItemTitle>
