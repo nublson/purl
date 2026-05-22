@@ -6,20 +6,57 @@ vi.mock("@/lib/safe-outbound-fetch", () => ({
   ),
 }));
 
-vi.mock("youtube-transcript", () => ({
-  YoutubeTranscript: {
-    fetchTranscript: vi.fn(),
-  },
+vi.mock("@/lib/ai", () => ({
+  getTranscriptionModel: vi.fn(() => "whisper-model"),
 }));
+
+vi.mock("ai", () => ({
+  experimental_transcribe: vi.fn(),
+}));
+
+class MockTranscriptSegment {
+  static type = "TranscriptSegment";
+  snippet: { text: string };
+  start_ms: string;
+  constructor(snippet: { text: string }, start_ms: string) {
+    this.snippet = snippet;
+    this.start_ms = start_ms;
+  }
+  is(klass: unknown) {
+    return klass === MockTranscriptSegment;
+  }
+}
+
+const mockGetTranscript = vi.fn();
+const mockChooseFormat = vi.fn();
+const mockGetInfo = vi.fn(() =>
+  Promise.resolve({
+    getTranscript: mockGetTranscript,
+    chooseFormat: mockChooseFormat,
+  }),
+);
+
+vi.mock("youtubei.js", () => {
+  const mockCreate = vi.fn(() =>
+    Promise.resolve({
+      getInfo: mockGetInfo,
+      session: { player: {} },
+    }),
+  );
+  return {
+    default: { create: mockCreate },
+    YTNodes: { TranscriptSegment: MockTranscriptSegment },
+  };
+});
 
 const {
   extractVideoId,
   fetchYouTubeTranscript,
-  isRecoverableYoutubeTranscriptError,
+  isYouTubeTranscriptUnavailableError,
+  YoutubeTranscriptUnavailableError,
 } = await import("./youtube-transcriber");
-const { YoutubeTranscript } = (await import("youtube-transcript")) as unknown as {
-  YoutubeTranscript: { fetchTranscript: ReturnType<typeof vi.fn> };
-};
+
+const { experimental_transcribe: transcribeMock } = await import("ai");
 
 describe("extractVideoId", () => {
   it("extracts id from youtube.com/watch?v=", () => {
@@ -51,75 +88,130 @@ describe("extractVideoId", () => {
   });
 });
 
-describe("fetchYouTubeTranscript", () => {
-  it("formats timestamps and strips bracketed non-speech like [Music]", async () => {
-    vi.mocked(YoutubeTranscript.fetchTranscript).mockResolvedValue([
-      { text: "[Music]", offset: 0, duration: 1000 },
-      { text: " Hello   &amp;  welcome ", offset: 94_000, duration: 1000 },
-      { text: "[Applause] great!", offset: 95_000, duration: 1000 },
-      { text: "  ", offset: 96_000, duration: 1000 },
-    ] as never);
+describe("fetchYouTubeTranscript — fast path (InnerTube transcript)", () => {
+  it("returns formatted [HH:MM:SS] lines from InnerTube transcript", async () => {
+    const makeSegment = (text: string, start_ms: string) =>
+      new MockTranscriptSegment({ text }, start_ms);
 
-    const out = await fetchYouTubeTranscript("https://youtube.com/watch?v=dQw4w9WgXcQ");
+    mockGetTranscript.mockResolvedValue({
+      transcript: {
+        content: {
+          body: {
+            initial_segments: [
+              makeSegment("[Music]", "0"),
+              makeSegment(" Hello   &amp;  world ", "94000"),
+              makeSegment("[Applause] great!", "95000"),
+              makeSegment("  ", "96000"),
+            ],
+          },
+        },
+      },
+    });
 
-    expect(out).toBe("[00:01:34] Hello & welcome\n[00:01:35] great!");
-    expect(YoutubeTranscript.fetchTranscript).toHaveBeenCalledWith(
-      "dQw4w9WgXcQ",
-      expect.objectContaining({ fetch: expect.any(Function) }),
-    );
-  });
-
-  it("throws when transcript is empty after cleaning", async () => {
-    vi.mocked(YoutubeTranscript.fetchTranscript).mockResolvedValue([
-      { text: "[Music]", offset: 0, duration: 1000 },
-      { text: "   ", offset: 1, duration: 1000 },
-    ] as never);
-
-    await expect(
-      fetchYouTubeTranscript("https://youtube.com/watch?v=dQw4w9WgXcQ"),
-    ).rejects.toThrow("YouTube transcript unavailable or empty");
-  });
-
-  it("rethrows library error after retry paths when nothing succeeds", async () => {
-    vi.mocked(YoutubeTranscript.fetchTranscript).mockRejectedValue(
-      new Error(
-        "[YoutubeTranscript] 🚨 No transcripts are available for this video (dQw4w9WgXcQ)",
-      ),
+    const result = await fetchYouTubeTranscript(
+      "https://youtube.com/watch?v=dQw4w9WgXcQ",
     );
 
-    await expect(
-      fetchYouTubeTranscript("https://youtube.com/watch?v=dQw4w9WgXcQ"),
-    ).rejects.toThrow("No transcripts are available for this video");
+    expect(result).toBe("[00:01:34] Hello & world\n[00:01:35] great!");
+  });
+
+  it("falls through to Whisper when getTranscript returns no segments", async () => {
+    mockGetTranscript.mockResolvedValue({
+      transcript: { content: { body: { initial_segments: [] } } },
+    });
+    mockChooseFormat.mockReturnValue({
+      decipher: vi.fn(() => Promise.resolve("https://cdn.googlevideo.com/audio")),
+    });
+
+    const { safeFetch } = await import("@/lib/safe-outbound-fetch");
+    vi.mocked(safeFetch).mockResolvedValueOnce({
+      ok: true,
+      blob: () => Promise.resolve(new Blob([new Uint8Array(100)])),
+    } as unknown as Response);
+
+    vi.mocked(transcribeMock as ReturnType<typeof vi.fn>).mockResolvedValue({
+      segments: [{ text: "hello world", startSecond: 1, endSecond: 3 }],
+      text: "hello world",
+    });
+
+    const result = await fetchYouTubeTranscript(
+      "https://youtube.com/watch?v=dQw4w9WgXcQ",
+    );
+
+    expect(result).toBe("[00:00:01] hello world");
+  });
+
+  it("falls through to Whisper when getTranscript throws", async () => {
+    mockGetTranscript.mockRejectedValue(new Error("no transcript"));
+    mockChooseFormat.mockReturnValue({
+      decipher: vi.fn(() => Promise.resolve("https://cdn.googlevideo.com/audio")),
+    });
+
+    const { safeFetch } = await import("@/lib/safe-outbound-fetch");
+    vi.mocked(safeFetch).mockResolvedValueOnce({
+      ok: true,
+      blob: () => Promise.resolve(new Blob([new Uint8Array(100)])),
+    } as unknown as Response);
+
+    vi.mocked(transcribeMock as ReturnType<typeof vi.fn>).mockResolvedValue({
+      segments: [{ text: "whisper result", startSecond: 0, endSecond: 2 }],
+      text: "whisper result",
+    });
+
+    const result = await fetchYouTubeTranscript(
+      "https://youtube.com/watch?v=dQw4w9WgXcQ",
+    );
+
+    expect(result).toBe("[00:00:00] whisper result");
   });
 });
 
-describe("isRecoverableYoutubeTranscriptError", () => {
-  it("returns true for library no-caption errors (message prefix)", () => {
+describe("fetchYouTubeTranscript — Whisper path", () => {
+  it("throws YoutubeTranscriptUnavailableError when no audio format", async () => {
+    mockGetTranscript.mockResolvedValue({
+      transcript: { content: null },
+    });
+    mockChooseFormat.mockImplementation(() => {
+      throw new Error("No format found");
+    });
+
+    await expect(
+      fetchYouTubeTranscript("https://youtube.com/watch?v=dQw4w9WgXcQ"),
+    ).rejects.toBeInstanceOf(YoutubeTranscriptUnavailableError);
+  });
+
+  it("throws YoutubeTranscriptUnavailableError when audio download fails", async () => {
+    mockGetTranscript.mockResolvedValue({
+      transcript: { content: null },
+    });
+    mockChooseFormat.mockReturnValue({
+      decipher: vi.fn(() => Promise.resolve("https://cdn.googlevideo.com/audio")),
+    });
+
+    const { safeFetch } = await import("@/lib/safe-outbound-fetch");
+    vi.mocked(safeFetch).mockRejectedValueOnce(new Error("network error"));
+
+    await expect(
+      fetchYouTubeTranscript("https://youtube.com/watch?v=dQw4w9WgXcQ"),
+    ).rejects.toBeInstanceOf(YoutubeTranscriptUnavailableError);
+  });
+});
+
+describe("isYouTubeTranscriptUnavailableError", () => {
+  it("returns true for YoutubeTranscriptUnavailableError", () => {
     expect(
-      isRecoverableYoutubeTranscriptError(
-        new Error(
-          "[YoutubeTranscript] 🚨 Transcript is disabled on this video (vid)",
-        ),
-      ),
-    ).toBe(true);
-    expect(
-      isRecoverableYoutubeTranscriptError(
-        new Error(
-          "[YoutubeTranscript] 🚨 No transcripts are available for this video (vid)",
-        ),
+      isYouTubeTranscriptUnavailableError(
+        new YoutubeTranscriptUnavailableError("no transcript"),
       ),
     ).toBe(true);
   });
 
-  it("returns true for empty-after-clean error", () => {
-    expect(
-      isRecoverableYoutubeTranscriptError(
-        new Error("YouTube transcript unavailable or empty"),
-      ),
-    ).toBe(true);
+  it("returns false for generic errors", () => {
+    expect(isYouTubeTranscriptUnavailableError(new Error("boom"))).toBe(false);
   });
 
-  it("returns false for unrelated errors", () => {
-    expect(isRecoverableYoutubeTranscriptError(new Error("boom"))).toBe(false);
+  it("returns false for non-errors", () => {
+    expect(isYouTubeTranscriptUnavailableError("string")).toBe(false);
+    expect(isYouTubeTranscriptUnavailableError(null)).toBe(false);
   });
 });

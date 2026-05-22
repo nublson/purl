@@ -23,6 +23,7 @@ vi.mock("@/lib/youtube-transcriber", async (importOriginal) => {
   return {
     ...actual,
     fetchYouTubeTranscript: vi.fn(),
+    isYouTubeTranscriptUnavailableError: actual.isYouTubeTranscriptUnavailableError,
   };
 });
 
@@ -55,7 +56,8 @@ const mockYoutubeLink = {
   description: "Channel",
 };
 
-const { fetchYouTubeTranscript } = await import("@/lib/youtube-transcriber");
+const { fetchYouTubeTranscript, YoutubeTranscriptUnavailableError } =
+  await import("@/lib/youtube-transcriber");
 const { chunkText } = await import("@/lib/chunk-text");
 const { embedTextChunks } = await import("@/lib/embeddings");
 const { logIngestStart, logIngestFailure } =
@@ -85,8 +87,8 @@ describe("ingestYoutube", () => {
 
   it("stores metadata chunk only when transcript library reports captions disabled", async () => {
     vi.mocked(fetchYouTubeTranscript).mockRejectedValue(
-      new Error(
-        "[YoutubeTranscript] 🚨 Transcript is disabled on this video (abc123)",
+      new YoutubeTranscriptUnavailableError(
+        "Transcript is disabled on this video (abc123)",
       ),
     );
     vi.mocked(embedTextChunks).mockResolvedValue([[0.1, 0.2]]);

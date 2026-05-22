@@ -46,6 +46,7 @@ const BASE_SECURITY_HEADERS: { key: string; value: string }[] = [
 ];
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["youtubei.js"],
   async headers() {
     if (process.env.NODE_ENV !== "production") {
       return [{ source: "/:path*", headers: [...BASE_SECURITY_HEADERS] }];

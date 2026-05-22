@@ -8,7 +8,7 @@ import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import prisma from "@/lib/prisma";
 import {
   fetchYouTubeTranscript,
-  isRecoverableYoutubeTranscriptError,
+  isYouTubeTranscriptUnavailableError,
 } from "@/lib/youtube-transcriber";
 
 type IngestYoutubeInput = {
@@ -49,7 +49,7 @@ export async function ingestYoutube({
       const transcript = await fetchYouTubeTranscript(url);
       contentChunks = chunkText(transcript);
     } catch (error) {
-      if (isRecoverableYoutubeTranscriptError(error)) {
+      if (isYouTubeTranscriptUnavailableError(error)) {
         console.log(
           JSON.stringify({
             event: "youtube_transcript_skipped",

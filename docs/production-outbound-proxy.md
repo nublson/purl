@@ -1,10 +1,10 @@
-# Production outbound proxy (YouTube transcripts)
+# Production outbound proxy
 
-Vercel functions use datacenter IPs. YouTube often omits caption tracks in player responses for those IPs, so transcript ingestion can fail while the same video works locally (see [`src/lib/youtube-transcriber.ts`](../src/lib/youtube-transcriber.ts)).
+Vercel functions use datacenter IPs. For most content types this is fine, but some third-party services may restrict datacenter access.
 
-**Caption pipeline:** [`fetchYouTubeTranscript`](../src/lib/youtube-transcriber.ts) uses `youtube-transcript`, then — when that fails with a retryable library error — tries **each caption track’s XML URL** from InnerTube / watch-page discovery and cycles common **`lang`** codes. That fixes cases where the first track’s timedtext request fails (`No transcripts are available for this video`) while another language still works.
+**YouTube ingestion no longer requires a proxy.** [`fetchYouTubeTranscript`](../src/lib/youtube-transcriber.ts) now uses `youtubei.js` as the InnerTube client: it first attempts the caption track (fast path), then falls back to downloading the audio stream and transcribing with OpenAI Whisper. YouTube’s audio CDN (googlevideo.com) is accessible from datacenter IPs, so `SAFE_OUTBOUND_HTTP_PROXY` is not needed for YouTube.
 
-**Proxy:** [`safeFetch`](../src/lib/safe-outbound-fetch.ts) reads `SAFE_OUTBOUND_HTTP_PROXY` at process startup and routes outbound HTTP(S) through HTTP CONNECT when set, including YouTube oEmbed and caption requests.
+**Proxy:** [`safeFetch`](../src/lib/safe-outbound-fetch.ts) reads `SAFE_OUTBOUND_HTTP_PROXY` at process startup and routes outbound HTTP(S) through HTTP CONNECT when set. This is optional and primarily useful if other outbound targets (web scraping, PDF fetch) need a proxy exit IP.
 
 ## 1. Get a proxy URL (HTTP CONNECT)
 
@@ -57,14 +57,9 @@ After deploy:
 
 1. Save a normal **HTTPS article** URL.
 2. Save a **PDF** URL.
-3. Save a **YouTube** URL that previously failed transcript on prod (e.g. `https://youtu.be/tK4NQtzfZbM`).
+3. Save a **YouTube** URL (e.g. `https://youtu.be/tK4NQtzfZbM`).
 
-Expect **`COMPLETED`** ingest for Pro/trial accounts. In function logs:
-
-- Success through proxy often means **no** `youtube_transcript_skipped` line for that save (full transcript path).
-- If you still see `youtube_transcript_skipped`, captions may be genuinely unavailable or the proxy exit IP is still blocked — try another proxy / provider tier.
-
-Also confirm general saves still work (proxy must allow your upstream targets and be reachable from Vercel regions).
+Expect **`COMPLETED`** ingest for Pro/trial accounts. YouTube ingestion no longer logs `youtube_transcript_skipped` for ordinary videos — that log line only appears for videos that are private, deleted, or age-restricted.
 
 ## Related env vars
 
