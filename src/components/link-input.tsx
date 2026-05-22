@@ -70,6 +70,7 @@ export function LinkInput({
             <Field>
               <InputGroup className="h-10">
                 <InputGroupInput
+                  data-cy="url-input"
                   name={field.name}
                   placeholder="Save a link..."
                   value={field.state.value}
@@ -79,6 +80,7 @@ export function LinkInput({
                 />
                 <InputGroupAddon align="inline-end">
                   <Button
+                    data-cy="save-link-button"
                     variant="ghost"
                     size="icon-sm"
                     disabled={form.state.isSubmitting || isUrlEmpty}
