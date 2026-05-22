@@ -36,6 +36,9 @@ const eslintConfig = defineConfig([
     "public/sw.js.map",
     "public/swe-worker-*.js",
     "public/swe-worker-*.js.map",
+    // Cypress E2E tests (use Cypress-specific conventions)
+    "cypress/**",
+    "cypress.config.ts",
   ]),
 ]);
 

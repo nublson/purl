@@ -1,0 +1,6 @@
+version: 2
+# cypress.config.ts implements a password hashing helper (scrypt) for DB
+# test seeding — not a real credential. Suppress the false positive.
+paths-ignore:
+  - cypress.config.ts
+  - cypress.env.json.example
