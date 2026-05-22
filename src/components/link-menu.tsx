@@ -121,7 +121,7 @@ export function LinkMenu({
             <Pencil /> Edit
           </DropdownMenuItem>
         </EditDialog>
-        <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+        <DropdownMenuItem data-cy="delete-link-menu-item" variant="destructive" onClick={handleDelete}>
           <Trash /> Delete
         </DropdownMenuItem>
       </DropdownMenuGroup>

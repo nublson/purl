@@ -10,7 +10,7 @@ import {
 
 export function LinkGroupEmpty() {
   return (
-    <Empty>
+    <Empty data-cy="link-group-empty">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <PackageOpen />
