@@ -2,7 +2,7 @@ import { defineConfig, loadEnv } from "vite";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
-  const purlUrl = env.VITE_PURL_URL ?? "https://purl.so";
+  const purlUrl = env.VITE_PURL_URL ?? "https://purl.nublson.com";
 
   return {
     define: {
