@@ -23,6 +23,12 @@ function isPublicRoute(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
+  // OPTIONS preflight requests never carry credentials; pass them through so
+  // route-level CORS handlers can respond correctly.
+  if (request.method === "OPTIONS") {
+    return NextResponse.next();
+  }
+
   const rateLimited = await rateLimitApiRequest(request);
   if (rateLimited) {
     return rateLimited;
