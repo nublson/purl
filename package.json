@@ -16,7 +16,9 @@
     "test:e2e": "cypress run",
     "test:e2e:open": "cypress open",
     "fix:prisma-types": "tsx fix-prisma-types.ts",
-    "dotenv": "npx dotenv-vault@latest"
+    "dotenv": "npx dotenv-vault@latest",
+    "ext:dev": "cd extension && npm run dev",
+    "ext:build": "cd extension && npm run build"
   },
   "dependencies": {
     "@ai-sdk/gateway": "^3.0.112",

@@ -1,5 +1,15 @@
 packages: []
 
+allowBuilds:
+  '@prisma/engines': true
+  '@sentry/cli': true
+  cypress: true
+  esbuild: true
+  msw: true
+  prisma: true
+  sharp: true
+  unrs-resolver: true
+
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
