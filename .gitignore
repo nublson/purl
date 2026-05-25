@@ -59,6 +59,10 @@ next-env.d.ts
 # Source maps
 *.map
 
+# Browser extension build output
+/extension/dist/
+/extension/node_modules/
+
 # Serwist (generated at build)
 public/sw.js
 public/sw.js.map

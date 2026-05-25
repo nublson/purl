@@ -21,6 +21,7 @@ export function buildContentSecurityPolicy(): string {
     "font-src 'self'",
     [
       "connect-src 'self'",
+      "chrome-extension:",
       "https://*.supabase.co",
       "wss://*.supabase.co",
       "https://vitals.vercel-insights.com",
