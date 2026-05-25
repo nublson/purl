@@ -1,0 +1,13 @@
+{
+  "name": "purl-extension",
+  "private": true,
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.321",
+    "typescript": "^5",
+    "vite": "^6"
+  }
+}
