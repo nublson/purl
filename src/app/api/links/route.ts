@@ -1,9 +1,31 @@
-import { createLink, UnauthorizedError } from "@/lib/links";
 import { BillingLimitError } from "@/lib/entitlements";
+import { createLink, UnauthorizedError } from "@/lib/links";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { serializeLink } from "@/lib/serialize-link";
 import { isValidUrl } from "@/utils/url";
 import { NextRequest, NextResponse } from "next/server";
+
+const ALLOWED_ORIGINS = new Set(
+  (process.env.ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean),
+);
+
+function withCors(request: NextRequest, response: NextResponse): NextResponse {
+  const origin = request.headers.get("origin") ?? "";
+  if (origin.startsWith("chrome-extension://") || ALLOWED_ORIGINS.has(origin)) {
+    response.headers.set("Access-Control-Allow-Origin", origin);
+    response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    response.headers.set("Access-Control-Allow-Headers", "Content-Type");
+    response.headers.set("Access-Control-Allow-Credentials", "true");
+  }
+  return response;
+}
+
+export async function OPTIONS(request: NextRequest) {
+  return withCors(request, new NextResponse(null, { status: 204 }));
+}
 
 export async function POST(request: NextRequest) {
   let body: { url?: string };
