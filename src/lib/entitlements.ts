@@ -8,6 +8,7 @@ import {
 } from "@/lib/plans";
 import prisma from "@/lib/prisma";
 import { resolveEffectiveBillingState } from "@/lib/subscription-utils";
+import { getByokKey } from "@/lib/user-anthropic-key";
 import { countUsage } from "@/lib/usage";
 import { cache } from "react";
 
@@ -26,14 +27,25 @@ export type EntitlementContext = {
   billing: Awaited<ReturnType<typeof resolveEffectiveBillingState>>;
   entitlements: EffectiveEntitlements;
   effectivePlanKey: PlanKey;
+  byokActive: boolean;
 };
 
 export const getEntitlementContext = cache(
   async (userId: string): Promise<EntitlementContext> => {
     const billing = await resolveEffectiveBillingState(userId);
-    const effectivePlanKey = billing.planKey;
+    let effectivePlanKey = billing.planKey;
+    let byokActive = false;
+
+    if (effectivePlanKey === "FREE") {
+      const { hasKey } = await getByokKey(userId);
+      if (hasKey) {
+        effectivePlanKey = "PRO";
+        byokActive = true;
+      }
+    }
+
     const entitlements = entitlementsForPlanKey(effectivePlanKey);
-    return { billing, entitlements, effectivePlanKey };
+    return { billing, entitlements, effectivePlanKey, byokActive };
   },
 );
 
