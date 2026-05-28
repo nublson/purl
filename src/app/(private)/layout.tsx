@@ -5,6 +5,7 @@ import { HeaderActionsFallback } from "@/components/skeletons";
 import { UploadFile } from "@/components/upload-file";
 import { User } from "@/components/user";
 import { ChatProvider } from "@/contexts/chat-context";
+import { UsageProvider } from "@/contexts/usage-context";
 import { auth } from "@/lib/auth";
 import { getLinksForCurrentUser } from "@/lib/links";
 import { getUsageSummaryForUser } from "@/lib/usage-summary";
@@ -25,11 +26,13 @@ async function HeaderActions() {
   const usageSummary = userId ? await getUsageSummaryForUser(userId) : null;
 
   return (
-    <div className="flex items-center justify-end gap-2">
-      <HeaderSearchLinks links={links} />
-      <UploadFile className="hidden md:block" />
-      <User usageSummary={usageSummary} />
-    </div>
+    <UsageProvider usageSummary={usageSummary}>
+      <div className="flex items-center justify-end gap-2">
+        <HeaderSearchLinks links={links} />
+        <UploadFile className="hidden md:block" />
+        <User />
+      </div>
+    </UsageProvider>
   );
 }
 

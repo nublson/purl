@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useUsage } from "@/hooks/use-usage";
 import { DialogWrapper } from "./dialog-wrapper";
 import { SettingsAccount } from "./settings-account";
 import { SettingsIntegrations } from "./settings-integrations";
@@ -8,17 +9,12 @@ import { SettingsPreferences } from "./settings-preferences";
 import { SettingsTabs } from "./settings-tabs";
 import { SettingsUsage } from "./settings-usage";
 import { Badge } from "./ui/badge";
-import type { UsageMeterData } from "./usage-item";
 
 interface SettingsDialogProps {
   children: React.ReactNode;
-  usageSummary?: UsageMeterData | null;
 }
 
-export function SettingsDialog({
-  children,
-  usageSummary = null,
-}: SettingsDialogProps) {
+export function SettingsDialog({ children }: SettingsDialogProps) {
   const [open, setOpen] = React.useState(false);
 
   return (
@@ -28,25 +24,15 @@ export function SettingsDialog({
       onOpenChange={setOpen}
       title="Settings"
       description="Manage your settings"
-      content={
-        <SettingsContent
-          closeDialog={() => setOpen(false)}
-          usageSummary={usageSummary}
-        />
-      }
+      content={<SettingsContent closeDialog={() => setOpen(false)} />}
     >
       {children}
     </DialogWrapper>
   );
 }
 
-function SettingsContent({
-  closeDialog,
-  usageSummary,
-}: {
-  closeDialog: () => void;
-  usageSummary: UsageMeterData | null;
-}) {
+function SettingsContent({ closeDialog }: { closeDialog: () => void }) {
+  const { usageSummary } = useUsage();
   const isTrial = usageSummary?.effectivePlanKey === "PRO_TRIAL";
 
   return (
