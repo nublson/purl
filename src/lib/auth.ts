@@ -2,7 +2,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import prisma from "@/lib/prisma";
 import { getResend } from "@/lib/resend";
-import { createTrialSubscriptionForNewUser } from "@/lib/subscription-utils";
+import { ensureSubscriptionRow } from "@/lib/subscription-utils";
 
 export const auth = betterAuth({
   databaseHooks: {
@@ -10,9 +10,9 @@ export const auth = betterAuth({
       create: {
         after: async (user) => {
           try {
-            await createTrialSubscriptionForNewUser(user.id);
+            await ensureSubscriptionRow(user.id);
           } catch (e) {
-            console.error("createTrialSubscriptionForNewUser failed", e);
+            console.error("ensureSubscriptionRow failed", e);
           }
         },
       },
