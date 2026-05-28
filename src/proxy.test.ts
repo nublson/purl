@@ -12,13 +12,22 @@ vi.mock("@/lib/auth", () => ({
 
 const auth = await import("@/lib/auth");
 
-function createRequest(pathname: string): NextRequest {
-  return new NextRequest(`http://localhost${pathname}`);
+function createRequest(pathname: string, method = "GET"): NextRequest {
+  return new NextRequest(`http://localhost${pathname}`, { method });
 }
 
 describe("proxy", () => {
   beforeEach(() => {
     vi.mocked(auth.auth.api.getSession).mockReset();
+  });
+
+  it("passes OPTIONS through without session lookup (CORS preflight)", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+    const req = createRequest("/api/links", "OPTIONS");
+    const res = await proxy(req);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+    expect(auth.auth.api.getSession).not.toHaveBeenCalled();
   });
 
   it("returns next for public route when no session", async () => {

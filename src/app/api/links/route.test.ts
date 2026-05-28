@@ -1,7 +1,7 @@
 import * as safeOutbound from "@/lib/safe-outbound-fetch";
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { POST } from "./route";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { OPTIONS, POST } from "./route";
 
 const realSafeFetch = safeOutbound.safeFetch;
 
@@ -98,11 +98,26 @@ const MOCK_LINK = {
   userId: "user-123",
 };
 
-function postRequest(body: unknown): NextRequest {
+function postRequest(body: unknown, origin?: string): NextRequest {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (origin) {
+    headers.origin = origin;
+  }
   return new NextRequest("http://localhost/api/links", {
     method: "POST",
     body: JSON.stringify(body),
-    headers: { "content-type": "application/json" },
+    headers,
+  });
+}
+
+function optionsRequest(origin?: string): NextRequest {
+  const headers: Record<string, string> = {};
+  if (origin) {
+    headers.origin = origin;
+  }
+  return new NextRequest("http://localhost/api/links", {
+    method: "OPTIONS",
+    headers,
   });
 }
 
@@ -740,6 +755,82 @@ describe("POST /api/links", () => {
           timeout: 8,
         }),
       );
+    });
+  });
+});
+
+describe("CORS /api/links", () => {
+  describe("OPTIONS preflight", () => {
+    it("returns 204 with credentialed CORS headers for chrome-extension origins", async () => {
+      const origin = "chrome-extension://abcdefghijklmnop";
+      const res = await OPTIONS(optionsRequest(origin));
+      expect(res.status).toBe(204);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+      expect(res.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+      expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST, OPTIONS");
+      expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+    });
+
+    it("omits CORS headers when Origin is not allowed", async () => {
+      const res = await OPTIONS(optionsRequest("https://evil.example"));
+      expect(res.status).toBe(204);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+      expect(res.headers.get("Access-Control-Allow-Credentials")).toBeNull();
+    });
+
+    it("omits CORS headers when Origin is missing", async () => {
+      const res = await OPTIONS(optionsRequest());
+      expect(res.status).toBe(204);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    });
+  });
+
+  describe("POST responses", () => {
+    it("includes CORS headers on error responses for chrome-extension origins", async () => {
+      const origin = "chrome-extension://extension-id-here";
+      vi.mocked(auth.api.getSession).mockResolvedValue(null);
+      const res = await POST(postRequest({ url: "https://example.com" }, origin));
+      expect(res.status).toBe(401);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+      expect(res.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+    });
+
+    it("omits CORS headers on POST when Origin is not allowed", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(null);
+      const res = await POST(
+        postRequest({ url: "https://example.com" }, "https://untrusted.example"),
+      );
+      expect(res.status).toBe(401);
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    });
+  });
+
+  describe("ALLOWED_ORIGINS", () => {
+    const prevAllowed = process.env.ALLOWED_ORIGINS;
+
+    afterEach(() => {
+      vi.resetModules();
+      if (prevAllowed === undefined) {
+        delete process.env.ALLOWED_ORIGINS;
+      } else {
+        process.env.ALLOWED_ORIGINS = prevAllowed;
+      }
+    });
+
+    it("allows credentialed CORS for origins listed in ALLOWED_ORIGINS", async () => {
+      process.env.ALLOWED_ORIGINS =
+        "https://partner.example.com, https://other.example";
+      vi.resetModules();
+      const { OPTIONS: optionsHandler } = await import("./route");
+      const origin = "https://partner.example.com";
+      const res = await optionsHandler(
+        new NextRequest("http://localhost/api/links", {
+          method: "OPTIONS",
+          headers: { origin },
+        }),
+      );
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+      expect(res.headers.get("Access-Control-Allow-Credentials")).toBe("true");
     });
   });
 });
