@@ -1,6 +1,6 @@
 import * as safeOutbound from "@/lib/safe-outbound-fetch";
 import { NextRequest } from "next/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OPTIONS, POST } from "./route";
 
 const realSafeFetch = safeOutbound.safeFetch;
