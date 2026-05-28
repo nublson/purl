@@ -64,7 +64,7 @@ export const publicPlans: PublicPlan[] = [
       "YouTube & audio transcriptions",
       `${PRO_CHAT_MESSAGES_PER_MONTH} AI chat messages per month`,
     ],
-    actionText: "Upgrade to Pro",
+    actionText: "Try for free",
     popular: true,
   },
 ];

@@ -59,7 +59,7 @@ export function UpgradeCard() {
             onClick={() => void handleUpgrade()}
             disabled={loading}
           >
-            {loading ? "Redirecting…" : "Upgrade"}
+            {loading ? "Redirecting…" : "Try for free"}
           </Button>
           <Button size="sm" variant="ghost" className="cursor-pointer" disabled>
             Learn more
