@@ -4,6 +4,7 @@ import * as React from "react";
 import { DialogWrapper } from "./dialog-wrapper";
 import { SettingsAccount } from "./settings-account";
 import { SettingsIntegrations } from "./settings-integrations";
+import { SettingsPreferences } from "./settings-preferences";
 import { SettingsTabs } from "./settings-tabs";
 import { SettingsUsage } from "./settings-usage";
 import { Badge } from "./ui/badge";
@@ -22,7 +23,7 @@ export function SettingsDialog({
 
   return (
     <DialogWrapper
-      className="md:min-w-xl"
+      className="md:min-w-xl md:min-h-[718px]"
       open={open}
       onOpenChange={setOpen}
       title="Settings"
@@ -55,11 +56,19 @@ function SettingsContent({
           label: "Usage",
           value: "usage",
           badge: isTrial ? (
-            <Badge variant="secondary" className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-0">
+            <Badge
+              variant="secondary"
+              className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-0"
+            >
               Trial
             </Badge>
           ) : undefined,
           content: <SettingsUsage data={usageSummary} />,
+        },
+        {
+          label: "Preferences",
+          value: "preferences",
+          content: <SettingsPreferences />,
         },
         {
           label: "Account",
