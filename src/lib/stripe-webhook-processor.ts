@@ -1,24 +1,8 @@
-import {
-  applyStripeSubscriptionToUser,
-  linkStripeCustomerFromCheckout,
-} from "@/lib/stripe-sync";
-import {
-  sendPaymentFailedEmail,
-  sendSubscriptionCanceledEmail,
-} from "@/lib/billing-emails";
-import prisma from "@/lib/prisma";
+import { applyOneTimePaymentToUser } from "@/lib/stripe-sync";
 import { getStripe } from "@/lib/stripe";
+import prisma from "@/lib/prisma";
 import type Stripe from "stripe";
 import * as Sentry from "@sentry/nextjs";
-
-function getInvoiceSubscriptionId(inv: Stripe.Invoice): string | null {
-  const raw = inv.parent?.subscription_details?.subscription;
-  if (typeof raw === "string") return raw;
-  if (raw && typeof raw === "object" && "id" in raw && typeof raw.id === "string") {
-    return raw.id;
-  }
-  return null;
-}
 
 export async function processStripeEvent(event: Stripe.Event): Promise<void> {
   try {
@@ -30,96 +14,15 @@ export async function processStripeEvent(event: Stripe.Event): Promise<void> {
           typeof session.customer === "string"
             ? session.customer
             : session.customer?.id;
-        const subscriptionId =
-          typeof session.subscription === "string"
-            ? session.subscription
-            : session.subscription?.id;
         if (!userId || !customerId) break;
-        await linkStripeCustomerFromCheckout(
-          userId,
-          customerId,
-          subscriptionId,
-        );
-        if (subscriptionId) {
-          const sub = await getStripe().subscriptions.retrieve(subscriptionId);
-          await applyStripeSubscriptionToUser(userId, sub);
-        }
-        break;
-      }
-      case "customer.subscription.created":
-      case "customer.subscription.updated": {
-        const sub = event.data.object as Stripe.Subscription;
-        const userId = sub.metadata?.userId;
-        if (!userId) break;
-        await applyStripeSubscriptionToUser(userId, sub);
-        break;
-      }
-      case "customer.subscription.deleted": {
-        const sub = event.data.object as Stripe.Subscription;
-        const userId = sub.metadata?.userId;
-        if (!userId) break;
-        await prisma.subscription.update({
-          where: { userId },
-          data: {
-            planKey: "FREE",
-            status: "ACTIVE",
-            stripeSubscriptionId: null,
-            stripePriceId: null,
-            currentPeriodStart: null,
-            currentPeriodEnd: null,
-            cancelAtPeriodEnd: false,
-          },
+
+        // Expand line_items to retrieve the price ID from the completed session
+        const full = await getStripe().checkout.sessions.retrieve(session.id, {
+          expand: ["line_items"],
         });
-        const row = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { email: true },
-        });
-        if (row?.email) await sendSubscriptionCanceledEmail(row.email);
-        break;
-      }
-      case "invoice.payment_succeeded": {
-        const inv = event.data.object as Stripe.Invoice;
-        const subId = getInvoiceSubscriptionId(inv);
-        if (!subId) break;
-        const sub = await getStripe().subscriptions.retrieve(subId);
-        const userId = sub.metadata?.userId;
-        if (!userId) break;
-        await prisma.subscription.update({
-          where: { userId },
-          data: { status: "ACTIVE" },
-        });
-        break;
-      }
-      case "invoice.payment_failed": {
-        const inv = event.data.object as Stripe.Invoice;
-        const subId = getInvoiceSubscriptionId(inv);
-        if (subId) {
-          const sub = await getStripe().subscriptions.retrieve(subId);
-          const uid = sub.metadata?.userId;
-          if (uid) {
-            await prisma.subscription.update({
-              where: { userId: uid },
-              data: { status: "PAST_DUE" },
-            });
-          }
-        }
-        let email = inv.customer_email ?? undefined;
-        if (!email && typeof inv.customer === "string") {
-          const cust = await getStripe().customers.retrieve(inv.customer);
-          if (
-            cust &&
-            !("deleted" in cust && cust.deleted) &&
-            "email" in cust
-          ) {
-            email = cust.email ?? undefined;
-          }
-        }
-        if (email) {
-          await sendPaymentFailedEmail(
-            email,
-            "If you are logged in, open Settings to manage billing.",
-          );
-        }
+        const priceId = full.line_items?.data[0]?.price?.id ?? "";
+
+        await applyOneTimePaymentToUser(userId, customerId, priceId);
         break;
       }
       default:
