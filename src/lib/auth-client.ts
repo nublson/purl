@@ -1,5 +1,7 @@
+import { inferAdditionalFields } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import { apiKeyClient } from "@better-auth/api-key/client";
+import type { auth } from "./auth";
 
 export const {
   signIn,
@@ -10,5 +12,5 @@ export const {
   deleteUser,
   updateUser,
 } = createAuthClient({
-  plugins: [apiKeyClient()],
+  plugins: [inferAdditionalFields<typeof auth>(), apiKeyClient()],
 });
