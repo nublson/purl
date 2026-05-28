@@ -110,18 +110,27 @@ describe("entitlements", () => {
     expect(r.skipReason).toBe("free_metadata_only");
   });
 
-  it("shouldRunIngest runs for PRO users with unlimited extractions", async () => {
+  it("shouldRunIngest runs for PRO users under the extraction cap", async () => {
     const uid = "user-pro-ingest";
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
-      {
-        ...mockSub({ planKey: "PRO", status: "ACTIVE" }),
-        userId: uid,
-      } as never,
+      { ...mockSub({ planKey: "PRO", status: "ACTIVE" }), userId: uid } as never,
     );
+    vi.mocked(prisma.usageEvent.count).mockResolvedValue(50);
 
     const r = await shouldRunIngest(uid);
     expect(r.run).toBe(true);
-    expect(prisma.usageEvent.count).not.toHaveBeenCalled();
+  });
+
+  it("shouldRunIngest blocks PRO users who hit the extraction cap", async () => {
+    const uid = "user-pro-ingest-cap";
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      { ...mockSub({ planKey: "PRO", status: "ACTIVE" }), userId: uid } as never,
+    );
+    vi.mocked(prisma.usageEvent.count).mockResolvedValue(150);
+
+    const r = await shouldRunIngest(uid);
+    expect(r.run).toBe(false);
+    expect(r.skipReason).toBe("extraction_cap");
   });
 
   it("assertCanChat always blocks free users without a DB query", async () => {
@@ -134,13 +143,24 @@ describe("entitlements", () => {
     expect(prisma.usageEvent.count).not.toHaveBeenCalled();
   });
 
-  it("assertCanChat allows PRO users", async () => {
+  it("assertCanChat allows PRO users under the monthly cap", async () => {
     const uid = "user-chat-pro";
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
       { ...mockSub({ planKey: "PRO", status: "ACTIVE" }), userId: uid } as never,
     );
+    vi.mocked(prisma.usageEvent.count).mockResolvedValue(10);
 
     await expect(assertCanChat(uid)).resolves.toBeUndefined();
+  });
+
+  it("assertCanChat blocks PRO users who hit the monthly chat cap", async () => {
+    const uid = "user-chat-pro-cap";
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      { ...mockSub({ planKey: "PRO", status: "ACTIVE" }), userId: uid } as never,
+    );
+    vi.mocked(prisma.usageEvent.count).mockResolvedValue(300);
+
+    await expect(assertCanChat(uid)).rejects.toBeInstanceOf(BillingLimitError);
   });
 
   it("compUntil grants PRO entitlements via getEntitlementContext", async () => {
