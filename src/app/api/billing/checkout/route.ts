@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { getAppBaseUrl } from "@/lib/billing-url";
-import { getStripePriceIdForBillingInterval } from "@/lib/plans";
+import { getStripeOneTimePriceId } from "@/lib/plans";
 import prisma from "@/lib/prisma";
 import { ensureSubscriptionRow } from "@/lib/subscription-utils";
 import { getStripe } from "@/lib/stripe";
@@ -17,17 +17,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let interval: "month" | "year" = "month";
-  try {
-    const body = (await request.json()) as { interval?: string };
-    if (body.interval === "year" || body.interval === "month") {
-      interval = body.interval;
-    }
-  } catch {
-    // default month
-  }
+  // consume body even though we don't use interval anymore
+  try { await request.json(); } catch { /* no body is fine */ }
 
-  const priceId = getStripePriceIdForBillingInterval(interval);
+  const priceId = getStripeOneTimePriceId();
   const subRow = await ensureSubscriptionRow(userId);
 
   let customerId = subRow.stripeCustomerId;
@@ -45,15 +38,12 @@ export async function POST(request: Request) {
 
   const base = getAppBaseUrl();
   const checkoutSession = await getStripe().checkout.sessions.create({
-    mode: "subscription",
+    mode: "payment",
     customer: customerId,
     client_reference_id: userId,
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: `${base}/home?checkout=success`,
     cancel_url: `${base}/home?checkout=canceled`,
-    subscription_data: {
-      metadata: { userId },
-    },
     allow_promotion_codes: true,
     billing_address_collection: "auto",
   });

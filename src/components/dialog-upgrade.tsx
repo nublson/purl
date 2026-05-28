@@ -7,16 +7,6 @@ import { toast } from "sonner";
 import { DialogWrapper } from "./dialog-wrapper";
 import { PricingCard } from "./pricing-card";
 import { Typography } from "./typography";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-
-function formatMoney(cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
-}
 
 interface UpgradeDialogProps {
   children: React.ReactNode;
@@ -24,24 +14,18 @@ interface UpgradeDialogProps {
 
 export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
   const { data: session } = useSession();
-  const [interval, setInterval] = React.useState<"month" | "year">("month");
-  const [loading, setLoading] = React.useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
 
   const proPlan = publicPlans.find((p) => p.id === "PRO");
-  const freePlan = publicPlans.find((p) => p.id === "FREE");
 
   const startCheckout = async () => {
     if (!session?.user) {
       toast.error("Please sign in to upgrade.");
       return;
     }
-    setLoading("checkout");
+    setLoading(true);
     try {
-      const res = await fetch("/api/billing/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ interval }),
-      });
+      const res = await fetch("/api/billing/checkout", { method: "POST" });
       const data = (await res.json()) as { url?: string; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Checkout failed");
       if (data.url) {
@@ -52,134 +36,42 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Checkout failed");
     } finally {
-      setLoading(null);
+      setLoading(false);
     }
   };
-
-  const openPortal = async () => {
-    setLoading("portal");
-    try {
-      const res = await fetch("/api/billing/portal", { method: "POST" });
-      const data = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok)
-        throw new Error(data.error ?? "Could not open billing portal");
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      throw new Error("No portal URL");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Portal failed");
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const monthly = proPlan?.monthlyAmountCents ?? 0;
-  const annual = proPlan?.annualAmountCents ?? monthly * 12;
-
-  const loadingBusy = loading !== null;
-
-  function planCardsForBilling(billing: "month" | "year") {
-    const priceDisplay =
-      billing === "month" ? formatMoney(monthly) : formatMoney(annual);
-    const priceSubLabel =
-      billing === "month" ? "/month" : "/year (~17% vs monthly)";
-
-    return (
-      <div className="grid grid-cols-1 gap-4 min-h-0 md:grid-cols-2">
-        {freePlan ? (
-          <PricingCard
-            key={freePlan.id}
-            name={freePlan.name}
-            description={freePlan.description}
-            price={freePlan.priceLabel}
-            priceSubLabel={freePlan.priceSubLabel}
-            features={freePlan.features}
-            actionText={freePlan.actionText}
-            popular={freePlan.popular}
-            hideFooter
-            className="h-full min-h-0 w-full min-w-0 rounded-lg border border-border bg-card/40 px-6 py-6"
-          />
-        ) : null}
-        {proPlan ? (
-          <PricingCard
-            key={proPlan.id}
-            name={proPlan.name}
-            description={proPlan.description}
-            price={priceDisplay}
-            priceSubLabel={priceSubLabel}
-            features={proPlan.features}
-            actionText={
-              loading === "checkout" ? "Redirecting…" : "Subscribe to Pro"
-            }
-            popular={proPlan.popular}
-            onCtaClick={session?.user ? () => void startCheckout() : undefined}
-            ctaLoading={loadingBusy}
-            secondaryAction={
-              session?.user
-                ? {
-                    text: "Manage subscription",
-                    onClick: () => void openPortal(),
-                    loading: loading === "portal",
-                  }
-                : undefined
-            }
-            footer={
-              session?.user ? undefined : (
-                <Typography size="small" className="text-muted-foreground">
-                  Sign in to upgrade.
-                </Typography>
-              )
-            }
-            className="h-full min-h-0 w-full min-w-0 rounded-lg border border-primary/30 bg-primary/5 px-6 py-6"
-          />
-        ) : null}
-      </div>
-    );
-  }
 
   const content = (
     <div className="flex min-h-0 flex-col gap-4 px-6 pb-6">
-      <Tabs
-        value={interval}
-        onValueChange={(v) => {
-          if (v === "month" || v === "year") {
-            setInterval(v);
+      {proPlan ? (
+        <PricingCard
+          name={proPlan.name}
+          description={proPlan.description}
+          price={proPlan.priceLabel}
+          priceSubLabel={proPlan.priceSubLabel}
+          features={proPlan.features}
+          actionText={loading ? "Redirecting…" : "Upgrade to Pro"}
+          popular={proPlan.popular}
+          onCtaClick={session?.user ? () => void startCheckout() : undefined}
+          ctaLoading={loading}
+          footer={
+            session?.user ? undefined : (
+              <Typography size="small" className="text-muted-foreground">
+                Sign in to upgrade.
+              </Typography>
+            )
           }
-        }}
-      >
-        <TabsList
-          className="mx-auto w-fit gap-1 rounded-full border border-border bg-muted/40 p-1"
-          aria-label="Billing period"
-        >
-          <TabsTrigger value="month" className="rounded-full px-3 py-1 text-xs">
-            Monthly
-          </TabsTrigger>
-          <TabsTrigger value="year" className="rounded-full px-3 py-1 text-xs">
-            Annual
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="month" className="mt-4 flex flex-col outline-none">
-          {planCardsForBilling("month")}
-        </TabsContent>
-        <TabsContent value="year" className="mt-4 flex flex-col outline-none">
-          {planCardsForBilling("year")}
-        </TabsContent>
-      </Tabs>
-      <Typography size="mini" className="text-center text-muted-foreground">
-        New accounts get a 7-day Pro trial (no card). Subscribe anytime to keep
-        Pro after the trial.
-      </Typography>
+          className="w-full rounded-lg border border-primary/30 bg-primary/5 px-6 py-6"
+        />
+      ) : null}
     </div>
   );
 
   return (
     <DialogWrapper
-      title="Plans & billing"
-      description="Upgrade for full AI ingest, semantic search, and unlimited chat."
+      title="Upgrade to Pro"
+      description="Save links for free. Pay once to unlock the full AI knowledge base."
       content={content}
-      className="min-w-sm md:min-w-2xl lg:min-w-3xl max-h-[90vh] md:max-h-none"
+      className="min-w-sm md:min-w-lg max-h-[90vh] md:max-h-none"
     >
       {children}
     </DialogWrapper>

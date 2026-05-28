@@ -2,28 +2,24 @@ import type { PlanKey } from "@/generated/prisma/enums";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   entitlementsForPlanKey,
-  FREE_CHAT_MESSAGES_PER_PERIOD,
-  FREE_CHAT_PERIOD_DAYS,
   FREE_LIFETIME_SAVE_CAP,
-  getStripePriceIdForBillingInterval,
-  PRO_EXTRACTIONS_PER_PERIOD,
+  getStripeOneTimePriceId,
+  PRO_ONETIME_PRICE_CENTS,
   publicPlans,
   stripePriceIdToPlanKey,
 } from "./plans";
 
 describe("stripePriceIdToPlanKey", () => {
   beforeEach(() => {
-    vi.stubEnv("STRIPE_PRICE_PRO_MONTHLY", "price_monthly_test");
-    vi.stubEnv("STRIPE_PRICE_PRO_ANNUAL", "  price_annual_test  ");
+    vi.stubEnv("STRIPE_PRICE_PRO_ONETIME", "price_onetime_test");
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it("maps configured monthly and annual price IDs to PRO", () => {
-    expect(stripePriceIdToPlanKey("price_monthly_test")).toBe("PRO");
-    expect(stripePriceIdToPlanKey("price_annual_test")).toBe("PRO");
+  it("maps configured one-time price ID to PRO", () => {
+    expect(stripePriceIdToPlanKey("price_onetime_test")).toBe("PRO");
   });
 
   it("returns null for unknown or empty price IDs", () => {
@@ -31,61 +27,50 @@ describe("stripePriceIdToPlanKey", () => {
     expect(stripePriceIdToPlanKey("")).toBeNull();
   });
 
-  it("returns null when Stripe price env vars are unset", () => {
+  it("returns null when Stripe price env var is unset", () => {
     vi.unstubAllEnvs();
-    expect(stripePriceIdToPlanKey("price_monthly_test")).toBeNull();
+    expect(stripePriceIdToPlanKey("price_onetime_test")).toBeNull();
   });
 });
 
-describe("getStripePriceIdForBillingInterval", () => {
+describe("getStripeOneTimePriceId", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it("returns trimmed monthly price id", () => {
-    vi.stubEnv("STRIPE_PRICE_PRO_MONTHLY", "  price_m  ");
-    expect(getStripePriceIdForBillingInterval("month")).toBe("price_m");
+  it("returns the one-time price ID", () => {
+    vi.stubEnv("STRIPE_PRICE_PRO_ONETIME", "  price_onetime  ");
+    expect(getStripeOneTimePriceId()).toBe("price_onetime");
   });
 
-  it("returns trimmed annual price id", () => {
-    vi.stubEnv("STRIPE_PRICE_PRO_ANNUAL", "price_y");
-    expect(getStripePriceIdForBillingInterval("year")).toBe("price_y");
-  });
-
-  it("throws a clear error when the monthly price env is missing", () => {
-    expect(() => getStripePriceIdForBillingInterval("month")).toThrow(
-      "Missing Stripe price env: STRIPE_PRICE_PRO_MONTHLY",
-    );
-  });
-
-  it("throws a clear error when the annual price env is missing", () => {
-    expect(() => getStripePriceIdForBillingInterval("year")).toThrow(
-      "Missing Stripe price env: STRIPE_PRICE_PRO_ANNUAL",
+  it("throws a clear error when the env var is missing", () => {
+    expect(() => getStripeOneTimePriceId()).toThrow(
+      "Missing Stripe price env: STRIPE_PRICE_PRO_ONETIME",
     );
   });
 });
 
 describe("entitlementsForPlanKey", () => {
-  it("FREE tier caps saves, chat, and blocks extractions/uploads", () => {
+  it("FREE tier caps saves, blocks AI and chat", () => {
     const e = entitlementsForPlanKey("FREE");
     expect(e.aiFullAccess).toBe(false);
     expect(e.maxLifetimeSaves).toBe(FREE_LIFETIME_SAVE_CAP);
     expect(e.maxExtractionsPerPeriod).toBe(0);
-    expect(e.maxChatMessagesPerPeriod).toBe(FREE_CHAT_MESSAGES_PER_PERIOD);
-    expect(e.chatPeriodDays).toBe(FREE_CHAT_PERIOD_DAYS);
+    expect(e.maxChatMessagesPerPeriod).toBe(0);
+    expect(e.chatPeriodDays).toBeNull();
     expect(e.extractionPeriodUsesSubscriptionPeriod).toBe(false);
     expect(e.allowFileUploads).toBe(false);
   });
 
-  it("PRO and PRO_TRIAL share full AI entitlements with extraction cap", () => {
+  it("PRO and PRO_TRIAL share full AI entitlements with no caps", () => {
     for (const key of ["PRO", "PRO_TRIAL"] as const) {
       const e = entitlementsForPlanKey(key);
       expect(e.aiFullAccess).toBe(true);
       expect(e.maxLifetimeSaves).toBeNull();
-      expect(e.maxExtractionsPerPeriod).toBe(PRO_EXTRACTIONS_PER_PERIOD);
+      expect(e.maxExtractionsPerPeriod).toBeNull();
       expect(e.maxChatMessagesPerPeriod).toBeNull();
       expect(e.chatPeriodDays).toBeNull();
-      expect(e.extractionPeriodUsesSubscriptionPeriod).toBe(true);
+      expect(e.extractionPeriodUsesSubscriptionPeriod).toBe(false);
       expect(e.allowFileUploads).toBe(true);
     }
   });
@@ -106,12 +91,19 @@ describe("publicPlans catalog", () => {
     expect(saveLine).toContain(String(FREE_LIFETIME_SAVE_CAP));
   });
 
-  it("keeps Pro extraction copy aligned with PRO_EXTRACTIONS_PER_PERIOD", () => {
+  it("FREE tier features do not mention AI chat", () => {
+    const free = publicPlans.find((p) => p.id === "FREE");
+    expect(free).toBeDefined();
+    const chatLine = free!.features.find((f) =>
+      f.toLowerCase().includes("chat"),
+    );
+    expect(chatLine).toBeUndefined();
+  });
+
+  it("PRO plan shows one-time price aligned with PRO_ONETIME_PRICE_CENTS", () => {
     const pro = publicPlans.find((p) => p.id === "PRO");
     expect(pro).toBeDefined();
-    const extractLine = pro!.features.find((f) =>
-      f.includes("content extractions"),
-    );
-    expect(extractLine).toContain(String(PRO_EXTRACTIONS_PER_PERIOD));
+    expect(pro!.oneTimeCents).toBe(PRO_ONETIME_PRICE_CENTS);
+    expect(pro!.priceSubLabel).toBe("one-time");
   });
 });

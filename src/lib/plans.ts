@@ -1,26 +1,19 @@
 import type { PlanKey } from "@/generated/prisma/enums";
 
-/** Billing catalog: Stripe price IDs → paid plan (always PRO on subscription). */
+export const FREE_LIFETIME_SAVE_CAP = 100;
+export const PRO_ONETIME_PRICE_CENTS = 3900;
+
+/** Billing catalog: Stripe price ID → paid plan (always PRO on one-time purchase). */
 export function stripePriceIdToPlanKey(priceId: string): PlanKey | null {
-  const monthly = process.env.STRIPE_PRICE_PRO_MONTHLY?.trim();
-  const annual = process.env.STRIPE_PRICE_PRO_ANNUAL?.trim();
-  if (monthly && priceId === monthly) return "PRO";
-  if (annual && priceId === annual) return "PRO";
+  const oneTime = process.env.STRIPE_PRICE_PRO_ONETIME?.trim();
+  if (oneTime && priceId === oneTime) return "PRO";
   return null;
 }
 
-export function getStripePriceIdForBillingInterval(
-  interval: "month" | "year",
-): string {
-  const key =
-    interval === "year"
-      ? process.env.STRIPE_PRICE_PRO_ANNUAL
-      : process.env.STRIPE_PRICE_PRO_MONTHLY;
-  const id = key?.trim();
+export function getStripeOneTimePriceId(): string {
+  const id = process.env.STRIPE_PRICE_PRO_ONETIME?.trim();
   if (!id) {
-    throw new Error(
-      `Missing Stripe price env: ${interval === "year" ? "STRIPE_PRICE_PRO_ANNUAL" : "STRIPE_PRICE_PRO_MONTHLY"}`,
-    );
+    throw new Error("Missing Stripe price env: STRIPE_PRICE_PRO_ONETIME");
   }
   return id;
 }
@@ -32,19 +25,11 @@ export type PublicPlan = {
   description: string;
   priceLabel: string;
   priceSubLabel?: string;
-  /** Monthly amount in cents for Pro (display); annual derived in UI */
-  monthlyAmountCents: number | null;
-  annualAmountCents: number | null;
+  oneTimeCents: number | null;
   features: string[];
   actionText: string;
   popular: boolean;
 };
-
-export const FREE_LIFETIME_SAVE_CAP = 100;
-export const FREE_CHAT_MESSAGES_PER_PERIOD = 20;
-/** Rolling window for free-tier chat counting (days). */
-export const FREE_CHAT_PERIOD_DAYS = 30;
-export const PRO_EXTRACTIONS_PER_PERIOD = 400;
 
 export const publicPlans: PublicPlan[] = [
   {
@@ -52,12 +37,11 @@ export const publicPlans: PublicPlan[] = [
     name: "Base",
     description: "A clean, fast home for everything you want to read later.",
     priceLabel: "Free",
-    monthlyAmountCents: null,
-    annualAmountCents: null,
+    oneTimeCents: null,
     features: [
-      "Save up to 100 links — Web, YouTube, PDF & Audio",
-      "20 AI chat messages / month",
+      `Save up to ${FREE_LIFETIME_SAVE_CAP} links — Web, YouTube, PDF & Audio`,
       "Full-text search",
+      "Basic metadata (title, favicon, description)",
     ],
     actionText: "Get started free",
     popular: false,
@@ -66,18 +50,17 @@ export const publicPlans: PublicPlan[] = [
     id: "PRO",
     name: "Pro",
     description: "Turn your saved content into a searchable AI knowledge base.",
-    priceLabel: "$5",
-    priceSubLabel: "/month",
-    monthlyAmountCents: 500,
-    annualAmountCents: 4900,
+    priceLabel: "$39",
+    priceSubLabel: "one-time",
+    oneTimeCents: PRO_ONETIME_PRICE_CENTS,
     features: [
       "Unlimited saved links",
-      "400 AI content extractions / month",
+      "AI content extraction — Web, YouTube, PDF & Audio",
       "AI-generated summaries",
+      "Semantic search",
       "PDF & audio file uploads",
       "YouTube & audio transcriptions",
       "Unlimited AI chat",
-      "Semantic search",
     ],
     actionText: "Upgrade to Pro",
     popular: true,
@@ -108,8 +91,8 @@ export function entitlementsForPlanKey(
         aiFullAccess: false,
         maxLifetimeSaves: FREE_LIFETIME_SAVE_CAP,
         maxExtractionsPerPeriod: 0,
-        maxChatMessagesPerPeriod: FREE_CHAT_MESSAGES_PER_PERIOD,
-        chatPeriodDays: FREE_CHAT_PERIOD_DAYS,
+        maxChatMessagesPerPeriod: 0,
+        chatPeriodDays: null,
         extractionPeriodUsesSubscriptionPeriod: false,
         allowFileUploads: false,
       };
@@ -118,10 +101,10 @@ export function entitlementsForPlanKey(
       return {
         aiFullAccess: true,
         maxLifetimeSaves: null,
-        maxExtractionsPerPeriod: PRO_EXTRACTIONS_PER_PERIOD,
+        maxExtractionsPerPeriod: null,
         maxChatMessagesPerPeriod: null,
         chatPeriodDays: null,
-        extractionPeriodUsesSubscriptionPeriod: true,
+        extractionPeriodUsesSubscriptionPeriod: false,
         allowFileUploads: true,
       };
     default: {

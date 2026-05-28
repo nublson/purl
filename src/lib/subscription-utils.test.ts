@@ -13,9 +13,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 const prisma = (await import("@/lib/prisma")).default;
-const { Prisma } = await import("@/generated/prisma/client");
 const {
-  createTrialSubscriptionForNewUser,
   ensureSubscriptionRow,
   resolveEffectiveBillingState,
 } = await import("./subscription-utils");
@@ -85,10 +83,7 @@ describe("resolveEffectiveBillingState", () => {
   it("treats compUntil in the future as effective PRO regardless of stored plan", async () => {
     const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
-      baseSub({
-        planKey: "FREE",
-        compUntil: future,
-      }) as never,
+      baseSub({ planKey: "FREE", compUntil: future }) as never,
     );
 
     const state = await resolveEffectiveBillingState("user-1");
@@ -97,52 +92,32 @@ describe("resolveEffectiveBillingState", () => {
     expect(state.compUntil).toEqual(future);
   });
 
-  it("returns PRO for an active paid subscription", async () => {
-    const periodStart = new Date("2026-04-01T00:00:00.000Z");
-    const periodEnd = new Date("2026-05-01T00:00:00.000Z");
+  it("returns PRO for a user who paid the one-time fee", async () => {
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
-      baseSub({
-        planKey: "PRO",
-        status: "ACTIVE",
-        currentPeriodStart: periodStart,
-        currentPeriodEnd: periodEnd,
-      }) as never,
+      baseSub({ planKey: "PRO", status: "ACTIVE", stripePriceId: "price_onetime" }) as never,
     );
 
     const state = await resolveEffectiveBillingState("user-1");
 
     expect(state.planKey).toBe("PRO");
     expect(state.status).toBe("ACTIVE");
-    expect(state.currentPeriodStart).toEqual(periodStart);
-    expect(state.currentPeriodEnd).toEqual(periodEnd);
   });
 
-  it("returns PRO_TRIAL while the internal trial window is still open", async () => {
+  it("returns PRO_TRIAL for existing trial users while still active", async () => {
     const trialEndsAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
-      baseSub({
-        planKey: "PRO_TRIAL",
-        status: "TRIALING",
-        trialEndsAt,
-      }) as never,
+      baseSub({ planKey: "PRO_TRIAL", status: "TRIALING", trialEndsAt }) as never,
     );
 
     const state = await resolveEffectiveBillingState("user-1");
 
     expect(state.planKey).toBe("PRO_TRIAL");
-    expect(state.trialEndsAt).toEqual(trialEndsAt);
   });
 
-  it("downgrades expired PRO_TRIAL to FREE and clears billing period fields", async () => {
+  it("downgrades expired PRO_TRIAL to FREE", async () => {
     const trialEndsAt = new Date(Date.now() - 60_000);
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
-      baseSub({
-        planKey: "PRO_TRIAL",
-        status: "TRIALING",
-        trialEndsAt,
-        currentPeriodStart: new Date("2026-01-01T00:00:00.000Z"),
-        currentPeriodEnd: new Date("2026-02-01T00:00:00.000Z"),
-      }) as never,
+      baseSub({ planKey: "PRO_TRIAL", status: "TRIALING", trialEndsAt }) as never,
     );
     vi.mocked(prisma.subscription.update).mockResolvedValue({} as never);
 
@@ -150,32 +125,17 @@ describe("resolveEffectiveBillingState", () => {
 
     expect(prisma.subscription.update).toHaveBeenCalledWith({
       where: { userId: "user-1" },
-      data: {
-        planKey: "FREE",
-        status: "ACTIVE",
-      },
+      data: { planKey: "FREE", status: "ACTIVE" },
     });
     expect(state.planKey).toBe("FREE");
     expect(state.status).toBe("ACTIVE");
-    expect(state.trialEndsAt).toBeNull();
-    expect(state.currentPeriodStart).toBeNull();
-    expect(state.currentPeriodEnd).toBeNull();
   });
 
-  it("demotes lapsed PRO (e.g. canceled) to FREE and clears Stripe billing fields", async () => {
+  it("demotes lapsed PRO (e.g. canceled) to FREE and clears Stripe fields", async () => {
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
-      baseSub({
-        planKey: "PRO",
-        status: "CANCELED",
-        stripeSubscriptionId: "sub_stripe",
-        stripePriceId: "price_x",
-        currentPeriodStart: new Date("2026-03-01T00:00:00.000Z"),
-        currentPeriodEnd: new Date("2026-04-01T00:00:00.000Z"),
-      }) as never,
+      baseSub({ planKey: "PRO", status: "CANCELED", stripePriceId: "price_x" }) as never,
     );
-    vi.mocked(prisma.subscription.updateMany).mockResolvedValue({
-      count: 1,
-    } as never);
+    vi.mocked(prisma.subscription.updateMany).mockResolvedValue({ count: 1 } as never);
 
     const state = await resolveEffectiveBillingState("user-1");
 
@@ -186,63 +146,9 @@ describe("resolveEffectiveBillingState", () => {
         status: "ACTIVE",
         stripeSubscriptionId: null,
         stripePriceId: null,
-        currentPeriodStart: null,
-        currentPeriodEnd: null,
-        cancelAtPeriodEnd: false,
       },
     });
     expect(state.planKey).toBe("FREE");
     expect(state.status).toBe("ACTIVE");
-    expect(state.currentPeriodStart).toBeNull();
-    expect(state.currentPeriodEnd).toBeNull();
-  });
-});
-
-describe("createTrialSubscriptionForNewUser", () => {
-  beforeEach(() => {
-    vi.mocked(prisma.subscription.create).mockReset();
-  });
-
-  it("creates a PRO_TRIAL row with a trial end timestamp", async () => {
-    vi.mocked(prisma.subscription.create).mockResolvedValue({} as never);
-
-    await createTrialSubscriptionForNewUser("new-user");
-
-    expect(prisma.subscription.create).toHaveBeenCalledTimes(1);
-    const arg = vi.mocked(prisma.subscription.create).mock.calls[0][0];
-    expect(arg.data.userId).toBe("new-user");
-    expect(arg.data.planKey).toBe("PRO_TRIAL");
-    expect(arg.data.status).toBe("TRIALING");
-    const trialEnd = arg.data.trialEndsAt;
-    expect(trialEnd).toBeInstanceOf(Date);
-    expect((trialEnd as Date).getTime()).toBeGreaterThan(Date.now());
-  });
-
-  it("swallows unique constraint races (P2002) so signup stays idempotent", async () => {
-    const err = new Prisma.PrismaClientKnownRequestError(
-      "Unique constraint failed on the fields: (`userId`)",
-      {
-        code: "P2002",
-        clientVersion: "vitest",
-        meta: { modelName: "Subscription" },
-      },
-    );
-    vi.mocked(prisma.subscription.create).mockRejectedValue(err);
-
-    await expect(
-      createTrialSubscriptionForNewUser("new-user"),
-    ).resolves.toBeUndefined();
-  });
-
-  it("rethrows non-unique Prisma errors", async () => {
-    const err = new Prisma.PrismaClientKnownRequestError("other", {
-      code: "P2025",
-      clientVersion: "vitest",
-    });
-    vi.mocked(prisma.subscription.create).mockRejectedValue(err);
-
-    await expect(createTrialSubscriptionForNewUser("new-user")).rejects.toBe(
-      err,
-    );
   });
 });
