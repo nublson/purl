@@ -1,10 +1,9 @@
+import { ByokKeyItem } from "@/components/byok-key-item";
+import { TrialBanner } from "@/components/trial-banner";
 import { Typography } from "@/components/typography";
+import { Separator } from "@/components/ui/separator";
 import type { UsageMeterData } from "@/components/usage-item";
 import { UsageItem } from "@/components/usage-item";
-
-function trialDaysRemaining(trialEndsAt: Date): number {
-  return Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-}
 
 export function SettingsUsage({ data }: { data: UsageMeterData | null }) {
   if (!data) {
@@ -17,20 +16,11 @@ export function SettingsUsage({ data }: { data: UsageMeterData | null }) {
     );
   }
 
-  const isTrial = data.effectivePlanKey === "PRO_TRIAL" && data.trialEndsAt != null;
-  const daysLeft = isTrial ? trialDaysRemaining(new Date(data.trialEndsAt!)) : null;
+  const trialEndsAt = data.effectivePlanKey === "PRO_TRIAL" ? data.trialEndsAt : null;
 
   return (
     <div className="w-full flex-1 flex flex-col gap-4">
-      {isTrial && (
-        <div className="rounded-md border border-border bg-muted/50 px-3 py-2">
-          <Typography size="small" className="text-muted-foreground">
-            {daysLeft === 0
-              ? "Your free trial ends today. Upgrade to keep AI access."
-              : `Free trial — ${daysLeft} day${daysLeft === 1 ? "" : "s"} remaining.`}
-          </Typography>
-        </div>
-      )}
+      <TrialBanner trialEndsAt={trialEndsAt} />
       <UsageItem
         label="Links"
         used={data.saves.used}
@@ -48,6 +38,8 @@ export function SettingsUsage({ data }: { data: UsageMeterData | null }) {
         used={data.extractions.used}
         cap={data.extractions.cap}
       />
+      <Separator />
+      <ByokKeyItem />
     </div>
   );
 }
