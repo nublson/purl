@@ -45,7 +45,7 @@ export function NavigationTabs() {
         >
           <Link href="/ai">
             <Sparkles />
-            AI
+            Purl AI
           </Link>
         </TabsTrigger>
       </TabsList>
