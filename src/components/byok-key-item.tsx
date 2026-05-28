@@ -3,6 +3,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { SettingsItem } from "./settings-item";
+import { Typography } from "./typography";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Skeleton } from "./ui/skeleton";
@@ -12,8 +13,10 @@ type KeyState =
   | { status: "no_key" }
   | { status: "has_key"; maskedKey: string };
 
-export function ByokKeyItem() {
-  const [keyState, setKeyState] = React.useState<KeyState>({ status: "loading" });
+export function ByokKeyItem({ isTrial = false }: { isTrial?: boolean }) {
+  const [keyState, setKeyState] = React.useState<KeyState>({
+    status: "loading",
+  });
   const [showInput, setShowInput] = React.useState(false);
   const [keyInput, setKeyInput] = React.useState("");
   const [saving, setSaving] = React.useState(false);
@@ -149,6 +152,11 @@ export function ByokKeyItem() {
             Cancel
           </Button>
         </div>
+      )}
+      {isTrial && keyState.status === "has_key" && (
+        <Typography size="mini" className="text-muted-foreground">
+          Your key will activate automatically when your trial ends.
+        </Typography>
       )}
     </div>
   );

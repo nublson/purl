@@ -33,7 +33,7 @@ export function SettingsUsage({ data }: { data: UsageMeterData | null }) {
         used={data.extractions.used}
         cap={data.extractions.cap}
       />
-      <ByokKeyItem />
+      <ByokKeyItem isTrial={data.effectivePlanKey === "PRO_TRIAL"} />
     </div>
   );
 }
