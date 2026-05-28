@@ -97,15 +97,12 @@ describe("resolveEffectiveBillingState", () => {
     expect(state.compUntil).toEqual(future);
   });
 
-  it("returns PRO for an active paid subscription", async () => {
-    const periodStart = new Date("2026-04-01T00:00:00.000Z");
-    const periodEnd = new Date("2026-05-01T00:00:00.000Z");
+  it("returns PRO for a user who paid the one-time fee", async () => {
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
       baseSub({
         planKey: "PRO",
         status: "ACTIVE",
-        currentPeriodStart: periodStart,
-        currentPeriodEnd: periodEnd,
+        stripePriceId: "price_onetime",
       }) as never,
     );
 
@@ -113,8 +110,6 @@ describe("resolveEffectiveBillingState", () => {
 
     expect(state.planKey).toBe("PRO");
     expect(state.status).toBe("ACTIVE");
-    expect(state.currentPeriodStart).toEqual(periodStart);
-    expect(state.currentPeriodEnd).toEqual(periodEnd);
   });
 
   it("returns PRO_TRIAL while the internal trial window is still open", async () => {
@@ -133,15 +128,13 @@ describe("resolveEffectiveBillingState", () => {
     expect(state.trialEndsAt).toEqual(trialEndsAt);
   });
 
-  it("downgrades expired PRO_TRIAL to FREE and clears billing period fields", async () => {
+  it("downgrades expired PRO_TRIAL to FREE", async () => {
     const trialEndsAt = new Date(Date.now() - 60_000);
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
       baseSub({
         planKey: "PRO_TRIAL",
         status: "TRIALING",
         trialEndsAt,
-        currentPeriodStart: new Date("2026-01-01T00:00:00.000Z"),
-        currentPeriodEnd: new Date("2026-02-01T00:00:00.000Z"),
       }) as never,
     );
     vi.mocked(prisma.subscription.update).mockResolvedValue({} as never);
@@ -158,19 +151,15 @@ describe("resolveEffectiveBillingState", () => {
     expect(state.planKey).toBe("FREE");
     expect(state.status).toBe("ACTIVE");
     expect(state.trialEndsAt).toBeNull();
-    expect(state.currentPeriodStart).toBeNull();
-    expect(state.currentPeriodEnd).toBeNull();
   });
 
-  it("demotes lapsed PRO (e.g. canceled) to FREE and clears Stripe billing fields", async () => {
+  it("demotes lapsed PRO (e.g. canceled) to FREE and clears Stripe fields", async () => {
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
       baseSub({
         planKey: "PRO",
         status: "CANCELED",
         stripeSubscriptionId: "sub_stripe",
         stripePriceId: "price_x",
-        currentPeriodStart: new Date("2026-03-01T00:00:00.000Z"),
-        currentPeriodEnd: new Date("2026-04-01T00:00:00.000Z"),
       }) as never,
     );
     vi.mocked(prisma.subscription.updateMany).mockResolvedValue({
@@ -186,15 +175,10 @@ describe("resolveEffectiveBillingState", () => {
         status: "ACTIVE",
         stripeSubscriptionId: null,
         stripePriceId: null,
-        currentPeriodStart: null,
-        currentPeriodEnd: null,
-        cancelAtPeriodEnd: false,
       },
     });
     expect(state.planKey).toBe("FREE");
     expect(state.status).toBe("ACTIVE");
-    expect(state.currentPeriodStart).toBeNull();
-    expect(state.currentPeriodEnd).toBeNull();
   });
 });
 

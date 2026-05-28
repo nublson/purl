@@ -50,8 +50,6 @@ export type EffectiveBillingState = {
   status: SubStatus;
   trialEndsAt: Date | null;
   compUntil: Date | null;
-  currentPeriodStart: Date | null;
-  currentPeriodEnd: Date | null;
 };
 
 /**
@@ -70,8 +68,6 @@ export async function resolveEffectiveBillingState(
       status: sub.status,
       trialEndsAt: sub.trialEndsAt,
       compUntil: sub.compUntil,
-      currentPeriodStart: sub.currentPeriodStart,
-      currentPeriodEnd: sub.currentPeriodEnd,
     };
   }
 
@@ -84,8 +80,6 @@ export async function resolveEffectiveBillingState(
       status: sub.status,
       trialEndsAt: sub.trialEndsAt,
       compUntil: sub.compUntil,
-      currentPeriodStart: sub.currentPeriodStart,
-      currentPeriodEnd: sub.currentPeriodEnd,
     };
   }
 
@@ -95,8 +89,6 @@ export async function resolveEffectiveBillingState(
       status: sub.status,
       trialEndsAt: sub.trialEndsAt,
       compUntil: sub.compUntil,
-      currentPeriodStart: sub.currentPeriodStart,
-      currentPeriodEnd: sub.currentPeriodEnd,
     };
   }
 
@@ -113,8 +105,6 @@ export async function resolveEffectiveBillingState(
       status: "ACTIVE",
       trialEndsAt: null,
       compUntil: sub.compUntil,
-      currentPeriodStart: null,
-      currentPeriodEnd: null,
     };
   }
 
@@ -126,9 +116,6 @@ export async function resolveEffectiveBillingState(
         status: "ACTIVE",
         stripeSubscriptionId: null,
         stripePriceId: null,
-        currentPeriodStart: null,
-        currentPeriodEnd: null,
-        cancelAtPeriodEnd: false,
       },
     });
     return {
@@ -136,8 +123,6 @@ export async function resolveEffectiveBillingState(
       status: "ACTIVE",
       trialEndsAt: sub.trialEndsAt,
       compUntil: sub.compUntil,
-      currentPeriodStart: null,
-      currentPeriodEnd: null,
     };
   }
 
@@ -146,7 +131,5 @@ export async function resolveEffectiveBillingState(
     status: "ACTIVE",
     trialEndsAt: sub.trialEndsAt,
     compUntil: sub.compUntil,
-    currentPeriodStart: sub.currentPeriodStart,
-    currentPeriodEnd: sub.currentPeriodEnd,
   };
 }
