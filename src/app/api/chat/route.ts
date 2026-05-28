@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
-import { BillingLimitError, assertCanChat } from "@/lib/entitlements";
+import { BillingLimitError, assertCanChat, getEntitlementContext } from "@/lib/entitlements";
 import { buildMentionContext, streamChatResponse } from "@/lib/chat";
+import { getDecryptedByokKey } from "@/lib/user-anthropic-key";
 import { chatJsonError } from "@/lib/chat-api-error-response";
 import { CHAT_ERROR_CODES } from "@/lib/chat-http-errors";
 import type { PurlChatUIMessage } from "@/lib/chat-stream-error";
@@ -144,6 +145,9 @@ export async function POST(request: Request) {
       throw err;
     }
 
+    const { byokActive } = await getEntitlementContext(userId);
+    const userAnthropicKey = byokActive ? await getDecryptedByokKey(userId) : null;
+
     const ownedIds = ownedMentionLinkIds;
     const hasMentionContext = Boolean(ownedIds?.length);
 
@@ -180,8 +184,9 @@ export async function POST(request: Request) {
           {
             chatId,
             streamWriter: writer,
+            userAnthropicKey,
             onAssistantText: async (text) => {
-              await saveMessage(chatId, "ASSISTANT", text);
+              await saveMessage(chatId, "ASSISTANT", text, undefined, userAnthropicKey);
             },
           },
         );
