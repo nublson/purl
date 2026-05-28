@@ -32,8 +32,8 @@ Full AI processing. Every saved item becomes queryable knowledge. Uses Purl's An
 | Dimension | Limit | Overage |
 |---|---|---|
 | Saved links | Unlimited | — |
-| AI content extractions | Unlimited | — |
-| AI chat messages | Unlimited | — |
+| AI content extractions | 150 / month (resets on the 1st) | Hard stop |
+| AI chat messages | 300 / month (resets on the 1st) | Hard stop |
 
 **Included features**
 - Everything in Free
@@ -42,7 +42,7 @@ Full AI processing. Every saved item becomes queryable knowledge. Uses Purl's An
 - Semantic search
 - PDF & audio file uploads
 - YouTube & audio transcriptions
-- Unlimited AI chat (powered by Purl)
+- 300 AI chat messages per month (powered by Purl)
 
 ---
 
@@ -81,5 +81,5 @@ Users who already pay Anthropic directly shouldn't pay twice. BYOK removes the b
 **Why only require the Anthropic key for BYOK?**
 Chat and summaries run on Claude (Anthropic). Embeddings use OpenAI's `text-embedding-3-small` — cheap enough (~$0.0001/1k tokens) that Purl absorbs this for all users rather than adding setup friction.
 
-**Why no extraction cap on Pro?**
-Unlimited extractions make the Pro value feel complete and remove anxiety about running out. The one-time pricing already accounts for average lifetime usage; heavy users are the exception, not the norm.
+**Why monthly caps on Pro instead of unlimited?**
+Monthly caps (300 chat / 150 extractions) make AI costs predictable while staying invisible to typical users. At average usage (~50 chats, ~20 extractions per month) users have substantial headroom. Power users who need more can supply their own Anthropic key via BYOK.
