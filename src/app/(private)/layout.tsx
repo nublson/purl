@@ -1,5 +1,6 @@
 import Header from "@/components/header";
 import { HeaderSearchLinks } from "@/components/header-search-links";
+import { NavigationTabs } from "@/components/navigation-tabs";
 import { HeaderActionsFallback } from "@/components/skeletons";
 import { UploadFile } from "@/components/upload-file";
 import { User } from "@/components/user";
@@ -21,9 +22,7 @@ async function HeaderActions() {
     auth.api.getSession({ headers: await headers() }),
   ]);
   const userId = session?.user?.id;
-  const usageSummary = userId
-    ? await getUsageSummaryForUser(userId)
-    : null;
+  const usageSummary = userId ? await getUsageSummaryForUser(userId) : null;
 
   return (
     <div className="flex items-center justify-end gap-2">
@@ -51,6 +50,7 @@ export default function PrivateLayout({
       />
       <main className="flex-1 flex flex-col items-center justify-start pt-6 overflow-y-auto px-4 md:px-0">
         {children}
+        <NavigationTabs />
       </main>
     </ChatProvider>
   );

@@ -5,7 +5,7 @@ import { ApiKeyLoader } from "./api-key-loader";
 
 export default function Home() {
   return (
-    <div className="wrapper-private flex flex-1 flex-col gap-8 pt-24 pb-32">
+    <div className="wrapper-private flex flex-1 flex-col gap-8 pt-24 pb-20">
       <Suspense fallback={<HomeSkeleton />}>
         <ApiKeyLoader />
       </Suspense>
