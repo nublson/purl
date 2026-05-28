@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useSession } from "@/lib/auth-client";
+import { ByokKeyItem } from "./byok-key-item";
 import { DeleteAccountItem } from "./delete-account-item";
 import { SettingsItem } from "./settings-item";
 import { Typography } from "./typography";
@@ -38,6 +39,7 @@ export function SettingsAccount({ closeDialog }: { closeDialog: () => void }) {
           </Button>
         }
       />
+      <ByokKeyItem />
       <DeleteAccountItem closeDialog={closeDialog} />
     </div>
   );
