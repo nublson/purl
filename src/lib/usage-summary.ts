@@ -12,7 +12,6 @@ function startOfUtcMonth(d: Date): Date {
 
 export type UsageSummary = {
   effectivePlanKey: string;
-  trialEndsAt: string | null;
   saves: { used: number; cap: number | null };
   chatMessages: { used: number; cap: number | null; windowDays: number | null };
   extractions: { used: number; cap: number | null };
@@ -45,7 +44,6 @@ export async function getUsageSummaryForUser(
 
   return {
     effectivePlanKey,
-    trialEndsAt: billing.trialEndsAt?.toISOString() ?? null,
     saves: {
       used: saveCount,
       cap: saveCap,

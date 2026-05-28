@@ -81,17 +81,13 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
           />
         ) : null}
       </div>
-      <Typography size="mini" className="text-center text-muted-foreground">
-        New accounts get a 7-day Pro trial (no card). Pay once to keep Pro
-        after the trial.
-      </Typography>
     </div>
   );
 
   return (
     <DialogWrapper
-      title="Plans & billing"
-      description="Upgrade for full AI ingest, semantic search, and unlimited chat."
+      title="Plans"
+      description="Save links for free. Pay once to unlock the full AI knowledge base."
       content={content}
       className="min-w-sm md:min-w-2xl lg:min-w-3xl max-h-[90vh] md:max-h-none"
     >
