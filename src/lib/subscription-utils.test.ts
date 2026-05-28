@@ -15,7 +15,9 @@ vi.mock("@/lib/prisma", () => ({
 const prisma = (await import("@/lib/prisma")).default;
 const {
   ensureSubscriptionRow,
+  createTrialSubscription,
   resolveEffectiveBillingState,
+  TRIAL_DAYS,
 } = await import("./subscription-utils");
 
 function baseSub(overrides: Record<string, unknown> = {}) {
@@ -72,6 +74,40 @@ describe("ensureSubscriptionRow", () => {
   });
 });
 
+describe("createTrialSubscription", () => {
+  beforeEach(() => {
+    vi.mocked(prisma.subscription.findUnique).mockReset();
+    vi.mocked(prisma.subscription.create).mockReset();
+  });
+
+  it("creates a PRO_TRIAL subscription with trialEndsAt set to TRIAL_DAYS from now", async () => {
+    const before = Date.now();
+    const created = baseSub({ planKey: "PRO_TRIAL", status: "TRIALING", trialEndsAt: new Date() });
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.subscription.create).mockResolvedValue(created as never);
+
+    await createTrialSubscription("user-trial");
+
+    const call = vi.mocked(prisma.subscription.create).mock.calls[0][0];
+    expect(call.data.planKey).toBe("PRO_TRIAL");
+    expect(call.data.status).toBe("TRIALING");
+    const trialEndsAt = call.data.trialEndsAt as Date;
+    const expectedMs = TRIAL_DAYS * 24 * 60 * 60 * 1000;
+    expect(trialEndsAt.getTime()).toBeGreaterThanOrEqual(before + expectedMs - 1000);
+    expect(trialEndsAt.getTime()).toBeLessThanOrEqual(Date.now() + expectedMs + 1000);
+  });
+
+  it("returns the existing row without creating a duplicate", async () => {
+    const row = baseSub();
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(row as never);
+
+    const result = await createTrialSubscription("user-1");
+
+    expect(result).toBe(row);
+    expect(prisma.subscription.create).not.toHaveBeenCalled();
+  });
+});
+
 describe("resolveEffectiveBillingState", () => {
   beforeEach(() => {
     vi.mocked(prisma.subscription.findUnique).mockReset();
@@ -112,6 +148,7 @@ describe("resolveEffectiveBillingState", () => {
     const state = await resolveEffectiveBillingState("user-1");
 
     expect(state.planKey).toBe("PRO_TRIAL");
+    expect(state.trialEndsAt).toEqual(trialEndsAt);
   });
 
   it("downgrades expired PRO_TRIAL to FREE", async () => {

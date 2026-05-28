@@ -29,6 +29,8 @@ A fast, clean bookmarking tool. Save links and come back to them later — no AI
 
 Full AI processing. Every saved item becomes queryable knowledge. Uses Purl's Anthropic key — no setup required.
 
+**New accounts start with a 7-day Pro trial — no card required.** After the trial, the account downgrades to Free unless the one-time payment is made.
+
 | Dimension | Limit | Overage |
 |---|---|---|
 | Saved links | Unlimited | — |
