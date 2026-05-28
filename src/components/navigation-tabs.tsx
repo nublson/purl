@@ -3,22 +3,26 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { House, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 
 export function NavigationTabs() {
-  const pathname = usePathname();
-  const activeTab = pathname.startsWith("/ai") ? "ai" : "home";
-
   return (
-    <Tabs className="fixed bottom-4" value={activeTab}>
-      <TabsList>
-        <TabsTrigger value="home" asChild>
+    <Tabs className="fixed top-4 z-51" defaultValue="home">
+      <TabsList className="bg-muted/60">
+        <TabsTrigger
+          value="home"
+          asChild
+          className="border-none data-active:bg-background!"
+        >
           <Link href="/home">
             <House />
             Home
           </Link>
         </TabsTrigger>
-        <TabsTrigger value="ai" asChild>
+        <TabsTrigger
+          value="ai"
+          asChild
+          className="border-none data-active:bg-background!"
+        >
           <Link href="/ai">
             <Sparkles />
             AI

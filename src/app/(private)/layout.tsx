@@ -27,7 +27,7 @@ async function HeaderActions() {
   return (
     <div className="flex items-center justify-end gap-2">
       <HeaderSearchLinks links={links} />
-      <UploadFile />
+      <UploadFile className="hidden md:block" />
       <User usageSummary={usageSummary} />
     </div>
   );

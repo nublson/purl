@@ -4,13 +4,18 @@ import {
   UPLOAD_FILE_INPUT_ACCEPT,
   uploadFileAsLink,
 } from "@/lib/upload-file-client";
+import { cn } from "@/lib/utils";
 import { CloudUpload, Loader2 } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 
-export function UploadFile() {
+interface UploadFileProps {
+  className?: string;
+}
+
+export function UploadFile({ className }: UploadFileProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -44,7 +49,7 @@ export function UploadFile() {
         type="button"
         variant="ghost"
         size="icon-sm"
-        className="cursor-pointer text-muted-foreground"
+        className={cn("cursor-pointer text-muted-foreground", className)}
         disabled={isUploading}
         onClick={() => inputRef.current?.click()}
       >
