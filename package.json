@@ -21,6 +21,7 @@
     "ext:build": "cd extension && npm run build"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.80",
     "@ai-sdk/gateway": "^3.0.112",
     "@ai-sdk/openai": "^3.0.49",
     "@ai-sdk/react": "^3.0.150",
