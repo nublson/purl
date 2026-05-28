@@ -6,7 +6,6 @@ import { Item, ItemActions, ItemContent, ItemTitle } from "./ui/item";
 
 export type UsageMeterData = {
   effectivePlanKey: string;
-  trialEndsAt: Date | null;
   saves: { used: number; cap: number | null };
   chatMessages: { used: number; cap: number | null; windowDays: number | null };
   extractions: { used: number; cap: number | null };
