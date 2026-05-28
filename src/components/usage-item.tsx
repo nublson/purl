@@ -1,7 +1,6 @@
 "use client";
 
 import { Typography } from "@/components/typography";
-import { Badge } from "@/components/ui/badge";
 import { Item, ItemActions, ItemContent, ItemTitle } from "./ui/item";
 
 export type UsageMeterData = {
@@ -24,14 +23,11 @@ export function UsageItem({ label, period, used, cap }: UsageItemProps) {
   return (
     <Item className="px-0">
       <ItemContent>
-        <ItemTitle>
-          {label}
-          {period && <Badge variant="secondary">/{period}</Badge>}
-        </ItemTitle>
+        <ItemTitle>{label}</ItemTitle>
       </ItemContent>
       <ItemActions>
         <Typography component="span" size="mini">
-          {used} / {cap == null ? "∞" : cap}
+          {used} / {cap == null ? "∞" : cap}{period ? ` · ${period}` : ""}
         </Typography>
       </ItemActions>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">

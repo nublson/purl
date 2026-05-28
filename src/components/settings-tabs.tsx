@@ -4,6 +4,7 @@ import { Separator } from "./ui/separator";
 interface SettingsTab {
   label: string;
   value: string;
+  badge?: React.ReactNode;
   content?: React.ReactNode;
 }
 
@@ -18,6 +19,7 @@ export function SettingsTabs({ tabs }: SettingsTabsProps) {
         {tabs.map((tab) => (
           <TabsTrigger key={tab.value} value={tab.value}>
             {tab.label}
+            {tab.badge}
           </TabsTrigger>
         ))}
       </TabsList>
