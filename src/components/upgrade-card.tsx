@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useSession } from "@/lib/auth-client";
 import { PRO_ONETIME_PRICE_CENTS } from "@/lib/plans";
 import { Sparkles } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -43,7 +44,10 @@ export function UpgradeCard() {
       <CardContent className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <Sparkles className="size-4 text-primary" />
-          <Typography size="small" className="font-semibold">
+          <Typography
+            size="small"
+            className="font-semibold text-accent-foreground"
+          >
             Upgrade to Pro
           </Typography>
           <Badge variant="secondary">{price} one-time</Badge>
@@ -61,8 +65,8 @@ export function UpgradeCard() {
           >
             {loading ? "Redirecting…" : "Try for free"}
           </Button>
-          <Button size="sm" variant="ghost" className="cursor-pointer" disabled>
-            Learn more
+          <Button size="sm" variant="ghost" className="cursor-pointer" asChild>
+            <Link href="/#pricing">Learn more</Link>
           </Button>
         </div>
       </CardContent>
