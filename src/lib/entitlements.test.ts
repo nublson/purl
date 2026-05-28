@@ -12,6 +12,7 @@ vi.mock("@/lib/prisma", () => ({
       update: vi.fn(),
       updateMany: vi.fn(),
     },
+    user: { findUnique: vi.fn() },
   },
 }));
 
@@ -56,6 +57,10 @@ describe("entitlements", () => {
     vi.mocked(prisma.subscription.updateMany).mockReset();
     vi.mocked(prisma.link.count).mockReset();
     vi.mocked(prisma.usageEvent.count).mockReset();
+    vi.mocked(prisma.user.findUnique).mockReset();
+    vi.mocked(prisma.user.findUnique).mockResolvedValue(
+      { anthropicApiKeyEncrypted: null } as never,
+    );
 
     vi.mocked(prisma.subscription.findUnique).mockImplementation(
       (async () => null) as unknown as typeof prisma.subscription.findUnique,
