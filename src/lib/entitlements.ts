@@ -80,6 +80,10 @@ export async function shouldRunIngest(
   return { run: true };
 }
 
+function startOfUtcMonth(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+}
+
 export async function assertCanChat(userId: string): Promise<void> {
   const { entitlements } = await getEntitlementContext(userId);
   const cap = entitlements.maxChatMessagesPerPeriod;
@@ -87,16 +91,14 @@ export async function assertCanChat(userId: string): Promise<void> {
   if (cap === 0) {
     throw new BillingLimitError(
       "CHAT_LIMIT",
-      "AI chat is a Pro feature. Upgrade to Pro for unlimited chat.",
+      "AI chat is a Pro feature. Upgrade to Pro or add your Anthropic key.",
     );
   }
-  const since = new Date();
-  since.setUTCDate(since.getUTCDate() - (entitlements.chatPeriodDays ?? 30));
-  const used = await countUsage(userId, "CHAT_MSG", { since });
+  const used = await countUsage(userId, "CHAT_MSG", { since: startOfUtcMonth(new Date()) });
   if (used >= cap) {
     throw new BillingLimitError(
       "CHAT_LIMIT",
-      `You've used your ${cap} free AI messages. Upgrade to Pro for unlimited chat.`,
+      `You've used your ${cap} AI messages this month. Your allowance resets on the 1st.`,
     );
   }
 }
