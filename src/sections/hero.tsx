@@ -31,13 +31,18 @@ export default function HeroSection() {
             </Typography>
           </div>
         </div>
-        <div className="w-full flex items-center justify-center gap-4">
-          <Button asChild>
-            <Link href="/signup">Try for free</Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href={"#pricing"}>See how it works</Link>
-          </Button>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-full flex items-center justify-center gap-4">
+            <Button asChild>
+              <Link href="/signup">Try for free</Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href={"#features"}>See how it works</Link>
+            </Button>
+          </div>
+          <Typography size="mini" className="text-muted-foreground">
+            7-day free trial · No credit card required
+          </Typography>
         </div>
       </div>
 

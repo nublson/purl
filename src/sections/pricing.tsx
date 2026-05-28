@@ -16,7 +16,7 @@ export const PricingSection = () => {
               </>
             ),
             description:
-              "Save links and search them for free. Pro turns your stash into an AI knowledge base with extractions, embeddings, and unlimited chat.",
+              "Save links for free. Pay once to unlock AI extraction, semantic search, and 300 chat messages per month — no subscription, no recurring fees.",
           }}
         />
         <PricingPlans />

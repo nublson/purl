@@ -3,17 +3,22 @@
     {
       "value": "what-content-can-i-save",
       "title": "What types of content can I save?",
-      "content": "Purl supports links (any URL), PDFs, YouTube videos, and audio files. When you save a link, Purl automatically fetches the title, favicon, and full text. PDFs are fully parsed, YouTube videos get their transcripts extracted, and audio is transcribed via Whisper. YouTube transcripts and audio transcription are included on Pro; see pricing for limits."
+      "content": "Purl supports links (any URL), PDFs, YouTube videos, and audio files. When you save a link, Purl automatically fetches the title, favicon, and full text. PDFs are fully parsed, YouTube videos get their transcripts extracted, and audio is transcribed via Whisper. AI extraction, transcripts, and file uploads require Pro."
+    },
+    {
+      "value": "free-trial",
+      "title": "Is there a free trial?",
+      "content": "Yes. Every new account starts with a 7-day Pro trial — no credit card required. You get full access to AI extraction, semantic search, chat, and file uploads. After the trial your account moves to the Free plan unless you upgrade."
     },
     {
       "value": "how-does-ai-chat-work",
       "title": "How does the AI chat work?",
-      "content": "You can ask Purl anything about your saved content in plain English — for example, \"what did I read about machine learning last week?\" Purl searches across all your saved articles, PDFs, and videos and returns a synthesized answer with sources, so you always know where the information came from."
+      "content": "You can ask Purl anything about your saved content in plain English — for example, \"what did I read about machine learning last week?\" Purl searches across all your saved articles, PDFs, and videos and returns a synthesized answer with sources, so you always know where the information came from. AI chat is available on Pro (300 messages/month) and for BYOK users."
     },
     {
       "value": "free-vs-pro",
       "title": "What's the difference between Free and Pro?",
-      "content": "The Free plan lets you save unlimited links and upload PDFs and audio files. Pro unlocks AI chat and transcript extraction for all your saved content — powered by your own OpenAI API key. There's no monthly subscription for Pro; just add your key in Settings and you only pay OpenAI directly for what you use."
+      "content": "Free lets you save up to 100 links and search them with full-text search. Pro ($39 one-time) unlocks AI content extraction, semantic search, unlimited saves, and 300 AI chat messages per month — powered by Purl's Anthropic key, no setup required. New accounts start with a 7-day free Pro trial."
     },
     {
       "value": "is-my-data-private",
@@ -21,9 +26,9 @@
       "content": "Yes. Your library is private to you — only you can see what you've saved and the answers you receive. Purl does not share your content with other users or use it to train AI models."
     },
     {
-      "value": "do-i-need-an-openai-account",
-      "title": "Do I need an OpenAI account?",
-      "content": "Only if you want to use AI chat or transcript extraction. Create a free account at platform.openai.com, generate an API key, and add it in your Purl Settings. You'll be billed directly by OpenAI based on your usage — typically a few cents per conversation."
+      "value": "do-i-need-an-api-key",
+      "title": "Do I need an API key?",
+      "content": "No. Pro uses Purl's Anthropic key — just upgrade and everything works out of the box. If you'd prefer to use your own Anthropic API key (BYOK), you can add it in Settings → Usage and get full Pro-equivalent AI access for free. You'll be billed by Anthropic directly for chat and summaries; Purl covers embedding costs for everyone."
     }
   ]
 }
