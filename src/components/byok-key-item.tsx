@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { SettingsItem } from "./settings-item";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { Skeleton } from "./ui/skeleton";
 
 type KeyState =
   | { status: "loading" }
@@ -83,7 +84,9 @@ export function ByokKeyItem() {
       : "Add your Anthropic API key to use AI features for free";
 
   const actions =
-    keyState.status === "loading" ? null : keyState.status === "has_key" ? (
+    keyState.status === "loading" ? (
+      <Skeleton className="h-7 w-16 rounded-md" />
+    ) : keyState.status === "has_key" ? (
       <Button
         variant="secondary"
         size="sm"
