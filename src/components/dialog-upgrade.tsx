@@ -1,6 +1,7 @@
 "use client";
 
 import { useCheckout } from "@/hooks/use-checkout";
+import { useUsage } from "@/hooks/use-usage";
 import { useSession } from "@/lib/auth-client";
 import { publicPlans } from "@/lib/plans";
 import * as React from "react";
@@ -15,6 +16,9 @@ interface UpgradeDialogProps {
 export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
   const { data: session } = useSession();
   const { startCheckout, loading } = useCheckout();
+  const { usageSummary } = useUsage();
+  const isTrial = usageSummary?.effectivePlanKey === "PRO_TRIAL";
+  const ctaLabel = loading ? "Redirecting…" : isTrial ? "Upgrade" : "Try for free";
   const proPlan = publicPlans.find((p) => p.id === "PRO");
 
   const content = (
@@ -26,7 +30,7 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
           price={proPlan.priceLabel}
           priceSubLabel={proPlan.priceSubLabel}
           features={proPlan.features}
-          actionText={loading ? "Redirecting…" : "Try for free"}
+          actionText={ctaLabel}
           popular={proPlan.popular}
           onCtaClick={session?.user ? () => void startCheckout() : undefined}
           ctaLoading={loading}
