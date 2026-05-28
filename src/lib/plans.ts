@@ -2,6 +2,8 @@ import type { PlanKey } from "@/generated/prisma/enums";
 
 export const FREE_LIFETIME_SAVE_CAP = 100;
 export const PRO_ONETIME_PRICE_CENTS = 3900;
+export const PRO_CHAT_MESSAGES_PER_MONTH = 300;
+export const PRO_EXTRACTIONS_PER_MONTH = 150;
 
 /** Billing catalog: Stripe price ID → paid plan (always PRO on one-time purchase). */
 export function stripePriceIdToPlanKey(priceId: string): PlanKey | null {
@@ -60,7 +62,7 @@ export const publicPlans: PublicPlan[] = [
       "Semantic search",
       "PDF & audio file uploads",
       "YouTube & audio transcriptions",
-      "Unlimited AI chat",
+      `${PRO_CHAT_MESSAGES_PER_MONTH} AI chat messages per month`,
     ],
     actionText: "Upgrade to Pro",
     popular: true,
@@ -101,8 +103,8 @@ export function entitlementsForPlanKey(
       return {
         aiFullAccess: true,
         maxLifetimeSaves: null,
-        maxExtractionsPerPeriod: null,
-        maxChatMessagesPerPeriod: null,
+        maxExtractionsPerPeriod: PRO_EXTRACTIONS_PER_MONTH,
+        maxChatMessagesPerPeriod: PRO_CHAT_MESSAGES_PER_MONTH,
         chatPeriodDays: null,
         extractionPeriodUsesSubscriptionPeriod: false,
         allowFileUploads: true,
