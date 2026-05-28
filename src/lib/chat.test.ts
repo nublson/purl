@@ -30,6 +30,7 @@ vi.mock("ai", () => ({
 
 vi.mock("@/lib/ai", () => ({
   getChatModel: vi.fn(),
+  getChatModelForUser: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -49,7 +50,7 @@ vi.mock("@/lib/semantic-search", () => ({
 }));
 
 const { streamText } = await import("ai");
-const { getChatModel } = await import("@/lib/ai");
+const { getChatModelForUser } = await import("@/lib/ai");
 const prisma = (await import("@/lib/prisma")).default;
 const { semanticSearch } = await import("@/lib/semantic-search");
 const Sentry = await import("@sentry/nextjs");
@@ -59,7 +60,7 @@ const { streamChatResponse, buildMentionContext, buildChatTools } =
 describe("streamChatResponse", () => {
   beforeEach(() => {
     vi.mocked(streamText).mockReset();
-    vi.mocked(getChatModel).mockReset();
+    vi.mocked(getChatModelForUser).mockReset();
   });
 
   it("delegates to AI SDK streamText with system prompt, tools, and messages", async () => {
@@ -69,7 +70,7 @@ describe("streamChatResponse", () => {
     ];
     const streamResult = { toDataStreamResponse: vi.fn() };
 
-    vi.mocked(getChatModel).mockReturnValue(model as never);
+    vi.mocked(getChatModelForUser).mockReturnValue(model as never);
     vi.mocked(streamText).mockReturnValue(streamResult as never);
 
     const result = await streamChatResponse(
@@ -81,7 +82,7 @@ describe("streamChatResponse", () => {
       },
     );
 
-    expect(getChatModel).toHaveBeenCalledWith();
+    expect(getChatModelForUser).toHaveBeenCalledWith(undefined);
     expect(streamText).toHaveBeenCalledWith(
       expect.objectContaining({
         model,
@@ -105,7 +106,7 @@ describe("streamChatResponse", () => {
     ];
     const context = "### Article\nSource: https://example.com\n\nSome content";
 
-    vi.mocked(getChatModel).mockReturnValue(model as never);
+    vi.mocked(getChatModelForUser).mockReturnValue(model as never);
     vi.mocked(streamText).mockReturnValue({} as never);
 
     await streamChatResponse(messages as never, "user-123", context, {
@@ -351,8 +352,8 @@ describe("streamChatResponse – providerOptions and callbacks", () => {
 
   beforeEach(() => {
     vi.mocked(streamText).mockReset();
-    vi.mocked(getChatModel).mockReset();
-    vi.mocked(getChatModel).mockReturnValue({ id: "claude" } as never);
+    vi.mocked(getChatModelForUser).mockReset();
+    vi.mocked(getChatModelForUser).mockReturnValue({ id: "claude" } as never);
     vi.mocked(streamText).mockReturnValue({} as never);
   });
 

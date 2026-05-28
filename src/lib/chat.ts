@@ -1,5 +1,5 @@
 import { getEntitlementContext } from "@/lib/entitlements";
-import { getChatModel } from "@/lib/ai";
+import { getChatModelForUser } from "@/lib/ai";
 import { CHAT_STREAM_ERROR_CODES } from "@/lib/chat-http-errors";
 import type {
   ChatStreamErrorPayload,
@@ -348,6 +348,7 @@ export type StreamChatResponseOptions = {
   chatId: string;
   onAssistantText?: (text: string) => void | Promise<void>;
   streamWriter?: UIMessageStreamWriter<PurlChatUIMessage>;
+  userAnthropicKey?: string | null;
 };
 
 export async function streamChatResponse(
@@ -356,7 +357,7 @@ export async function streamChatResponse(
   context: string | null,
   options: StreamChatResponseOptions,
 ) {
-  const { chatId, onAssistantText, streamWriter } = options;
+  const { chatId, onAssistantText, streamWriter, userAnthropicKey } = options;
   const anthropicThinkingOptions = {
     thinking: {
       type: "enabled" as const,
@@ -374,22 +375,27 @@ export async function streamChatResponse(
     });
   }
 
+  const usingDirectKey = Boolean(userAnthropicKey);
   const gatewayEnvTag =
     process.env.VERCEL_ENV ??
     (process.env.NODE_ENV === "production" ? "production" : "development");
 
   return streamText({
-    model: getChatModel(),
+    model: getChatModelForUser(userAnthropicKey),
     system: buildSystemPrompt(context),
     messages,
     tools: buildChatTools(userId, { chatId, streamWriter }),
     providerOptions: {
       anthropic: anthropicThinkingOptions,
-      gateway: {
-        order: ["anthropic"],
-        tags: ["feature:chat", `env:${gatewayEnvTag}`],
-        user: userId,
-      },
+      ...(usingDirectKey
+        ? {}
+        : {
+            gateway: {
+              order: ["anthropic"],
+              tags: ["feature:chat", `env:${gatewayEnvTag}`],
+              user: userId,
+            },
+          }),
     },
     stopWhen: stepCountIs(5),
     onError: ({ error }) => {

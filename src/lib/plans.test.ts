@@ -4,6 +4,8 @@ import {
   entitlementsForPlanKey,
   FREE_LIFETIME_SAVE_CAP,
   getStripeOneTimePriceId,
+  PRO_CHAT_MESSAGES_PER_MONTH,
+  PRO_EXTRACTIONS_PER_MONTH,
   PRO_ONETIME_PRICE_CENTS,
   publicPlans,
   stripePriceIdToPlanKey,
@@ -62,13 +64,13 @@ describe("entitlementsForPlanKey", () => {
     expect(e.allowFileUploads).toBe(false);
   });
 
-  it("PRO and PRO_TRIAL share full AI entitlements with no caps", () => {
+  it("PRO and PRO_TRIAL share full AI entitlements with monthly caps", () => {
     for (const key of ["PRO", "PRO_TRIAL"] as const) {
       const e = entitlementsForPlanKey(key);
       expect(e.aiFullAccess).toBe(true);
       expect(e.maxLifetimeSaves).toBeNull();
-      expect(e.maxExtractionsPerPeriod).toBeNull();
-      expect(e.maxChatMessagesPerPeriod).toBeNull();
+      expect(e.maxExtractionsPerPeriod).toBe(PRO_EXTRACTIONS_PER_MONTH);
+      expect(e.maxChatMessagesPerPeriod).toBe(PRO_CHAT_MESSAGES_PER_MONTH);
       expect(e.chatPeriodDays).toBeNull();
       expect(e.extractionPeriodUsesSubscriptionPeriod).toBe(false);
       expect(e.allowFileUploads).toBe(true);
@@ -98,6 +100,13 @@ describe("publicPlans catalog", () => {
       f.toLowerCase().includes("chat"),
     );
     expect(chatLine).toBeUndefined();
+  });
+
+  it("PRO plan chat feature line is aligned with PRO_CHAT_MESSAGES_PER_MONTH", () => {
+    const pro = publicPlans.find((p) => p.id === "PRO");
+    expect(pro).toBeDefined();
+    const chatLine = pro!.features.find((f) => f.toLowerCase().includes("chat"));
+    expect(chatLine).toContain(String(PRO_CHAT_MESSAGES_PER_MONTH));
   });
 
   it("PRO plan shows one-time price aligned with PRO_ONETIME_PRICE_CENTS", () => {

@@ -60,18 +60,19 @@ enum UsageKind {
 }
 
 model User {
-  id            String        @id
-  name          String
-  email         String
-  emailVerified Boolean
-  image         String?
-  createdAt     DateTime
-  updatedAt     DateTime
-  sessions      Session[]
-  accounts      Account[]
-  links         Link[]
-  chats         Chat[]
-  subscription  Subscription?
+  id                         String        @id
+  name                       String
+  email                      String
+  emailVerified              Boolean
+  image                      String?
+  createdAt                  DateTime
+  updatedAt                  DateTime
+  anthropicApiKeyEncrypted   String?
+  sessions                   Session[]
+  accounts                   Account[]
+  links                      Link[]
+  chats                      Chat[]
+  subscription               Subscription?
 
   @@unique([email])
   @@map("users")

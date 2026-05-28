@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { getChatModel } from "@/lib/ai";
+import { getChatModelForUser } from "@/lib/ai";
 import prisma from "@/lib/prisma";
 import type { MessageRole } from "@/generated/prisma/enums";
 import { generateText } from "ai";
@@ -8,6 +8,7 @@ import { headers } from "next/headers";
 async function generateChatTitle(input: {
   userMessage?: string | null;
   assistantReply?: string | null;
+  userAnthropicKey?: string | null;
 }): Promise<string> {
   const blocks: string[] = [];
   if (input.userMessage?.trim()) {
@@ -25,7 +26,7 @@ async function generateChatTitle(input: {
   const prompt = blocks.join("\n\n").trim() || "Untitled conversation";
 
   const { text } = await generateText({
-    model: getChatModel(),
+    model: getChatModelForUser(input.userAnthropicKey),
     system: `You name a personal chat thread the way a human would label it in a notes app or message list: concrete and specific, never bureaucratic.
 
 Rules:
@@ -153,6 +154,7 @@ export async function saveMessage(
   role: MessageRole,
   content: string,
   mentionedLinkIds?: string[],
+  userAnthropicKey?: string | null,
 ) {
   const message = await prisma.chatMessage.create({
     data: {
@@ -186,6 +188,7 @@ export async function saveMessage(
       const raw = await generateChatTitle({
         userMessage: lastUser?.content ?? null,
         assistantReply: content,
+        userAnthropicKey,
       });
       const trimmed = raw.trim().slice(0, 80);
       if (trimmed) newTitle = trimmed;

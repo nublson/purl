@@ -26,6 +26,7 @@ vi.mock("ai", () => ({
 
 vi.mock("@/lib/ai", () => ({
   getChatModel: vi.fn(),
+  getChatModelForUser: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -41,7 +42,7 @@ vi.mock("next/headers", () => ({
 }));
 
 const { generateText } = await import("ai");
-const { getChatModel } = await import("@/lib/ai");
+const { getChatModelForUser } = await import("@/lib/ai");
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
 const {
@@ -147,7 +148,7 @@ describe("saveMessage", () => {
     vi.mocked(prisma.chat.findUnique).mockReset();
     vi.mocked(prisma.chat.update).mockReset();
     vi.mocked(generateText).mockReset();
-    vi.mocked(getChatModel).mockReset();
+    vi.mocked(getChatModelForUser).mockReset();
     vi.mocked(prisma.chatMessage.create).mockResolvedValue(mockMessage as never);
     vi.mocked(prisma.chat.update).mockResolvedValue({} as never);
   });
@@ -215,7 +216,7 @@ describe("saveMessage", () => {
     vi.mocked(prisma.chatMessage.findFirst).mockResolvedValue({
       content: "What are the best React patterns?",
     } as never);
-    vi.mocked(getChatModel).mockReturnValue({ id: "model" } as never);
+    vi.mocked(getChatModelForUser).mockReturnValue({ id: "model" } as never);
     vi.mocked(generateText).mockResolvedValue({ text: "Best React Patterns" } as never);
 
     await saveMessage(chatId, "ASSISTANT", "Here are the patterns...");

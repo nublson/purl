@@ -12,22 +12,13 @@ export type UsageMeterData = {
 
 export type UsageItemProps = {
   label: string;
+  period?: string;
   used: number;
   cap: number | null;
 };
 
-export function UsageItem({ label, used, cap }: UsageItemProps) {
-  if (cap == null) {
-    return (
-      <div className="flex flex-col gap-1">
-        <Typography size="mini" className="text-muted-foreground">
-          {label}: {used} (Pro)
-        </Typography>
-      </div>
-    );
-  }
-
-  const pct = cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
+export function UsageItem({ label, period, used, cap }: UsageItemProps) {
+  const pct = cap != null && cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
 
   return (
     <Item className="px-0">
@@ -36,7 +27,7 @@ export function UsageItem({ label, used, cap }: UsageItemProps) {
       </ItemContent>
       <ItemActions>
         <Typography component="span" size="mini">
-          {used} / {cap}
+          {used} / {cap == null ? "∞" : cap}{period ? ` · ${period}` : ""}
         </Typography>
       </ItemActions>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">

@@ -63,6 +63,18 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
           className="w-full rounded-lg border border-primary/30 bg-primary/5 px-6 py-6"
         />
       ) : null}
+      <div className="flex items-center gap-3 text-muted-foreground">
+        <div className="h-px flex-1 bg-border" />
+        <Typography size="small">or</Typography>
+        <div className="h-px flex-1 bg-border" />
+      </div>
+      <Typography size="small" className="text-center text-muted-foreground">
+        Already have an Anthropic API key?{" "}
+        <span className="font-medium text-foreground">
+          Add it in Settings → Account
+        </span>{" "}
+        to use all AI features for free.
+      </Typography>
     </div>
   );
 

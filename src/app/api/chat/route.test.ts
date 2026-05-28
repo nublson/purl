@@ -38,8 +38,13 @@ vi.mock("@/lib/entitlements", async () => {
   return {
     ...actual,
     assertCanChat: vi.fn(),
+    getEntitlementContext: vi.fn(),
   };
 });
+
+vi.mock("@/lib/user-anthropic-key", () => ({
+  getDecryptedByokKey: vi.fn().mockResolvedValue(null),
+}));
 
 vi.mock("@/lib/usage", () => ({
   recordUsage: vi.fn(),
@@ -57,7 +62,7 @@ const { auth } = await import("@/lib/auth");
 const { buildMentionContext, streamChatResponse } = await import("@/lib/chat");
 const { filterMentionLinkIdsForUser, saveMessage, verifyChatOwnership } =
   await import("@/lib/chats");
-const { assertCanChat } = await import("@/lib/entitlements");
+const { assertCanChat, getEntitlementContext } = await import("@/lib/entitlements");
 const { recordUsage } = await import("@/lib/usage");
 const { convertToModelMessages } = await import("ai");
 const Sentry = await import("@sentry/nextjs");
@@ -103,6 +108,8 @@ describe("POST /api/chat", () => {
     vi.mocked(recordUsage).mockReset();
     vi.mocked(assertCanChat).mockReset();
     vi.mocked(assertCanChat).mockResolvedValue(undefined);
+    vi.mocked(getEntitlementContext).mockReset();
+    vi.mocked(getEntitlementContext).mockResolvedValue({ byokActive: false } as never);
     vi.mocked(recordUsage).mockResolvedValue(undefined);
     vi.mocked(verifyChatOwnership).mockReset();
     vi.mocked(filterMentionLinkIdsForUser).mockReset();
