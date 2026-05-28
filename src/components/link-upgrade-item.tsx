@@ -1,3 +1,6 @@
+"use client";
+
+import { useCheckout } from "@/hooks/use-checkout";
 import { Sparkles } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -10,6 +13,8 @@ import {
 } from "./ui/item";
 
 export function LinkUpgradeItem() {
+  const { startCheckout, loading } = useCheckout();
+
   return (
     <Item className="flex-col">
       <ItemContent>
@@ -24,8 +29,13 @@ export function LinkUpgradeItem() {
         </ItemDescription>
       </ItemContent>
       <ItemActions className="w-full">
-        <Button className="w-full" size="sm">
-          Upgrade
+        <Button
+          className="w-full"
+          size="sm"
+          disabled={loading}
+          onClick={() => void startCheckout()}
+        >
+          {loading ? "Redirecting…" : "Upgrade"}
         </Button>
       </ItemActions>
     </Item>
