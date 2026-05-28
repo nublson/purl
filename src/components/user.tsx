@@ -4,10 +4,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { useSession } from "@/lib/auth-client";
 import {
   BadgeCheck,
+  House,
   LogOut,
   MessageCircleHeart,
   SettingsIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { FeedbackDialog } from "./dialog-feedback";
 import { SettingsDialog } from "./dialog-settings";
 import { UpgradeDialog } from "./dialog-upgrade";
@@ -36,7 +38,12 @@ export function User({
       className="w-52"
       align="end"
       trigger={
-        <Button data-cy="user-menu-button" variant="ghost" size="icon-sm" className="rounded-full">
+        <Button
+          data-cy="user-menu-button"
+          variant="ghost"
+          size="icon-sm"
+          className="rounded-full"
+        >
           <Avatar>
             <AvatarImage
               className="rounded-full"
@@ -95,7 +102,13 @@ export function User({
         </UpgradeDialog>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
-
+      <DropdownMenuItem data-cy="sign-out-menu-item" asChild>
+        <Link href="/">
+          <House />
+          Home page
+        </Link>
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
       <DropdownMenuItem data-cy="sign-out-menu-item" onClick={() => signOut()}>
         <LogOut />
         Sign out
