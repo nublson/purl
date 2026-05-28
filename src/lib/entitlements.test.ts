@@ -29,8 +29,6 @@ function mockSub(overrides: {
   status?: "ACTIVE" | "PAST_DUE" | "CANCELED" | "TRIALING" | "INCOMPLETE";
   trialEndsAt?: Date | null;
   compUntil?: Date | null;
-  currentPeriodStart?: Date | null;
-  currentPeriodEnd?: Date | null;
 }) {
   return {
     userId: "u1",
@@ -38,8 +36,8 @@ function mockSub(overrides: {
     status: overrides.status ?? "ACTIVE",
     trialEndsAt: overrides.trialEndsAt ?? null,
     compUntil: overrides.compUntil ?? null,
-    currentPeriodStart: overrides.currentPeriodStart ?? null,
-    currentPeriodEnd: overrides.currentPeriodEnd ?? null,
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
     stripeCustomerId: null,
     stripeSubscriptionId: null,
     stripePriceId: null,
@@ -96,7 +94,7 @@ describe("entitlements", () => {
     );
   });
 
-  it("shouldRunIngest skips when no ai access", async () => {
+  it("shouldRunIngest skips free users (no AI access)", async () => {
     const uid = "user-ingest-skip";
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
       { ...mockSub({ planKey: "FREE" }), userId: uid } as never,
@@ -107,64 +105,37 @@ describe("entitlements", () => {
     expect(r.skipReason).toBe("free_metadata_only");
   });
 
-  it("shouldRunIngest for PRO counts extractions within the Stripe billing period", async () => {
-    const uid = "user-pro-ingest-window";
-    const periodStart = new Date("2026-04-01T00:00:00.000Z");
-    const periodEnd = new Date("2026-05-01T00:00:00.000Z");
+  it("shouldRunIngest runs for PRO users with unlimited extractions", async () => {
+    const uid = "user-pro-ingest";
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
       {
-        ...mockSub({
-          planKey: "PRO",
-          status: "ACTIVE",
-          currentPeriodStart: periodStart,
-          currentPeriodEnd: periodEnd,
-        }),
+        ...mockSub({ planKey: "PRO", status: "ACTIVE" }),
         userId: uid,
       } as never,
     );
-    vi.mocked(prisma.usageEvent.count).mockResolvedValue(0);
 
     const r = await shouldRunIngest(uid);
     expect(r.run).toBe(true);
-    expect(prisma.usageEvent.count).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          userId: uid,
-          kind: "EXTRACT",
-          createdAt: { gte: periodStart, lt: periodEnd },
-        }),
-      }),
-    );
+    expect(prisma.usageEvent.count).not.toHaveBeenCalled();
   });
 
-  it("shouldRunIngest skips PRO users who hit the extraction cap for the current period", async () => {
-    const uid = "user-pro-extract-cap";
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
-      {
-        ...mockSub({
-          planKey: "PRO",
-          status: "ACTIVE",
-          currentPeriodStart: new Date("2026-04-01T00:00:00.000Z"),
-          currentPeriodEnd: new Date("2026-05-01T00:00:00.000Z"),
-        }),
-        userId: uid,
-      } as never,
-    );
-    vi.mocked(prisma.usageEvent.count).mockResolvedValue(400);
-
-    const r = await shouldRunIngest(uid);
-    expect(r.run).toBe(false);
-    expect(r.skipReason).toBe("extraction_cap");
-  });
-
-  it("assertCanChat enforces free tier message cap", async () => {
-    const uid = "user-chat-cap";
+  it("assertCanChat always blocks free users without a DB query", async () => {
+    const uid = "user-chat-free";
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
       { ...mockSub({ planKey: "FREE" }), userId: uid } as never,
     );
-    vi.mocked(prisma.usageEvent.count).mockResolvedValue(20);
 
     await expect(assertCanChat(uid)).rejects.toBeInstanceOf(BillingLimitError);
+    expect(prisma.usageEvent.count).not.toHaveBeenCalled();
+  });
+
+  it("assertCanChat allows PRO users", async () => {
+    const uid = "user-chat-pro";
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      { ...mockSub({ planKey: "PRO", status: "ACTIVE" }), userId: uid } as never,
+    );
+
+    await expect(assertCanChat(uid)).resolves.toBeUndefined();
   });
 
   it("compUntil grants PRO entitlements via getEntitlementContext", async () => {
