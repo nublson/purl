@@ -6,12 +6,12 @@
   },
   {
     "title": "Organized by time",
-    "description": "Today, Yesterday, Last week - your library is always in chronological order. No manual sorting ever needed.",
+    "description": "Today, Yesterday, Last week — your library is always in chronological order. No manual sorting ever needed.",
     "icon": "Clock3"
   },
   {
     "title": "Ask anything with AI",
-    "description": "Ask \"what did i read about X last week?\" and Purl searches across all your saved content to give you a real answer.",
+    "description": "Ask \"what did I read about X last week?\" and Purl searches across all your saved content to give you a real answer.",
     "icon": "MessageSquareText"
   },
   {
@@ -20,13 +20,13 @@
     "icon": "ScrollText"
   },
   {
-    "title": "Collections",
-    "description": "Group related content into named collections. Purl can suggest where new saves belong automatically.",
-    "icon": "Lock"
+    "title": "Semantic search",
+    "description": "Find anything across your library by meaning, not just keywords. Ask in plain English and Purl surfaces the right content.",
+    "icon": "Search"
   },
   {
-    "title": "Weekly digest",
-    "description": "A smart summary of what you saved this week, what's worth revisiting, and what you might have missed.",
-    "icon": "Mail"
+    "title": "Bring your own key",
+    "description": "Add your own Anthropic API key in Settings to get full AI access for free. You pay Anthropic directly; Purl covers embeddings.",
+    "icon": "Key"
   }
 ]

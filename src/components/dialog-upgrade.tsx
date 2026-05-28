@@ -49,7 +49,7 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
           price={proPlan.priceLabel}
           priceSubLabel={proPlan.priceSubLabel}
           features={proPlan.features}
-          actionText={loading ? "Redirecting…" : "Upgrade to Pro"}
+          actionText={loading ? "Redirecting…" : "Try for free"}
           popular={proPlan.popular}
           onCtaClick={session?.user ? () => void startCheckout() : undefined}
           ctaLoading={loading}
@@ -71,7 +71,7 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
       <Typography size="small" className="text-center text-muted-foreground">
         Already have an Anthropic API key?{" "}
         <span className="font-medium text-foreground">
-          Add it in Settings → Account
+          Add it in Settings → Usage
         </span>{" "}
         to use all AI features for free.
       </Typography>

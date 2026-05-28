@@ -58,7 +58,7 @@ export function PricingPlans() {
               priceSubLabel={plan.priceSubLabel}
               features={plan.features}
               actionText={
-                session?.user ? plan.actionText : `${plan.actionText} →`
+                session?.user ? "Upgrade to Pro" : `${plan.actionText} →`
               }
               popular={plan.popular}
               ctaHref={session?.user ? undefined : "/signup?next=upgrade"}

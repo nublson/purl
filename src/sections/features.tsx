@@ -7,20 +7,20 @@ import SectionWrapper from "@/components/section-wrapper";
 import featuresData from "@/data/features.json";
 import {
   Clock3,
+  Key,
   Link2,
-  Lock,
-  Mail,
   MessageSquareText,
   ScrollText,
+  Search,
 } from "lucide-react";
 
 const featureIcons = {
   Clock3,
+  Key,
   Link2,
-  Lock,
-  Mail,
   MessageSquareText,
   ScrollText,
+  Search,
 } as const;
 
 type FeatureIconName = keyof typeof featureIcons;
