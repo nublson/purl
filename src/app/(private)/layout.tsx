@@ -29,7 +29,7 @@ async function HeaderActions() {
     <UsageProvider usageSummary={usageSummary}>
       <div className="flex items-center justify-end gap-2">
         <HeaderSearchLinks links={links} />
-        <UploadFile className="hidden md:block" />
+        <UploadFile className="hidden md:inline-flex" />
         <User />
       </div>
     </UsageProvider>
@@ -51,7 +51,7 @@ export default function PrivateLayout({
           </Suspense>
         }
       />
-      <main className="flex-1 flex flex-col items-center justify-start pt-6 overflow-y-auto px-4 md:px-0">
+      <main className="flex-1 flex flex-col items-center justify-start pt-4 overflow-y-auto px-4 md:px-0">
         {children}
         <NavigationTabs />
       </main>
