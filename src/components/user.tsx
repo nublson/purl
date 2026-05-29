@@ -49,7 +49,11 @@ export function User({
       }
     >
       <DropdownMenuGroup>
-        <DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault();
+          }}
+        >
           <UserItem
             user={{
               image: user?.image ?? "",
