@@ -27,7 +27,7 @@ export function NavigationTabs() {
 
   return (
     <Tabs className="fixed top-3.5 z-51" value={activeTab}>
-      <TabsList className="bg-muted/60">
+      <TabsList className="bg-accent/40">
         <TabsTrigger
           value="home"
           asChild
