@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "vite build --watch",
-    "build": "vite build"
+    "build": "vite build && node scripts/zip.mjs"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.321",
