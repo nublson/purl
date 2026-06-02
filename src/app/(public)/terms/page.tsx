@@ -79,14 +79,16 @@ export default function TermsPage() {
 
       <Section title="Plans and billing">
         <Typography size="small">
-          Purl offers a Free plan and a Pro plan ($9/month). New accounts
-          receive a 7-day Pro trial. Subscriptions are billed monthly and
-          managed through Stripe. You can cancel at any time; access continues
-          until the end of the current billing period.
+          Purl offers three plans: Free ($0), Pro ($39 one-time payment), and
+          BYOK (Bring Your Own Key, free). New accounts receive a 7-day Pro
+          trial — no card required. After the trial, the account downgrades to
+          Free unless the one-time Pro payment is made.
         </Typography>
         <Typography size="small">
-          We reserve the right to change pricing with 30 days&apos; notice to
-          existing subscribers.
+          Pro payments are processed by Stripe. Because Pro is a one-time
+          purchase, there are no recurring charges or cancellations. We reserve
+          the right to change pricing with 30 days&apos; notice to existing
+          users.
         </Typography>
       </Section>
 
