@@ -3,7 +3,7 @@ import { Typography } from "@/components/typography";
 
 export default function TermsPage() {
   return (
-    <article className="w-full max-w-2xl py-16 flex flex-col gap-10">
+    <article className="w-full max-w-2xl pt-24 pb-16 flex flex-col gap-10">
       <header className="flex flex-col gap-2">
         <Typography variant="h1" component="h1">
           Terms of Service
