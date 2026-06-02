@@ -8,22 +8,22 @@
 
 **Live preview:** [https://purl.nublson.com](https://purl.nublson.com)
 
-Purl is a free, AI-powered read-it-later app and personal knowledge base. You paste URLs (or upload files): web pages, PDFs, YouTube videos, and audio. Purl ingests the content, stores chunked text with vector embeddings, and answers questions by searching what you saved — optionally scoped with `@` mentions to specific items.
+Purl is an AI-powered read-it-later app and personal knowledge base. You paste URLs (or upload files): web pages, PDFs, YouTube videos, and audio. Purl ingests the content, stores chunked text with vector embeddings, and answers questions by searching what you saved — optionally scoped with `@` mentions to specific items.
 
-**Plans:** **Free** and **Pro** are enforced server-side (see [`docs/commercial-model.md`](docs/commercial-model.md)). New signups get a **7-day Pro trial** (no card). **Stripe Checkout** handles subscriptions; **webhooks** sync status to Postgres. Usage meters and limits apply to saved links, AI extractions, and chat messages on the free tier.
+**Plans:** **Free**, **Pro**, and **BYOK** are enforced server-side (see [`docs/commercial-model.md`](docs/commercial-model.md)). New signups get a **7-day Pro trial** (no card required). **Stripe Checkout** handles the one-time Pro payment; **webhooks** sync status to Postgres.
 
 The product goal: one place to stash material you care about, then query it later with citations instead of digging through bookmarks.
 
 ## Plans (summary)
 
-| Feature                       | Free | Pro |
-| ----------------------------- | ---- | --- |
-| Save links (cap on free)      | Yes  | Yes |
-| Full-text search              | Yes  | Yes |
-| AI extraction & embeddings    | No   | Yes |
-| Semantic search in chat       | No   | Yes |
-| PDF/audio **upload**          | No   | Yes |
-| AI chat                       | Limited | Unlimited |
+| Feature                       | Free | Pro ($39 one-time) | BYOK (free) |
+| ----------------------------- | ---- | ------------------ | ----------- |
+| Save links (100 lifetime cap) | Yes  | Unlimited          | Unlimited   |
+| Full-text search              | Yes  | Yes                | Yes         |
+| AI extraction & embeddings    | No   | Yes (150/mo)       | Yes (unlimited) |
+| Semantic search               | No   | Yes                | Yes         |
+| PDF/audio **upload**          | No   | Yes                | Yes         |
+| AI chat                       | No   | 300 msg/mo         | Unlimited   |
 
 Exact limits are in [`docs/commercial-model.md`](docs/commercial-model.md).
 
@@ -101,8 +101,6 @@ flowchart TB
 These are called out explicitly because the repo is going public:
 
 - **Settings breadth** — Settings include account deletion; broader account preferences (profile edits, password change, notification settings, etc.) are not implemented yet.
-- **Subscription plans** — Usage limits, billing, and plan enforcement are planned but not yet implemented.
-- **Pro gating** — AI Chat, YouTube transcript extraction, and Audio transcription are intended to be Pro-only, but entitlement checks are not fully enforced yet.
 
 **Marketing vs. product:** The landing page copy mentions ideas such as **collections** and a **weekly digest**. Those are **not** built in the current schema or app — treat them as roadmap, not shipped features.
 
@@ -151,19 +149,19 @@ Purl is built around **untrusted input** (arbitrary URLs and uploaded files). A 
 
 **Reporting a vulnerability:** use [GitHub Security Advisories](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability) for this repository so details stay private until patched.
 
-## Stripe (subscriptions)
+## Stripe (one-time payment)
 
-Billing uses **Stripe Checkout** (`POST /api/billing/checkout`), **Customer Portal** (`POST /api/billing/portal`), and **webhooks** (`POST /api/billing/webhook`). Plan entitlements and usage limits are enforced in-app from Postgres (see [`src/lib/entitlements.ts`](src/lib/entitlements.ts)); webhooks keep the [`Subscription`](prisma/schema.prisma) row in sync.
+Billing uses **Stripe Checkout** (`POST /api/billing/checkout`) for the one-time Pro payment, **Customer Portal** (`POST /api/billing/portal`), and **webhooks** (`POST /api/billing/webhook`). Plan entitlements and usage limits are enforced in-app from Postgres (see [`src/lib/entitlements.ts`](src/lib/entitlements.ts)); webhooks keep the plan row in sync.
 
-**Env (see `.env.example`):** `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` (server-only for now), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_PRO_ANNUAL`, optional `ADMIN_TOKEN` for `POST /api/admin/grants`.
+**Env (see `.env.example`):** `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` (server-only), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO` (one-time price ID), optional `ADMIN_TOKEN` for `POST /api/admin/grants`.
 
-**Local webhook testing:** create Pro prices in [Stripe Test mode](https://dashboard.stripe.com/test/products), put the price IDs in `.env`, then:
+**Local webhook testing:** create a one-time Pro price in [Stripe Test mode](https://dashboard.stripe.com/test/products), put the price ID in `.env`, then:
 
 ```bash
 stripe listen --forward-to localhost:3000/api/billing/webhook
 ```
 
-Copy the CLI signing secret into `STRIPE_WEBHOOK_SECRET` for that shell session. Trigger flows with `stripe trigger checkout.session.completed` (and exercise checkout from the app). **Go-live:** recreate products and a Live webhook endpoint; rotate keys and webhook secret per environment.
+Copy the CLI signing secret into `STRIPE_WEBHOOK_SECRET` for that shell session. Trigger flows with `stripe trigger checkout.session.completed` (and exercise checkout from the app). **Go-live:** recreate the product and a Live webhook endpoint; rotate keys and webhook secret per environment.
 
 ## Setup (local development)
 
