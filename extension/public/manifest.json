@@ -16,5 +16,5 @@
     "default_title": "Save to Purl"
   },
   "permissions": ["activeTab", "scripting"],
-  "host_permissions": ["https://purl.so/*", "http://localhost:3000/*"]
+  "host_permissions": ["https://purl.nublson.com/*"]
 }

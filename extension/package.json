@@ -7,6 +7,7 @@
   },
   "devDependencies": {
     "@types/chrome": "^0.0.321",
+    "@types/node": "^25.9.1",
     "typescript": "^5",
     "vite": "^6"
   }
