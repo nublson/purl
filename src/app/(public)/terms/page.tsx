@@ -146,8 +146,8 @@ export default function TermsPage() {
 
       <Section title="Governing law">
         <Typography size="small">
-          These terms are governed by the laws of Brazil. Any disputes will be
-          resolved in the courts of Brazil.
+          These terms are governed by the laws of Portugal. Any disputes will be
+          resolved in the courts of Portugal.
         </Typography>
       </Section>
 
