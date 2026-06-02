@@ -1,3 +1,4 @@
+import { CopySection } from "@/components/copy-section";
 import { Typography } from "@/components/typography";
 
 export default function TermsPage() {
@@ -10,23 +11,23 @@ export default function TermsPage() {
         <Typography size="small">Last updated: June 2, 2025</Typography>
       </header>
 
-      <Section title="Acceptance">
+      <CopySection title="Acceptance">
         <Typography size="small">
           By creating an account or using Purl, you agree to these Terms of
           Service. If you do not agree, do not use Purl.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="The service">
+      <CopySection title="The service">
         <Typography size="small">
           Purl is a personal knowledge base that lets you save URLs, extract
           their content, and ask AI-powered questions over what you&apos;ve
           saved. We reserve the right to modify or discontinue the service at
           any time with reasonable notice.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Your account">
+      <CopySection title="Your account">
         <ul className="list-disc pl-5 flex flex-col gap-1">
           <li>
             <Typography size="small" component="span">
@@ -46,9 +47,9 @@ export default function TermsPage() {
             </Typography>
           </li>
         </ul>
-      </Section>
+      </CopySection>
 
-      <Section title="Acceptable use">
+      <CopySection title="Acceptable use">
         <Typography size="small">You agree not to:</Typography>
         <ul className="list-disc pl-5 flex flex-col gap-1">
           <li>
@@ -75,9 +76,9 @@ export default function TermsPage() {
             </Typography>
           </li>
         </ul>
-      </Section>
+      </CopySection>
 
-      <Section title="Plans and billing">
+      <CopySection title="Plans and billing">
         <Typography size="small">
           Purl offers three plans: Free ($0), Pro ($39 one-time payment), and
           BYOK (Bring Your Own Key, free). New accounts receive a 7-day Pro
@@ -90,51 +91,51 @@ export default function TermsPage() {
           the right to change pricing with 30 days&apos; notice to existing
           users.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Your content">
+      <CopySection title="Your content">
         <Typography size="small">
           You retain ownership of the content you save to Purl. By using the
           service, you grant us a limited license to store, process, and
           transmit your content solely to provide the service to you. We do not
           claim any rights to your content beyond this.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="AI-generated output">
+      <CopySection title="AI-generated output">
         <Typography size="small">
           Purl uses AI to summarize and answer questions about your saved
           content. AI output may be inaccurate or incomplete. You are
           responsible for verifying any information before relying on it.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Intellectual property">
+      <CopySection title="Intellectual property">
         <Typography size="small">
           The Purl name, logo, and application code are owned by us and
           protected by copyright. Nothing in these terms grants you a license to
           use our trademarks or branding.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Disclaimers">
+      <CopySection title="Disclaimers">
         <Typography size="small">
           Purl is provided &quot;as is&quot; without warranties of any kind. We
           do not guarantee uninterrupted availability or that the service will
           be error-free.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Limitation of liability">
+      <CopySection title="Limitation of liability">
         <Typography size="small">
           To the maximum extent permitted by law, Purl&apos;s liability for any
           claim related to the service is limited to the amount you paid us in
           the 12 months prior to the claim. We are not liable for indirect,
           incidental, or consequential damages.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Termination">
+      <CopySection title="Termination">
         <Typography size="small">
           You may delete your account at any time by contacting us. We may
           suspend or terminate accounts that violate these terms. Upon
@@ -144,16 +145,16 @@ export default function TermsPage() {
           </a>
           .
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Governing law">
+      <CopySection title="Governing law">
         <Typography size="small">
           These terms are governed by the laws of Portugal. Any disputes will be
           resolved in the courts of Portugal.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Contact">
+      <CopySection title="Contact">
         <Typography size="small">
           Questions about these terms? Email us at{" "}
           <a
@@ -164,24 +165,7 @@ export default function TermsPage() {
           </a>
           .
         </Typography>
-      </Section>
+      </CopySection>
     </article>
-  );
-}
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="flex flex-col gap-3">
-      <Typography variant="h4" component="h2">
-        {title}
-      </Typography>
-      <div className="flex flex-col gap-2">{children}</div>
-    </section>
   );
 }

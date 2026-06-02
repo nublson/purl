@@ -1,3 +1,4 @@
+import { CopySection } from "@/components/copy-section";
 import { Typography } from "@/components/typography";
 
 export default function PrivacyPage() {
@@ -10,16 +11,16 @@ export default function PrivacyPage() {
         <Typography size="small">Last updated: June 2, 2025</Typography>
       </header>
 
-      <Section title="Overview">
+      <CopySection title="Overview">
         <Typography size="small">
           Purl (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is a
           personal knowledge base that lets you save and query content from the
           web. This policy explains what data we collect, how we use it, and
           your rights.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Information we collect">
+      <CopySection title="Information we collect">
         <ul className="list-disc pl-5 flex flex-col gap-1">
           <li>
             <Typography size="small" component="span">
@@ -49,9 +50,9 @@ export default function PrivacyPage() {
             </Typography>
           </li>
         </ul>
-      </Section>
+      </CopySection>
 
-      <Section title="How we use your data">
+      <CopySection title="How we use your data">
         <ul className="list-disc pl-5 flex flex-col gap-1">
           <li>
             <Typography size="small" component="span">
@@ -79,9 +80,9 @@ export default function PrivacyPage() {
           We do not sell your data, use it for advertising, or share it with
           third parties outside of the service providers listed below.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Third-party service providers">
+      <CopySection title="Third-party service providers">
         <Typography size="small">
           We use the following sub-processors to operate Purl:
         </Typography>
@@ -103,9 +104,9 @@ export default function PrivacyPage() {
             </li>
           ))}
         </ul>
-      </Section>
+      </CopySection>
 
-      <Section title="Chrome extension">
+      <CopySection title="Chrome extension">
         <Typography size="small">
           The Purl browser extension reads only the URL of the active tab when
           you click the toolbar icon. It does not track browsing history, read
@@ -115,9 +116,9 @@ export default function PrivacyPage() {
           </code>{" "}
           solely to save the link to your account.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Data retention">
+      <CopySection title="Data retention">
         <Typography size="small">
           Your data is retained as long as your account is active. You can
           delete individual saved links at any time. To delete your account and
@@ -130,32 +131,32 @@ export default function PrivacyPage() {
           </a>
           .
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Security">
+      <CopySection title="Security">
         <Typography size="small">
           Passwords are hashed and never stored in plain text. All data is
           transmitted over HTTPS. We follow industry-standard practices to
           protect your information.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Children">
+      <CopySection title="Children">
         <Typography size="small">
           Purl is not directed at children under 13. We do not knowingly collect
           data from children.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Changes to this policy">
+      <CopySection title="Changes to this policy">
         <Typography size="small">
           We may update this policy from time to time. When we do, we&apos;ll
           update the date at the top. Continued use of Purl after changes
           constitutes acceptance of the revised policy.
         </Typography>
-      </Section>
+      </CopySection>
 
-      <Section title="Contact">
+      <CopySection title="Contact">
         <Typography size="small">
           Questions? Reach us at{" "}
           <a
@@ -166,24 +167,7 @@ export default function PrivacyPage() {
           </a>
           .
         </Typography>
-      </Section>
+      </CopySection>
     </article>
-  );
-}
-
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="flex flex-col gap-3">
-      <Typography variant="h4" component="h2">
-        {title}
-      </Typography>
-      <div className="flex flex-col gap-2">{children}</div>
-    </section>
   );
 }
