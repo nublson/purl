@@ -37,9 +37,15 @@ export function SettingsIntegrations() {
 
   React.useEffect(() => {
     fetch("/api/v1/keys")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
       .then((data: ApiKeyItem[]) => setKeys(Array.isArray(data) ? data : []))
-      .catch(() => setKeys([]))
+      .catch(() => {
+        toast.error("Failed to load API keys");
+        setKeys([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -52,11 +58,11 @@ export function SettingsIntegrations() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name }),
       });
-      const data = (await res.json()) as CreatedApiKey;
       if (!res.ok) {
         toast.error("Failed to create API key");
         return;
       }
+      const data = (await res.json()) as CreatedApiKey;
       setKeys((prev) => [data, ...prev]);
       setNewlyCreatedKey(data.key);
       setShowCreateForm(false);
