@@ -34,11 +34,16 @@ export async function proxy(request: NextRequest) {
     return rateLimited;
   }
 
+  // API v1 routes authenticate at the route handler level — bypass session redirect
+  const currentPath = request.nextUrl.pathname;
+  if (currentPath.startsWith("/api/v1/")) {
+    return NextResponse.next();
+  }
+
   const session = await auth.api.getSession({
     headers: request.headers,
   });
 
-  const currentPath = request.nextUrl.pathname;
   const publicRoute = isPublicRoute(currentPath);
 
   if (publicRoute && !session) {
