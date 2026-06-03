@@ -76,7 +76,7 @@ export function SettingsIntegrations() {
         return;
       }
       setKeys((prev) => prev.filter((k) => k.id !== id));
-      if (newlyCreatedKey) setNewlyCreatedKey(null);
+      setNewlyCreatedKey(null);
       toast.success("API key revoked");
     } catch {
       toast.error("Failed to revoke key");
@@ -141,6 +141,7 @@ export function SettingsIntegrations() {
               value={newlyCreatedKey}
               className="flex-1 font-mono text-xs"
               onFocus={(e) => e.target.select()}
+              aria-label="New API key"
             />
             <Button
               variant="secondary"
@@ -172,7 +173,7 @@ export function SettingsIntegrations() {
             <ApiKeyRow
               key={apiKey.id}
               apiKey={apiKey}
-              onRevoke={() => void handleRevoke(apiKey.id)}
+              onRevoke={() => handleRevoke(apiKey.id)}
             />
           ))}
         </div>
@@ -186,7 +187,7 @@ function ApiKeyRow({
   onRevoke,
 }: {
   apiKey: ApiKeyItem;
-  onRevoke: () => void;
+  onRevoke: () => Promise<void>;
 }) {
   const [alertOpen, setAlertOpen] = React.useState(false);
   const [revoking, setRevoking] = React.useState(false);
