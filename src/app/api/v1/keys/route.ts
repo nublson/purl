@@ -31,6 +31,8 @@ export async function GET(_request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // listApiKeys scopes results to the session user automatically via the session
+  // cookie in headers — the plugin enforces ownership; no extra userId filter needed.
   const result = await auth.api.listApiKeys({
     headers: await headers(),
   });

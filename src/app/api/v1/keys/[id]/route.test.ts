@@ -54,4 +54,18 @@ describe("DELETE /api/v1/keys/[id]", () => {
     const res = await DELETE(req, { params });
     expect(res.status).toBe(404);
   });
+
+  it("returns 404 when authenticated user tries to delete another user's key", async () => {
+    // Ownership is enforced by the Better Auth apiKey plugin — it returns
+    // { success: false } when the session user doesn't own the key.
+    mockGetSession.mockResolvedValue({ user: { id: "u2" } });
+    mockDeleteApiKey.mockResolvedValue({ success: false });
+    const { DELETE } = await import("./route");
+    const otherUsersKeyParams = Promise.resolve({ id: "k-owned-by-u1" });
+    const req = new NextRequest("http://localhost/api/v1/keys/k-owned-by-u1", {
+      method: "DELETE",
+    });
+    const res = await DELETE(req, { params: otherUsersKeyParams });
+    expect(res.status).toBe(404);
+  });
 });

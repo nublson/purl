@@ -13,6 +13,8 @@ export async function DELETE(
 
   const { id } = await context.params;
 
+  // deleteApiKey enforces ownership via the session in headers — the plugin
+  // returns { success: false } if the key doesn't belong to the session user.
   const result = await auth.api.deleteApiKey({
     body: { keyId: id },
     headers: await headers(),

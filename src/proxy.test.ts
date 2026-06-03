@@ -130,7 +130,7 @@ describe("proxy", () => {
         method: "GET",
       });
       const response = await proxy(request);
-      expect(response.status).not.toBe(307);
+      expect(response.status).toBe(200);
     });
 
     it("passes through /api/v1/links without a session", async () => {
@@ -139,7 +139,7 @@ describe("proxy", () => {
         method: "GET",
       });
       const response = await proxy(request);
-      expect(response.status).not.toBe(307);
+      expect(response.status).toBe(200);
     });
 
     it("passes through /api/v1/links with a valid session", async () => {
@@ -151,7 +151,7 @@ describe("proxy", () => {
         method: "GET",
       });
       const response = await proxy(request);
-      expect(response.status).not.toBe(307);
+      expect(response.status).toBe(200);
     });
   });
 });
