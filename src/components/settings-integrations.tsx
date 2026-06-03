@@ -33,7 +33,9 @@ export function SettingsIntegrations() {
   const [showCreateForm, setShowCreateForm] = React.useState(false);
   const [nameInput, setNameInput] = React.useState("");
   const [creating, setCreating] = React.useState(false);
-  const [newlyCreatedKey, setNewlyCreatedKey] = React.useState<string | null>(null);
+  const [newlyCreatedKey, setNewlyCreatedKey] = React.useState<string | null>(
+    null,
+  );
 
   React.useEffect(() => {
     fetch("/api/v1/keys")
@@ -138,7 +140,10 @@ export function SettingsIntegrations() {
 
       {newlyCreatedKey && (
         <div className="flex flex-col gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
-          <Typography size="small" className="font-medium text-amber-600 dark:text-amber-400">
+          <Typography
+            size="small"
+            className="font-medium text-amber-600 dark:text-amber-400"
+          >
             Copy your key now — it won&apos;t be shown again.
           </Typography>
           <div className="flex gap-2 items-center">
@@ -224,7 +229,10 @@ function ApiKeyRow({
           {apiKey.start ?? "purl_…"} · Created {createdDate}
         </Typography>
       </div>
-      <AlertDialog open={alertOpen} onOpenChange={(v) => !revoking && setAlertOpen(v)}>
+      <AlertDialog
+        open={alertOpen}
+        onOpenChange={(v) => !revoking && setAlertOpen(v)}
+      >
         <AlertDialogTrigger asChild>
           <Button
             variant="secondary"
