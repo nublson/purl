@@ -1,10 +1,27 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { apiKey } from "@better-auth/api-key";
 import prisma from "@/lib/prisma";
 import { getResend } from "@/lib/resend";
 import { createTrialSubscription } from "@/lib/subscription-utils";
 
 export const auth = betterAuth({
+  plugins: [
+    apiKey({
+      enableSessionForAPIKeys: true,
+      defaultPrefix: "purl_",
+      customAPIKeyGetter: (ctx) => {
+        // Extract token from "Authorization: Bearer purl_..." header
+        const authHeader =
+          (ctx as any).request?.headers?.get?.("authorization") ??
+          (ctx as any).headers?.get?.("authorization") ??
+          null;
+        if (typeof authHeader !== "string") return null;
+        if (!authHeader.startsWith("Bearer ")) return null;
+        return authHeader.slice(7);
+      },
+    }),
+  ],
   databaseHooks: {
     user: {
       create: {
