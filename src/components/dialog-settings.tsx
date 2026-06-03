@@ -3,6 +3,7 @@
 import * as React from "react";
 import { DialogWrapper } from "./dialog-wrapper";
 import { SettingsAccount } from "./settings-account";
+import { SettingsIntegrations } from "./settings-integrations";
 import { SettingsTabs } from "./settings-tabs";
 import { SettingsUsage } from "./settings-usage";
 import { Badge } from "./ui/badge";
@@ -64,6 +65,11 @@ function SettingsContent({
           label: "Account",
           value: "account",
           content: <SettingsAccount closeDialog={closeDialog} />,
+        },
+        {
+          label: "Integrations",
+          value: "integrations",
+          content: <SettingsIntegrations />,
         },
       ]}
     />
