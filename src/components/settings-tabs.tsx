@@ -25,7 +25,12 @@ export function SettingsTabs({ tabs }: SettingsTabsProps) {
       </TabsList>
       <Separator />
       {tabs.map((tab) => (
-        <TabsContent key={tab.value} value={tab.value} className="p-6 pb-0">
+        <TabsContent
+          key={tab.value}
+          value={tab.value}
+          className="p-6 pb-0 data-[state=inactive]:hidden"
+          forceMount
+        >
           {tab.content}
         </TabsContent>
       ))}
