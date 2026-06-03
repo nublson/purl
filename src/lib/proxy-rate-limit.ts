@@ -48,7 +48,7 @@ export async function rateLimitApiRequest(
   if (pathname.startsWith("/api/v1/")) {
     const authHeader = request.headers.get("authorization");
     let rateLimitKey: string;
-    if (typeof authHeader === "string" && authHeader.startsWith("Bearer ") && authHeader.length > 7) {
+    if (authHeader?.startsWith("Bearer ") && authHeader.length > 7) {
       rateLimitKey = authHeader.slice(7);
     } else {
       rateLimitKey = ip;
