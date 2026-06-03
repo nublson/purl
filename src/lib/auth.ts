@@ -17,7 +17,7 @@ export const auth = betterAuth({
           (ctx as any).headers?.get?.("authorization") ??
           null;
         if (typeof authHeader !== "string") return null;
-        if (!authHeader.startsWith("Bearer ")) return null;
+        if (!authHeader.startsWith("Bearer ") || authHeader.length <= 7) return null;
         return authHeader.slice(7);
       },
     }),

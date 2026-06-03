@@ -12,3 +12,33 @@ describe("auth config", () => {
     expect(pluginIds).toContain("api-key");
   });
 });
+
+describe("Bearer token extraction logic", () => {
+  // Mirror of the customAPIKeyGetter logic from auth.ts
+  function extractBearer(authHeader: string | null): string | null {
+    if (typeof authHeader !== "string") return null;
+    if (!authHeader.startsWith("Bearer ") || authHeader.length <= 7) return null;
+    return authHeader.slice(7);
+  }
+
+  it("extracts token from valid Bearer header", () => {
+    expect(extractBearer("Bearer purl_abc123")).toBe("purl_abc123");
+  });
+
+  it("returns null for missing header", () => {
+    expect(extractBearer(null)).toBeNull();
+  });
+
+  it("returns null for non-Bearer scheme", () => {
+    expect(extractBearer("Basic abc123")).toBeNull();
+  });
+
+  it("returns null for bare Bearer with no token", () => {
+    expect(extractBearer("Bearer ")).toBeNull();
+    expect(extractBearer("Bearer")).toBeNull();
+  });
+
+  it("returns null for empty string", () => {
+    expect(extractBearer("")).toBeNull();
+  });
+});
