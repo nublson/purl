@@ -331,7 +331,7 @@ describe("rateLimitApiRequest", () => {
         headers: { authorization: "Bearer purl_abc123" },
       });
       await rateLimitApiRequest(request);
-      expect(mockGetSession).toHaveBeenCalled();
+      expect(mockGetSession).toHaveBeenCalledWith({ headers: expect.any(Headers) });
       expect(limitMock).toHaveBeenCalledWith("user-abc");
     });
 

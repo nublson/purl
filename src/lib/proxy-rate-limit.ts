@@ -52,7 +52,7 @@ export async function rateLimitApiRequest(
 
     if (authHeader?.startsWith("Bearer ") && authHeader.length > 7) {
       // Resolve Bearer token to userId so all keys from the same user share one bucket.
-      // enableSessionForAPIKeys: true makes getSession understand Bearer tokens.
+      // API key session resolution is enabled globally in src/lib/auth.ts.
       const session = await auth.api.getSession({ headers: request.headers });
       rateLimitKey = session?.user?.id ?? authHeader.slice(7);
     } else {
