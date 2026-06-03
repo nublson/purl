@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -31,11 +32,11 @@ export async function GET(_request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // listApiKeys scopes results to the session user automatically via the session
-  // cookie in headers — the plugin enforces ownership; no extra userId filter needed.
-  const result = await auth.api.listApiKeys({
-    headers: await headers(),
+  const keys = await prisma.apikey.findMany({
+    where: { referenceId: session.user.id },
+    select: { id: true, name: true, start: true, createdAt: true },
+    orderBy: { createdAt: "desc" },
   });
 
-  return NextResponse.json(result);
+  return NextResponse.json(keys);
 }
