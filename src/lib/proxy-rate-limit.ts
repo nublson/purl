@@ -1,3 +1,4 @@
+import { auth } from "@/lib/auth";
 import {
   getAuthRateLimiter,
   getChatPostRateLimiter,
@@ -48,8 +49,12 @@ export async function rateLimitApiRequest(
   if (pathname.startsWith("/api/v1/")) {
     const authHeader = request.headers.get("authorization");
     let rateLimitKey: string;
+
     if (authHeader?.startsWith("Bearer ") && authHeader.length > 7) {
-      rateLimitKey = authHeader.slice(7);
+      // Resolve Bearer token to userId so all keys from the same user share one bucket.
+      // enableSessionForAPIKeys: true makes getSession understand Bearer tokens.
+      const session = await auth.api.getSession({ headers: request.headers });
+      rateLimitKey = session?.user?.id ?? authHeader.slice(7);
     } else {
       rateLimitKey = ip;
     }

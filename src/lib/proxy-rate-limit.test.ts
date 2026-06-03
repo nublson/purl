@@ -3,6 +3,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const limitMock = vi.fn();
 
+const mockGetSession = vi.fn();
+
+vi.mock("@/lib/auth", () => ({
+  auth: {
+    api: {
+      getSession: mockGetSession,
+    },
+  },
+}));
+
 vi.mock("@/lib/upstash-rate-limit", () => ({
   getAuthRateLimiter: vi.fn(),
   getChatPostRateLimiter: vi.fn(),
@@ -265,6 +275,7 @@ describe("rateLimitApiRequest", () => {
       limitMock.mockReset();
       vi.mocked(getV1RateLimiter).mockReset();
       vi.mocked(getV1PostRateLimiter).mockReset();
+      mockGetSession.mockReset();
     });
 
     it("uses getV1RateLimiter for GET /api/v1/links and returns 429 when exceeded", async () => {
@@ -311,9 +322,23 @@ describe("rateLimitApiRequest", () => {
       expect(result).toBeNull();
     });
 
-    it("uses Bearer token as rate limit key when Authorization header is present", async () => {
+    it("uses userId from resolved session as rate limit key", async () => {
       vi.mocked(getV1RateLimiter).mockReturnValue(mockLimiter() as never);
       limitMock.mockResolvedValue({ success: true, reset: 0 });
+      mockGetSession.mockResolvedValue({ user: { id: "user-abc" } });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+        headers: { authorization: "Bearer purl_abc123" },
+      });
+      await rateLimitApiRequest(request);
+      expect(mockGetSession).toHaveBeenCalled();
+      expect(limitMock).toHaveBeenCalledWith("user-abc");
+    });
+
+    it("falls back to Bearer token when session resolution returns null", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      mockGetSession.mockResolvedValue(null);
       const request = new NextRequest("http://localhost/api/v1/links", {
         method: "GET",
         headers: { authorization: "Bearer purl_abc123" },
@@ -330,6 +355,7 @@ describe("rateLimitApiRequest", () => {
         headers: { "x-forwarded-for": "5.5.5.5" },
       });
       await rateLimitApiRequest(request);
+      expect(mockGetSession).not.toHaveBeenCalled();
       expect(limitMock).toHaveBeenCalledWith("5.5.5.5");
     });
 
@@ -344,6 +370,7 @@ describe("rateLimitApiRequest", () => {
         },
       });
       await rateLimitApiRequest(request);
+      expect(mockGetSession).not.toHaveBeenCalled();
       expect(limitMock).toHaveBeenCalledWith("7.7.7.7");
     });
 
