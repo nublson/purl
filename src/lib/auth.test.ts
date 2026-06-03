@@ -6,8 +6,9 @@ vi.mock("server-only", () => ({}));
 describe("auth config", () => {
   it("includes the apiKey plugin", async () => {
     const { auth } = await import("@/lib/auth");
-    const pluginIds = (auth as any).options?.plugins?.map(
-      (p: any) => p.id ?? p.name
+    type AuthLike = { options?: { plugins?: Array<{ id?: string; name?: string }> } };
+    const pluginIds = (auth as unknown as AuthLike).options?.plugins?.map(
+      (p) => p.id ?? p.name
     ) ?? [];
     expect(pluginIds).toContain("api-key");
   });

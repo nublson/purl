@@ -12,9 +12,15 @@ export const auth = betterAuth({
       defaultPrefix: "purl_",
       customAPIKeyGetter: (ctx) => {
         // Extract token from "Authorization: Bearer purl_..." header
+        // GenericEndpointContext is a Better Auth internal type — cast via unknown
+        type CtxLike = {
+          request?: { headers?: { get?: (k: string) => string | null } };
+          headers?: { get?: (k: string) => string | null };
+        };
+        const c = ctx as unknown as CtxLike;
         const authHeader =
-          (ctx as any).request?.headers?.get?.("authorization") ??
-          (ctx as any).headers?.get?.("authorization") ??
+          c.request?.headers?.get?.("authorization") ??
+          c.headers?.get?.("authorization") ??
           null;
         if (typeof authHeader !== "string") return null;
         if (!authHeader.startsWith("Bearer ") || authHeader.length <= 7) return null;
