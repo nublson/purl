@@ -10,6 +10,7 @@ vi.mock("@/lib/upstash-rate-limit", () => ({
   getLinksPostRateLimiter: vi.fn(),
   getUploadPostRateLimiter: vi.fn(),
   getV1RateLimiter: vi.fn().mockReturnValue({ limit: limitMock }),
+  getV1PostRateLimiter: vi.fn(),
 }));
 
 const {
@@ -19,6 +20,7 @@ const {
   getLinksPostRateLimiter,
   getUploadPostRateLimiter,
   getV1RateLimiter,
+  getV1PostRateLimiter,
 } = await import("@/lib/upstash-rate-limit");
 
 const { rateLimitApiRequest } = await import("./proxy-rate-limit");
@@ -259,21 +261,96 @@ describe("rateLimitApiRequest", () => {
   });
 
   describe("v1 api rate limiting", () => {
-    it("applies rate limit to GET /api/v1/links", async () => {
-      limitMock.mockResolvedValue({ success: false, reset: Date.now() + 60000 });
+    beforeEach(() => {
+      limitMock.mockReset();
+      vi.mocked(getV1RateLimiter).mockReset();
+      vi.mocked(getV1PostRateLimiter).mockReset();
+    });
+
+    it("uses getV1RateLimiter for GET /api/v1/links and returns 429 when exceeded", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: false, reset: Date.now() + 60_000 });
       const request = new NextRequest("http://localhost/api/v1/links", {
         method: "GET",
-        headers: { "x-forwarded-for": "1.2.3.4" },
       });
       const result = await rateLimitApiRequest(request);
       expect(result?.status).toBe(429);
+      expect(getV1RateLimiter).toHaveBeenCalled();
+      expect(getV1PostRateLimiter).not.toHaveBeenCalled();
     });
 
-    it("passes through GET /api/v1/links when under limit", async () => {
+    it("returns null for GET /api/v1/links when under the limit", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(mockLimiter() as never);
       limitMock.mockResolvedValue({ success: true, reset: 0 });
       const request = new NextRequest("http://localhost/api/v1/links", {
         method: "GET",
-        headers: { "x-forwarded-for": "1.2.3.4" },
+      });
+      const result = await rateLimitApiRequest(request);
+      expect(result).toBeNull();
+    });
+
+    it("uses getV1PostRateLimiter for POST /api/v1/links and returns 429 when exceeded", async () => {
+      vi.mocked(getV1PostRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: false, reset: Date.now() + 60_000 });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "POST",
+      });
+      const result = await rateLimitApiRequest(request);
+      expect(result?.status).toBe(429);
+      expect(getV1PostRateLimiter).toHaveBeenCalled();
+      expect(getV1RateLimiter).not.toHaveBeenCalled();
+    });
+
+    it("returns null for POST /api/v1/links when under the limit", async () => {
+      vi.mocked(getV1PostRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "POST",
+      });
+      const result = await rateLimitApiRequest(request);
+      expect(result).toBeNull();
+    });
+
+    it("uses Bearer token as rate limit key when Authorization header is present", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+        headers: { authorization: "Bearer purl_abc123" },
+      });
+      await rateLimitApiRequest(request);
+      expect(limitMock).toHaveBeenCalledWith("purl_abc123");
+    });
+
+    it("falls back to IP when no Authorization header is present", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+        headers: { "x-forwarded-for": "5.5.5.5" },
+      });
+      await rateLimitApiRequest(request);
+      expect(limitMock).toHaveBeenCalledWith("5.5.5.5");
+    });
+
+    it("falls back to IP when Authorization header is malformed", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+        headers: {
+          authorization: "Basic dXNlcjpwYXNz",
+          "x-forwarded-for": "7.7.7.7",
+        },
+      });
+      await rateLimitApiRequest(request);
+      expect(limitMock).toHaveBeenCalledWith("7.7.7.7");
+    });
+
+    it("returns null (no limiter configured) without error for GET /api/v1/links", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(null);
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
       });
       const result = await rateLimitApiRequest(request);
       expect(result).toBeNull();

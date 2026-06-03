@@ -4,6 +4,7 @@ import {
   getFeedbackPostRateLimiter,
   getLinksPostRateLimiter,
   getUploadPostRateLimiter,
+  getV1PostRateLimiter,
   getV1RateLimiter,
 } from "@/lib/upstash-rate-limit";
 import { type NextRequest, NextResponse } from "next/server";
@@ -45,9 +46,17 @@ export async function rateLimitApiRequest(
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/api/v1/")) {
-    const limiter = getV1RateLimiter();
+    const authHeader = request.headers.get("authorization");
+    let rateLimitKey: string;
+    if (typeof authHeader === "string" && authHeader.startsWith("Bearer ") && authHeader.length > 7) {
+      rateLimitKey = authHeader.slice(7);
+    } else {
+      rateLimitKey = ip;
+    }
+
+    const limiter = request.method === "POST" ? getV1PostRateLimiter() : getV1RateLimiter();
     if (limiter) {
-      const { success, reset } = await limiter.limit(ip);
+      const { success, reset } = await limiter.limit(rateLimitKey);
       if (!success) return tooManyRequests(reset);
     }
     return null;
