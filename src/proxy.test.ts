@@ -122,4 +122,36 @@ describe("proxy", () => {
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toContain("/home");
   });
+
+  describe("API v1 routes", () => {
+    it("passes through /api/v1/keys without a session", async () => {
+      vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+      const request = new NextRequest("http://localhost/api/v1/keys", {
+        method: "GET",
+      });
+      const response = await proxy(request);
+      expect(response.status).toBe(200);
+    });
+
+    it("passes through /api/v1/links without a session", async () => {
+      vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+      });
+      const response = await proxy(request);
+      expect(response.status).toBe(200);
+    });
+
+    it("passes through /api/v1/links with a valid session", async () => {
+      vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+        user: { id: "u1", emailVerified: true },
+        session: {},
+      } as never);
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+      });
+      const response = await proxy(request);
+      expect(response.status).toBe(200);
+    });
+  });
 });

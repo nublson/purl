@@ -1,10 +1,33 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
+import { apiKey } from "@better-auth/api-key";
 import prisma from "@/lib/prisma";
 import { getResend } from "@/lib/resend";
 import { createTrialSubscription } from "@/lib/subscription-utils";
 
 export const auth = betterAuth({
+  plugins: [
+    apiKey({
+      enableSessionForAPIKeys: true,
+      defaultPrefix: "purl_",
+      customAPIKeyGetter: (ctx) => {
+        // Extract token from "Authorization: Bearer purl_..." header
+        // GenericEndpointContext is a Better Auth internal type — cast via unknown
+        type CtxLike = {
+          request?: { headers?: { get?: (k: string) => string | null } };
+          headers?: { get?: (k: string) => string | null };
+        };
+        const c = ctx as unknown as CtxLike;
+        const authHeader =
+          c.request?.headers?.get?.("authorization") ??
+          c.headers?.get?.("authorization") ??
+          null;
+        if (typeof authHeader !== "string") return null;
+        if (!authHeader.startsWith("Bearer ") || authHeader.length <= 7) return null;
+        return authHeader.slice(7);
+      },
+    }),
+  ],
   databaseHooks: {
     user: {
       create: {

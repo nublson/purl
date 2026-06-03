@@ -3,12 +3,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const limitMock = vi.fn();
 
+const mockGetSession = vi.fn();
+
+vi.mock("@/lib/auth", () => ({
+  auth: {
+    api: {
+      getSession: mockGetSession,
+    },
+  },
+}));
+
 vi.mock("@/lib/upstash-rate-limit", () => ({
   getAuthRateLimiter: vi.fn(),
   getChatPostRateLimiter: vi.fn(),
   getFeedbackPostRateLimiter: vi.fn(),
   getLinksPostRateLimiter: vi.fn(),
   getUploadPostRateLimiter: vi.fn(),
+  getV1RateLimiter: vi.fn().mockReturnValue({ limit: limitMock }),
+  getV1PostRateLimiter: vi.fn(),
 }));
 
 const {
@@ -17,6 +29,8 @@ const {
   getFeedbackPostRateLimiter,
   getLinksPostRateLimiter,
   getUploadPostRateLimiter,
+  getV1RateLimiter,
+  getV1PostRateLimiter,
 } = await import("@/lib/upstash-rate-limit");
 
 const { rateLimitApiRequest } = await import("./proxy-rate-limit");
@@ -253,6 +267,120 @@ describe("rateLimitApiRequest", () => {
       expect(result!.status).toBe(429);
       const retryAfter = Number(result!.headers.get("Retry-After"));
       expect(retryAfter).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("v1 api rate limiting", () => {
+    beforeEach(() => {
+      limitMock.mockReset();
+      vi.mocked(getV1RateLimiter).mockReset();
+      vi.mocked(getV1PostRateLimiter).mockReset();
+      mockGetSession.mockReset();
+    });
+
+    it("uses getV1RateLimiter for GET /api/v1/links and returns 429 when exceeded", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: false, reset: Date.now() + 60_000 });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+      });
+      const result = await rateLimitApiRequest(request);
+      expect(result?.status).toBe(429);
+      expect(getV1RateLimiter).toHaveBeenCalled();
+      expect(getV1PostRateLimiter).not.toHaveBeenCalled();
+    });
+
+    it("returns null for GET /api/v1/links when under the limit", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+      });
+      const result = await rateLimitApiRequest(request);
+      expect(result).toBeNull();
+    });
+
+    it("uses getV1PostRateLimiter for POST /api/v1/links and returns 429 when exceeded", async () => {
+      vi.mocked(getV1PostRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: false, reset: Date.now() + 60_000 });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "POST",
+      });
+      const result = await rateLimitApiRequest(request);
+      expect(result?.status).toBe(429);
+      expect(getV1PostRateLimiter).toHaveBeenCalled();
+      expect(getV1RateLimiter).not.toHaveBeenCalled();
+    });
+
+    it("returns null for POST /api/v1/links when under the limit", async () => {
+      vi.mocked(getV1PostRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "POST",
+      });
+      const result = await rateLimitApiRequest(request);
+      expect(result).toBeNull();
+    });
+
+    it("uses userId from resolved session as rate limit key", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      mockGetSession.mockResolvedValue({ user: { id: "user-abc" } });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+        headers: { authorization: "Bearer purl_abc123" },
+      });
+      await rateLimitApiRequest(request);
+      expect(mockGetSession).toHaveBeenCalledWith({ headers: expect.any(Headers) });
+      expect(limitMock).toHaveBeenCalledWith("user-abc");
+    });
+
+    it("falls back to Bearer token when session resolution returns null", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      mockGetSession.mockResolvedValue(null);
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+        headers: { authorization: "Bearer purl_abc123" },
+      });
+      await rateLimitApiRequest(request);
+      expect(limitMock).toHaveBeenCalledWith("purl_abc123");
+    });
+
+    it("falls back to IP when no Authorization header is present", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+        headers: { "x-forwarded-for": "5.5.5.5" },
+      });
+      await rateLimitApiRequest(request);
+      expect(mockGetSession).not.toHaveBeenCalled();
+      expect(limitMock).toHaveBeenCalledWith("5.5.5.5");
+    });
+
+    it("falls back to IP when Authorization header is malformed", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+        headers: {
+          authorization: "Basic dXNlcjpwYXNz",
+          "x-forwarded-for": "7.7.7.7",
+        },
+      });
+      await rateLimitApiRequest(request);
+      expect(mockGetSession).not.toHaveBeenCalled();
+      expect(limitMock).toHaveBeenCalledWith("7.7.7.7");
+    });
+
+    it("returns null (no limiter configured) without error for GET /api/v1/links", async () => {
+      vi.mocked(getV1RateLimiter).mockReturnValue(null);
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+      });
+      const result = await rateLimitApiRequest(request);
+      expect(result).toBeNull();
     });
   });
 });

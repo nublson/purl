@@ -1,9 +1,12 @@
+import { auth } from "@/lib/auth";
 import {
   getAuthRateLimiter,
   getChatPostRateLimiter,
   getFeedbackPostRateLimiter,
   getLinksPostRateLimiter,
   getUploadPostRateLimiter,
+  getV1PostRateLimiter,
+  getV1RateLimiter,
 } from "@/lib/upstash-rate-limit";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -42,6 +45,27 @@ export async function rateLimitApiRequest(
 ): Promise<NextResponse | null> {
   const ip = clientIp(request);
   const { pathname } = request.nextUrl;
+
+  if (pathname.startsWith("/api/v1/")) {
+    const authHeader = request.headers.get("authorization");
+    let rateLimitKey: string;
+
+    if (authHeader?.startsWith("Bearer ") && authHeader.length > 7) {
+      // Resolve Bearer token to userId so all keys from the same user share one bucket.
+      // API key session resolution is enabled globally in src/lib/auth.ts.
+      const session = await auth.api.getSession({ headers: request.headers });
+      rateLimitKey = session?.user?.id ?? authHeader.slice(7);
+    } else {
+      rateLimitKey = ip;
+    }
+
+    const limiter = request.method === "POST" ? getV1PostRateLimiter() : getV1RateLimiter();
+    if (limiter) {
+      const { success, reset } = await limiter.limit(rateLimitKey);
+      if (!success) return tooManyRequests(reset);
+    }
+    return null;
+  }
 
   if (pathname.startsWith("/api/auth")) {
     const limiter = getAuthRateLimiter();

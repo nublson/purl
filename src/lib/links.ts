@@ -96,6 +96,9 @@ const YOUTUBE_OEMBED_MAX_BYTES = 256 * 1024;
 /** Thrown when link helpers are called without an authenticated user. */
 export class UnauthorizedError extends Error {
   readonly name = "UnauthorizedError";
+  constructor() {
+    super("Unauthorized");
+  }
 }
 
 function formatFileSize(bytes: number | null): string | null {
@@ -575,4 +578,51 @@ export async function deleteLink(id: string): Promise<boolean> {
   if (!existing) return false;
   await prisma.link.delete({ where: { id } });
   return true;
+}
+
+export type ListLinksOptions = {
+  limit: number;
+  cursor: string | null;
+  contentType: string | null;
+};
+
+export type ListLinksResult = {
+  links: Awaited<ReturnType<typeof prisma.link.findMany>>;
+  nextCursor: string | null;
+};
+
+export async function listLinks(opts: ListLinksOptions): Promise<ListLinksResult> {
+  const userId = await getCurrentUserId();
+  const { limit, cursor, contentType } = opts;
+
+  type WhereInput = {
+    userId: string;
+    contentType?: ContentType;
+    createdAt?: { lt: Date };
+  };
+
+  const where: WhereInput = { userId };
+
+  if (contentType) {
+    where.contentType = contentType as ContentType;
+  }
+
+  if (cursor) {
+    const cursorDate = new Date(cursor);
+    if (!isNaN(cursorDate.getTime())) {
+      where.createdAt = { lt: cursorDate };
+    }
+  }
+
+  const rows = await prisma.link.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+    take: limit + 1,
+  });
+
+  const hasMore = rows.length > limit;
+  const links = hasMore ? rows.slice(0, limit) : rows;
+  const nextCursor = hasMore ? links[links.length - 1].createdAt.toISOString() : null;
+
+  return { links, nextCursor };
 }
