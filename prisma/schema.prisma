@@ -60,40 +60,40 @@ enum UsageKind {
 }
 
 model User {
-  id                         String        @id
-  name                       String
-  email                      String
-  emailVerified              Boolean
-  image                      String?
-  createdAt                  DateTime
-  updatedAt                  DateTime
-  anthropicApiKeyEncrypted   String?
-  sessions                   Session[]
-  accounts                   Account[]
-  links                      Link[]
-  chats                      Chat[]
-  subscription               Subscription?
+  id                       String        @id
+  name                     String
+  email                    String
+  emailVerified            Boolean
+  image                    String?
+  createdAt                DateTime
+  updatedAt                DateTime
+  anthropicApiKeyEncrypted String?
+  sessions                 Session[]
+  accounts                 Account[]
+  links                    Link[]
+  chats                    Chat[]
+  subscription             Subscription?
 
   @@unique([email])
   @@map("users")
 }
 
 model Subscription {
-  id                   String        @id @default(cuid())
-  userId               String        @unique
-  user                 User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  planKey              PlanKey       @default(FREE)
-  status               SubStatus     @default(ACTIVE)
-  stripeCustomerId     String?       @unique
-  stripeSubscriptionId String?       @unique
-  stripePriceId        String?
-  currentPeriodStart   DateTime?
-  currentPeriodEnd     DateTime?
-  cancelAtPeriodEnd    Boolean       @default(false)
-  trialEndsAt          DateTime?
+  id                    String    @id @default(cuid())
+  userId                String    @unique
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planKey               PlanKey   @default(FREE)
+  status                SubStatus @default(ACTIVE)
+  stripeCustomerId      String?   @unique
+  stripeSubscriptionId  String?   @unique
+  stripePriceId         String?
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  cancelAtPeriodEnd     Boolean   @default(false)
+  trialEndsAt           DateTime?
   trialEndingNotifiedAt DateTime?
-  compUntil            DateTime?
-  updatedAt            DateTime      @updatedAt
+  compUntil             DateTime?
+  updatedAt             DateTime  @updatedAt
 
   @@map("subscriptions")
 }
@@ -118,35 +118,35 @@ model ProcessedStripeEvent {
 }
 
 model Link {
-  id           String       @id @default(cuid())
-  url          String
-  title        String
-  favicon      String
-  domain       String
-  contentType  ContentType  @default(WEB)
-  description  String?
-  thumbnail    String?
-  storagePath  String?
-  createdAt    DateTime     @default(now())
-  ingestStatus IngestStatus @default(PENDING)
+  id                  String               @id @default(cuid())
+  url                 String
+  title               String
+  favicon             String
+  domain              String
+  contentType         ContentType          @default(WEB)
+  description         String?
+  thumbnail           String?
+  storagePath         String?
+  createdAt           DateTime             @default(now())
+  ingestStatus        IngestStatus         @default(PENDING)
   ingestFailureReason IngestFailureReason?
-  userId       String
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  contents     LinkContent[]
-  chatMessages ChatMessage[]
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contents            LinkContent[]
+  chatMessages        ChatMessage[]
 
   @@index([userId, createdAt])
   @@map("links")
 }
 
 model LinkContent {
-  id         String   @id @default(cuid())
+  id         String                       @id @default(cuid())
   linkId     String
-  link       Link     @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  link       Link                         @relation(fields: [linkId], references: [id], onDelete: Cascade)
   content    String
   embedding  Unsupported("vector(1536)")?
   chunkIndex Int
-  createdAt  DateTime @default(now())
+  createdAt  DateTime                     @default(now())
 
   @@map("link_contents")
 }
@@ -190,6 +190,7 @@ model Session {
 
   @@unique([token])
   @@map("sessions")
+  @@index([userId])
 }
 
 model Account {
@@ -209,6 +210,7 @@ model Account {
   updatedAt             DateTime
 
   @@map("accounts")
+  @@index([userId])
 }
 
 model Verification {
@@ -220,4 +222,35 @@ model Verification {
   updatedAt  DateTime?
 
   @@map("verifications")
+  @@index([identifier])
+}
+
+model Apikey {
+  id                  String    @id
+  configId            String    @default("default")
+  name                String?
+  start               String?
+  referenceId         String
+  prefix              String?
+  key                 String
+  refillInterval      Int?
+  refillAmount        Int?
+  lastRefillAt        DateTime?
+  enabled             Boolean?  @default(true)
+  rateLimitEnabled    Boolean?  @default(true)
+  rateLimitTimeWindow Int?      @default(86400000)
+  rateLimitMax        Int?      @default(10)
+  requestCount        Int?      @default(0)
+  remaining           Int?
+  lastRequest         DateTime?
+  expiresAt           DateTime?
+  createdAt           DateTime
+  updatedAt           DateTime
+  permissions         String?
+  metadata            String?
+
+  @@index([configId])
+  @@index([referenceId])
+  @@index([key])
+  @@map("apikey")
 }
