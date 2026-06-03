@@ -8,14 +8,21 @@ vi.mock("next/headers", () => ({
 
 const mockGetSession = vi.fn();
 const mockCreateApiKey = vi.fn();
-const mockListApiKeys = vi.fn();
+const mockFindMany = vi.fn();
 
 vi.mock("@/lib/auth", () => ({
   auth: {
     api: {
       getSession: mockGetSession,
       createApiKey: mockCreateApiKey,
-      listApiKeys: mockListApiKeys,
+    },
+  },
+}));
+
+vi.mock("@/lib/prisma", () => ({
+  default: {
+    apikey: {
+      findMany: mockFindMany,
     },
   },
 }));
@@ -81,15 +88,15 @@ describe("GET /api/v1/keys", () => {
 
   it("returns list of keys", async () => {
     mockGetSession.mockResolvedValue({ user: { id: "u1" } });
-    mockListApiKeys.mockResolvedValue({
-      apiKeys: [{ id: "k1", name: "my key", start: "purl_ab" }],
-      total: 1,
-    });
+    mockFindMany.mockResolvedValue([
+      { id: "k1", name: "my key", start: "purl_ab", createdAt: new Date() },
+    ]);
     const { GET } = await import("./route");
     const req = new NextRequest("http://localhost/api/v1/keys");
     const res = await GET(req);
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.apiKeys).toHaveLength(1);
+    expect(body).toHaveLength(1);
+    expect(body[0].id).toBe("k1");
   });
 });
