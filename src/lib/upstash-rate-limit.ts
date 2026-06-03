@@ -44,12 +44,14 @@ const uploadPostLimiter = () => makeLimiter("upload_post", 20, "1 m");
 const feedbackPostLimiter = () => makeLimiter("feedback_post", 10, "1 m");
 
 const v1Limiter = () => makeLimiter("v1", 120, "1 m");
+const v1PostLimiter = () => makeLimiter("v1_post", 60, "1 m");
 
 let cachedAuth: Ratelimit | null | undefined;
 let cachedChat: Ratelimit | null | undefined;
 let cachedLinksPost: Ratelimit | null | undefined;
 let cachedUploadPost: Ratelimit | null | undefined;
 let cachedV1: Ratelimit | null | undefined;
+let cachedV1Post: Ratelimit | null | undefined;
 let cachedFeedbackPost: Ratelimit | null | undefined;
 
 export function getAuthRateLimiter(): Ratelimit | null {
@@ -75,6 +77,11 @@ export function getUploadPostRateLimiter(): Ratelimit | null {
 export function getV1RateLimiter(): Ratelimit | null {
   if (cachedV1 === undefined) cachedV1 = v1Limiter();
   return cachedV1;
+}
+
+export function getV1PostRateLimiter(): Ratelimit | null {
+  if (cachedV1Post === undefined) cachedV1Post = v1PostLimiter();
+  return cachedV1Post;
 }
 
 export function getFeedbackPostRateLimiter(): Ratelimit | null {
