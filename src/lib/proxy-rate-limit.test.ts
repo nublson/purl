@@ -9,6 +9,7 @@ vi.mock("@/lib/upstash-rate-limit", () => ({
   getFeedbackPostRateLimiter: vi.fn(),
   getLinksPostRateLimiter: vi.fn(),
   getUploadPostRateLimiter: vi.fn(),
+  getV1RateLimiter: vi.fn().mockReturnValue({ limit: limitMock }),
 }));
 
 const {
@@ -17,6 +18,7 @@ const {
   getFeedbackPostRateLimiter,
   getLinksPostRateLimiter,
   getUploadPostRateLimiter,
+  getV1RateLimiter,
 } = await import("@/lib/upstash-rate-limit");
 
 const { rateLimitApiRequest } = await import("./proxy-rate-limit");
@@ -253,6 +255,28 @@ describe("rateLimitApiRequest", () => {
       expect(result!.status).toBe(429);
       const retryAfter = Number(result!.headers.get("Retry-After"));
       expect(retryAfter).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("v1 api rate limiting", () => {
+    it("applies rate limit to GET /api/v1/links", async () => {
+      limitMock.mockResolvedValue({ success: false, reset: Date.now() + 60000 });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+        headers: { "x-forwarded-for": "1.2.3.4" },
+      });
+      const result = await rateLimitApiRequest(request);
+      expect(result?.status).toBe(429);
+    });
+
+    it("passes through GET /api/v1/links when under limit", async () => {
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      const request = new NextRequest("http://localhost/api/v1/links", {
+        method: "GET",
+        headers: { "x-forwarded-for": "1.2.3.4" },
+      });
+      const result = await rateLimitApiRequest(request);
+      expect(result).toBeNull();
     });
   });
 });
