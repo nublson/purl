@@ -6,7 +6,10 @@ import {
   parseChatErrorBody,
 } from "@/lib/chat-http-errors";
 import {
+  clearChatSnapshot,
+  clearDraft,
   clearLastChatId,
+  DRAFT_NEW_CHAT_KEY,
   getLastChatId,
   setLastChatId,
 } from "@/lib/chat-storage";
@@ -36,6 +39,9 @@ interface ChatContextValue {
   pendingSummarize: Link | null;
   triggerSummarize: (link: Link) => void;
   clearPendingSummarize: () => void;
+  pendingMessage: { text: string; mentions: Link[] } | null;
+  triggerSend: (text: string, mentions?: Link[]) => void;
+  clearPendingMessage: () => void;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -48,6 +54,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [mentions, setMentions] = useState<Link[]>([]);
   const [isWidgetOpen, setIsWidgetOpen] = useState(false);
   const [pendingSummarize, setPendingSummarize] = useState<Link | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<{
+    text: string;
+    mentions: Link[];
+  } | null>(null);
 
   const setChatId = useCallback((id: string | null) => {
     setChatIdState(id);
@@ -133,6 +143,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setPendingSummarize(null);
   }, []);
 
+  const triggerSend = useCallback((text: string, mentionLinks?: Link[]) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    clearDraft(DRAFT_NEW_CHAT_KEY);
+    clearChatSnapshot(DRAFT_NEW_CHAT_KEY);
+    setPendingMessage({
+      text: trimmed,
+      mentions: mentionLinks ?? [],
+    });
+  }, []);
+
+  const clearPendingMessage = useCallback(() => {
+    setPendingMessage(null);
+  }, []);
+
   return (
     <ChatContext
       value={{
@@ -151,6 +176,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         pendingSummarize,
         triggerSummarize,
         clearPendingSummarize,
+        pendingMessage,
+        triggerSend,
+        clearPendingMessage,
       }}
     >
       {children}
