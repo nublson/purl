@@ -122,6 +122,29 @@ export async function deleteChat(chatId: string): Promise<boolean> {
   return true;
 }
 
+export async function updateChatTitle(
+  chatId: string,
+  title: string,
+): Promise<{ id: string; title: string | null } | null> {
+  const userId = await getCurrentUserId();
+  const trimmed = title.trim().slice(0, 80);
+  if (!trimmed) return null;
+
+  const existing = await prisma.chat.findFirst({
+    where: { id: chatId, userId },
+    select: { id: true },
+  });
+  if (!existing) return null;
+
+  const updated = await prisma.chat.update({
+    where: { id: chatId },
+    data: { title: trimmed, updatedAt: new Date() },
+    select: { id: true, title: true },
+  });
+
+  return updated;
+}
+
 /**
  * Keeps only link IDs owned by the user, in first-seen input order (deduped).
  * Non-owned IDs are dropped silently (no 403): keeps partial-mention UX when the
