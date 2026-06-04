@@ -1,23 +1,15 @@
 "use client";
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { UserPreferences } from "@/lib/user-preferences";
-import { fetchPreferences } from "@/lib/user-preferences-client";
+import { usePreferences } from "@/contexts/preferences-context";
 import { House, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import * as React from "react";
 
 export function NavigationTabs() {
   const pathname = usePathname();
-  const [defaultPage, setDefaultPage] =
-    React.useState<NonNullable<UserPreferences["defaultPage"]>>("home");
-
-  React.useEffect(() => {
-    fetchPreferences()
-      .then((data) => setDefaultPage(data.defaultPage ?? "home"))
-      .catch(() => {});
-  }, []);
+  const { preferences } = usePreferences();
+  const defaultPage = preferences.defaultPage ?? "home";
 
   const activeTab = pathname.startsWith("/ai")
     ? "ai"
