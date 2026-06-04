@@ -41,7 +41,7 @@ export default function ChatInput({
   );
 
   return (
-    <form onSubmit={onSubmit} className="w-full p-4">
+    <form onSubmit={onSubmit} className="w-full sm:p-0 md:p-4">
       <InputGroup className="w-full h-full dark:bg-input/30 items-end">
         {mentions.length > 0 && (
           <InputGroupAddon

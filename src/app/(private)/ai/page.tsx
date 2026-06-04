@@ -12,7 +12,7 @@ export default function AiPage() {
     <div className="wrapper-private flex flex-1 flex-col items-center justify-center gap-0 pt-24 pb-32">
       <div className="flex flex-col items-center justify-center gap-4 mb-8">
         <Logo size={64} />
-        <Typography component="h2" variant="h2">
+        <Typography component="h2" variant="h2" className="text-center">
           What magic shall we make happen?
         </Typography>
       </div>
@@ -29,7 +29,7 @@ export default function AiPage() {
         isLoading={false}
         className="min-h-16"
       />
-      <div className="w-full flex items-start justify-between gap-4 px-4 pt-14">
+      <div className="w-full flex flex-col md:flex-row items-start justify-between gap-4 px-0 md:px-4 pt-14">
         <ChatItemGroup title="Recent chats">
           <ChatItem title="Updates in Purl AI" />
           <ChatItem title="Summarize of last two weeks" />
