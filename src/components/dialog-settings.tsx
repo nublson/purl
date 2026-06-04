@@ -1,7 +1,7 @@
 "use client";
 
-import * as React from "react";
 import { useUsage } from "@/hooks/use-usage";
+import * as React from "react";
 import { DialogWrapper } from "./dialog-wrapper";
 import { SettingsAccount } from "./settings-account";
 import { SettingsIntegrations } from "./settings-integrations";
@@ -57,14 +57,14 @@ function SettingsContent({ closeDialog }: { closeDialog: () => void }) {
           content: <SettingsPreferences />,
         },
         {
-          label: "Account",
-          value: "account",
-          content: <SettingsAccount closeDialog={closeDialog} />,
-        },
-        {
           label: "Integrations",
           value: "integrations",
           content: <SettingsIntegrations />,
+        },
+        {
+          label: "Account",
+          value: "account",
+          content: <SettingsAccount closeDialog={closeDialog} />,
         },
       ]}
     />
