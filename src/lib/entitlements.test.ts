@@ -179,4 +179,49 @@ describe("entitlements", () => {
     const ctx = await getEntitlementContext(uid);
     expect(ctx.entitlements.aiFullAccess).toBe(true);
   });
+
+  it("getEntitlementContext upgrades FREE users with BYOK to effective PRO", async () => {
+    const uid = "user-byok";
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      { ...mockSub({ planKey: "FREE" }), userId: uid } as never,
+    );
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      anthropicApiKeyEncrypted: "iv:tag:cipher",
+    } as never);
+
+    const ctx = await getEntitlementContext(uid);
+
+    expect(ctx.byokActive).toBe(true);
+    expect(ctx.effectivePlanKey).toBe("PRO");
+    expect(ctx.entitlements.aiFullAccess).toBe(true);
+    expect(ctx.billing.planKey).toBe("FREE");
+  });
+
+  it("shouldRunIngest runs for FREE users with BYOK under the extraction cap", async () => {
+    const uid = "user-byok-ingest";
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      { ...mockSub({ planKey: "FREE" }), userId: uid } as never,
+    );
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      anthropicApiKeyEncrypted: "iv:tag:cipher",
+    } as never);
+    vi.mocked(prisma.usageEvent.count).mockResolvedValue(10);
+
+    const r = await shouldRunIngest(uid);
+
+    expect(r.run).toBe(true);
+  });
+
+  it("assertCanChat allows FREE users with BYOK under the monthly cap", async () => {
+    const uid = "user-byok-chat";
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+      { ...mockSub({ planKey: "FREE" }), userId: uid } as never,
+    );
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      anthropicApiKeyEncrypted: "iv:tag:cipher",
+    } as never);
+    vi.mocked(prisma.usageEvent.count).mockResolvedValue(5);
+
+    await expect(assertCanChat(uid)).resolves.toBeUndefined();
+  });
 });
