@@ -1,4 +1,4 @@
-import type { UserPreferences } from "./user-preferences";
+import type { UserPreferences } from "./user-preferences-shared";
 
 export async function fetchPreferences(): Promise<UserPreferences> {
   const res = await fetch("/api/user/preferences");

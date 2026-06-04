@@ -5,9 +5,14 @@ import { HeaderActionsFallback } from "@/components/skeletons";
 import { UploadFile } from "@/components/upload-file";
 import { User } from "@/components/user";
 import { ChatProvider } from "@/contexts/chat-context";
+import { PreferencesProvider } from "@/contexts/preferences-context";
 import { UsageProvider } from "@/contexts/usage-context";
 import { auth } from "@/lib/auth";
 import { getLinksForCurrentUser } from "@/lib/links";
+import {
+  DEFAULT_PREFERENCES,
+  getPreferences,
+} from "@/lib/user-preferences";
 import { getUsageSummaryForUser } from "@/lib/usage-summary";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
@@ -36,25 +41,33 @@ async function HeaderActions() {
   );
 }
 
-export default function PrivateLayout({
+export default async function PrivateLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  const userId = session?.user?.id;
+  const initialPreferences = userId
+    ? await getPreferences(userId)
+    : DEFAULT_PREFERENCES;
+
   return (
     <ChatProvider>
-      <Header
-        pathname="/home"
-        actions={
-          <Suspense fallback={<HeaderActionsFallback variant="private" />}>
-            <HeaderActions />
-          </Suspense>
-        }
-      />
-      <main className="flex-1 flex flex-col items-center justify-start pt-4 overflow-y-auto px-4 md:px-0">
-        {children}
-        <NavigationTabs />
-      </main>
+      <PreferencesProvider initialPreferences={initialPreferences}>
+        <Header
+          pathname="/home"
+          actions={
+            <Suspense fallback={<HeaderActionsFallback variant="private" />}>
+              <HeaderActions />
+            </Suspense>
+          }
+        />
+        <main className="flex-1 flex flex-col items-center justify-start pt-4 overflow-y-auto px-4 md:px-0">
+          {children}
+          <NavigationTabs />
+        </main>
+      </PreferencesProvider>
     </ChatProvider>
   );
 }
