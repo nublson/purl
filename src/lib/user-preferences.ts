@@ -1,20 +1,17 @@
+import "server-only";
+
 import prisma from "@/lib/prisma";
+import {
+  DEFAULT_PREFERENCES,
+  parsePreferences,
+  type UserPreferences,
+} from "@/lib/user-preferences-shared";
 
-export type UserPreferences = {
-  defaultPage?: "home" | "ai";
-};
-
-export const DEFAULT_PREFERENCES: UserPreferences = {
-  defaultPage: "home",
-};
-
-export function parsePreferences(raw: unknown): UserPreferences {
-  if (!raw || typeof raw !== "object") return DEFAULT_PREFERENCES;
-  const p = raw as Record<string, unknown>;
-  return {
-    defaultPage: p.defaultPage === "ai" ? "ai" : "home",
-  };
-}
+export {
+  DEFAULT_PREFERENCES,
+  parsePreferences,
+  type UserPreferences,
+} from "@/lib/user-preferences-shared";
 
 export async function getPreferences(userId: string): Promise<UserPreferences> {
   const user = await prisma.user.findUnique({
