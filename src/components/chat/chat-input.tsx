@@ -71,6 +71,7 @@ export default function ChatInput({
             size="icon-sm"
             variant="ghost"
             className="cursor-pointer rounded-full"
+            disabled
           >
             <AtSign />
           </Button>
@@ -80,6 +81,7 @@ export default function ChatInput({
               size="icon-sm"
               variant="ghost"
               className="cursor-pointer rounded-full"
+              disabled
             >
               <Mic />
             </Button>
