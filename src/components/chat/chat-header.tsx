@@ -360,21 +360,14 @@ export default function ChatHeader({
           <Skeleton className="h-3.5 w-32" />
         ) : (
           <div className="max-w-72 flex items-center justify-start gap-1">
-            <Typography
-              component="h3"
-              size="small"
-              className="text-accent-foreground font-medium line-clamp-1 break-all"
-            >
-              {label}
-            </Typography>
             <ChatHistory
               chats={chats}
               isLoading={isLoading}
               onSelectChat={onSelectChat}
               onOpenChange={handleHistoryOpenChange}
             >
-              <Button variant="ghost" size="icon-sm" className="cursor-pointer">
-                <ChevronDown />
+              <Button variant="ghost" size="sm" className="cursor-pointer">
+                {label} <ChevronDown />
               </Button>
             </ChatHistory>
           </div>
