@@ -74,3 +74,4 @@ Link ingest, OG scraping, PDF/audio fetch, and related paths use [`src/lib/safe-
 ## Learned Workspace Facts
 
 - `SKIPPED` ingest status covers metadata-only skips such as free-plan extraction limits and known unsupported SPA/full-browser hosts; use `skipIngest` for reusable skip behavior.
+- Widespread `SCRAPE_FAILED` on every URL in local dev often means `SAFE_OUTBOUND_HTTP_PROXY` is set but unreachable or returns HTTP 407; unset it for direct egress or verify the proxy with `curl -x "$SAFE_OUTBOUND_HTTP_PROXY" https://example.com` before debugging scrapers.

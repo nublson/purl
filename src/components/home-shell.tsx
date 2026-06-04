@@ -1,6 +1,5 @@
 "use client";
 
-import { LimitBanner } from "@/components/limit-banner";
 import { LinkGroup } from "@/components/link-group";
 import { LinkInput } from "@/components/link-input";
 import { PasteHandler } from "@/components/paste-handler";

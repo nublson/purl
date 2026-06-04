@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Fragment } from "react";
 
 export default function HeaderActions() {
-  const { data: session, isPending } = useSession();
+  const { isPending } = useSession();
 
   if (isPending) {
     return <HeaderActionsFallback />;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useChatContext } from "@/contexts/chat-context";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, AtSign, Mic } from "lucide-react";
 import type React from "react";
 import { useCallback } from "react";
 import { Button } from "../ui/button";
@@ -56,14 +56,30 @@ export default function ChatInput({
         )}
         <InputGroupTextarea
           placeholder="Enter your message"
-          className="min-h-11 max-h-24 no-scrollbar"
+          className="min-h-16 max-h-24 no-scrollbar"
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={isLoading}
         />
-        <InputGroupAddon align="block-end" className="justify-end gap-2">
-          <div className="shrink-0">
+        <InputGroupAddon align="block-end" className="justify-between gap-2">
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="ghost"
+            className="cursor-pointer rounded-full"
+          >
+            <AtSign />
+          </Button>
+          <div className="shrink-0 flex items-center gap-2">
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              className="cursor-pointer rounded-full"
+            >
+              <Mic />
+            </Button>
             <Button
               type="submit"
               size="icon-sm"
