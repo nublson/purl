@@ -70,8 +70,11 @@ Link ingest, OG scraping, PDF/audio fetch, and related paths use [`src/lib/safe-
 
 - When implementing an attached plan, treat the plan file as read-only, use the already-created todos instead of creating new ones, mark todos in progress as work advances, and continue until all todos are complete.
 - When the user asks for a branch or PR after implementation, follow the project Git workflow: short-lived feature/fix branches from `develop`, target PRs to `develop`, and avoid direct commits to `main` or `develop`.
+- Prefer React context (e.g., `PreferencesContext`) over custom-event or event-emitter patterns for cross-component reactive state; if an event-based approach is proposed and rejected, migrate to a context instead.
+- When a feature is complete, the user may ask for "isolated commits related to what we did" — group changes into small logical atomic commits per feature area rather than one large catch-all commit.
 
 ## Learned Workspace Facts
 
 - `SKIPPED` ingest status covers metadata-only skips such as free-plan extraction limits and known unsupported SPA/full-browser hosts; use `skipIngest` for reusable skip behavior.
 - Widespread `SCRAPE_FAILED` on every URL in local dev often means `SAFE_OUTBOUND_HTTP_PROXY` is set but unreachable or returns HTTP 407; unset it for direct egress or verify the proxy with `curl -x "$SAFE_OUTBOUND_HTTP_PROXY" https://example.com` before debugging scrapers.
+- Server-only modules (e.g. those importing Prisma/pg) must not bleed into the client bundle; extract shared types, constants, and pure functions into a `*-shared.ts` sibling file, and guard the server module with `import "server-only"` at the top.
