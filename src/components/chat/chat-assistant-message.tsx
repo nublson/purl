@@ -29,7 +29,8 @@ export interface ChatAssistantMessageProps {
 function AssistantMarkdownFallback({ content }: { content: string }) {
   return (
     <Typography
-      className="text-base leading-6 text-foreground wrap-anywhere whitespace-pre-wrap"
+      size="small"
+      className="leading-6 text-foreground wrap-anywhere whitespace-pre-wrap"
     >
       {content}
     </Typography>
@@ -57,9 +58,7 @@ export default function ChatAssistantMessage({
 
   return (
     <Message
-      className={cn(
-        "min-w-0 w-full max-w-full flex-row items-start gap-2 p-0",
-      )}
+      className={cn("min-w-0 w-full max-w-full flex-row items-start gap-2 p-0")}
       from="assistant"
     >
       <div className="shrink-0">
@@ -77,7 +76,9 @@ export default function ChatAssistantMessage({
                   isStreaming={isReasoningStreaming}
                 >
                   <ReasoningTrigger />
-                  <ReasoningContent>{reasoningText}</ReasoningContent>
+                  <ReasoningContent className="text-sm">
+                    {reasoningText}
+                  </ReasoningContent>
                 </Reasoning>
               )}
               {content ? (

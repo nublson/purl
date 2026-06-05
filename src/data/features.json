@@ -5,11 +5,6 @@
     "icon": "Link2"
   },
   {
-    "title": "Organized by time",
-    "description": "Today, Yesterday, Last week — your library is always in chronological order. No manual sorting ever needed.",
-    "icon": "Clock3"
-  },
-  {
     "title": "Ask anything with AI",
     "description": "Ask \"what did I read about X last week?\" and Purl searches across all your saved content to give you a real answer.",
     "icon": "MessageSquareText"
@@ -28,5 +23,10 @@
     "title": "Bring your own key",
     "description": "Add your own Anthropic API key in Settings to get full AI access for free. You pay Anthropic directly; Purl covers embeddings.",
     "icon": "Key"
+  },
+  {
+    "title": "Purl API",
+    "description": "Access your saved content programmatically. Query your library, trigger ingestion, and build on top of your knowledge base.",
+    "icon": "Braces"
   }
 ]

@@ -10,7 +10,7 @@ export default function ChatItem({ title, icon, ...props }: ChatItemProps) {
   return (
     <Button
       variant="ghost"
-      className="w-full justify-start cursor-pointer"
+      className="w-full justify-start cursor-pointer text-muted-foreground hover:text-accent-foreground"
       {...props}
     >
       {icon || <MessageCircle className="size-4" />}

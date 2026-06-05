@@ -1,5 +1,6 @@
 import { BelowFoldSectionSkeleton } from "@/components/skeletons";
 import HeroSection from "@/sections/hero";
+import { PurlAISection } from "@/sections/purl-ai";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 
@@ -36,6 +37,7 @@ export default function Home() {
       <HeroSection />
       <FeaturesSection />
       <ContentTypeSection />
+      <PurlAISection />
       <PricingSection />
       <FAQSection />
     </div>

@@ -1,18 +1,7 @@
 [
-  {
-    "title": "Features",
-    "path": "/#features"
-  },
-  {
-    "title": "Pricing",
-    "path": "/#pricing"
-  },
-  {
-    "title": "Privacy",
-    "path": "/privacy"
-  },
-  {
-    "title": "Terms",
-    "path": "/terms"
-  }
+  { "title": "Features", "path": "/#features" },
+  { "title": "Pricing", "path": "/#pricing" },
+  { "title": "API", "path": "/docs/api" },
+  { "title": "Privacy", "path": "/privacy" },
+  { "title": "Terms", "path": "/terms" }
 ]

@@ -73,6 +73,7 @@ Link ingest, OG scraping, PDF/audio fetch, and related paths use [`src/lib/safe-
 - Prefer React context (e.g., `PreferencesContext`) over custom-event or event-emitter patterns for cross-component reactive state; if an event-based approach is proposed and rejected, migrate to a context instead.
 - When a feature is complete, the user may ask for "isolated commits related to what we did" — group changes into small logical atomic commits per feature area rather than one large catch-all commit.
 - Use existing UI wrappers (`dialog-wrapper`, `dropdown-wrapper`, `alert-dialog-wrapper`) when adding modals, dropdowns, or confirm dialogs; match patterns used elsewhere instead of inlining raw Radix/shadcn primitives.
+- Context files should export only the context object and Provider; consumer `useContext` hooks belong in `src/hooks/use-*.ts`, matching the existing `use-plan.ts` / `use-usage.ts` pattern (do not inline hooks in context files).
 
 ## Learned Workspace Facts
 
@@ -80,3 +81,5 @@ Link ingest, OG scraping, PDF/audio fetch, and related paths use [`src/lib/safe-
 - Widespread `SCRAPE_FAILED` on every URL in local dev often means `SAFE_OUTBOUND_HTTP_PROXY` is set but unreachable or returns HTTP 407; unset it for direct egress or verify the proxy with `curl -x "$SAFE_OUTBOUND_HTTP_PROXY" https://example.com` before debugging scrapers.
 - Server-only modules (e.g. those importing Prisma/pg) must not bleed into the client bundle; extract shared types, constants, and pure functions into a `*-shared.ts` sibling file, and guard the server module with `import "server-only"` at the top.
 - Reusable chat dialogs (`DeleteChatDialog`, `RenameChatDialog`) live as isolated files under `src/components/chat/` so full-page chat and the chat widget can share them.
+- When the `showChatWidget` user preference is false, `HomeChatWidget` renders nothing — link "Add to chat" should `addMention` and redirect to `/ai`, and link menu "Summarize with AI" should `startNewChat()`, `triggerSummarize()`, then redirect to `/chat` (chat state persists via providers in the private layout).
+- Route-level loading skeletons use a component in `src/components/skeletons/` plus a route `loading.tsx` (e.g. `/home`, `/chat`); in-chat message loading reuse is handled by `ChatAreaSkeleton` inside `ChatArea`, shared by the full page and the widget.

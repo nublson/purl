@@ -20,6 +20,7 @@ interface ChatInputProps {
   onInputChange: (value: string) => void;
   onSubmit: (e?: React.FormEvent) => void;
   isLoading: boolean;
+  disabled?: boolean;
   className?: string;
 }
 
@@ -28,6 +29,7 @@ export default function ChatInput({
   onInputChange,
   onSubmit,
   isLoading,
+  disabled = false,
   className,
 }: ChatInputProps) {
   const { mentions, removeMention } = useChatContext();
@@ -106,12 +108,13 @@ export default function ChatInput({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (disabled) return;
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         onSubmit();
       }
     },
-    [onSubmit],
+    [disabled, onSubmit],
   );
 
   const displayValue =
@@ -120,7 +123,16 @@ export default function ChatInput({
       : input;
 
   return (
-    <form onSubmit={onSubmit} className="w-full sm:p-0 md:p-4 md:pt-0">
+    <form
+      onSubmit={(e) => {
+        if (disabled) {
+          e.preventDefault();
+          return;
+        }
+        onSubmit(e);
+      }}
+      className="w-full sm:p-0 md:p-4 md:pt-0"
+    >
       <InputGroup className="w-full h-full dark:bg-input/30 items-end">
         {mentions.length > 0 && (
           <InputGroupAddon
@@ -142,7 +154,15 @@ export default function ChatInput({
           value={displayValue}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={isLoading || isListening}
+          disabled={disabled || isLoading || isListening}
+          tabIndex={disabled ? -1 : undefined}
+          onFocus={
+            disabled
+              ? (e) => {
+                  e.currentTarget.blur();
+                }
+              : undefined
+          }
         />
         <InputGroupAddon align="block-end" className="justify-end gap-2">
           <div className="shrink-0 flex items-center gap-2">
@@ -152,7 +172,7 @@ export default function ChatInput({
               variant={isListening ? "destructive" : "ghost"}
               className="cursor-pointer rounded-full"
               onClick={toggleDictation}
-              disabled={isLoading || isConnecting}
+              disabled={disabled || isLoading || isConnecting}
               title={isListening ? "Stop dictation" : "Dictate message"}
             >
               {isConnecting ? (
@@ -168,7 +188,7 @@ export default function ChatInput({
               size="icon-sm"
               variant="default"
               className="cursor-pointer rounded-full"
-              disabled={isLoading || !input.trim()}
+              disabled={disabled || isLoading || !input.trim()}
             >
               <ArrowUp />
             </Button>
