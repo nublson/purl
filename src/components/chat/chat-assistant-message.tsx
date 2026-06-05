@@ -28,7 +28,10 @@ export interface ChatAssistantMessageProps {
 
 function AssistantMarkdownFallback({ content }: { content: string }) {
   return (
-    <Typography className="text-base leading-6 text-foreground wrap-anywhere whitespace-pre-wrap">
+    <Typography
+      size="small"
+      className="leading-6 text-foreground wrap-anywhere whitespace-pre-wrap"
+    >
       {content}
     </Typography>
   );
@@ -73,7 +76,9 @@ export default function ChatAssistantMessage({
                   isStreaming={isReasoningStreaming}
                 >
                   <ReasoningTrigger />
-                  <ReasoningContent>{reasoningText}</ReasoningContent>
+                  <ReasoningContent className="text-sm">
+                    {reasoningText}
+                  </ReasoningContent>
                 </Reasoning>
               )}
               {content ? (

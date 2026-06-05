@@ -15,6 +15,7 @@ interface ChatAreaProps {
   messageMentions?: Link[][];
   isLoading: boolean;
   isLoadingChat?: boolean;
+  autoScroll?: boolean;
   onSuggestion: (text: string) => void;
   userAvatarUrl?: string | null;
   userDisplayName?: string | null;
@@ -69,6 +70,7 @@ export default function ChatArea({
   messageMentions,
   isLoading,
   isLoadingChat,
+  autoScroll = true,
   onSuggestion,
   userAvatarUrl,
   userDisplayName,
@@ -78,8 +80,9 @@ export default function ChatArea({
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!autoScroll) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, flowError]);
+  }, [autoScroll, messages, flowError]);
 
   if (isLoadingChat) {
     return <ChatAreaSkeleton />;

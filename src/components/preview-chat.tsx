@@ -191,6 +191,7 @@ function PreviewChatInner() {
         <ChatArea
           messages={activeChat.messages}
           isLoading={false}
+          autoScroll={false}
           onSuggestion={() => undefined}
         />
 
@@ -199,6 +200,7 @@ function PreviewChatInner() {
           onInputChange={() => undefined}
           onSubmit={() => undefined}
           isLoading={false}
+          disabled
         />
       </div>
     </div>
