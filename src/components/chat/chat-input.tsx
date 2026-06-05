@@ -2,9 +2,10 @@
 
 import { useChatContext } from "@/hooks/use-chat-context";
 import { cn } from "@/lib/utils";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Loader2, Mic, MicOff } from "lucide-react";
 import type React from "react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import { CommitStrategy, useScribe } from "@elevenlabs/react";
 import { Button } from "../ui/button";
 import {
   InputGroup,
@@ -29,6 +30,44 @@ export default function ChatInput({
   className,
 }: ChatInputProps) {
   const { mentions, removeMention } = useChatContext();
+  const [partialText, setPartialText] = useState("");
+
+  const scribe = useScribe({
+    modelId: "scribe_v2_realtime",
+    commitStrategy: CommitStrategy.VAD,
+    onPartialTranscript: (data) => setPartialText(data.text),
+    onCommittedTranscript: (data) => {
+      onInputChange(input ? `${input} ${data.text}` : data.text);
+      setPartialText("");
+    },
+  });
+
+  const isListening =
+    scribe.status === "connected" || scribe.status === "transcribing";
+  const isConnecting = scribe.status === "connecting";
+
+  const toggleDictation = useCallback(async () => {
+    if (isListening) {
+      scribe.disconnect();
+      setPartialText("");
+      return;
+    }
+    try {
+      const res = await fetch("/api/scribe-token");
+      if (!res.ok) throw new Error("Failed to get token");
+      const { token } = await res.json();
+      await scribe.connect({
+        token,
+        microphone: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+    } catch (err) {
+      console.error("Dictation error:", err);
+    }
+  }, [isListening, scribe]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -39,6 +78,11 @@ export default function ChatInput({
     },
     [onSubmit],
   );
+
+  const displayValue =
+    isListening && partialText
+      ? `${input}${input ? " " : ""}${partialText}`
+      : input;
 
   return (
     <form onSubmit={onSubmit} className="w-full sm:p-0 md:p-4 md:pt-0">
@@ -58,15 +102,32 @@ export default function ChatInput({
           </InputGroupAddon>
         )}
         <InputGroupTextarea
-          placeholder="Enter your message"
+          placeholder={isListening ? "Listening…" : "Enter your message"}
           className={cn("min-h-11 max-h-24 no-scrollbar", className)}
-          value={input}
+          value={displayValue}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={isLoading}
+          disabled={isLoading || isListening}
         />
         <InputGroupAddon align="block-end" className="justify-end gap-2">
           <div className="shrink-0 flex items-center gap-2">
+            <Button
+              type="button"
+              size="icon-sm"
+              variant={isListening ? "destructive" : "ghost"}
+              className="cursor-pointer rounded-full"
+              onClick={toggleDictation}
+              disabled={isLoading || isConnecting}
+              title={isListening ? "Stop dictation" : "Dictate message"}
+            >
+              {isConnecting ? (
+                <Loader2 className="animate-spin" />
+              ) : isListening ? (
+                <MicOff />
+              ) : (
+                <Mic />
+              )}
+            </Button>
             <Button
               type="submit"
               size="icon-sm"
