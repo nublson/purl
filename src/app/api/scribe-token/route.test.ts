@@ -24,7 +24,7 @@ describe("GET /api/scribe-token", () => {
     vi.mocked(auth.api.getSession).mockResolvedValue({
       user: { id: "user-1" },
       session: {},
-    } as any);
+    } as Awaited<ReturnType<typeof auth.api.getSession>>);
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -48,7 +48,7 @@ describe("GET /api/scribe-token", () => {
           create: vi.fn().mockRejectedValueOnce(new Error("API error")),
         },
       },
-    } as any);
+    } as unknown as ReturnType<typeof getElevenLabsClient>);
     const res = await GET();
     expect(res.status).toBe(500);
   });
