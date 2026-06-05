@@ -4,7 +4,10 @@ import {
   HistoryErrorBanner,
   type ChatHistoryLoadError,
 } from "@/components/chat/chat-header";
-import { ChatHistory, type ChatHistoryItem } from "@/components/chat/chat-history";
+import {
+  ChatHistory,
+  type ChatHistoryItem,
+} from "@/components/chat/chat-history";
 import { Logo } from "@/components/logo";
 import { TooltipWrapper } from "@/components/tooltip-wrapper";
 import { Typography } from "@/components/typography";
