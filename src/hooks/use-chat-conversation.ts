@@ -1,6 +1,6 @@
 "use client";
 
-import { useChatContext } from "@/contexts/chat-context";
+import { useChatContext } from "@/hooks/use-chat-context";
 import { useSession } from "@/lib/auth-client";
 import {
   chatFlowErrorFromHttp,

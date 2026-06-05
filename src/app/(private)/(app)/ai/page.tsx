@@ -7,7 +7,7 @@ import ChatItemGroup from "@/components/chat/chat-item-group";
 import { Logo } from "@/components/logo";
 import { ChatItemSkeleton } from "@/components/skeletons";
 import { Typography } from "@/components/typography";
-import { useChatContext } from "@/contexts/chat-context";
+import { useChatContext } from "@/hooks/use-chat-context";
 import { chatEmptySuggestions } from "@/data/chat-empty-suggestions";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";

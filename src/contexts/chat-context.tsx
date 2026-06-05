@@ -17,7 +17,6 @@ import type { Link } from "@/utils/links";
 import {
   createContext,
   useCallback,
-  useContext,
   useState,
   type ReactNode,
 } from "react";
@@ -44,7 +43,7 @@ interface ChatContextValue {
   clearPendingMessage: () => void;
 }
 
-const ChatContext = createContext<ChatContextValue | null>(null);
+export const ChatContext = createContext<ChatContextValue | null>(null);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [chatId, setChatIdState] = useState<string | null>(() =>
@@ -184,16 +183,4 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       {children}
     </ChatContext>
   );
-}
-
-export function useChatContext() {
-  const ctx = useContext(ChatContext);
-  if (!ctx) {
-    throw new Error("useChatContext must be used within a ChatProvider");
-  }
-  return ctx;
-}
-
-export function useChatContextSafe() {
-  return useContext(ChatContext);
 }

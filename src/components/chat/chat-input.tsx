@@ -1,6 +1,6 @@
 "use client";
 
-import { useChatContext } from "@/contexts/chat-context";
+import { useChatContext } from "@/hooks/use-chat-context";
 import { cn } from "@/lib/utils";
 import { ArrowUp, AtSign, Mic } from "lucide-react";
 import type React from "react";

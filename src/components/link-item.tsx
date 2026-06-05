@@ -1,6 +1,7 @@
 "use client";
 
-import { useChatContextSafe } from "@/contexts/chat-context";
+import { useChatContextSafe } from "@/hooks/use-chat-context";
+import { usePreferences } from "@/hooks/use-preferences";
 import { cn } from "@/lib/utils";
 import { Link as LinkType } from "@/utils/links";
 import { MessageCircle } from "lucide-react";
@@ -45,6 +46,7 @@ export const LinkItem = React.forwardRef<
 ) {
   const chatCtx = useChatContextSafe();
   const router = useRouter();
+  const { preferences } = usePreferences();
 
   const lastLinkIdRef = React.useRef(link.id);
   const [displayIngestStatus, setDisplayIngestStatus] = React.useState<
@@ -143,6 +145,10 @@ export const LinkItem = React.forwardRef<
           className="cursor-pointer text-muted-foreground"
           onClick={() => {
             chatCtx.addMention(linkForUi);
+            if (preferences.showChatWidget === false) {
+              router.push("/ai");
+              return;
+            }
             chatCtx.setIsWidgetOpen(true);
           }}
         >
