@@ -44,6 +44,18 @@ export default function ChatInput({
       onInputChange(current ? `${current} ${data.text}` : data.text);
       setPartialText("");
     },
+    onError: (err) => {
+      console.error("Scribe error:", err);
+      setPartialText("");
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("auth")) {
+        toast.error("Dictation auth failed. Please reload and try again.");
+      } else if (message.includes("quota")) {
+        toast.error("Dictation quota exceeded. Please try again later.");
+      } else {
+        toast.error("Dictation error. Please try again.");
+      }
+    },
   });
 
   const isListening =
@@ -56,6 +68,24 @@ export default function ChatInput({
       setPartialText("");
       return;
     }
+    // Pre-check mic permission — getUserMedia inside @elevenlabs/client runs
+    // in a fire-and-forget async chain that escapes our try/catch below.
+    // By probing first we surface NotAllowedError in our own code.
+    try {
+      const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
+      probe.getTracks().forEach((t) => t.stop());
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        toast.error(
+          "Microphone access denied. Allow microphone permissions in your browser and try again.",
+        );
+      } else {
+        toast.error("Could not access microphone. Please try again.");
+      }
+      return;
+    }
+
     try {
       const res = await fetch("/api/scribe-token");
       if (!res.ok) throw new Error("Failed to get token");
