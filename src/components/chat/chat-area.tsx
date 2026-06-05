@@ -103,7 +103,7 @@ export default function ChatArea({
 
   return (
     <ScrollArea className="flex-1 w-full h-20 p-4 pb-0">
-      <div className="flex w-full flex-col items-stretch justify-start gap-4 h-full">
+      <div className="flex w-full flex-col items-stretch justify-start gap-6 h-full">
         {messages.map((message, index) => (
           <ChatMessage
             key={message.id}
