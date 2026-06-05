@@ -1,5 +1,6 @@
 "use client";
 
+import { DeleteChatDialog } from "@/components/chat/chat-delete-dialog";
 import {
   HistoryErrorBanner,
   type ChatHistoryLoadError,
@@ -8,40 +9,18 @@ import {
   ChatHistory,
   type ChatHistoryItem,
 } from "@/components/chat/chat-history";
+import { RenameChatDialog } from "@/components/chat/chat-rename-dialog";
+import { DropdownWrapper } from "@/components/dropdown-wrapper";
 import { Logo } from "@/components/logo";
 import { TooltipWrapper } from "@/components/tooltip-wrapper";
 import { Typography } from "@/components/typography";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CHAT_ERROR_CODES, parseChatErrorBody } from "@/lib/chat-http-errors";
-import { ChevronDown, Ellipsis, Plus } from "lucide-react";
+import { ChevronDown, Ellipsis, Plus, SquarePen, Trash } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 
 interface HeaderChatProps {
   title: string | null;
@@ -70,13 +49,6 @@ export default function HeaderChat({
     null,
   );
   const hasLoadedOnce = useRef(false);
-
-  const [renameOpen, setRenameOpen] = useState(false);
-  const [renameValue, setRenameValue] = useState("");
-  const [isRenaming, setIsRenaming] = useState(false);
-
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadChats = useCallback(async (opts?: { silent?: boolean }) => {
     const silent = opts?.silent === true;
@@ -139,12 +111,6 @@ export default function HeaderChat({
     void loadChats();
   }, [loadChats]);
 
-  useEffect(() => {
-    if (renameOpen) {
-      setRenameValue(label === "New chat" ? "" : label);
-    }
-  }, [renameOpen, label]);
-
   const handleHistoryOpenChange = useCallback(
     (open: boolean) => {
       if (open && hasLoadedOnce.current) {
@@ -154,44 +120,9 @@ export default function HeaderChat({
     [loadChats],
   );
 
-  const handleRenameSubmit = async () => {
-    const trimmed = renameValue.trim();
-    if (!trimmed) {
-      toast.error("Enter a chat name.");
-      return;
-    }
-    if (!onRenameChat) return;
-
-    setIsRenaming(true);
-    try {
-      const ok = await onRenameChat(trimmed);
-      if (!ok) {
-        toast.error("Could not rename chat.");
-        return;
-      }
-      setRenameOpen(false);
-      void loadChats({ silent: true });
-    } finally {
-      setIsRenaming(false);
-    }
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!onDeleteChat) return;
-
-    setIsDeleting(true);
-    try {
-      const ok = await onDeleteChat();
-      if (!ok) {
-        toast.error("Could not delete chat.");
-        return;
-      }
-      setDeleteOpen(false);
-      void loadChats({ silent: true });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+  const handleChatActionSuccess = useCallback(() => {
+    void loadChats({ silent: true });
+  }, [loadChats]);
 
   const menuDisabled = !chatId;
 
@@ -259,101 +190,56 @@ export default function HeaderChat({
               <Plus />
             </Button>
           </TooltipWrapper>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <DropdownWrapper
+            trigger={
               <Button
                 variant="ghost"
                 size="icon-sm"
                 className="cursor-pointer"
-                disabled={menuDisabled}
                 aria-label="More options"
               >
                 <Ellipsis />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            }
+            align="end"
+          >
+            <RenameChatDialog
+              label={label}
+              onRename={async (nextTitle) => {
+                if (!onRenameChat) return false;
+                return onRenameChat(nextTitle);
+              }}
+              onSuccess={handleChatActionSuccess}
+            >
               <DropdownMenuItem
                 disabled={menuDisabled}
-                onSelect={() => setRenameOpen(true)}
+                onSelect={(event) => {
+                  event.preventDefault();
+                }}
               >
-                Rename
+                <SquarePen /> <span>Rename</span>
               </DropdownMenuItem>
+            </RenameChatDialog>
+            <DeleteChatDialog
+              onDelete={async () => {
+                if (!onDeleteChat) return false;
+                return onDeleteChat();
+              }}
+              onSuccess={handleChatActionSuccess}
+            >
               <DropdownMenuItem
                 variant="destructive"
                 disabled={menuDisabled}
-                onSelect={() => setDeleteOpen(true)}
+                onSelect={(event) => {
+                  event.preventDefault();
+                }}
               >
-                Delete
+                <Trash /> <span>Delete</span>
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </DeleteChatDialog>
+          </DropdownWrapper>
         </div>
       </div>
-
-      <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Rename chat</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="chat-rename-title">Name</Label>
-            <Input
-              id="chat-rename-title"
-              value={renameValue}
-              onChange={(e) => setRenameValue(e.target.value)}
-              maxLength={80}
-              disabled={isRenaming}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void handleRenameSubmit();
-                }
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setRenameOpen(false)}
-              disabled={isRenaming}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => void handleRenameSubmit()}
-              disabled={isRenaming}
-            >
-              {isRenaming ? "Saving…" : "Save"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent size="default" className="sm:max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete this chat?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently removes the chat and its messages. This cannot be
-              undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <Button
-              type="button"
-              variant="destructive"
-              disabled={isDeleting}
-              className="cursor-pointer"
-              onClick={() => void handleDeleteConfirm()}
-            >
-              {isDeleting ? "Deleting…" : "Delete"}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </header>
   );
 }
