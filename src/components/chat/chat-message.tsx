@@ -10,9 +10,7 @@ export interface ChatMessageProps {
   message: UIMessage;
   isLoading?: boolean;
   mentions?: Link[];
-  /** Session profile image for user messages */
   userAvatarUrl?: string | null;
-  /** Used for avatar alt text and fallback initial */
   userDisplayName?: string | null;
 }
 
@@ -27,26 +25,12 @@ export default function ChatMessage({
     message.role === "user" ? (
       <ChatUserMessage
         message={message}
-        mentions={mentions}
         userAvatarUrl={userAvatarUrl}
         userDisplayName={userDisplayName}
       />
     ) : (
       <ChatAssistantMessage message={message} isLoading={isLoading} />
     );
-
-  // if (message.role === "user") {
-  //   return (
-  //     <ChatUserMessage
-  //       message={message}
-  //       mentions={mentions}
-  //       userAvatarUrl={userAvatarUrl}
-  //       userDisplayName={userDisplayName}
-  //     />
-  //   );
-  // }
-
-  // return <ChatAssistantMessage message={message} isLoading={isLoading} />;
 
   return (
     <div className="flex flex-col gap-2">

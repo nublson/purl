@@ -2,23 +2,19 @@
 
 import { Message, MessageContent } from "@/components/ai-elements/message";
 import { cn } from "@/lib/utils";
-import type { Link } from "@/utils/links";
 import type { UIMessage } from "ai";
 import { Typography } from "../typography";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import ChatMention from "./chat-mention";
 import { getMessageText } from "./chat-message-utils";
 
 export interface ChatUserMessageProps {
   message: UIMessage;
-  mentions?: Link[];
   userAvatarUrl?: string | null;
   userDisplayName?: string | null;
 }
 
 export default function ChatUserMessage({
   message,
-  mentions,
   userAvatarUrl,
   userDisplayName,
 }: ChatUserMessageProps) {

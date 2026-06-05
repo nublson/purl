@@ -2,7 +2,7 @@
 
 import { useChatContext } from "@/hooks/use-chat-context";
 import { cn } from "@/lib/utils";
-import { ArrowUp, AtSign, Mic } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import type React from "react";
 import { useCallback } from "react";
 import { Button } from "../ui/button";
@@ -65,26 +65,8 @@ export default function ChatInput({
           onKeyDown={handleKeyDown}
           disabled={isLoading}
         />
-        <InputGroupAddon align="block-end" className="justify-between gap-2">
-          <Button
-            type="button"
-            size="icon-sm"
-            variant="ghost"
-            className="cursor-pointer rounded-full"
-            disabled
-          >
-            <AtSign />
-          </Button>
+        <InputGroupAddon align="block-end" className="justify-end gap-2">
           <div className="shrink-0 flex items-center gap-2">
-            <Button
-              type="button"
-              size="icon-sm"
-              variant="ghost"
-              className="cursor-pointer rounded-full"
-              disabled
-            >
-              <Mic />
-            </Button>
             <Button
               type="submit"
               size="icon-sm"
