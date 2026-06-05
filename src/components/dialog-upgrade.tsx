@@ -1,9 +1,10 @@
 "use client";
 
+import { useCheckout } from "@/hooks/use-checkout";
+import { useUsage } from "@/hooks/use-usage";
 import { useSession } from "@/lib/auth-client";
 import { publicPlans } from "@/lib/plans";
 import * as React from "react";
-import { toast } from "sonner";
 import { DialogWrapper } from "./dialog-wrapper";
 import { PricingCard } from "./pricing-card";
 import { Typography } from "./typography";
@@ -14,31 +15,11 @@ interface UpgradeDialogProps {
 
 export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
   const { data: session } = useSession();
-  const [loading, setLoading] = React.useState(false);
-
+  const { startCheckout, loading } = useCheckout();
+  const { usageSummary } = useUsage();
+  const isTrial = usageSummary?.effectivePlanKey === "PRO_TRIAL";
+  const ctaLabel = loading ? "Redirecting…" : isTrial ? "Upgrade" : "Try for free";
   const proPlan = publicPlans.find((p) => p.id === "PRO");
-
-  const startCheckout = async () => {
-    if (!session?.user) {
-      toast.error("Please sign in to upgrade.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch("/api/billing/checkout", { method: "POST" });
-      const data = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Checkout failed");
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      throw new Error("No checkout URL");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Checkout failed");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const content = (
     <div className="flex min-h-0 flex-col gap-4 px-6 pb-6">
@@ -49,7 +30,7 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
           price={proPlan.priceLabel}
           priceSubLabel={proPlan.priceSubLabel}
           features={proPlan.features}
-          actionText={loading ? "Redirecting…" : "Try for free"}
+          actionText={ctaLabel}
           popular={proPlan.popular}
           onCtaClick={session?.user ? () => void startCheckout() : undefined}
           ctaLoading={loading}

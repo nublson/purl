@@ -10,6 +10,10 @@ vi.mock("@/lib/auth", () => ({
   },
 }));
 
+vi.mock("@/lib/user-preferences", () => ({
+  getPreferences: vi.fn().mockResolvedValue({ defaultPage: "/home" }),
+}));
+
 const auth = await import("@/lib/auth");
 
 function createRequest(pathname: string, method = "GET"): NextRequest {

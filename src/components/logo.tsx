@@ -3,14 +3,18 @@ import Link from "next/link";
 
 export function Logo({
   size,
-  pathname = "/",
+  pathname,
 }: {
   size: number;
   pathname?: string;
 }) {
-  return (
-    <Link href={pathname}>
-      <Image src="/logo.svg" alt="Purl" width={size} height={size} priority />
-    </Link>
+  const image = (
+    <Image src="/logo.svg" alt="Purl" width={size} height={size} priority />
   );
+
+  if (pathname === undefined) {
+    return image;
+  }
+
+  return <Link href={pathname}>{image}</Link>;
 }

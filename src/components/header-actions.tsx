@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Fragment } from "react";
 
 export default function HeaderActions() {
-  const { data: session, isPending } = useSession();
+  const { isPending } = useSession();
 
   if (isPending) {
     return <HeaderActionsFallback />;
@@ -15,20 +15,14 @@ export default function HeaderActions() {
 
   return (
     <div className="flex items-center gap-2">
-      {session ? (
-        <Button aria-label="Dashboard" size="sm" variant="outline" asChild>
-          <Link href="/home">Dashboard</Link>
+      <Fragment>
+        <Button aria-label="Sign in" size="sm" variant="outline" asChild>
+          <Link href="/login">Sign in</Link>
         </Button>
-      ) : (
-        <Fragment>
-          <Button aria-label="Sign in" size="sm" variant="outline" asChild>
-            <Link href="/login">Sign in</Link>
-          </Button>
-          <Button aria-label="Get started" size="sm" asChild>
-            <Link href="/signup">Get started</Link>
-          </Button>
-        </Fragment>
-      )}
+        <Button aria-label="Get started" size="sm" asChild>
+          <Link href="/signup">Get started</Link>
+        </Button>
+      </Fragment>
     </div>
   );
 }

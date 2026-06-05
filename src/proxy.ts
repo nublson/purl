@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { rateLimitApiRequest } from "@/lib/proxy-rate-limit";
+import { getPreferences } from "@/lib/user-preferences";
 import { type NextRequest, NextResponse } from "next/server";
 
 const publicRoutes = [
@@ -12,8 +13,12 @@ const publicRoutes = [
 
 const VERIFY_EMAIL_PATH = "/verify-email";
 const REDIRECT_WHEN_NOT_AUTHENTICATED = "/login";
-const REDIRECT_WHEN_AUTHENTICATED_ON_AUTH_PAGE = "/home";
 const REDIRECT_WHEN_NOT_VERIFIED = "/verify-email";
+
+async function getDefaultPage(userId: string) {
+  const prefs = await getPreferences(userId);
+  return prefs.defaultPage === "ai" ? "/ai" : "/home";
+}
 
 function isPublicRoute(pathname: string) {
   if (pathname.startsWith("/api/auth")) {
@@ -52,7 +57,7 @@ export async function proxy(request: NextRequest) {
 
   if (publicRoute && session && publicRoute.whenAuthenticated === "redirect") {
     const url = request.nextUrl.clone();
-    url.pathname = REDIRECT_WHEN_AUTHENTICATED_ON_AUTH_PAGE;
+    url.pathname = await getDefaultPage(session.user.id);
     return NextResponse.redirect(url);
   }
 
@@ -68,7 +73,7 @@ export async function proxy(request: NextRequest) {
 
   if (currentPath === VERIFY_EMAIL_PATH && session?.user?.emailVerified) {
     const url = request.nextUrl.clone();
-    url.pathname = REDIRECT_WHEN_AUTHENTICATED_ON_AUTH_PAGE;
+    url.pathname = await getDefaultPage(session.user.id);
     return NextResponse.redirect(url);
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useChatContextSafe } from "@/contexts/chat-context";
+import { useChatContextSafe } from "@/hooks/use-chat-context";
+import { usePreferences } from "@/hooks/use-preferences";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { Link as LinkType } from "@/utils/links";
 import {
@@ -37,6 +38,7 @@ export function LinkMenu({
 }: LinkMenuProps) {
   const router = useRouter();
   const chatCtx = useChatContextSafe();
+  const { preferences } = usePreferences();
 
   async function handleOpenInNewTab() {
     window.open(link.url, "_blank");
@@ -90,6 +92,12 @@ export function LinkMenu({
       <DropdownMenuGroup>
         <DropdownMenuItem
           onSelect={() => {
+            if (preferences.showChatWidget === false) {
+              chatCtx?.startNewChat();
+              chatCtx?.triggerSummarize(link);
+              router.push("/chat");
+              return;
+            }
             chatCtx?.triggerSummarize(link);
           }}
         >

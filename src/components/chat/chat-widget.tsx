@@ -1,6 +1,6 @@
 "use client";
 
-import { useChatContext } from "@/contexts/chat-context";
+import { useChatContext } from "@/hooks/use-chat-context";
 import { useFullscreenRadixPopperOnMobile } from "@/hooks/use-fullscreen-radix-popper-on-mobile";
 import { cn } from "@/lib/utils";
 import { ChevronDown, MessageCircle } from "lucide-react";

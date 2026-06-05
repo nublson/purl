@@ -3,11 +3,14 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import { usePlan } from "@/hooks/use-plan";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import type { Link } from "@/utils/links";
 import type { ReactNode } from "react";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
+import { LinkUpgradeItem } from "./link-upgrade-item";
 import { PdfThumbnail } from "./pdf-thumbnail";
+import { Separator } from "./ui/separator";
 
 type LinkPreviewProps = {
   children: ReactNode;
@@ -16,6 +19,8 @@ type LinkPreviewProps = {
   onOpenChange?: (open: boolean) => void;
   /** Eager-load preview thumbnail (first above-the-fold row) for LCP. */
   eagerThumbnail?: boolean;
+  onPreviewMouseEnter?: () => void;
+  onPreviewMouseLeave?: () => void;
 };
 
 export function LinkPreview({
@@ -24,7 +29,11 @@ export function LinkPreview({
   open,
   onOpenChange,
   eagerThumbnail = false,
+  onPreviewMouseEnter,
+  onPreviewMouseLeave,
 }: LinkPreviewProps) {
+  const { effectivePlanKey } = usePlan();
+  const isFree = effectivePlanKey === "FREE";
   const thumbnailSrc = link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
 
   return (
@@ -39,6 +48,8 @@ export function LinkPreview({
         side="right"
         align="start"
         className="p-0 flex-col hidden md:[@media(hover:hover)]:flex z-40"
+        onMouseEnter={onPreviewMouseEnter}
+        onMouseLeave={onPreviewMouseLeave}
       >
         {link.contentType === "PDF" ? (
           <PdfThumbnail url={link.url} />
@@ -58,15 +69,13 @@ export function LinkPreview({
               {link.description}
             </p>
           )}
-          <a
-            href={link.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:text-primary/80 text-xs font-normal line-clamp-1 break-all underline"
-          >
-            {link.url}
-          </a>
         </div>
+        {isFree && (
+          <>
+            <Separator />
+            <LinkUpgradeItem />
+          </>
+        )}
       </HoverCardContent>
     </HoverCard>
   );

@@ -1,6 +1,5 @@
 "use client";
 
-import { LimitBanner } from "@/components/limit-banner";
 import { LinkGroup } from "@/components/link-group";
 import { LinkInput } from "@/components/link-input";
 import { PasteHandler } from "@/components/paste-handler";
@@ -42,9 +41,7 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
   );
 
   const onSaveError = useCallback(
-    (
-      detail: { limit?: boolean; message?: string } | null,
-    ) => {
+    (detail: { limit?: boolean; message?: string } | null) => {
       setPendingUrl(null);
       if (detail?.limit && detail.message) {
         setLimitMessage(detail.message);
@@ -107,14 +104,6 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
 
   return (
     <>
-      {limitMessage ? (
-        <div className="mb-4 w-full max-w-2xl self-center">
-          <LimitBanner
-            message={limitMessage}
-            onDismiss={() => setLimitMessage(null)}
-          />
-        </div>
-      ) : null}
       <LinkInput
         onSaveStart={onPasteStart}
         onSaveSuccess={onSaveSuccess}

@@ -8,7 +8,8 @@
  * - Open PR preview: wait until all GitHub Actions check suites on the PR head pass.
  * - main (no PR): wait until commit status `release/build-validation` is set by
  *   the Release workflow Build Validation job (see .github/workflows/release.yml).
- * - Anything else (e.g. develop): proceed immediately.
+ * - develop: proceed immediately.
+ * - Anything else (feature branches without a PR): skip the build.
  *
  * Requires env GITHUB_WAIT_TOKEN on Vercel (classic PAT: repo scope, or
  * fine-grained: Contents read + Checks read + Commit statuses read).
@@ -53,7 +54,12 @@ if (prId) {
 }
 
 if (mode === "skip") {
-  exit(1);
+  if (commitRef === "develop") {
+    console.log("[vercel-wait-github-ci] develop branch; proceeding with build.");
+    exit(1);
+  }
+  console.log(`[vercel-wait-github-ci] Branch "${commitRef}" has no open PR; skipping build.`);
+  exit(0);
 }
 
 async function githubJson(path, { allow404 = false } = {}) {

@@ -1,6 +1,7 @@
 "use client";
 
-import { useChatContext } from "@/contexts/chat-context";
+import { useChatContext } from "@/hooks/use-chat-context";
+import { cn } from "@/lib/utils";
 import { ArrowUp } from "lucide-react";
 import type React from "react";
 import { useCallback } from "react";
@@ -17,6 +18,7 @@ interface ChatInputProps {
   onInputChange: (value: string) => void;
   onSubmit: (e?: React.FormEvent) => void;
   isLoading: boolean;
+  className?: string;
 }
 
 export default function ChatInput({
@@ -24,6 +26,7 @@ export default function ChatInput({
   onInputChange,
   onSubmit,
   isLoading,
+  className,
 }: ChatInputProps) {
   const { mentions, removeMention } = useChatContext();
 
@@ -38,7 +41,7 @@ export default function ChatInput({
   );
 
   return (
-    <form onSubmit={onSubmit} className="w-full p-4">
+    <form onSubmit={onSubmit} className="w-full sm:p-0 md:p-4 md:pt-0">
       <InputGroup className="w-full h-full dark:bg-input/30 items-end">
         {mentions.length > 0 && (
           <InputGroupAddon
@@ -56,14 +59,14 @@ export default function ChatInput({
         )}
         <InputGroupTextarea
           placeholder="Enter your message"
-          className="min-h-11 max-h-24 no-scrollbar"
+          className={cn("min-h-11 max-h-24 no-scrollbar", className)}
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={isLoading}
         />
         <InputGroupAddon align="block-end" className="justify-end gap-2">
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-2">
             <Button
               type="submit"
               size="icon-sm"

@@ -4,10 +4,12 @@ import { useAuth } from "@/hooks/use-auth";
 import { useSession } from "@/lib/auth-client";
 import {
   BadgeCheck,
+  House,
   LogOut,
   MessageCircleHeart,
   SettingsIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { FeedbackDialog } from "./dialog-feedback";
 import { SettingsDialog } from "./dialog-settings";
 import { UpgradeDialog } from "./dialog-upgrade";
@@ -19,14 +21,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
-import type { UsageMeterData } from "./usage-item";
 import { UserItem } from "./user-item";
 
-export function User({
-  usageSummary = null,
-}: {
-  usageSummary?: UsageMeterData | null;
-}) {
+export function User() {
   const { data: session } = useSession();
   const { signOut } = useAuth();
   const user = session?.user ?? null;
@@ -36,7 +33,12 @@ export function User({
       className="w-52"
       align="end"
       trigger={
-        <Button data-cy="user-menu-button" variant="ghost" size="icon-sm" className="rounded-full">
+        <Button
+          data-cy="user-menu-button"
+          variant="ghost"
+          size="icon-sm"
+          className="rounded-full"
+        >
           <Avatar>
             <AvatarImage
               className="rounded-full"
@@ -73,7 +75,7 @@ export function User({
             Share feedback
           </DropdownMenuItem>
         </FeedbackDialog>
-        <SettingsDialog usageSummary={usageSummary}>
+        <SettingsDialog>
           <DropdownMenuItem
             onSelect={(event) => {
               event.preventDefault();
@@ -95,7 +97,13 @@ export function User({
         </UpgradeDialog>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
-
+      <DropdownMenuItem data-cy="sign-out-menu-item" asChild>
+        <Link href="/">
+          <House />
+          Home page
+        </Link>
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
       <DropdownMenuItem data-cy="sign-out-menu-item" onClick={() => signOut()}>
         <LogOut />
         Sign out

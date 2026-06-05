@@ -1,11 +1,13 @@
 "use client";
 
+import type { ChatFlowError } from "@/lib/chat-flow-error";
 import type { Link } from "@/utils/links";
 import type { UIMessage } from "ai";
 import { useEffect, useRef } from "react";
 import { ScrollArea } from "../ui/scroll-area";
 import { Skeleton } from "../ui/skeleton";
 import { ChatEmpty } from "./chat-empty";
+import { ChatErrorMessage } from "./chat-error-message";
 import ChatMessage from "./chat-message";
 
 interface ChatAreaProps {
@@ -16,6 +18,8 @@ interface ChatAreaProps {
   onSuggestion: (text: string) => void;
   userAvatarUrl?: string | null;
   userDisplayName?: string | null;
+  flowError?: ChatFlowError | null;
+  onRetrySend?: () => void;
 }
 
 const SKELETON_ROWS: Array<{ role: "user" | "assistant"; lines: string[] }> = [
@@ -68,26 +72,38 @@ export default function ChatArea({
   onSuggestion,
   userAvatarUrl,
   userDisplayName,
+  flowError,
+  onRetrySend,
 }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, flowError]);
 
   if (isLoadingChat) {
     return <ChatAreaSkeleton />;
   }
 
   if (messages.length === 0) {
+    if (flowError) {
+      return (
+        <ScrollArea className="flex-1 w-full h-20 p-0 md:p-4 md:pb-0">
+          <div className="flex w-full flex-col items-stretch justify-start gap-4 h-full">
+            <ChatErrorMessage error={flowError} onRetrySend={onRetrySend} />
+            <div ref={bottomRef} />
+          </div>
+        </ScrollArea>
+      );
+    }
     return <ChatEmpty onSuggestion={onSuggestion} />;
   }
 
   const mentionsPerMessage = getMentionsPerMessage(messages, messageMentions);
 
   return (
-    <ScrollArea className="flex-1 w-full h-20 p-4 pb-0">
-      <div className="flex w-full flex-col items-stretch justify-start gap-4 h-full">
+    <ScrollArea className="flex-1 w-full h-20 p-0 md:p-4 md:pb-0">
+      <div className="flex w-full flex-col items-stretch justify-start gap-6 h-full">
         {messages.map((message, index) => (
           <ChatMessage
             key={message.id}
@@ -112,6 +128,9 @@ export default function ChatArea({
             isLoading
           />
         )}
+        {flowError ? (
+          <ChatErrorMessage error={flowError} onRetrySend={onRetrySend} />
+        ) : null}
         <div ref={bottomRef} />
       </div>
     </ScrollArea>

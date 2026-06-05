@@ -1,6 +1,7 @@
 "use client";
 
-import { useChatContextSafe } from "@/contexts/chat-context";
+import { useChatContextSafe } from "@/hooks/use-chat-context";
+import { usePreferences } from "@/hooks/use-preferences";
 import { cn } from "@/lib/utils";
 import { Link as LinkType } from "@/utils/links";
 import { MessageCircle } from "lucide-react";
@@ -45,6 +46,7 @@ export const LinkItem = React.forwardRef<
 ) {
   const chatCtx = useChatContextSafe();
   const router = useRouter();
+  const { preferences } = usePreferences();
 
   const lastLinkIdRef = React.useRef(link.id);
   const [displayIngestStatus, setDisplayIngestStatus] = React.useState<
@@ -79,6 +81,7 @@ export const LinkItem = React.forwardRef<
   >("idle");
   const [previewOpen, setPreviewOpen] = React.useState(false);
   const hoveringActionsRef = React.useRef(false);
+  const hoveringPreviewRef = React.useRef(false);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -108,7 +111,7 @@ export const LinkItem = React.forwardRef<
     clearCloseTimer();
 
     closeTimerRef.current = setTimeout(() => {
-      setPreviewOpen(false);
+      if (!hoveringPreviewRef.current) setPreviewOpen(false);
     }, 100);
   }, [clearCloseTimer, clearOpenTimer]);
 
@@ -120,8 +123,7 @@ export const LinkItem = React.forwardRef<
   }, [clearCloseTimer, clearOpenTimer]);
 
   const showIngestPulse =
-    displayIngestStatus === "PENDING" ||
-    displayIngestStatus === "PROCESSING";
+    displayIngestStatus === "PENDING" || displayIngestStatus === "PROCESSING";
 
   function renderLoadingOrChatAction(): React.ReactNode {
     if (
@@ -143,6 +145,10 @@ export const LinkItem = React.forwardRef<
           className="cursor-pointer text-muted-foreground"
           onClick={() => {
             chatCtx.addMention(linkForUi);
+            if (preferences.showChatWidget === false) {
+              router.push("/ai");
+              return;
+            }
             chatCtx.setIsWidgetOpen(true);
           }}
         >
@@ -211,10 +217,16 @@ export const LinkItem = React.forwardRef<
       </ItemMedia>
       <ItemContent>
         <ItemTitle>
-          <p data-cy="link-title" className="text-accent-foreground text-sm font-medium line-clamp-1 break-all">
+          <p
+            data-cy="link-title"
+            className="text-accent-foreground text-sm font-medium line-clamp-1 break-all"
+          >
             {link.title}
           </p>
-          <p data-cy="link-domain" className="text-muted-foreground text-sm font-normal hidden md:block">
+          <p
+            data-cy="link-domain"
+            className="text-muted-foreground text-sm font-normal hidden md:block"
+          >
             {link.domain}
           </p>
         </ItemTitle>
@@ -226,7 +238,6 @@ export const LinkItem = React.forwardRef<
             hoveringActionsRef.current = true;
             clearOpenTimer();
             clearCloseTimer();
-            setPreviewOpen(false);
           }}
           onMouseLeave={() => {
             hoveringActionsRef.current = false;
@@ -258,6 +269,14 @@ export const LinkItem = React.forwardRef<
       open={mode === "default" && previewOpen}
       onOpenChange={() => {
         // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.
+      }}
+      onPreviewMouseEnter={() => {
+        hoveringPreviewRef.current = true;
+        clearCloseTimer();
+      }}
+      onPreviewMouseLeave={() => {
+        hoveringPreviewRef.current = false;
+        scheduleClose();
       }}
     >
       {content}

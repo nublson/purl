@@ -4,40 +4,19 @@ import { Typography } from "@/components/typography";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useSession } from "@/lib/auth-client";
+import { useCheckout } from "@/hooks/use-checkout";
+import { useUsage } from "@/hooks/use-usage";
 import { PRO_ONETIME_PRICE_CENTS } from "@/lib/plans";
 import { Sparkles } from "lucide-react";
 import Link from "next/link";
-import * as React from "react";
-import { toast } from "sonner";
 
 const price = `$${PRO_ONETIME_PRICE_CENTS / 100}`;
 
 export function UpgradeCard() {
-  const { data: session } = useSession();
-  const [loading, setLoading] = React.useState(false);
-
-  const handleUpgrade = async () => {
-    if (!session?.user) {
-      toast.error("Please sign in to upgrade.");
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch("/api/billing/checkout", { method: "POST" });
-      const data = (await res.json()) as { url?: string; error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Checkout failed");
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      throw new Error("No checkout URL");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Checkout failed");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { startCheckout, loading } = useCheckout();
+  const { usageSummary } = useUsage();
+  const isTrial = usageSummary?.effectivePlanKey === "PRO_TRIAL";
+  const ctaLabel = loading ? "Redirecting…" : isTrial ? "Upgrade" : "Try for free";
 
   return (
     <Card size="sm">
@@ -60,10 +39,10 @@ export function UpgradeCard() {
           <Button
             size="sm"
             className="cursor-pointer"
-            onClick={() => void handleUpgrade()}
+            onClick={() => void startCheckout()}
             disabled={loading}
           >
-            {loading ? "Redirecting…" : "Try for free"}
+            {ctaLabel}
           </Button>
           <Button size="sm" variant="ghost" className="cursor-pointer" asChild>
             <Link href="/#pricing">Learn more</Link>

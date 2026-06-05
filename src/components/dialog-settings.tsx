@@ -1,51 +1,38 @@
 "use client";
 
+import { useUsage } from "@/hooks/use-usage";
 import * as React from "react";
 import { DialogWrapper } from "./dialog-wrapper";
 import { SettingsAccount } from "./settings-account";
 import { SettingsIntegrations } from "./settings-integrations";
+import { SettingsPreferences } from "./settings-preferences";
 import { SettingsTabs } from "./settings-tabs";
 import { SettingsUsage } from "./settings-usage";
 import { Badge } from "./ui/badge";
-import type { UsageMeterData } from "./usage-item";
 
 interface SettingsDialogProps {
   children: React.ReactNode;
-  usageSummary?: UsageMeterData | null;
 }
 
-export function SettingsDialog({
-  children,
-  usageSummary = null,
-}: SettingsDialogProps) {
+export function SettingsDialog({ children }: SettingsDialogProps) {
   const [open, setOpen] = React.useState(false);
 
   return (
     <DialogWrapper
-      className="md:min-w-xl"
+      className="md:min-w-xl md:min-h-[718px]"
       open={open}
       onOpenChange={setOpen}
       title="Settings"
       description="Manage your settings"
-      content={
-        <SettingsContent
-          closeDialog={() => setOpen(false)}
-          usageSummary={usageSummary}
-        />
-      }
+      content={<SettingsContent closeDialog={() => setOpen(false)} />}
     >
       {children}
     </DialogWrapper>
   );
 }
 
-function SettingsContent({
-  closeDialog,
-  usageSummary,
-}: {
-  closeDialog: () => void;
-  usageSummary: UsageMeterData | null;
-}) {
+function SettingsContent({ closeDialog }: { closeDialog: () => void }) {
+  const { usageSummary } = useUsage();
   const isTrial = usageSummary?.effectivePlanKey === "PRO_TRIAL";
 
   return (
@@ -55,21 +42,29 @@ function SettingsContent({
           label: "Usage",
           value: "usage",
           badge: isTrial ? (
-            <Badge variant="secondary" className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-0">
+            <Badge
+              variant="secondary"
+              className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-0"
+            >
               Trial
             </Badge>
           ) : undefined,
           content: <SettingsUsage data={usageSummary} />,
         },
         {
-          label: "Account",
-          value: "account",
-          content: <SettingsAccount closeDialog={closeDialog} />,
+          label: "Preferences",
+          value: "preferences",
+          content: <SettingsPreferences />,
         },
         {
           label: "Integrations",
           value: "integrations",
           content: <SettingsIntegrations />,
+        },
+        {
+          label: "Account",
+          value: "account",
+          content: <SettingsAccount closeDialog={closeDialog} />,
         },
       ]}
     />

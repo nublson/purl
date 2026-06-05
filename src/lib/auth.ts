@@ -48,6 +48,13 @@ export const auth = betterAuth({
     deleteUser: {
       enabled: true,
     },
+    additionalFields: {
+      preferences: {
+        type: "json",
+        required: false,
+        input: false,
+      },
+    },
   },
   session: {
     cookieCache: {
