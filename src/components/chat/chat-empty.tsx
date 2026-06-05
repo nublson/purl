@@ -9,7 +9,7 @@ interface ChatEmptyProps {
 
 export const ChatEmpty = ({ onSuggestion }: ChatEmptyProps) => {
   return (
-    <div className="flex-1 flex flex-col items-start justify-end gap-4 px-4">
+    <div className="flex-1 flex flex-col items-start justify-end gap-4 p-4">
       <div className="flex flex-col items-start justify-start gap-2">
         <Logo size={64} />
         <Typography component="h2" variant="h3">

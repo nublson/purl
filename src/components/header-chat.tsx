@@ -135,10 +135,10 @@ export default function HeaderChat({
           onDismiss={() => setHistoryError(null)}
         />
       ) : null}
-      <div className="w-full flex justify-between items-center p-4 bg-linear-to-b from-background to-transparent">
-        <div className="flex items-center justify-start gap-1">
-          <div className="flex items-center justify-start gap-1">
-            <Logo size={18} />
+      <div className="w-full flex justify-between items-center gap-2 p-4 bg-linear-to-b from-background to-transparent">
+        <div className="flex min-w-0 flex-1 items-center justify-start gap-1 overflow-hidden">
+          <div className="flex shrink-0 items-center justify-start gap-1">
+            <Logo size={18} pathname="/home" />
             <Button
               variant="ghost"
               size="sm"
@@ -159,27 +159,34 @@ export default function HeaderChat({
           <Typography
             component="span"
             size="small"
-            className="text-muted-foreground font-medium"
+            className="shrink-0 text-muted-foreground font-medium"
           >
             /
           </Typography>
           {isLoadingChat ? (
-            <Skeleton className="h-8 w-28" />
+            <Skeleton className="h-8 w-28 max-w-full shrink" />
           ) : (
-            <ChatHistory
-              chats={chats}
-              isLoading={isLoading}
-              onSelectChat={onSelectChat}
-              onOpenChange={handleHistoryOpenChange}
-            >
-              <Button variant="ghost" size="sm" className="cursor-pointer">
-                {label} <ChevronDown />
-              </Button>
-            </ChatHistory>
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <ChatHistory
+                chats={chats}
+                isLoading={isLoading}
+                onSelectChat={onSelectChat}
+                onOpenChange={handleHistoryOpenChange}
+              >
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="max-w-full min-w-0 shrink cursor-pointer gap-1 overflow-hidden"
+                >
+                  <span className="min-w-0 truncate">{label}</span>
+                  <ChevronDown className="shrink-0" />
+                </Button>
+              </ChatHistory>
+            </div>
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex shrink-0 items-center justify-end gap-2">
           <TooltipWrapper content="New chat">
             <Button
               variant="ghost"

@@ -32,7 +32,7 @@ export default function ChatUserMessage({
       )}
       from="user"
     >
-      <div className="shrink-0 mt-3">
+      <div className="shrink-0 mt-2">
         <Avatar className="size-5">
           <AvatarImage
             src={userAvatarUrl ?? ""}
@@ -41,7 +41,7 @@ export default function ChatUserMessage({
           <AvatarFallback>{userInitial}</AvatarFallback>
         </Avatar>
       </div>
-      <MessageContent className="min-w-0 max-w-[85%] gap-2">
+      <MessageContent className="min-w-0 max-w-[85%] group-[.is-user]:bg-muted/50! p-2! gap-2">
         <Typography
           size="small"
           className="text-accent-foreground wrap-anywhere"

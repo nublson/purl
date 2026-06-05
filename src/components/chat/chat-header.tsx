@@ -4,6 +4,7 @@ import { CHAT_ERROR_CODES, parseChatErrorBody } from "@/lib/chat-http-errors";
 import { ChevronDown, Minus, Plus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { TooltipWrapper } from "../tooltip-wrapper";
 import { Typography } from "../typography";
 import { Button } from "../ui/button";
 import { Skeleton } from "../ui/skeleton";
@@ -198,22 +199,26 @@ export default function ChatHeader({
           </div>
         )}
         <div className="flex items-center justify-center gap-2">
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="cursor-pointer"
-            onClick={onNewChat}
-          >
-            <Plus />
-          </Button>
-          <Button
-            size="icon-sm"
-            variant="ghost"
-            className="cursor-pointer"
-            onClick={onClose}
-          >
-            <Minus />
-          </Button>
+          <TooltipWrapper content="New chat">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="cursor-pointer"
+              onClick={onNewChat}
+            >
+              <Plus />
+            </Button>
+          </TooltipWrapper>
+          <TooltipWrapper content="Close chat">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="cursor-pointer"
+              onClick={onClose}
+            >
+              <Minus />
+            </Button>
+          </TooltipWrapper>
         </div>
       </div>
     </header>

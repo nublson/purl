@@ -29,8 +29,7 @@ export interface ChatAssistantMessageProps {
 function AssistantMarkdownFallback({ content }: { content: string }) {
   return (
     <Typography
-      size="small"
-      className="text-accent-foreground wrap-anywhere whitespace-pre-wrap"
+      className="text-base leading-6 text-foreground wrap-anywhere whitespace-pre-wrap"
     >
       {content}
     </Typography>
@@ -71,7 +70,7 @@ export default function ChatAssistantMessage({
           {showSpinner ? (
             <Loader2 className="size-4 animate-spin text-muted-foreground" />
           ) : (
-            <div className="min-w-0 max-w-full text-sm wrap-anywhere">
+            <div className="min-w-0 max-w-full wrap-anywhere">
               {hasReasoning && (
                 <Reasoning
                   className="w-full"
