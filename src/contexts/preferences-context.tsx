@@ -8,7 +8,6 @@ import { patchPreferences } from "@/lib/user-preferences-client";
 import {
   createContext,
   useCallback,
-  useContext,
   useState,
   type ReactNode,
 } from "react";
@@ -18,7 +17,7 @@ interface PreferencesContextValue {
   updatePreferences: (patch: Partial<UserPreferences>) => Promise<void>;
 }
 
-const PreferencesContext = createContext<PreferencesContextValue>({
+export const PreferencesContext = createContext<PreferencesContextValue>({
   preferences: DEFAULT_PREFERENCES,
   updatePreferences: async () => {},
 });
@@ -46,8 +45,4 @@ export function PreferencesProvider({
       {children}
     </PreferencesContext>
   );
-}
-
-export function usePreferences() {
-  return useContext(PreferencesContext);
 }

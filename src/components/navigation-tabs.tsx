@@ -1,7 +1,7 @@
 "use client";
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { usePreferences } from "@/contexts/preferences-context";
+import { usePreferences } from "@/hooks/use-preferences";
 import { House, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";

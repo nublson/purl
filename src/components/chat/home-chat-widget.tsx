@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { usePreferences } from "@/contexts/preferences-context";
+import { usePreferences } from "@/hooks/use-preferences";
 import { MessageCircle } from "lucide-react";
 import dynamic from "next/dynamic";
 

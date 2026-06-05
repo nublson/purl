@@ -1,6 +1,6 @@
 "use client";
 
-import { usePreferences } from "@/contexts/preferences-context";
+import { usePreferences } from "@/hooks/use-preferences";
 import type { UserPreferences } from "@/lib/user-preferences-shared";
 import {
   Select,
