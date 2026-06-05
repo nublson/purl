@@ -1,15 +1,7 @@
-import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-} from "@/components/ui/empty";
-import chatEmptySuggestionsJson from "@/data/chat-empty-suggestions.json" with {
-  type: "json",
-};
-import Image from "next/image";
-import { Button } from "../ui/button";
+import ChatItem from "@/components/chat/chat-item";
+import { chatEmptySuggestions } from "@/data/chat-empty-suggestions";
+import { Logo } from "../logo";
+import { Typography } from "../typography";
 
 interface ChatEmptyProps {
   onSuggestion: (text: string) => void;
@@ -17,27 +9,23 @@ interface ChatEmptyProps {
 
 export const ChatEmpty = ({ onSuggestion }: ChatEmptyProps) => {
   return (
-    <Empty>
-      <EmptyHeader>
-        <EmptyMedia>
-          <Image src="/logo.svg" alt="Purl" width={60} height={60} priority />
-        </EmptyMedia>
-        <EmptyDescription>
-          Purl AI lets you ask anything about your links.
-        </EmptyDescription>
-      </EmptyHeader>
-      <EmptyContent>
-        {chatEmptySuggestionsJson.suggestions.map((text) => (
-          <Button
-            key={text}
-            size="xs"
-            variant="outline"
-            onClick={() => onSuggestion(text)}
-          >
-            {text}
-          </Button>
+    <div className="flex-1 flex flex-col items-start justify-end gap-4 px-4">
+      <div className="flex flex-col items-start justify-start gap-2">
+        <Logo size={64} />
+        <Typography component="h2" variant="h3">
+          What magic shall we make happen?
+        </Typography>
+      </div>
+      <div className="flex flex-col items-start justify-start gap-1 w-full">
+        {chatEmptySuggestions.map(({ title, Icon }) => (
+          <ChatItem
+            key={title}
+            title={title}
+            icon={<Icon className="size-4" />}
+            onClick={() => onSuggestion(title)}
+          />
         ))}
-      </EmptyContent>
-    </Empty>
+      </div>
+    </div>
   );
 };
