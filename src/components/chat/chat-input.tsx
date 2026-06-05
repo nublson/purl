@@ -2,9 +2,11 @@
 
 import { useChatContext } from "@/hooks/use-chat-context";
 import { cn } from "@/lib/utils";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Loader2, Mic, MicOff } from "lucide-react";
 import type React from "react";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { CommitStrategy, useScribe } from "@elevenlabs/react";
 import { Button } from "../ui/button";
 import {
   InputGroup,
@@ -29,6 +31,78 @@ export default function ChatInput({
   className,
 }: ChatInputProps) {
   const { mentions, removeMention } = useChatContext();
+  const [partialText, setPartialText] = useState("");
+  const inputRef = useRef(input);
+  useEffect(() => { inputRef.current = input; }, [input]);
+
+  const scribe = useScribe({
+    modelId: "scribe_v2_realtime",
+    commitStrategy: CommitStrategy.VAD,
+    onPartialTranscript: (data) => setPartialText(data.text),
+    onCommittedTranscript: (data) => {
+      const current = inputRef.current;
+      onInputChange(current ? `${current} ${data.text}` : data.text);
+      setPartialText("");
+    },
+    onError: (err) => {
+      console.error("Scribe error:", err);
+      setPartialText("");
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("auth")) {
+        toast.error("Dictation auth failed. Please reload and try again.");
+      } else if (message.includes("quota")) {
+        toast.error("Dictation quota exceeded. Please try again later.");
+      } else {
+        toast.error("Dictation error. Please try again.");
+      }
+    },
+  });
+
+  const isListening =
+    scribe.status === "connected" || scribe.status === "transcribing";
+  const isConnecting = scribe.status === "connecting";
+
+  const toggleDictation = useCallback(async () => {
+    if (isListening) {
+      scribe.disconnect();
+      setPartialText("");
+      return;
+    }
+    // Pre-check mic permission — getUserMedia inside @elevenlabs/client runs
+    // in a fire-and-forget async chain that escapes our try/catch below.
+    // By probing first we surface NotAllowedError in our own code.
+    try {
+      const probe = await navigator.mediaDevices.getUserMedia({ audio: true });
+      probe.getTracks().forEach((t) => t.stop());
+    } catch (err) {
+      const name = err instanceof DOMException ? err.name : "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        toast.error(
+          "Microphone access denied. Allow microphone permissions in your browser and try again.",
+        );
+      } else {
+        toast.error("Could not access microphone. Please try again.");
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/scribe-token");
+      if (!res.ok) throw new Error("Failed to get token");
+      const { token } = await res.json();
+      await scribe.connect({
+        token,
+        microphone: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+    } catch (err) {
+      console.error("Dictation error:", err);
+      toast.error("Could not start dictation. Please try again.");
+    }
+  }, [isListening, scribe]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -39,6 +113,11 @@ export default function ChatInput({
     },
     [onSubmit],
   );
+
+  const displayValue =
+    isListening && partialText
+      ? `${input}${input ? " " : ""}${partialText}`
+      : input;
 
   return (
     <form onSubmit={onSubmit} className="w-full sm:p-0 md:p-4 md:pt-0">
@@ -58,15 +137,32 @@ export default function ChatInput({
           </InputGroupAddon>
         )}
         <InputGroupTextarea
-          placeholder="Enter your message"
+          placeholder={isListening ? "Listening…" : "Enter your message"}
           className={cn("min-h-11 max-h-24 no-scrollbar", className)}
-          value={input}
+          value={displayValue}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={isLoading}
+          disabled={isLoading || isListening}
         />
         <InputGroupAddon align="block-end" className="justify-end gap-2">
           <div className="shrink-0 flex items-center gap-2">
+            <Button
+              type="button"
+              size="icon-sm"
+              variant={isListening ? "destructive" : "ghost"}
+              className="cursor-pointer rounded-full"
+              onClick={toggleDictation}
+              disabled={isLoading || isConnecting}
+              title={isListening ? "Stop dictation" : "Dictate message"}
+            >
+              {isConnecting ? (
+                <Loader2 className="animate-spin" />
+              ) : isListening ? (
+                <MicOff />
+              ) : (
+                <Mic />
+              )}
+            </Button>
             <Button
               type="submit"
               size="icon-sm"
