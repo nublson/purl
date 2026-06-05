@@ -1,16 +1,13 @@
 "use client";
 
+import type { ChatHistoryItem } from "@/components/chat/chat-history";
 import ChatInput from "@/components/chat/chat-input";
 import ChatItem from "@/components/chat/chat-item";
 import ChatItemGroup from "@/components/chat/chat-item-group";
-import type { ChatHistoryItem } from "@/components/chat/chat-history";
 import { Logo } from "@/components/logo";
 import { Typography } from "@/components/typography";
 import { useChatContext } from "@/contexts/chat-context";
-import chatEmptySuggestionsJson from "@/data/chat-empty-suggestions.json" with {
-  type: "json",
-};
-import { Brain, CalendarDays } from "lucide-react";
+import { chatEmptySuggestions } from "@/data/chat-empty-suggestions";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -121,18 +118,12 @@ export default function AiPage() {
         </ChatItemGroup>
 
         <ChatItemGroup title="Suggested">
-          {chatEmptySuggestionsJson.suggestions.map((text, index) => (
+          {chatEmptySuggestions.map(({ title, Icon }) => (
             <ChatItem
-              key={text}
-              title={text}
-              icon={
-                index === 0 ? (
-                  <Brain className="size-4" />
-                ) : (
-                  <CalendarDays className="size-4" />
-                )
-              }
-              onClick={() => handleSuggestion(text)}
+              key={title}
+              title={title}
+              icon={<Icon className="size-4" />}
+              onClick={() => handleSuggestion(title)}
             />
           ))}
         </ChatItemGroup>
