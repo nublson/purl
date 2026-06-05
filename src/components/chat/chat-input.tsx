@@ -4,7 +4,8 @@ import { useChatContext } from "@/hooks/use-chat-context";
 import { cn } from "@/lib/utils";
 import { ArrowUp, Loader2, Mic, MicOff } from "lucide-react";
 import type React from "react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { CommitStrategy, useScribe } from "@elevenlabs/react";
 import { Button } from "../ui/button";
 import {
@@ -31,13 +32,16 @@ export default function ChatInput({
 }: ChatInputProps) {
   const { mentions, removeMention } = useChatContext();
   const [partialText, setPartialText] = useState("");
+  const inputRef = useRef(input);
+  useEffect(() => { inputRef.current = input; }, [input]);
 
   const scribe = useScribe({
     modelId: "scribe_v2_realtime",
     commitStrategy: CommitStrategy.VAD,
     onPartialTranscript: (data) => setPartialText(data.text),
     onCommittedTranscript: (data) => {
-      onInputChange(input ? `${input} ${data.text}` : data.text);
+      const current = inputRef.current;
+      onInputChange(current ? `${current} ${data.text}` : data.text);
       setPartialText("");
     },
   });
@@ -66,6 +70,7 @@ export default function ChatInput({
       });
     } catch (err) {
       console.error("Dictation error:", err);
+      toast.error("Could not start dictation. Please try again.");
     }
   }, [isListening, scribe]);
 
