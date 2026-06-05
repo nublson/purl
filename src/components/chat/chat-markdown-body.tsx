@@ -52,7 +52,7 @@ export function ChatMarkdownBody({ content }: { content: string }) {
         li: ({ ...props }) => <li className="mb-1" {...props} />,
         h1: ({ ...props }) => (
           <Typography
-            component="h4"
+            component="h3"
             size="small"
             className="mb-2 font-semibold"
             {...props}
@@ -60,7 +60,7 @@ export function ChatMarkdownBody({ content }: { content: string }) {
         ),
         h2: ({ ...props }) => (
           <Typography
-            component="h5"
+            component="h4"
             size="small"
             className="mb-2 font-semibold"
             {...props}
@@ -68,7 +68,7 @@ export function ChatMarkdownBody({ content }: { content: string }) {
         ),
         h3: ({ ...props }) => (
           <Typography
-            component="h6"
+            component="h5"
             size="small"
             className="mb-2 font-semibold"
             {...props}
