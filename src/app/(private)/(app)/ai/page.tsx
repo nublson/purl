@@ -5,6 +5,7 @@ import ChatInput from "@/components/chat/chat-input";
 import ChatItem from "@/components/chat/chat-item";
 import ChatItemGroup from "@/components/chat/chat-item-group";
 import { Logo } from "@/components/logo";
+import { ChatItemSkeleton } from "@/components/skeletons";
 import { Typography } from "@/components/typography";
 import { useChatContext } from "@/contexts/chat-context";
 import { chatEmptySuggestions } from "@/data/chat-empty-suggestions";
@@ -99,9 +100,7 @@ export default function AiPage() {
       <div className="w-full flex flex-col md:flex-row items-start justify-between gap-4 px-0 md:px-4 pt-14">
         <ChatItemGroup title="Recent chats">
           {isLoadingChats ? (
-            <Typography size="small" className="text-muted-foreground px-2.5">
-              Loading…
-            </Typography>
+            <ChatItemSkeleton count={2} />
           ) : recentChats.length === 0 ? (
             <Typography size="small" className="text-muted-foreground px-2.5">
               No past chats
@@ -118,14 +117,18 @@ export default function AiPage() {
         </ChatItemGroup>
 
         <ChatItemGroup title="Suggested">
-          {chatEmptySuggestions.map(({ title, Icon }) => (
-            <ChatItem
-              key={title}
-              title={title}
-              icon={<Icon className="size-4" />}
-              onClick={() => handleSuggestion(title)}
-            />
-          ))}
+          {isLoadingChats ? (
+            <ChatItemSkeleton count={chatEmptySuggestions.length} />
+          ) : (
+            chatEmptySuggestions.map(({ title, Icon }) => (
+              <ChatItem
+                key={title}
+                title={title}
+                icon={<Icon className="size-4" />}
+                onClick={() => handleSuggestion(title)}
+              />
+            ))
+          )}
         </ChatItemGroup>
       </div>
     </div>
