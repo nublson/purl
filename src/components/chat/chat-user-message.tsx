@@ -48,20 +48,6 @@ export default function ChatUserMessage({
         >
           {content}
         </Typography>
-        {mentions && mentions.length > 0 && (
-          <div className="flex w-full items-center justify-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar">
-            {mentions.map((link) => (
-              <a
-                key={link.id}
-                href={link.url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <ChatMention link={link} />
-              </a>
-            ))}
-          </div>
-        )}
       </MessageContent>
     </Message>
   );
