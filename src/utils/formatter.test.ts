@@ -1,14 +1,40 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   formatChatHistoryTime,
+  formatDomain,
   getRelativeDateLabel,
   getUrlDomain,
   groupChatsByChatHistoryDate,
 } from "./formatter";
 
+describe("formatDomain", () => {
+  it("strips subdomains", () => {
+    expect(formatDomain("cdn.prod.website-files.com")).toBe("website-files.com");
+  });
+
+  it("strips www. prefix", () => {
+    expect(formatDomain("www.example.com")).toBe("example.com");
+  });
+
+  it("leaves bare domains unchanged", () => {
+    expect(formatDomain("github.com")).toBe("github.com");
+    expect(formatDomain("claude.com")).toBe("claude.com");
+  });
+
+  it("handles multi-part public suffixes", () => {
+    expect(formatDomain("www.bbc.co.uk")).toBe("bbc.co.uk");
+  });
+});
+
 describe("getUrlDomain", () => {
   it("strips www. prefix", () => {
     expect(getUrlDomain("https://www.example.com/path")).toBe("example.com");
+  });
+
+  it("strips nested subdomains", () => {
+    expect(
+      getUrlDomain("https://cdn.prod.website-files.com/some/path"),
+    ).toBe("website-files.com");
   });
 
   it("leaves non-www hostnames unchanged", () => {

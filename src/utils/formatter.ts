@@ -1,7 +1,49 @@
+/** Common ccTLD second-level suffixes where registrable domain is three labels. */
+const MULTI_PART_SUFFIXES = new Set([
+  "co.uk",
+  "org.uk",
+  "ac.uk",
+  "gov.uk",
+  "net.uk",
+  "com.au",
+  "net.au",
+  "org.au",
+  "edu.au",
+  "co.jp",
+  "ne.jp",
+  "or.jp",
+  "co.nz",
+  "co.kr",
+  "com.br",
+  "com.mx",
+  "co.in",
+  "com.sg",
+  "com.hk",
+]);
+
+function stripWww(hostname: string): string {
+  return hostname.startsWith("www.") ? hostname.slice(4) : hostname;
+}
+
+/** Returns the registrable domain (eTLD+1), e.g. cdn.prod.website-files.com → website-files.com */
+export function formatDomain(hostname: string): string {
+  const trimmed = hostname.trim();
+  const host = stripWww(trimmed.toLowerCase());
+  if (!host.includes(".")) return trimmed;
+
+  const parts = host.split(".");
+  if (parts.length <= 2) return host;
+
+  const lastTwo = `${parts.at(-2)}.${parts.at(-1)}`;
+  if (MULTI_PART_SUFFIXES.has(lastTwo)) {
+    return parts.slice(-3).join(".");
+  }
+  return lastTwo;
+}
+
 export function getUrlDomain(url: string): string {
   try {
-    const hostname = new URL(url).hostname;
-    return hostname.startsWith("www.") ? hostname.slice(4) : hostname;
+    return formatDomain(new URL(url).hostname);
   } catch {
     return url;
   }

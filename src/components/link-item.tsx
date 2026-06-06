@@ -3,6 +3,7 @@
 import { useChatContextSafe } from "@/hooks/use-chat-context";
 import { usePreferences } from "@/hooks/use-preferences";
 import { cn } from "@/lib/utils";
+import { formatDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
 import { MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -13,6 +14,7 @@ import { LinkMenu } from "./link-menu";
 import { LinkPreview } from "./link-preview";
 import { LinkItemSkeleton } from "./skeletons";
 import { TooltipWrapper } from "./tooltip-wrapper";
+import { Typography } from "./typography";
 import { Button } from "./ui/button";
 import {
   Item,
@@ -217,18 +219,19 @@ export const LinkItem = React.forwardRef<
       </ItemMedia>
       <ItemContent>
         <ItemTitle>
-          <p
-            data-cy="link-title"
-            className="text-accent-foreground text-sm font-medium line-clamp-1 break-all"
+          <Typography
+            size="small"
+            className="text-accent-foreground font-medium line-clamp-1 break-all"
           >
             {link.title}
-          </p>
-          <p
-            data-cy="link-domain"
-            className="text-muted-foreground text-sm font-normal hidden md:block"
+          </Typography>
+          <Typography
+            component="span"
+            size="small"
+            className="text-muted-foreground font-normal hidden md:block"
           >
-            {link.domain}
-          </p>
+            {formatDomain(link.domain)}
+          </Typography>
         </ItemTitle>
       </ItemContent>
       {mode !== "preview" && (
