@@ -35,7 +35,7 @@ export default function AiPage() {
       }
       const data = body as { chats?: ChatHistoryItem[] };
       const chats = data.chats ?? [];
-      setRecentChats(chats.slice(0, 5));
+      setRecentChats(chats.slice(0, 3));
     } catch {
       setRecentChats([]);
     } finally {
