@@ -68,6 +68,7 @@ jobs:
       - name: Build application
         run: pnpm build
         env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
           DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
           BETTER_AUTH_SECRET: "ci-build-placeholder-min-32-chars-do-not-use"
           BETTER_AUTH_URL: "http://localhost:3000"
