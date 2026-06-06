@@ -16,14 +16,14 @@ The product goal: one place to stash material you care about, then query it late
 
 ## Plans (summary)
 
-| Feature                       | Free | Pro ($39 one-time) | BYOK (free) |
-| ----------------------------- | ---- | ------------------ | ----------- |
-| Save links (100 lifetime cap) | Yes  | Unlimited          | Unlimited   |
-| Full-text search              | Yes  | Yes                | Yes         |
+| Feature                       | Free | Pro ($39 one-time) | BYOK (free)     |
+| ----------------------------- | ---- | ------------------ | --------------- |
+| Save links (100 lifetime cap) | Yes  | Unlimited          | Unlimited       |
+| Full-text search              | Yes  | Yes                | Yes             |
 | AI extraction & embeddings    | No   | Yes (150/mo)       | Yes (unlimited) |
-| Semantic search               | No   | Yes                | Yes         |
-| PDF/audio **upload**          | No   | Yes                | Yes         |
-| AI chat                       | No   | 300 msg/mo         | Unlimited   |
+| Semantic search               | No   | Yes                | Yes             |
+| PDF/audio **upload**          | No   | Yes                | Yes             |
+| AI chat                       | No   | 300 msg/mo         | Unlimited       |
 
 Exact limits are in [`docs/commercial-model.md`](docs/commercial-model.md).
 
