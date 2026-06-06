@@ -68,8 +68,8 @@ export function useChatConversation() {
   const chatIdRef = useRef(chatId);
   const mentionsRef = useRef(mentions);
   const inputRef = useRef("");
-  const needsInitialRestoreRef = useRef(true);
   const loadAbortRef = useRef<AbortController | null>(null);
+  const lastSyncedChatIdRef = useRef<string | null>(null);
   const lastRequestIdRef = useRef<string | null>(null);
   const messagesForSnapshotRef = useRef<UIMessage[]>([]);
   const messageMentionsForSnapshotRef = useRef<Link[][]>([]);
@@ -395,6 +395,7 @@ export function useChatConversation() {
           messages: payload.messages as unknown[],
           messageMentions: payload.messageMentions,
         });
+        lastSyncedChatIdRef.current = id;
       } finally {
         setIsLoadingChat(false);
       }
@@ -433,17 +434,16 @@ export function useChatConversation() {
   }, [isLoading, chatId, setChatTitle]);
 
   useEffect(() => {
-    if (!needsInitialRestoreRef.current) return;
     const id = chatId;
     if (!id) {
-      needsInitialRestoreRef.current = false;
+      lastSyncedChatIdRef.current = null;
       return;
     }
-    if (pendingSummarize || pendingMessage) {
-      needsInitialRestoreRef.current = false;
+    if (pendingSummarize || pendingMessage) return;
+    if (pendingMessageInFlightRef.current || summarizeInFlightRef.current) {
       return;
     }
-    needsInitialRestoreRef.current = false;
+    if (lastSyncedChatIdRef.current === id) return;
     void syncChatFromServer(id);
   }, [chatId, syncChatFromServer, pendingSummarize, pendingMessage]);
 
@@ -677,6 +677,7 @@ export function useChatConversation() {
     const prev = chatIdRef.current;
     if (prev) clearDraft(prev);
     clearDraft(DRAFT_NEW_CHAT_KEY);
+    lastSyncedChatIdRef.current = null;
     startNewChat();
     setMessages([]);
     setMessageMentions([]);
@@ -687,6 +688,7 @@ export function useChatConversation() {
 
   const handleSelectChat = useCallback(
     async (id: string) => {
+      lastSyncedChatIdRef.current = null;
       await syncChatFromServer(id);
     },
     [syncChatFromServer],
