@@ -18,7 +18,11 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
   const { startCheckout, loading } = useCheckout();
   const { usageSummary } = useUsage();
   const isTrial = usageSummary?.effectivePlanKey === "PRO_TRIAL";
-  const ctaLabel = loading ? "Redirecting…" : isTrial ? "Upgrade" : "Try for free";
+  const ctaLabel = loading
+    ? "Redirecting…"
+    : isTrial
+      ? "Upgrade"
+      : "Try for free";
   const proPlan = publicPlans.find((p) => p.id === "PRO");
 
   const content = (
@@ -64,7 +68,7 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
       title="Upgrade to Pro"
       description="Save links for free. Pay once to unlock the full AI knowledge base."
       content={content}
-      className="min-w-sm md:min-w-lg max-h-[90vh] md:max-h-none"
+      className="dialog-top"
     >
       {children}
     </DialogWrapper>

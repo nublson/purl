@@ -19,7 +19,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
 
   return (
     <DialogWrapper
-      className="md:min-w-xl md:min-h-[718px]"
+      className="dialog-top"
       open={open}
       onOpenChange={setOpen}
       title="Settings"

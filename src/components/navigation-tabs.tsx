@@ -18,7 +18,7 @@ export function NavigationTabs() {
       : defaultPage;
 
   return (
-    <Tabs className="fixed top-3.5 z-51" value={activeTab}>
+    <Tabs className="fixed top-3.5 z-50" value={activeTab}>
       <TabsList className="bg-accent/40">
         <TabsTrigger
           value="home"

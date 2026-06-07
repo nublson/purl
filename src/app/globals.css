@@ -145,3 +145,7 @@ body {
 .wrapper-center {
   @apply w-full flex-1 flex flex-col items-center justify-center;
 }
+
+.dialog-top {
+  @apply top-0 md:top-24 translate-y-0 md:-translate-x-1/2 h-dvh max-h-dvh md:h-auto md:max-h-[calc(100dvh-11rem)] w-screen max-w-none md:w-[90vw] md:max-w-xl rounded-none md:rounded-xl;
+}

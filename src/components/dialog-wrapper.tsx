@@ -39,7 +39,7 @@ export function DialogWrapper({
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent
         className={cn(
-          "gap-4 px-0",
+          "gap-4 px-0 z-51",
           content && "flex min-h-0 flex-col overflow-hidden",
           className,
         )}
