@@ -26,7 +26,7 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
   const proPlan = publicPlans.find((p) => p.id === "PRO");
 
   const content = (
-    <div className="flex min-h-0 flex-col gap-4 px-6 pb-6">
+    <div className="flex min-h-0 flex-col items-center justify-center gap-4 px-6 pb-6">
       {proPlan ? (
         <PricingCard
           name={proPlan.name}
@@ -38,14 +38,7 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
           popular={proPlan.popular}
           onCtaClick={session?.user ? () => void startCheckout() : undefined}
           ctaLoading={loading}
-          footer={
-            session?.user ? undefined : (
-              <Typography size="small" className="text-muted-foreground">
-                Sign in to upgrade.
-              </Typography>
-            )
-          }
-          className="w-full rounded-lg border border-primary/30 bg-primary/5 px-6 py-6"
+          className="bg-primary/5 p-6 max-w-96"
         />
       ) : null}
       <div className="flex items-center gap-3 text-muted-foreground">

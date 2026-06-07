@@ -15,7 +15,10 @@ interface SettingsTabsProps {
 export function SettingsTabs({ tabs }: SettingsTabsProps) {
   return (
     <Tabs defaultValue={tabs[0].value} className="w-full gap-0">
-      <TabsList variant="line" className="px-6">
+      <TabsList
+        variant="line"
+        className="px-4 md:px-6 w-full overflow-x-auto overflow-y-hidden"
+      >
         {tabs.map((tab) => (
           <TabsTrigger key={tab.value} value={tab.value}>
             {tab.label}
