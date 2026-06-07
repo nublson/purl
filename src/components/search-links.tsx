@@ -49,7 +49,7 @@ export default function SearchLinks({ links: linksProp }: { links: Link[] }) {
       <CommandDialog
         open={open}
         onOpenChange={setOpen}
-        className="sm:max-w-2xl"
+        className="dialog-top top-24! h-auto! w-[90vw]!"
         title="Search links"
         description="Filter your saved links by title, URL, or domain"
       >
