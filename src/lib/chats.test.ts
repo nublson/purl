@@ -53,6 +53,7 @@ const {
   deleteChat,
   getChatsForCurrentUser,
   getChatWithMessages,
+  updateChatTitle,
 } = await import("./chats");
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
@@ -344,6 +345,61 @@ describe("getChatsForCurrentUser", () => {
     mockNoSession();
 
     await expect(getChatsForCurrentUser()).rejects.toThrow();
+  });
+});
+
+describe("updateChatTitle", () => {
+  beforeEach(() => {
+    vi.mocked(auth.api.getSession).mockReset();
+    vi.mocked(prisma.chat.findFirst).mockReset();
+    vi.mocked(prisma.chat.update).mockReset();
+  });
+
+  it("returns null when the title is empty after trimming", async () => {
+    mockSession();
+
+    const result = await updateChatTitle("chat-1", "   ");
+
+    expect(result).toBeNull();
+    expect(prisma.chat.findFirst).not.toHaveBeenCalled();
+    expect(prisma.chat.update).not.toHaveBeenCalled();
+  });
+
+  it("returns null when the chat does not belong to the user", async () => {
+    mockSession();
+    vi.mocked(prisma.chat.findFirst).mockResolvedValue(null);
+
+    const result = await updateChatTitle("chat-ghost", "Renamed");
+
+    expect(result).toBeNull();
+    expect(prisma.chat.update).not.toHaveBeenCalled();
+  });
+
+  it("trims and truncates the title to 80 characters before saving", async () => {
+    mockSession();
+    vi.mocked(prisma.chat.findFirst).mockResolvedValue({ id: "chat-1" } as never);
+    const longTitle = ` ${"a".repeat(100)} `;
+    const expectedTitle = "a".repeat(80);
+    vi.mocked(prisma.chat.update).mockResolvedValue({
+      id: "chat-1",
+      title: expectedTitle,
+    } as never);
+
+    const result = await updateChatTitle("chat-1", longTitle);
+
+    expect(result).toEqual({ id: "chat-1", title: expectedTitle });
+    expect(prisma.chat.update).toHaveBeenCalledWith({
+      where: { id: "chat-1" },
+      data: { title: expectedTitle, updatedAt: expect.any(Date) },
+      select: { id: true, title: true },
+    });
+  });
+
+  it("throws when unauthenticated", async () => {
+    mockNoSession();
+
+    await expect(updateChatTitle("chat-1", "New title")).rejects.toThrow();
+    expect(prisma.chat.findFirst).not.toHaveBeenCalled();
   });
 });
 
