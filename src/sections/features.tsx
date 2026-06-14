@@ -10,6 +10,7 @@ import {
   Key,
   Link2,
   MessageSquareText,
+  Plug,
   ScrollText,
   Search,
 } from "lucide-react";
@@ -18,6 +19,7 @@ const featureIcons = {
   Key,
   Link2,
   MessageSquareText,
+  Plug,
   ScrollText,
   Search,
   Braces,

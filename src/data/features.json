@@ -14,19 +14,20 @@
     "description": "Upload a PDF and ask questions about it. Purl reads the full document and surfaces exactly what you need.",
     "icon": "ScrollText"
   },
-  {
-    "title": "Semantic search",
-    "description": "Find anything across your library by meaning, not just keywords. Ask in plain English and Purl surfaces the right content.",
-    "icon": "Search"
-  },
+
   {
     "title": "Bring your own key",
     "description": "Add your own Anthropic API key in Settings to get full AI access for free. You pay Anthropic directly; Purl covers embeddings.",
     "icon": "Key"
   },
   {
-    "title": "Purl API",
-    "description": "Access your saved content programmatically. Query your library, trigger ingestion, and build on top of your knowledge base.",
+    "title": "Connect any AI Agent",
+    "description": "Plug Purl into Claude, Cursor, or VS Code over the MCP. Your agent can search and save to your library directly.",
+    "icon": "Plug"
+  },
+  {
+    "title": "Build with the API",
+    "description": "Save links, search, and pull your content into your own scripts and tools with a simple REST API and a Purl key.",
     "icon": "Braces"
   }
 ]
