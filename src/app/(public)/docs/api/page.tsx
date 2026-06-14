@@ -3,6 +3,7 @@ import { MethodBadge } from "@/components/docs/method-badge";
 import { ParamTable } from "@/components/docs/param-table";
 import { Typography } from "@/components/typography";
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "API Reference",
@@ -27,6 +28,13 @@ export default function ApiDocsPage() {
           <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
             https://purl.so/api/v1
           </code>
+        </Typography>
+        <Typography size="mini" className="text-muted-foreground">
+          Using an AI client?{" "}
+          <Link href="/docs/mcp" className="underline underline-offset-4">
+            Connect over MCP
+          </Link>{" "}
+          instead.
         </Typography>
       </header>
 
