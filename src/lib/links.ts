@@ -475,6 +475,14 @@ export async function reingestLink(
 /** Creates a link for the current user after scraping metadata. If a link with the same URL already exists, updates its createdAt and returns it. Throws UnauthorizedError if not authenticated. */
 export async function createLink(url: string): Promise<CreateLinkResult> {
   const userId = await getCurrentUserId();
+  return createLinkForUser(userId, url);
+}
+
+/** Creates a link for an explicit user id. Used where the caller has already resolved the user (e.g. the MCP server via bearer token). */
+export async function createLinkForUser(
+  userId: string,
+  url: string,
+): Promise<CreateLinkResult> {
   const existing = await prisma.link.findFirst({
     where: { userId, url },
   });
@@ -505,6 +513,14 @@ export async function createLink(url: string): Promise<CreateLinkResult> {
 /** Fetches a single link if it belongs to the current user; otherwise null. Throws UnauthorizedError if not authenticated. */
 export async function readLink(id: string): Promise<Link | null> {
   const userId = await getCurrentUserId();
+  return readLinkForUser(userId, id);
+}
+
+/** Fetches a single link for an explicit user id; otherwise null. */
+export async function readLinkForUser(
+  userId: string,
+  id: string,
+): Promise<Link | null> {
   const row = await prisma.link.findFirst({
     where: { id, userId },
   });
@@ -593,6 +609,14 @@ export type ListLinksResult = {
 
 export async function listLinks(opts: ListLinksOptions): Promise<ListLinksResult> {
   const userId = await getCurrentUserId();
+  return listLinksForUser(userId, opts);
+}
+
+/** Lists links for an explicit user id. Used where the caller has already resolved the user (e.g. the MCP server via bearer token). */
+export async function listLinksForUser(
+  userId: string,
+  opts: ListLinksOptions,
+): Promise<ListLinksResult> {
   const { limit, cursor, contentType } = opts;
 
   type WhereInput = {

@@ -126,6 +126,8 @@ export async function semanticSearch(
     similarityThreshold?: SimilarityThreshold;
     dateFrom?: Date;
     dateTo?: Date;
+    /** Observability tags attached to the embed call (e.g. ["feature:mcp"]). */
+    tags?: string[];
   },
 ): Promise<LinkSearchResult[]> {
   const normalizedQuery = query.trim();
@@ -134,7 +136,7 @@ export async function semanticSearch(
   try {
     const embedding = await embedQuery(normalizedQuery, {
       user: userId,
-      tags: ["feature:semantic-search"],
+      tags: options?.tags ?? ["feature:semantic-search"],
     });
     const embeddingVector = JSON.stringify(embedding);
     const resultLimit = Math.max(1, Math.min(options?.matchCount ?? 20, 50));
