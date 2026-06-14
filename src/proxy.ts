@@ -60,9 +60,10 @@ export async function proxy(request: NextRequest) {
     return rateLimited;
   }
 
-  // API v1 routes authenticate at the route handler level — bypass session redirect
+  // API v1 and MCP routes authenticate at the route handler level (API key /
+  // bearer token) — bypass the session redirect.
   const currentPath = request.nextUrl.pathname;
-  if (currentPath.startsWith("/api/v1/")) {
+  if (currentPath.startsWith("/api/v1/") || currentPath.startsWith("/api/mcp")) {
     return NextResponse.next();
   }
 
