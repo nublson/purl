@@ -1,4 +1,5 @@
 import { CodeBlock } from "@/components/docs/code-block";
+import { McpInstallButtons } from "@/components/docs/mcp-install-buttons";
 import { ParamTable } from "@/components/docs/param-table";
 import { Typography } from "@/components/typography";
 import { getAppBaseUrl } from "@/lib/billing-url";
@@ -100,6 +101,8 @@ export default function McpDocsPage() {
           <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">purl_…</code>{" "}
           with your key.
         </Typography>
+
+        <McpInstallButtons endpoint={endpoint} />
 
         <div className="flex flex-col gap-2">
           <Typography size="small" className="font-medium">
