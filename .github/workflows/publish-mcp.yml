@@ -4,7 +4,7 @@ name: Publish to MCP Registry
 # Auth uses GitHub OIDC — no secrets required. The `io.github.nublson/*` namespace is
 # authorized because this workflow runs in a repo owned by `nublson`.
 #
-# The remote server URL (https://purl.so/api/mcp) MUST be live before publishing, so tag
+# The remote server URL (https://purl.nublson.com/api/mcp) MUST be live before publishing, so tag
 # a release only AFTER the production deploy is out.
 
 on:

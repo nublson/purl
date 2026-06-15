@@ -26,7 +26,7 @@ export default function ApiDocsPage() {
         <Typography size="mini" className="text-muted-foreground mt-4">
           Base URL:{" "}
           <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
-            https://purl.so/api/v1
+            https://purl.nublson.com/api/v1
           </code>
         </Typography>
         <Typography size="mini" className="text-muted-foreground">
@@ -128,7 +128,7 @@ export default function ApiDocsPage() {
           </Typography>
           <CodeBlock
             language="curl"
-            code={`curl https://purl.so/api/v1/links?limit=10 \\
+            code={`curl https://purl.nublson.com/api/v1/links?limit=10 \\
   -H "Authorization: Bearer purl_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"`}
           />
           <Typography size="mini" className="font-medium text-foreground">
@@ -191,7 +191,7 @@ export default function ApiDocsPage() {
           </Typography>
           <CodeBlock
             language="curl"
-            code={`curl -X POST https://purl.so/api/v1/links \\
+            code={`curl -X POST https://purl.nublson.com/api/v1/links \\
   -H "Authorization: Bearer purl_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \\
   -H "Content-Type: application/json" \\
   -d '{"url": "https://example.com/article"}'`}
@@ -229,7 +229,7 @@ export default function ApiDocsPage() {
           </Typography>
           <CodeBlock
             language="curl"
-            code={`curl https://purl.so/api/v1/links/clxyz123 \\
+            code={`curl https://purl.nublson.com/api/v1/links/clxyz123 \\
   -H "Authorization: Bearer purl_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"`}
           />
         </div>
@@ -270,7 +270,7 @@ export default function ApiDocsPage() {
           />
           <CodeBlock
             language="curl"
-            code={`curl -X PATCH https://purl.so/api/v1/links/clxyz123 \\
+            code={`curl -X PATCH https://purl.nublson.com/api/v1/links/clxyz123 \\
   -H "Authorization: Bearer purl_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \\
   -H "Content-Type: application/json" \\
   -d '{"title": "Updated title"}'`}
@@ -294,7 +294,7 @@ export default function ApiDocsPage() {
           </Typography>
           <CodeBlock
             language="curl"
-            code={`curl -X DELETE https://purl.so/api/v1/links/clxyz123 \\
+            code={`curl -X DELETE https://purl.nublson.com/api/v1/links/clxyz123 \\
   -H "Authorization: Bearer purl_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"`}
           />
         </div>
@@ -318,7 +318,7 @@ export default function ApiDocsPage() {
           </Typography>
           <CodeBlock
             language="curl"
-            code={`curl https://purl.so/api/v1/keys \\
+            code={`curl https://purl.nublson.com/api/v1/keys \\
   -H "Authorization: Bearer purl_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"`}
           />
           <CodeBlock
@@ -356,7 +356,7 @@ export default function ApiDocsPage() {
           />
           <CodeBlock
             language="curl"
-            code={`curl -X POST https://purl.so/api/v1/keys \\
+            code={`curl -X POST https://purl.nublson.com/api/v1/keys \\
   -H "Authorization: Bearer purl_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" \\
   -H "Content-Type: application/json" \\
   -d '{"name": "My App"}'`}
@@ -395,7 +395,7 @@ export default function ApiDocsPage() {
           </Typography>
           <CodeBlock
             language="curl"
-            code={`curl -X DELETE https://purl.so/api/v1/keys/key_abc123 \\
+            code={`curl -X DELETE https://purl.nublson.com/api/v1/keys/key_abc123 \\
   -H "Authorization: Bearer purl_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"`}
           />
         </div>

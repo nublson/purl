@@ -11,7 +11,7 @@
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://purl.so/api/mcp",
+      "url": "https://purl.nublson.com/api/mcp",
       "headers": [
         {
           "name": "Authorization",
