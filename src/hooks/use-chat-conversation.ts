@@ -24,6 +24,7 @@ import {
   chatFlowErrorFromStreamPayload,
   isChatStreamErrorPayload,
 } from "@/lib/chat-stream-error";
+import { shouldSyncChatFromServer } from "@/lib/chat-sync-guard";
 import { loadChatFromApi } from "@/lib/load-chat";
 import type { Link } from "@/utils/links";
 import { useChat } from "@ai-sdk/react";
@@ -434,17 +435,23 @@ export function useChatConversation() {
   }, [isLoading, chatId, setChatTitle]);
 
   useEffect(() => {
-    const id = chatId;
-    if (!id) {
+    if (!chatId) {
       lastSyncedChatIdRef.current = null;
       return;
     }
-    if (pendingSummarize || pendingMessage) return;
-    if (pendingMessageInFlightRef.current || summarizeInFlightRef.current) {
+    if (
+      !shouldSyncChatFromServer({
+        chatId,
+        lastSyncedChatId: lastSyncedChatIdRef.current,
+        hasPendingSummarize: Boolean(pendingSummarize),
+        hasPendingMessage: Boolean(pendingMessage),
+        summarizeInFlight: summarizeInFlightRef.current,
+        pendingMessageInFlight: pendingMessageInFlightRef.current,
+      })
+    ) {
       return;
     }
-    if (lastSyncedChatIdRef.current === id) return;
-    void syncChatFromServer(id);
+    void syncChatFromServer(chatId);
   }, [chatId, syncChatFromServer, pendingSummarize, pendingMessage]);
 
   useEffect(() => {
