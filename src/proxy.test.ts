@@ -42,6 +42,30 @@ describe("proxy", () => {
     expect(res.headers.get("location")).toBeNull();
   });
 
+  it("returns next for /docs routes when no session", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+    const req = createRequest("/docs/api");
+    const res = await proxy(req);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("returns next for /docs index when no session", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+    const req = createRequest("/docs");
+    const res = await proxy(req);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("redirects to /login for /docsomething (not a docs prefix match)", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+    const req = createRequest("/docsomething");
+    const res = await proxy(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/login");
+  });
+
   it("redirects to /home for public redirect route (e.g. /login) when session exists", async () => {
     vi.mocked(auth.auth.api.getSession).mockResolvedValue({ user: {}, session: {} } as never);
     const req = createRequest("/login");
