@@ -90,7 +90,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
-    "undici": "^7.24.4",
+    "undici": "^7.28.0",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.0"
   },
