@@ -3,13 +3,30 @@ import { rateLimitApiRequest } from "@/lib/proxy-rate-limit";
 import { getPreferences } from "@/lib/user-preferences";
 import { type NextRequest, NextResponse } from "next/server";
 
-const publicRoutes = [
+type WhenAuthenticated = "next" | "redirect";
+
+type PublicRoute = {
+  path: string;
+  whenAuthenticated: WhenAuthenticated;
+  match?: "exact" | "prefix";
+  /** Skip Better Auth session lookup (e.g. auth API handles its own cookies). */
+  skipSessionLookup?: boolean;
+};
+
+const publicRoutes: PublicRoute[] = [
   { path: "/", whenAuthenticated: "next" },
-  { path: "/login", whenAuthenticated: "redirect" as const },
-  { path: "/signup", whenAuthenticated: "redirect" as const },
+  { path: "/login", whenAuthenticated: "redirect" },
+  { path: "/signup", whenAuthenticated: "redirect" },
   { path: "/privacy", whenAuthenticated: "next" },
   { path: "/terms", whenAuthenticated: "next" },
-] as const;
+  { path: "/docs", match: "prefix", whenAuthenticated: "next" },
+  {
+    path: "/api/auth",
+    match: "prefix",
+    whenAuthenticated: "next",
+    skipSessionLookup: true,
+  },
+];
 
 const VERIFY_EMAIL_PATH = "/verify-email";
 const REDIRECT_WHEN_NOT_AUTHENTICATED = "/login";
@@ -20,11 +37,15 @@ async function getDefaultPage(userId: string) {
   return prefs.defaultPage === "ai" ? "/ai" : "/home";
 }
 
-function isPublicRoute(pathname: string) {
-  if (pathname.startsWith("/api/auth")) {
-    return { path: "/api/auth", whenAuthenticated: "next" as const };
+function matchesPublicRoute(pathname: string, route: PublicRoute): boolean {
+  if ((route.match ?? "exact") === "exact") {
+    return pathname === route.path;
   }
-  return publicRoutes.find((route) => route.path === pathname);
+  return pathname === route.path || pathname.startsWith(`${route.path}/`);
+}
+
+function isPublicRoute(pathname: string): PublicRoute | undefined {
+  return publicRoutes.find((route) => matchesPublicRoute(pathname, route));
 }
 
 export async function proxy(request: NextRequest) {
@@ -45,11 +66,14 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  const publicRoute = isPublicRoute(currentPath);
+  if (publicRoute?.skipSessionLookup) {
+    return NextResponse.next();
+  }
+
   const session = await auth.api.getSession({
     headers: request.headers,
   });
-
-  const publicRoute = isPublicRoute(currentPath);
 
   if (publicRoute && !session) {
     return NextResponse.next();
