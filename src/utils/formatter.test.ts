@@ -24,6 +24,23 @@ describe("formatDomain", () => {
   it("handles multi-part public suffixes", () => {
     expect(formatDomain("www.bbc.co.uk")).toBe("bbc.co.uk");
   });
+
+  it("normalizes uppercase hostnames and strips www", () => {
+    expect(formatDomain("WWW.EXAMPLE.COM")).toBe("example.com");
+  });
+
+  it("trims surrounding whitespace", () => {
+    expect(formatDomain("  www.example.com  ")).toBe("example.com");
+  });
+
+  it("returns a hostname without dots unchanged aside from www stripping", () => {
+    expect(formatDomain("localhost")).toBe("localhost");
+  });
+
+  it("returns a two-label domain as-is", () => {
+    expect(formatDomain("sub.example.com")).toBe("example.com");
+    expect(formatDomain("news.ycombinator.com")).toBe("ycombinator.com");
+  });
 });
 
 describe("getUrlDomain", () => {
