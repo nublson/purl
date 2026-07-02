@@ -253,6 +253,42 @@ describe("saveMessage", () => {
 
     expect(result).toEqual(mockMessage);
   });
+
+  it("leaves title unset when title generation throws", async () => {
+    vi.mocked(prisma.chat.findUnique).mockResolvedValue({ title: null } as never);
+    vi.mocked(prisma.chatMessage.findFirst).mockResolvedValue({
+      content: "What is React?",
+    } as never);
+    vi.mocked(getChatModelForUser).mockReturnValue({ id: "model" } as never);
+    vi.mocked(generateText).mockRejectedValue(new Error("AI unavailable"));
+
+    await saveMessage(chatId, "ASSISTANT", "Here is the answer...");
+
+    expect(prisma.chat.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({ title: expect.anything() }),
+      }),
+    );
+  });
+
+  it("passes userAnthropicKey to getChatModelForUser during title generation", async () => {
+    vi.mocked(prisma.chat.findUnique).mockResolvedValue({ title: null } as never);
+    vi.mocked(prisma.chatMessage.findFirst).mockResolvedValue({
+      content: "Summarize my links",
+    } as never);
+    vi.mocked(getChatModelForUser).mockReturnValue({ id: "model" } as never);
+    vi.mocked(generateText).mockResolvedValue({ text: "Link Summary" } as never);
+
+    await saveMessage(
+      chatId,
+      "ASSISTANT",
+      "Summary here",
+      undefined,
+      "sk-ant-user-key",
+    );
+
+    expect(getChatModelForUser).toHaveBeenCalledWith("sk-ant-user-key");
+  });
 });
 
 describe("createChat", () => {

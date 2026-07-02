@@ -11,10 +11,11 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 vi.mock("@/lib/user-preferences", () => ({
-  getPreferences: vi.fn().mockResolvedValue({ defaultPage: "/home" }),
+  getPreferences: vi.fn().mockResolvedValue({ defaultPage: "home" }),
 }));
 
 const auth = await import("@/lib/auth");
+const { getPreferences } = await import("@/lib/user-preferences");
 
 function createRequest(pathname: string, method = "GET"): NextRequest {
   return new NextRequest(`http://localhost${pathname}`, { method });
@@ -23,6 +24,7 @@ function createRequest(pathname: string, method = "GET"): NextRequest {
 describe("proxy", () => {
   beforeEach(() => {
     vi.mocked(auth.auth.api.getSession).mockReset();
+    vi.mocked(getPreferences).mockResolvedValue({ defaultPage: "home" });
   });
 
   it("passes OPTIONS through without session lookup (CORS preflight)", async () => {
@@ -72,6 +74,33 @@ describe("proxy", () => {
     const res = await proxy(req);
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toContain("/home");
+  });
+
+  it("redirects to /ai for /login when session exists and defaultPage preference is ai", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+      user: { id: "user-1" },
+      session: {},
+    } as never);
+    vi.mocked(getPreferences).mockResolvedValue({ defaultPage: "ai" });
+    const req = createRequest("/login");
+    const res = await proxy(req);
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/ai");
+    expect(getPreferences).toHaveBeenCalledWith("user-1");
+  });
+
+  it("returns next for /privacy when no session", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+    const res = await proxy(createRequest("/privacy"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("returns next for /terms when no session", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+    const res = await proxy(createRequest("/terms"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
   });
 
   it("returns next for public next route (e.g. /) when session exists", async () => {
@@ -149,6 +178,18 @@ describe("proxy", () => {
     const res = await proxy(req);
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toContain("/home");
+  });
+
+  it("redirects to /ai for /verify-email when verified and defaultPage preference is ai", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+      user: { id: "user-1", emailVerified: true },
+      session: {},
+    } as never);
+    vi.mocked(getPreferences).mockResolvedValue({ defaultPage: "ai" });
+    const res = await proxy(createRequest("/verify-email"));
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/ai");
+    expect(getPreferences).toHaveBeenCalledWith("user-1");
   });
 
   describe("API v1 routes", () => {
