@@ -4,12 +4,17 @@ name: Publish to MCP Registry
 # Auth uses GitHub OIDC — no secrets required. The `io.github.nublson/*` namespace is
 # authorized because this workflow runs in a repo owned by `nublson`.
 #
+# server.json's `version` field is the source of truth (bumped automatically by
+# auto-bump-mcp-version.yml whenever MCP behavior changes). The "Tag MCP release" step
+# in release.yml tags whatever version is committed there, and that tag push is what
+# triggers this workflow — so the tag always mirrors server.json, never the reverse.
+#
 # The remote server URL (https://purl.nublson.com/api/mcp) MUST be live before publishing, so tag
 # a release only AFTER the production deploy is out.
 
 on:
   push:
-    tags: ["v*"] # e.g. git tag v0.1.0 && git push origin v0.1.0
+    tags: ["v*"] # pushed automatically by release.yml's "Tag MCP release" step
   workflow_dispatch: # manual trigger from the Actions tab
 
 jobs:
@@ -27,13 +32,17 @@ jobs:
         run: |
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 
-      # Keep the published version in sync with the release tag (v0.1.0 -> 0.1.0).
-      # The registry rejects re-publishing an existing version, so each release needs a fresh tag.
-      - name: Set version from tag
+      # Safety net: fail loudly rather than silently publish a mismatched version if a
+      # tag was ever pushed by hand instead of via release.yml.
+      - name: Verify tag matches server.json version
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          jq --arg v "$VERSION" '.version = $v' server.json > server.tmp && mv server.tmp server.json
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          FILE_VERSION=$(jq -r .version server.json)
+          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+            echo "::error::Tag v${TAG_VERSION} does not match server.json version ${FILE_VERSION}"
+            exit 1
+          fi
 
       - name: Authenticate to MCP Registry (GitHub OIDC)
         run: ./mcp-publisher login github-oidc
