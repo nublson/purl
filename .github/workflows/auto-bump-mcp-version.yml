@@ -1,0 +1,95 @@
+name: Auto Bump MCP Version
+
+# Bumps server.json's version whenever code that changes MCP behavior lands on
+# develop, so `release.yml` has something new to tag. Mirrors the auto-changeset
+# pattern from nublson/quiver, adapted for a single-manifest project (no
+# @changesets/cli needed — server.json's `version` field is the only thing that
+# needs bumping).
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  auto-bump:
+    name: 📦 Bump server.json version
+    runs-on: ubuntu-latest
+    # Skip if this push was made by the bot itself (prevents a commit loop).
+    if: github.actor != 'github-actions[bot]'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Detect MCP behavior changes and existing manual bump
+        id: check
+        run: |
+          BEFORE="${{ github.event.before }}"
+          AFTER="${{ github.sha }}"
+
+          # `before` is all-zeros on a branch's first push — nothing to diff against.
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            echo "mcp_changed=" >> "$GITHUB_OUTPUT"
+            echo "already_bumped=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # bash steps run under `set -e -o pipefail`; if $BEFORE is unreachable
+          # (e.g. history rewritten), fail safe to "no MCP change detected" instead
+          # of crashing the whole workflow.
+          MCP_CHANGED=$( (git diff --name-only "$BEFORE" "$AFTER" -- \
+            'src/lib/mcp.ts' \
+            ':(literal)src/app/api/[transport]' \
+            2>/dev/null || true) | head -1 )
+          echo "mcp_changed=${MCP_CHANGED}" >> "$GITHUB_OUTPUT"
+
+          OLD_VERSION=$(git show "${BEFORE}:server.json" 2>/dev/null | jq -r .version 2>/dev/null || echo "")
+          NEW_VERSION=$(jq -r .version server.json)
+          if [ -n "$OLD_VERSION" ] && [ "$OLD_VERSION" != "$NEW_VERSION" ]; then
+            echo "already_bumped=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_bumped=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump version
+        id: bump
+        if: steps.check.outputs.mcp_changed != '' && steps.check.outputs.already_bumped == ''
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          FIRST_LINE=$(printf '%s' "$COMMIT_MSG" | head -1)
+
+          if printf '%s' "$FIRST_LINE" | grep -qE '^feat(\([^)]*\))?!:|^[^:]+!:'; then
+            BUMP="major"
+          elif printf '%s' "$FIRST_LINE" | grep -qE '^feat(\([^)]*\))?:'; then
+            BUMP="minor"
+          else
+            BUMP="patch"
+          fi
+
+          CURRENT=$(jq -r .version server.json)
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          case "$BUMP" in
+            major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+            minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+            patch) PATCH=$((PATCH + 1)) ;;
+          esac
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+
+          jq --arg v "$NEW_VERSION" '.version = $v' server.json > server.tmp && mv server.tmp server.json
+          echo "Bumped server.json: $CURRENT -> $NEW_VERSION ($BUMP)"
+          echo "version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push version bump
+        if: steps.bump.outputs.version != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add server.json
+          git commit -m "chore: bump MCP server version to v${{ steps.bump.outputs.version }}"
+          git push origin develop
