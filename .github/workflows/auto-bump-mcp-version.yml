@@ -39,10 +39,13 @@ jobs:
             exit 0
           fi
 
-          MCP_CHANGED=$(git diff --name-only "$BEFORE" "$AFTER" -- \
+          # bash steps run under `set -e -o pipefail`; if $BEFORE is unreachable
+          # (e.g. history rewritten), fail safe to "no MCP change detected" instead
+          # of crashing the whole workflow.
+          MCP_CHANGED=$( (git diff --name-only "$BEFORE" "$AFTER" -- \
             'src/lib/mcp.ts' \
             ':(literal)src/app/api/[transport]' \
-            | head -1)
+            2>/dev/null || true) | head -1 )
           echo "mcp_changed=${MCP_CHANGED}" >> "$GITHUB_OUTPUT"
 
           OLD_VERSION=$(git show "${BEFORE}:server.json" 2>/dev/null | jq -r .version 2>/dev/null || echo "")
