@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { mcp } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { apiKey } from "@better-auth/api-key";
 import prisma from "@/lib/prisma";
@@ -31,6 +32,13 @@ export const auth = betterAuth({
         if (typeof authHeader !== "string") return null;
         if (!authHeader.startsWith("Bearer ") || authHeader.length <= 7) return null;
         return authHeader.slice(7);
+      },
+    }),
+    mcp({
+      loginPage: "/login",
+      oidcConfig: {
+        loginPage: "/login",
+        consentPage: "/oauth/consent",
       },
     }),
   ],
