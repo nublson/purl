@@ -177,12 +177,11 @@ export function registerPurlTools(server: McpServer): void {
   );
 }
 
-/** Validates the `Authorization: Bearer purl_…` API key and attaches the owning user id to the request auth context. */
-export async function verifyToken(
+/** Verifies a `purl_…` API key via the apiKey plugin. */
+async function verifyApiKeyToken(
   req: Request,
-  bearerToken?: string,
+  bearerToken: string,
 ): Promise<AuthInfo | undefined> {
-  if (!bearerToken) return undefined;
   let result: Awaited<ReturnType<typeof auth.api.verifyApiKey>>;
   try {
     result = await auth.api.verifyApiKey({
@@ -190,9 +189,7 @@ export async function verifyToken(
       headers: req.headers,
     });
   } catch (err) {
-    // verifyApiKey throws (e.g. on rate limit) rather than returning a result.
-    // Reject the connection cleanly instead of surfacing an unexpected error.
-    console.error("MCP bearer token verification failed:", err);
+    console.error("MCP API key verification failed:", err);
     return undefined;
   }
   if (!result.valid || !result.key) return undefined;
@@ -202,4 +199,46 @@ export async function verifyToken(
     scopes: [],
     extra: { userId: result.key.referenceId },
   };
+}
+
+/** Verifies an OAuth access token issued by Better Auth's mcp plugin. */
+async function verifyOAuthToken(req: Request): Promise<AuthInfo | undefined> {
+  let session: Awaited<ReturnType<typeof auth.api.getMcpSession>>;
+  try {
+    session = await auth.api.getMcpSession({
+      request: req,
+      headers: req.headers,
+      asResponse: false,
+    });
+  } catch (err) {
+    console.error("MCP OAuth token verification failed:", err);
+    return undefined;
+  }
+  if (!session?.userId) return undefined;
+  // Defense in depth: verify expiry ourselves rather than trusting the
+  // endpoint to have already filtered it out.
+  if (new Date(session.accessTokenExpiresAt).getTime() < Date.now()) {
+    return undefined;
+  }
+  return {
+    token: session.accessToken,
+    clientId: session.clientId,
+    scopes: session.scopes ? session.scopes.split(" ") : [],
+    extra: { userId: session.userId },
+  };
+}
+
+/**
+ * Validates the `Authorization: Bearer …` header, accepting either a
+ * `purl_…` API key or an OAuth access token issued via the mcp plugin's
+ * Connect flow, and attaches the owning user id to the request auth context.
+ */
+export async function verifyToken(
+  req: Request,
+  bearerToken?: string,
+): Promise<AuthInfo | undefined> {
+  if (!bearerToken) return undefined;
+  const apiKeyInfo = await verifyApiKeyToken(req, bearerToken);
+  if (apiKeyInfo) return apiKeyInfo;
+  return verifyOAuthToken(req);
 }
