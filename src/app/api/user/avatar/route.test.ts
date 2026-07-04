@@ -158,6 +158,20 @@ describe("POST /api/user/avatar", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ image: MOCK_IMAGE_URL });
-    expect(uploadUserAvatar).toHaveBeenCalledWith(file, "user-123");
+
+    // The request body round-trips through multipart form-data encoding, so the
+    // File the route handler receives is reconstructed (not the same instance) and
+    // gets a fresh `lastModified` timestamp — compare the fields that matter instead
+    // of deep-equating the whole File object, which flakes when Date.now() ticks
+    // between the two constructions.
+    expect(uploadUserAvatar).toHaveBeenCalledTimes(1);
+    const [receivedFile, receivedUserId] = vi.mocked(uploadUserAvatar).mock
+      .calls[0] as [File, string];
+    expect(receivedFile).toBeInstanceOf(File);
+    expect(receivedFile.name).toBe(file.name);
+    expect(receivedFile.type).toBe(file.type);
+    expect(receivedFile.size).toBe(file.size);
+    expect(await receivedFile.text()).toBe(await file.text());
+    expect(receivedUserId).toBe("user-123");
   });
 });
