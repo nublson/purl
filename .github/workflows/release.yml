@@ -97,6 +97,7 @@ jobs:
     needs: validate-build
     permissions:
       contents: write
+      actions: write
     steps:
       - name: Checkout main
         uses: actions/checkout@v4
@@ -106,12 +107,14 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Tag if server.json version is new
+        id: tag
         run: |
           VERSION=$(jq -r .version server.json)
           TAG="v${VERSION}"
 
           if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" > /dev/null 2>&1; then
             echo "Tag ${TAG} already exists — MCP server version unchanged this release, skipping."
+            echo "tag=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -119,4 +122,14 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "${TAG}"
           git push origin "${TAG}"
-          echo "Pushed tag ${TAG} — this triggers the MCP Registry publish workflow."
+          echo "Pushed tag ${TAG}."
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      # A tag pushed with GITHUB_TOKEN does NOT trigger other workflows' `on: push:
+      # tags` events — GitHub suppresses this to prevent recursive workflow runs.
+      # Dispatch the publish workflow explicitly instead of relying on that push.
+      - name: Trigger MCP Registry publish
+        if: steps.tag.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run publish-mcp.yml --ref "${{ steps.tag.outputs.tag }}"
