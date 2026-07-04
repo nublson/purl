@@ -4,6 +4,7 @@ import {
   getChatPostRateLimiter,
   getFeedbackPostRateLimiter,
   getLinksPostRateLimiter,
+  getMcpRateLimiter,
   getUploadPostRateLimiter,
   getV1PostRateLimiter,
   getV1RateLimiter,
@@ -19,6 +20,24 @@ function clientIp(request: NextRequest): string {
   const realIp = request.headers.get("x-real-ip")?.trim();
   if (realIp) return realIp;
   return "127.0.0.1";
+}
+
+/**
+ * Resolves a per-user rate limit key from a Bearer API key, falling back to the
+ * raw token (if session resolution fails) or the client IP (if no Bearer header
+ * is present). Shared by `/api/v1/*` and `/api/mcp` so all keys from the same
+ * user share one bucket rather than one per key.
+ */
+async function resolveBearerRateLimitKey(
+  request: NextRequest,
+  ip: string,
+): Promise<string> {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ") || authHeader.length <= 7) {
+    return ip;
+  }
+  const session = await auth.api.getSession({ headers: request.headers });
+  return session?.user?.id ?? authHeader.slice(7);
 }
 
 function tooManyRequests(reset: number) {
@@ -47,19 +66,18 @@ export async function rateLimitApiRequest(
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/api/v1/")) {
-    const authHeader = request.headers.get("authorization");
-    let rateLimitKey: string;
-
-    if (authHeader?.startsWith("Bearer ") && authHeader.length > 7) {
-      // Resolve Bearer token to userId so all keys from the same user share one bucket.
-      // API key session resolution is enabled globally in src/lib/auth.ts.
-      const session = await auth.api.getSession({ headers: request.headers });
-      rateLimitKey = session?.user?.id ?? authHeader.slice(7);
-    } else {
-      rateLimitKey = ip;
-    }
-
+    const rateLimitKey = await resolveBearerRateLimitKey(request, ip);
     const limiter = request.method === "POST" ? getV1PostRateLimiter() : getV1RateLimiter();
+    if (limiter) {
+      const { success, reset } = await limiter.limit(rateLimitKey);
+      if (!success) return tooManyRequests(reset);
+    }
+    return null;
+  }
+
+  if (pathname.startsWith("/api/mcp")) {
+    const rateLimitKey = await resolveBearerRateLimitKey(request, ip);
+    const limiter = getMcpRateLimiter();
     if (limiter) {
       const { success, reset } = await limiter.limit(rateLimitKey);
       if (!success) return tooManyRequests(reset);

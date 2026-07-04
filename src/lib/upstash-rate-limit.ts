@@ -45,6 +45,7 @@ const feedbackPostLimiter = () => makeLimiter("feedback_post", 10, "1 m");
 
 const v1Limiter = () => makeLimiter("v1", 120, "1 m");
 const v1PostLimiter = () => makeLimiter("v1_post", 60, "1 m");
+const mcpLimiter = () => makeLimiter("mcp", 60, "1 m");
 
 let cachedAuth: Ratelimit | null | undefined;
 let cachedChat: Ratelimit | null | undefined;
@@ -53,6 +54,7 @@ let cachedUploadPost: Ratelimit | null | undefined;
 let cachedV1: Ratelimit | null | undefined;
 let cachedV1Post: Ratelimit | null | undefined;
 let cachedFeedbackPost: Ratelimit | null | undefined;
+let cachedMcp: Ratelimit | null | undefined;
 
 export function getAuthRateLimiter(): Ratelimit | null {
   if (cachedAuth === undefined) cachedAuth = authLimiter();
@@ -89,4 +91,9 @@ export function getFeedbackPostRateLimiter(): Ratelimit | null {
     cachedFeedbackPost = feedbackPostLimiter();
   }
   return cachedFeedbackPost;
+}
+
+export function getMcpRateLimiter(): Ratelimit | null {
+  if (cachedMcp === undefined) cachedMcp = mcpLimiter();
+  return cachedMcp;
 }

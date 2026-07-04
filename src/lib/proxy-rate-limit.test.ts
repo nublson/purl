@@ -21,6 +21,7 @@ vi.mock("@/lib/upstash-rate-limit", () => ({
   getUploadPostRateLimiter: vi.fn(),
   getV1RateLimiter: vi.fn().mockReturnValue({ limit: limitMock }),
   getV1PostRateLimiter: vi.fn(),
+  getMcpRateLimiter: vi.fn(),
 }));
 
 const {
@@ -31,6 +32,7 @@ const {
   getUploadPostRateLimiter,
   getV1RateLimiter,
   getV1PostRateLimiter,
+  getMcpRateLimiter,
 } = await import("@/lib/upstash-rate-limit");
 
 const { rateLimitApiRequest } = await import("./proxy-rate-limit");
@@ -381,6 +383,81 @@ describe("rateLimitApiRequest", () => {
       });
       const result = await rateLimitApiRequest(request);
       expect(result).toBeNull();
+    });
+  });
+
+  describe("/api/mcp rate limiting", () => {
+    beforeEach(() => {
+      limitMock.mockReset();
+      vi.mocked(getMcpRateLimiter).mockReset();
+      mockGetSession.mockReset();
+    });
+
+    it("returns 429 when the MCP limit is exceeded", async () => {
+      vi.mocked(getMcpRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: false, reset: Date.now() + 60_000 });
+      const request = new NextRequest("http://localhost/api/mcp", {
+        method: "POST",
+      });
+      const result = await rateLimitApiRequest(request);
+      expect(result?.status).toBe(429);
+      expect(getMcpRateLimiter).toHaveBeenCalled();
+    });
+
+    it("returns null for /api/mcp when under the limit", async () => {
+      vi.mocked(getMcpRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      const request = new NextRequest("http://localhost/api/mcp", {
+        method: "POST",
+      });
+      const result = await rateLimitApiRequest(request);
+      expect(result).toBeNull();
+    });
+
+    it("returns null (no limiter configured) without error for /api/mcp", async () => {
+      vi.mocked(getMcpRateLimiter).mockReturnValue(null);
+      const request = new NextRequest("http://localhost/api/mcp", {
+        method: "POST",
+      });
+      const result = await rateLimitApiRequest(request);
+      expect(result).toBeNull();
+    });
+
+    it("uses userId from resolved session as rate limit key", async () => {
+      vi.mocked(getMcpRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      mockGetSession.mockResolvedValue({ user: { id: "user-abc" } });
+      const request = new NextRequest("http://localhost/api/mcp", {
+        method: "POST",
+        headers: { authorization: "Bearer purl_abc123" },
+      });
+      await rateLimitApiRequest(request);
+      expect(mockGetSession).toHaveBeenCalledWith({ headers: expect.any(Headers) });
+      expect(limitMock).toHaveBeenCalledWith("user-abc");
+    });
+
+    it("falls back to Bearer token when session resolution returns null", async () => {
+      vi.mocked(getMcpRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      mockGetSession.mockResolvedValue(null);
+      const request = new NextRequest("http://localhost/api/mcp", {
+        method: "POST",
+        headers: { authorization: "Bearer purl_abc123" },
+      });
+      await rateLimitApiRequest(request);
+      expect(limitMock).toHaveBeenCalledWith("purl_abc123");
+    });
+
+    it("falls back to IP when no Authorization header is present", async () => {
+      vi.mocked(getMcpRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      const request = new NextRequest("http://localhost/api/mcp", {
+        method: "POST",
+        headers: { "x-forwarded-for": "5.5.5.5" },
+      });
+      await rateLimitApiRequest(request);
+      expect(mockGetSession).not.toHaveBeenCalled();
+      expect(limitMock).toHaveBeenCalledWith("5.5.5.5");
     });
   });
 });

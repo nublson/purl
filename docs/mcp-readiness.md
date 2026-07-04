@@ -88,7 +88,7 @@ The MCP SDK's `server.tool(...)` expects Zod schemas. The codebase currently use
 
 ### 6. Cross-cutting concerns to carry over
 - **Entitlements + usage:** MCP `save_link`/`search` must run `assertCanSaveLink` / `aiFullAccess` checks and `recordUsage`, or MCP becomes a cap-bypass. (`createLink` already enforces save limits internally.)
-- **Rate limiting:** decide whether `src/lib/proxy-rate-limit.ts` (Upstash) covers the MCP route or it's gated in-handler.
+- **Rate limiting:** `src/lib/proxy-rate-limit.ts` now covers `/api/mcp` — 60 req/min (Upstash), keyed by resolved userId (falls back to the raw Bearer token, then IP), same pattern as `/api/v1`.
 - **Observability:** add a `feature:mcp` (or `source:mcp`) tag to Gateway embedding/search calls so MCP usage is attributable.
 - **SSRF:** `save_link` → `createLink` → existing `safeFetch` guards, so it's already covered.
 
