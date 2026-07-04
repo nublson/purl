@@ -1,12 +1,11 @@
-import { getEntitlementContext } from "@/lib/entitlements";
 import { getChatModelForUser } from "@/lib/ai";
 import { CHAT_STREAM_ERROR_CODES } from "@/lib/chat-http-errors";
 import type {
   ChatStreamErrorPayload,
   PurlChatUIMessage,
 } from "@/lib/chat-stream-error";
-import prisma, { ContentType } from "@/lib/prisma";
-import { semanticSearch } from "@/lib/semantic-search";
+import prisma from "@/lib/prisma";
+import { searchSavedContent } from "@/lib/search-saved-content";
 import * as Sentry from "@sentry/nextjs";
 import {
   jsonSchema,
@@ -225,68 +224,13 @@ export function buildChatTools(
       ) => {
         void options;
         try {
-          const { entitlements } = await getEntitlementContext(userId);
-          if (!entitlements.aiFullAccess) {
-            return [];
-          }
-          const results = await semanticSearch(query, userId, {
-            matchCount: Math.max(1, Math.min(limit ?? 10, 20)),
-            type: contentType as ContentType | undefined,
-            dateFrom: dateFrom ? new Date(dateFrom) : undefined,
-            dateTo: dateTo ? new Date(dateTo) : undefined,
+          return await searchSavedContent(userId, {
+            query,
+            contentType,
+            dateFrom,
+            dateTo,
+            limit,
           });
-
-          if (results.length === 0) return [];
-
-          const linkIds = [...new Set(results.map((r) => r.linkId))];
-          const linkContents = await prisma.linkContent.findMany({
-            where: { linkId: { in: linkIds } },
-            orderBy: [{ linkId: "asc" }, { chunkIndex: "asc" }],
-            select: {
-              content: true,
-              link: {
-                select: {
-                  title: true,
-                  url: true,
-                  contentType: true,
-                  createdAt: true,
-                },
-              },
-            },
-          });
-
-          const grouped = new Map<
-            string,
-            {
-              url: string;
-              contentType: string;
-              savedAt: string;
-              texts: string[];
-            }
-          >();
-          for (const c of linkContents) {
-            const existing = grouped.get(c.link.title);
-            if (existing) {
-              existing.texts.push(c.content);
-            } else {
-              grouped.set(c.link.title, {
-                url: c.link.url,
-                contentType: c.link.contentType,
-                savedAt: c.link.createdAt.toISOString(),
-                texts: [c.content],
-              });
-            }
-          }
-
-          return Array.from(grouped.entries()).map(
-            ([title, { url, contentType: type, savedAt, texts }]) => ({
-              title,
-              url,
-              contentType: type,
-              savedAt,
-              relevantContent: texts.join("\n\n"),
-            }),
-          );
         } catch (err) {
           captureToolError("searchContent", err, toolCtx);
           emitChatStreamProtocolError(toolCtx.streamWriter, {

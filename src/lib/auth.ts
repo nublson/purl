@@ -10,6 +10,12 @@ export const auth = betterAuth({
     apiKey({
       enableSessionForAPIKeys: true,
       defaultPrefix: "purl_",
+      // Per-key rate limiting defaults to 10 requests/day, which is far too low
+      // for the MCP server (every request re-validates the key) and the REST
+      // API. Abuse protection is handled at the proxy layer (Upstash).
+      rateLimit: {
+        enabled: false,
+      },
       customAPIKeyGetter: (ctx) => {
         // Extract token from "Authorization: Bearer purl_..." header
         // GenericEndpointContext is a Better Auth internal type — cast via unknown

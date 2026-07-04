@@ -1,6 +1,7 @@
 [
   { "title": "Features", "path": "/#features" },
   { "title": "Pricing", "path": "/#pricing" },
+  { "title": "MCP", "path": "/docs/mcp" },
   { "title": "API", "path": "/docs/api" },
   { "title": "Privacy", "path": "/privacy" },
   { "title": "Terms", "path": "/terms" }
