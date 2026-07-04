@@ -21,6 +21,12 @@ const publicRoutes: PublicRoute[] = [
   { path: "/terms", whenAuthenticated: "next" },
   { path: "/docs", match: "prefix", whenAuthenticated: "next" },
   {
+    path: "/.well-known",
+    match: "prefix",
+    whenAuthenticated: "next",
+    skipSessionLookup: true,
+  },
+  {
     path: "/api/auth",
     match: "prefix",
     whenAuthenticated: "next",

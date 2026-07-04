@@ -223,4 +223,24 @@ describe("proxy", () => {
       expect(response.status).toBe(200);
     });
   });
+
+  describe(".well-known OAuth discovery routes", () => {
+    it("returns next for oauth-protected-resource without a session lookup", async () => {
+      vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+      const req = createRequest("/.well-known/oauth-protected-resource");
+      const res = await proxy(req);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+      expect(auth.auth.api.getSession).not.toHaveBeenCalled();
+    });
+
+    it("returns next for oauth-authorization-server without a session lookup", async () => {
+      vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+      const req = createRequest("/.well-known/oauth-authorization-server");
+      const res = await proxy(req);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+      expect(auth.auth.api.getSession).not.toHaveBeenCalled();
+    });
+  });
 });
