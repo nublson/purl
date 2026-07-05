@@ -32,7 +32,7 @@
 | `src/app/api/user/connected-apps/[clientId]/route.ts` | Create | `DELETE` — revoke a connected app |
 | `src/app/api/user/connected-apps/[clientId]/route.test.ts` | Create | Route test |
 | `src/components/settings-integrations.tsx` | Modify | Add "Connected Apps" section |
-| `src/app/(public)/oauth/consent/page.tsx` | Create | Consent screen (server component, fetches client name via Prisma) |
+| `src/app/oauth/consent/page.tsx` | Create | Consent screen (server component, fetches client name via Prisma) |
 | `src/components/oauth-consent-actions.tsx` | Create | Client component — Allow/Deny buttons, posts the decision |
 
 ---
@@ -1148,8 +1148,10 @@ git commit -m "feat(mcp): add Connected Apps section to Settings > Integrations"
 
 ### Task 9: OAuth consent screen
 
+> **Note (post-implementation):** originally planned under `src/app/(public)/oauth/consent`, but relocated to the top-level `src/app/oauth/` segment with its own `layout.tsx`. The `(public)` route group's layout sets `export const dynamic = "force-static"`, which Next.js propagates to all descendant pages regardless of their own `dynamic` export, silently zeroing out `searchParams` — a real bug discovered during manual browser verification, not a stylistic choice.
+
 **Files:**
-- Create: `src/app/(public)/oauth/consent/page.tsx`
+- Create: `src/app/oauth/consent/page.tsx`
 - Create: `src/components/oauth-consent-actions.tsx`
 
 - [ ] **Step 1: Create the client component that handles Allow/Deny**
@@ -1217,7 +1219,7 @@ export function OAuthConsentActions({ consentCode }: { consentCode: string }) {
 
 - [ ] **Step 2: Create the consent page (server component)**
 
-Create `src/app/(public)/oauth/consent/page.tsx`:
+Create `src/app/oauth/consent/page.tsx`:
 
 ```tsx
 import { OAuthConsentActions } from "@/components/oauth-consent-actions";

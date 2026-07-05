@@ -73,8 +73,10 @@ Two new files, each a one-liner delegating to Better Auth's exported handlers:
 
 These must live at the domain root (not under `/api/auth`) because OAuth discovery convention requires it, and `mcp-handler`'s `withMcpAuth` already points its `WWW-Authenticate` header at `${origin}/.well-known/oauth-protected-resource` by default.
 
-### 4. Consent page — `src/app/(public)/oauth/consent/page.tsx`
+### 4. Consent page — `src/app/oauth/consent/page.tsx`
 Reads `consent_code`, `client_id`, `scope` from the query string, looks up the client's display name, and shows an "Authorize `<client_name>` to access your Purl account? Allow / Deny" screen. Submits the decision via `POST /api/auth/oauth2/consent` with `{ accept, consent_code }`.
+
+**Implementation note:** this route ended up living at `src/app/oauth/consent` rather than under `(public)`, with its own `src/app/oauth/layout.tsx` reproducing the public Header/Footer chrome. The `(public)` route group's layout sets `export const dynamic = "force-static"`, which Next.js's app-render pipeline propagates to *all* descendants via an internal `workStore.forceStatic` flag — `searchParams`/`cookies`/`headers` all check that flag first and short-circuit to empty, regardless of a descendant page's own `dynamic` export. Since this page must read real per-request query params, it needed a segment without that ancestor setting.
 
 ### 5. `src/lib/mcp.ts` — `verifyToken`
 Extend the existing function to try both auth methods:
