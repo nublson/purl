@@ -13,6 +13,9 @@ import { Fragment } from "react";
 // `forceStatic` first. This route needs real, per-request query params
 // (`consent_code`, `client_id`, `scope`) from Better Auth's mcp plugin
 // redirect, so it lives in its own segment with its own dynamic rendering.
+//
+// The JSX below duplicates src/app/(public)/layout.tsx's chrome -- keep the
+// two in sync (nav/footer changes there should be mirrored here).
 export const dynamic = "force-dynamic";
 
 export default function OAuthLayout({

@@ -21,7 +21,10 @@ export function OAuthConsentActions({ consentCode }: { consentCode: string }) {
       if (!res.ok) {
         throw new Error(`Consent request failed with status ${res.status}`);
       }
-      const data = (await res.json()) as { redirectURI: string };
+      const data = (await res.json()) as { redirectURI?: string };
+      if (!data.redirectURI) {
+        throw new Error("No redirect URL returned");
+      }
       window.location.href = data.redirectURI;
     } catch (err) {
       setError(
