@@ -1,6 +1,5 @@
 import { ContentTypeProps } from "@/sections/content-type";
 import ContentTypeItem from "./content-type-item";
-import { Typography } from "./typography";
 import { ItemGroup } from "./ui/item";
 
 interface ContentTypeGroupProps {
@@ -15,10 +14,6 @@ export default function ContentTypeGroup({
       {contentTypes.map((contentType) => (
         <ContentTypeItem key={contentType.type} contentType={contentType} />
       ))}
-      <Typography size="mini" className="text-muted-foreground">
-        Extractions and transcriptions are AI-powered features that require an
-        OpenAI API key.
-      </Typography>
     </ItemGroup>
   );
 }
