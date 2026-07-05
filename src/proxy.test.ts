@@ -243,4 +243,34 @@ describe("proxy", () => {
       expect(auth.auth.api.getSession).not.toHaveBeenCalled();
     });
   });
+
+  describe("malformed Authorization header on a private route", () => {
+    it("redirects to /login instead of crashing when getSession throws (e.g. an invalid API key)", async () => {
+      vi.mocked(auth.auth.api.getSession).mockRejectedValue(
+        new Error("Invalid API key."),
+      );
+      const req = createRequest("/home", "GET");
+      req.headers.set("authorization", "Bearer purl_some_garbage_value");
+
+      const res = await proxy(req);
+
+      expect(res.status).toBe(307);
+      expect(res.headers.get("location")).toContain("/login");
+    });
+
+    it("redirects to /login instead of crashing on a public redirect route (e.g. /login itself)", async () => {
+      vi.mocked(auth.auth.api.getSession).mockRejectedValue(
+        new Error("Invalid API key."),
+      );
+      const req = createRequest("/", "GET");
+      req.headers.set("authorization", "Bearer purl_some_garbage_value");
+
+      const res = await proxy(req);
+
+      // "/" is public and treated as unauthenticated (same as a thrown
+      // session lookup), so it should pass through rather than crash.
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+    });
+  });
 });
