@@ -1302,7 +1302,7 @@ git commit -m "feat(mcp): add OAuth consent screen"
 
 ### Task 10: End-to-end manual verification against real MCP clients
 
-This can't be automated in Vitest — it validates the two risks flagged in the design doc: whether login-resumption works cleanly through Purl's custom login page, and whether the consent screen actually renders for real clients.
+This can't be automated in Vitest — it validates the two risks flagged in the design doc (whether login-resumption works cleanly through Purl's custom login page, and whether the consent screen actually renders for real clients), plus a third risk the final whole-implementation code review surfaced: `src/proxy.ts`'s email-verification redirect (`/verify-email`) rewrites `pathname` only, dropping any pending OAuth query params (`consent_code`/`client_id`/`scope`), and `/verify-email`'s own post-verification redirect (`src/hooks/use-auth.ts`, `src/app/(public)/verify-email/page.tsx`) hardcodes `/home` — so a brand-new user who signs up via Claude's "Connect" button (triggering Purl's `emailVerification.sendOnSignUp: true`) would lose the pending authorization after verifying, with no visible error. Task 10 tests with an *existing* account by default (Step 1) — Step 1a below specifically exercises the fresh-signup path, since it's a distinct risk that wouldn't otherwise get covered.
 
 **Files:** none (manual QA pass, run against a deployed preview or `pnpm build && pnpm start` locally with a real Postgres + `BETTER_AUTH_URL` reachable from Claude).
 
@@ -1313,6 +1313,14 @@ Log out of Purl entirely (clear cookies or use an incognito window). In Claude D
 Expected: you're redirected to Purl's `/login` page. Log in. Confirm you land back in a flow that completes the OAuth authorization (either directly redirected to Claude's callback, or — if the consent screen renders — to `/oauth/consent` first) rather than being dumped at `/home`.
 
 If you land at `/home` instead of resuming the OAuth flow: this confirms the login-resumption risk from the design doc. The fix is to check `document.cookie` for Better Auth's `oidc_login_prompt` cookie (or check for OAuth-flow query params) in `src/hooks/use-auth.ts`'s `signInWithEmail`, and if present, do `window.location.href = window.location.href` (a full reload) instead of `router.replace("/home")`, so Better Auth's server-side resumption hook — which needs the original request context — gets a chance to run. This isn't written out in advance because it depends on what's actually observed in this step.
+
+- [ ] **Step 1a: Fresh-signup round trip (new-user path)**
+
+Same as Step 1, but instead of logging into an existing account, click **Connect** with no Purl account at all, and sign up fresh when prompted (triggering `emailVerification.sendOnSignUp: true`).
+
+Expected risk: after email verification, you'll likely land at `/home` with the OAuth authorization lost, rather than resuming the connection — `src/proxy.ts`'s `/verify-email` redirect only rewrites `pathname` (dropping `consent_code`/`client_id`/`scope`), and both `src/hooks/use-auth.ts` and `src/app/(public)/verify-email/page.tsx` hardcode a post-verification redirect to `/home`.
+
+If this reproduces: this is a distinct gap from Step 1's login-resumption risk (it's specifically the email-verification detour, not the login step itself) — decide whether to fix now (thread a return-to path through `/verify-email` the same way Step 1's fallback threads it through `/login`) or explicitly accept it as a known limitation for v1 (new users would need to verify their email first via the normal signup flow, then retry Connect once logged in). Either way, record the decision in Step 6.
 
 - [ ] **Step 2: Consent screen check**
 

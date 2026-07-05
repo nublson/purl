@@ -37,6 +37,9 @@ export const auth = betterAuth({
     mcp({
       loginPage: "/login",
       oidcConfig: {
+        // Required by OIDCOptions' type (not optional, unlike consentPage) even
+        // though the mcp plugin already forwards the top-level loginPage above --
+        // duplicated here only to satisfy the installed Better Auth version's types.
         loginPage: "/login",
         consentPage: "/oauth/consent",
       },
