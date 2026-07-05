@@ -11,13 +11,16 @@ export default async function OAuthConsentPage({
     scope?: string;
   }>;
 }) {
-  const { consent_code: consentCode, client_id: clientId, scope } =
-    await searchParams;
+  const {
+    consent_code: consentCode,
+    client_id: clientId,
+    scope,
+  } = await searchParams;
 
   if (!consentCode || !clientId) {
     return (
-      <div className="wrapper-private flex min-h-screen flex-col items-center justify-center gap-2 pb-12 pt-24">
-        <Typography variant="h3" component="h1">
+      <div className="wrapper-private flex flex-1 flex-col items-center justify-center gap-2 pb-12 pt-24">
+        <Typography variant="h2" component="h1">
           Invalid authorization request
         </Typography>
         <Typography size="small" className="text-muted-foreground">
@@ -32,19 +35,19 @@ export default async function OAuthConsentPage({
     where: { clientId },
     select: { name: true },
   });
-  const clientName = client?.name ?? "This app";
+  const clientName = client?.name ?? "This App";
   const scopes = scope ? scope.split(" ") : [];
 
   return (
-    <div className="wrapper-private flex min-h-screen flex-col items-center justify-center gap-6 pb-12 pt-24">
+    <div className="wrapper-private flex flex-1 flex-col items-center justify-center gap-6 pb-12 pt-24">
       <div className="flex flex-col items-center gap-2 text-center">
-        <Typography variant="h3" component="h1">
+        <Typography variant="h2" component="h1">
           Authorize {clientName}
         </Typography>
         <Typography size="small" className="text-muted-foreground max-w-md">
           {clientName} wants to access your Purl account
-          {scopes.length > 0 ? ` (${scopes.join(", ")})` : ""}. It will be
-          able to search, save, and read your saved content on your behalf.
+          {scopes.length > 0 ? ` (${scopes.join(", ")})` : ""}. It will be able
+          to search, save, and read your saved content on your behalf.
         </Typography>
       </div>
       <OAuthConsentActions consentCode={consentCode} />

@@ -82,7 +82,7 @@ function DeleteAccountButton({ closeDialog }: { closeDialog: () => void }) {
           Delete
         </Button>
       </AlertDialogTrigger>
-      <AlertDialogContent size="default" className="sm:max-w-md">
+      <AlertDialogContent nested size="default" className="sm:max-w-md">
         <AlertDialogHeader>
           <AlertDialogTitle>Delete your account?</AlertDialogTitle>
           <AlertDialogDescription>

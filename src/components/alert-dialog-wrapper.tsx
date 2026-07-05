@@ -19,6 +19,8 @@ interface AlertDialogWrapperProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   className?: string;
+  /** Raise above DialogWrapper (z-51) when opened inside another dialog. */
+  nested?: boolean;
 }
 
 export function AlertDialogWrapper({
@@ -29,6 +31,7 @@ export function AlertDialogWrapper({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
   className,
+  nested,
 }: AlertDialogWrapperProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
@@ -38,6 +41,7 @@ export function AlertDialogWrapper({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogTrigger asChild>{children}</AlertDialogTrigger>
       <AlertDialogContent
+        nested={nested}
         size="default"
         className={cn(
           "gap-4 px-0",

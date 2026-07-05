@@ -309,7 +309,7 @@ function ApiKeyRow({
             Revoke
           </Button>
         </AlertDialogTrigger>
-        <AlertDialogContent size="default" className="sm:max-w-md">
+        <AlertDialogContent nested size="default" className="sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Revoke API key?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -385,7 +385,7 @@ function ConnectedAppRow({
             Revoke
           </Button>
         </AlertDialogTrigger>
-        <AlertDialogContent size="default" className="sm:max-w-md">
+        <AlertDialogContent nested size="default" className="sm:max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Disconnect app?</AlertDialogTitle>
             <AlertDialogDescription>
