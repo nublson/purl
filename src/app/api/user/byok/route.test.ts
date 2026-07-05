@@ -1,17 +1,9 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { DELETE, GET, POST } from "./route";
 
-vi.mock("@/lib/auth", () => ({
-  auth: {
-    api: {
-      getSession: vi.fn(),
-    },
-  },
-}));
-
-vi.mock("next/headers", () => ({
-  headers: vi.fn().mockResolvedValue(new Headers()),
+const mockGetBrowserSessionUserId = vi.fn();
+vi.mock("@/lib/require-browser-session", () => ({
+  getBrowserSessionUserId: mockGetBrowserSessionUserId,
 }));
 
 vi.mock("@/lib/user-anthropic-key", () => ({
@@ -22,7 +14,6 @@ vi.mock("@/lib/user-anthropic-key", () => ({
   deleteByokKey: vi.fn(),
 }));
 
-const { auth } = await import("@/lib/auth");
 const {
   deleteByokKey,
   getByokKey,
@@ -30,8 +21,8 @@ const {
   maskByokKey,
   saveByokKey,
 } = await import("@/lib/user-anthropic-key");
+const { DELETE, GET, POST } = await import("./route");
 
-const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 const VALID_KEY = "sk-ant-api03-abcdefghijklmnopqrst";
 
 function postRequest(body: unknown): NextRequest {
@@ -44,14 +35,14 @@ function postRequest(body: unknown): NextRequest {
 
 describe("GET /api/user/byok", () => {
   beforeEach(() => {
-    vi.mocked(auth.api.getSession).mockReset();
+    mockGetBrowserSessionUserId.mockReset();
     vi.mocked(getByokKey).mockReset();
     vi.mocked(getDecryptedByokKey).mockReset();
     vi.mocked(maskByokKey).mockReset();
   });
 
   it("returns 401 when unauthenticated", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+    mockGetBrowserSessionUserId.mockResolvedValue(null);
 
     const res = await GET();
 
@@ -61,7 +52,7 @@ describe("GET /api/user/byok", () => {
   });
 
   it("returns hasKey false when no key is stored", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
     vi.mocked(getByokKey).mockResolvedValue({ hasKey: false, encryptedKey: null });
 
     const res = await GET();
@@ -72,7 +63,7 @@ describe("GET /api/user/byok", () => {
   });
 
   it("returns masked key when a key is stored", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
     vi.mocked(getByokKey).mockResolvedValue({
       hasKey: true,
       encryptedKey: "encrypted",
@@ -94,13 +85,13 @@ describe("GET /api/user/byok", () => {
 
 describe("POST /api/user/byok", () => {
   beforeEach(() => {
-    vi.mocked(auth.api.getSession).mockReset();
+    mockGetBrowserSessionUserId.mockReset();
     vi.mocked(saveByokKey).mockReset();
     vi.mocked(maskByokKey).mockReset();
   });
 
   it("returns 401 when unauthenticated", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+    mockGetBrowserSessionUserId.mockResolvedValue(null);
 
     const res = await POST(postRequest({ key: VALID_KEY }));
 
@@ -109,7 +100,7 @@ describe("POST /api/user/byok", () => {
   });
 
   it("returns 400 for invalid JSON body", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
 
     const res = await POST(
       new NextRequest("http://localhost/api/user/byok", {
@@ -123,7 +114,7 @@ describe("POST /api/user/byok", () => {
   });
 
   it("returns 400 when key is missing or blank", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
 
     const res = await POST(postRequest({ key: "   " }));
 
@@ -133,7 +124,7 @@ describe("POST /api/user/byok", () => {
   });
 
   it("returns 400 when saveByokKey rejects the key format", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
     vi.mocked(saveByokKey).mockRejectedValue(
       new Error("Key must start with sk-ant- and be at least 20 characters"),
     );
@@ -147,7 +138,7 @@ describe("POST /api/user/byok", () => {
   });
 
   it("saves a valid key and returns the masked value", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
     vi.mocked(saveByokKey).mockResolvedValue(undefined);
     vi.mocked(maskByokKey).mockReturnValue("sk-ant-api...qrst");
 
@@ -161,12 +152,12 @@ describe("POST /api/user/byok", () => {
 
 describe("DELETE /api/user/byok", () => {
   beforeEach(() => {
-    vi.mocked(auth.api.getSession).mockReset();
+    mockGetBrowserSessionUserId.mockReset();
     vi.mocked(deleteByokKey).mockReset();
   });
 
   it("returns 401 when unauthenticated", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+    mockGetBrowserSessionUserId.mockResolvedValue(null);
 
     const res = await DELETE();
 
@@ -175,7 +166,7 @@ describe("DELETE /api/user/byok", () => {
   });
 
   it("deletes the stored key and returns 204", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
     vi.mocked(deleteByokKey).mockResolvedValue(undefined);
 
     const res = await DELETE();

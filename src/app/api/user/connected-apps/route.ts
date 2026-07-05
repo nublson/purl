@@ -1,14 +1,13 @@
-import { auth } from "@/lib/auth";
 import { listConnectedApps } from "@/lib/connected-apps";
-import { headers } from "next/headers";
+import { getBrowserSessionUserId } from "@/lib/require-browser-session";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(_request: NextRequest) {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user?.id) {
+  const userId = await getBrowserSessionUserId();
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const apps = await listConnectedApps(session.user.id);
+  const apps = await listConnectedApps(userId);
   return NextResponse.json(apps);
 }

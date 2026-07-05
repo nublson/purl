@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/auth", () => ({
-  auth: { api: { getSession: vi.fn() } },
+const mockGetBrowserSessionUserId = vi.fn();
+vi.mock("@/lib/require-browser-session", () => ({
+  getBrowserSessionUserId: mockGetBrowserSessionUserId,
 }));
 
 const mockRevokeConnectedApp = vi.fn();
@@ -10,25 +11,24 @@ vi.mock("@/lib/connected-apps", () => ({
   revokeConnectedApp: mockRevokeConnectedApp,
 }));
 
-vi.mock("next/headers", () => ({
-  headers: vi.fn().mockResolvedValue(new Headers()),
-}));
-
-const { auth } = await import("@/lib/auth");
 const { DELETE } = await import("./route");
 
 function makeContext(clientId: string) {
   return { params: Promise.resolve({ clientId }) };
 }
 
+// getBrowserSessionUserId's own rejection of Authorization-header (API-key)
+// requests is covered in src/lib/require-browser-session.test.ts -- proves
+// this security kill-switch route can't be triggered by just a leaked API
+// key. This route just trusts whatever the guard returns.
 describe("DELETE /api/user/connected-apps/[clientId]", () => {
   beforeEach(() => {
-    vi.mocked(auth.api.getSession).mockReset();
+    mockGetBrowserSessionUserId.mockReset();
     mockRevokeConnectedApp.mockReset();
   });
 
-  it("returns 401 when there is no session", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+  it("returns 401 when there is no browser session", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue(null);
     const res = await DELETE(
       new NextRequest("http://localhost/api/user/connected-apps/client-1"),
       makeContext("client-1"),
@@ -38,10 +38,7 @@ describe("DELETE /api/user/connected-apps/[clientId]", () => {
   });
 
   it("returns 404 when there was nothing to revoke", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue({
-      user: { id: "user-1" },
-      session: {},
-    } as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
     mockRevokeConnectedApp.mockResolvedValue(false);
 
     const res = await DELETE(
@@ -52,10 +49,7 @@ describe("DELETE /api/user/connected-apps/[clientId]", () => {
   });
 
   it("returns 204 and revokes the app scoped to the session user", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue({
-      user: { id: "user-1" },
-      session: {},
-    } as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
     mockRevokeConnectedApp.mockResolvedValue(true);
 
     const res = await DELETE(
