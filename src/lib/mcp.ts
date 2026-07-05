@@ -215,15 +215,18 @@ async function verifyOAuthToken(req: Request): Promise<AuthInfo | undefined> {
     return undefined;
   }
   if (!session?.userId) return undefined;
-  // Defense in depth: verify expiry ourselves rather than trusting the
-  // endpoint to have already filtered it out.
-  if (new Date(session.accessTokenExpiresAt).getTime() < Date.now()) {
+  // getMcpSession does a raw DB lookup by access token with no expiry filter
+  // of its own — this is the only expiry check in the auth path. Guard
+  // against a malformed/missing timestamp failing open (NaN < anything is
+  // false, which would otherwise treat a bad value as "not expired").
+  const expiresAt = new Date(session.accessTokenExpiresAt).getTime();
+  if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
     return undefined;
   }
   return {
     token: session.accessToken,
     clientId: session.clientId,
-    scopes: session.scopes ? session.scopes.split(" ") : [],
+    scopes: session.scopes ? session.scopes.split(" ").filter(Boolean) : [],
     extra: { userId: session.userId },
   };
 }
