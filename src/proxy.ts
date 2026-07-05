@@ -20,6 +20,15 @@ const publicRoutes: PublicRoute[] = [
   { path: "/privacy", whenAuthenticated: "next" },
   { path: "/terms", whenAuthenticated: "next" },
   { path: "/docs", match: "prefix", whenAuthenticated: "next" },
+  // RFC 8615 reserved namespace — anything under .well-known is by convention
+  // a public, unauthenticated discovery/metadata document (OAuth server
+  // metadata, security.txt, etc.), never a session-bearing app route.
+  {
+    path: "/.well-known",
+    match: "prefix",
+    whenAuthenticated: "next",
+    skipSessionLookup: true,
+  },
   {
     path: "/api/auth",
     match: "prefix",
@@ -72,9 +81,17 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const session = await auth.api.getSession({
-    headers: request.headers,
-  });
+  // Better Auth's apiKey plugin throws (rather than returning null) when the
+  // Authorization header carries an invalid/expired/malformed API key. Treat
+  // that the same as "no session" instead of letting it crash the whole
+  // middleware with an unhandled 500 for what's just a bad Bearer token on a
+  // normal page.
+  let session: Awaited<ReturnType<typeof auth.api.getSession>> = null;
+  try {
+    session = await auth.api.getSession({ headers: request.headers });
+  } catch (err) {
+    console.error("proxy: getSession threw, treating as unauthenticated:", err);
+  }
 
   if (publicRoute && !session) {
     return NextResponse.next();

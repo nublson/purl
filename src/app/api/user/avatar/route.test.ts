@@ -4,18 +4,10 @@ import {
   AVATAR_MAX_UPLOAD_BYTES,
   avatarMaxSizeExceededMessage,
 } from "@/utils/upload-limits";
-import { POST } from "./route";
 
-vi.mock("@/lib/auth", () => ({
-  auth: {
-    api: {
-      getSession: vi.fn(),
-    },
-  },
-}));
-
-vi.mock("next/headers", () => ({
-  headers: vi.fn().mockResolvedValue(new Headers()),
+const mockGetBrowserSessionUserId = vi.fn();
+vi.mock("@/lib/require-browser-session", () => ({
+  getBrowserSessionUserId: mockGetBrowserSessionUserId,
 }));
 
 vi.mock("@/lib/upload-avatar", () => {
@@ -36,15 +28,14 @@ vi.mock("@/lib/upload-avatar", () => {
   };
 });
 
-const { auth } = await import("@/lib/auth");
 const {
   uploadUserAvatar,
   InvalidAvatarTypeError,
   AvatarMaxSizeError,
   AvatarStorageError,
 } = await import("@/lib/upload-avatar");
+const { POST } = await import("./route");
 
-const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 const MOCK_IMAGE_URL =
   "https://example.supabase.co/storage/v1/object/public/avatars/user-123/avatar.png";
 
@@ -59,12 +50,12 @@ function postRequest(file?: File): NextRequest {
 
 describe("POST /api/user/avatar", () => {
   beforeEach(() => {
-    vi.mocked(auth.api.getSession).mockReset();
+    mockGetBrowserSessionUserId.mockReset();
     vi.mocked(uploadUserAvatar).mockReset();
   });
 
   it("returns 401 when unauthenticated", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+    mockGetBrowserSessionUserId.mockResolvedValue(null);
 
     const res = await POST(
       postRequest(new File(["img"], "photo.png", { type: "image/png" })),
@@ -76,7 +67,7 @@ describe("POST /api/user/avatar", () => {
   });
 
   it("returns 400 when file is missing", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
 
     const res = await POST(postRequest());
 
@@ -86,7 +77,7 @@ describe("POST /api/user/avatar", () => {
   });
 
   it("returns 413 when image exceeds size limit", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
 
     const oversized = new File(
       [new Uint8Array(AVATAR_MAX_UPLOAD_BYTES + 1)],
@@ -104,7 +95,7 @@ describe("POST /api/user/avatar", () => {
   });
 
   it("returns 400 when upload helper throws InvalidAvatarTypeError", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
     vi.mocked(uploadUserAvatar).mockRejectedValue(
       new InvalidAvatarTypeError("Only image files are supported."),
     );
@@ -120,7 +111,7 @@ describe("POST /api/user/avatar", () => {
   });
 
   it("returns 413 when upload helper throws AvatarMaxSizeError", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
     vi.mocked(uploadUserAvatar).mockRejectedValue(
       new AvatarMaxSizeError(avatarMaxSizeExceededMessage()),
     );
@@ -136,7 +127,7 @@ describe("POST /api/user/avatar", () => {
   });
 
   it("returns 500 when upload helper throws AvatarStorageError", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
     vi.mocked(uploadUserAvatar).mockRejectedValue(
       new AvatarStorageError("Storage failed"),
     );
@@ -150,7 +141,7 @@ describe("POST /api/user/avatar", () => {
   });
 
   it("returns 200 with image URL on success", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
     vi.mocked(uploadUserAvatar).mockResolvedValue(MOCK_IMAGE_URL);
 
     const file = new File(["img"], "photo.png", { type: "image/png" });

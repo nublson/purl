@@ -7,6 +7,13 @@ What it would take to expose Purl as a **Model Context Protocol (MCP) server**, 
 > Route: [`src/app/api/[transport]/route.ts`](../src/app/api/[transport]/route.ts); tools/auth in
 > [`src/lib/mcp.ts`](../src/lib/mcp.ts); user-facing docs at `/docs/mcp`. Tools: `search_content`,
 > `save_link`, `list_saved_items`, `get_link`. The analysis below is kept for historical context.
+>
+> **Update 2 — OAuth 2.1 also implemented.** Contrary to §2/"Open decisions" below (written before
+> this was built), full OAuth 2.1 via Better Auth's `mcp` plugin now ships alongside the static
+> API-key path — Claude Desktop/claude.ai's native "Connect" button works. See
+> [`docs/superpowers/specs/2026-07-04-mcp-oauth-design.md`](superpowers/specs/2026-07-04-mcp-oauth-design.md)
+> for the design and [`docs/superpowers/plans/2026-07-04-mcp-oauth-implementation.md`](superpowers/plans/2026-07-04-mcp-oauth-implementation.md)
+> for the implementation record.
 
 **Status: ~70% of the groundwork is already in place.** The recent public-API work (API keys + `/api/v1`) solved the hardest MCP prerequisites — token auth and a user-scoped, non-cookie execution path. What remains is mostly the MCP protocol layer itself.
 

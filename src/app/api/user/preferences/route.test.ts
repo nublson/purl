@@ -1,17 +1,9 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { GET, PATCH } from "./route";
 
-vi.mock("@/lib/auth", () => ({
-  auth: {
-    api: {
-      getSession: vi.fn(),
-    },
-  },
-}));
-
-vi.mock("next/headers", () => ({
-  headers: vi.fn().mockResolvedValue(new Headers()),
+const mockGetBrowserSessionUserId = vi.fn();
+vi.mock("@/lib/require-browser-session", () => ({
+  getBrowserSessionUserId: mockGetBrowserSessionUserId,
 }));
 
 vi.mock("@/lib/user-preferences", () => ({
@@ -19,12 +11,10 @@ vi.mock("@/lib/user-preferences", () => ({
   updatePreferences: vi.fn(),
 }));
 
-const { auth } = await import("@/lib/auth");
 const { getPreferences, updatePreferences } = await import(
   "@/lib/user-preferences"
 );
-
-const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
+const { GET, PATCH } = await import("./route");
 
 function patchRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/user/preferences", {
@@ -36,12 +26,12 @@ function patchRequest(body: unknown): NextRequest {
 
 describe("GET /api/user/preferences", () => {
   beforeEach(() => {
-    vi.mocked(auth.api.getSession).mockReset();
+    mockGetBrowserSessionUserId.mockReset();
     vi.mocked(getPreferences).mockReset();
   });
 
   it("returns 401 when unauthenticated", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+    mockGetBrowserSessionUserId.mockResolvedValue(null);
 
     const res = await GET();
 
@@ -51,7 +41,7 @@ describe("GET /api/user/preferences", () => {
   });
 
   it("returns stored preferences for the authenticated user", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
     const preferences = { defaultPage: "ai" as const, showChatWidget: false };
     vi.mocked(getPreferences).mockResolvedValue(preferences);
 
@@ -65,12 +55,12 @@ describe("GET /api/user/preferences", () => {
 
 describe("PATCH /api/user/preferences", () => {
   beforeEach(() => {
-    vi.mocked(auth.api.getSession).mockReset();
+    mockGetBrowserSessionUserId.mockReset();
     vi.mocked(updatePreferences).mockReset();
   });
 
   it("returns 401 when unauthenticated", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+    mockGetBrowserSessionUserId.mockResolvedValue(null);
 
     const res = await PATCH(patchRequest({ defaultPage: "ai" }));
 
@@ -80,7 +70,7 @@ describe("PATCH /api/user/preferences", () => {
   });
 
   it("returns 400 when the request body is invalid JSON", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
 
     const res = await PATCH(
       new NextRequest("http://localhost/api/user/preferences", {
@@ -96,7 +86,7 @@ describe("PATCH /api/user/preferences", () => {
   });
 
   it("merges and returns updated preferences", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    mockGetBrowserSessionUserId.mockResolvedValue("user-123");
     const updated = { defaultPage: "ai" as const, showChatWidget: true };
     vi.mocked(updatePreferences).mockResolvedValue(updated);
 

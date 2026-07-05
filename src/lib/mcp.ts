@@ -177,12 +177,11 @@ export function registerPurlTools(server: McpServer): void {
   );
 }
 
-/** Validates the `Authorization: Bearer purl_…` API key and attaches the owning user id to the request auth context. */
-export async function verifyToken(
+/** Verifies a `purl_…` API key via the apiKey plugin. */
+async function verifyApiKeyToken(
   req: Request,
-  bearerToken?: string,
+  bearerToken: string,
 ): Promise<AuthInfo | undefined> {
-  if (!bearerToken) return undefined;
   let result: Awaited<ReturnType<typeof auth.api.verifyApiKey>>;
   try {
     result = await auth.api.verifyApiKey({
@@ -190,9 +189,7 @@ export async function verifyToken(
       headers: req.headers,
     });
   } catch (err) {
-    // verifyApiKey throws (e.g. on rate limit) rather than returning a result.
-    // Reject the connection cleanly instead of surfacing an unexpected error.
-    console.error("MCP bearer token verification failed:", err);
+    console.error("MCP API key verification failed:", err);
     return undefined;
   }
   if (!result.valid || !result.key) return undefined;
@@ -202,4 +199,49 @@ export async function verifyToken(
     scopes: [],
     extra: { userId: result.key.referenceId },
   };
+}
+
+/** Verifies an OAuth access token issued by Better Auth's mcp plugin. */
+async function verifyOAuthToken(req: Request): Promise<AuthInfo | undefined> {
+  let session: Awaited<ReturnType<typeof auth.api.getMcpSession>>;
+  try {
+    session = await auth.api.getMcpSession({
+      request: req,
+      headers: req.headers,
+      asResponse: false,
+    });
+  } catch (err) {
+    console.error("MCP OAuth token verification failed:", err);
+    return undefined;
+  }
+  if (!session?.userId) return undefined;
+  // getMcpSession does a raw DB lookup by access token with no expiry filter
+  // of its own — this is the only expiry check in the auth path. Guard
+  // against a malformed/missing timestamp failing open (NaN < anything is
+  // false, which would otherwise treat a bad value as "not expired").
+  const expiresAt = new Date(session.accessTokenExpiresAt).getTime();
+  if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
+    return undefined;
+  }
+  return {
+    token: session.accessToken,
+    clientId: session.clientId,
+    scopes: session.scopes ? session.scopes.split(" ").filter(Boolean) : [],
+    extra: { userId: session.userId },
+  };
+}
+
+/**
+ * Validates the `Authorization: Bearer …` header, accepting either a
+ * `purl_…` API key or an OAuth access token issued via the mcp plugin's
+ * Connect flow, and attaches the owning user id to the request auth context.
+ */
+export async function verifyToken(
+  req: Request,
+  bearerToken?: string,
+): Promise<AuthInfo | undefined> {
+  if (!bearerToken) return undefined;
+  const apiKeyInfo = await verifyApiKeyToken(req, bearerToken);
+  if (apiKeyInfo) return apiKeyInfo;
+  return verifyOAuthToken(req);
 }

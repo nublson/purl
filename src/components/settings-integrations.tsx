@@ -27,6 +27,12 @@ type ApiKeyItem = {
 
 type CreatedApiKey = ApiKeyItem & { key: string };
 
+type ConnectedApp = {
+  clientId: string;
+  name: string;
+  createdAt: string;
+};
+
 export function SettingsIntegrations() {
   const [keys, setKeys] = React.useState<ApiKeyItem[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -88,6 +94,41 @@ export function SettingsIntegrations() {
       toast.success("API key revoked");
     } catch {
       toast.error("Failed to revoke key");
+    }
+  };
+
+  const [connectedApps, setConnectedApps] = React.useState<ConnectedApp[]>([]);
+  const [connectedAppsLoading, setConnectedAppsLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    fetch("/api/user/connected-apps")
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then((data: ConnectedApp[]) =>
+        setConnectedApps(Array.isArray(data) ? data : []),
+      )
+      .catch(() => {
+        toast.error("Failed to load connected apps");
+        setConnectedApps([]);
+      })
+      .finally(() => setConnectedAppsLoading(false));
+  }, []);
+
+  const handleRevokeConnectedApp = async (clientId: string) => {
+    try {
+      const res = await fetch(`/api/user/connected-apps/${clientId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        toast.error("Failed to revoke app");
+        return;
+      }
+      setConnectedApps((prev) => prev.filter((a) => a.clientId !== clientId));
+      toast.success("App disconnected");
+    } catch {
+      toast.error("Failed to revoke app");
     }
   };
 
@@ -189,6 +230,32 @@ export function SettingsIntegrations() {
           ))}
         </div>
       )}
+
+      <SettingsItem
+        title="Connected Apps"
+        description="Apps you've authorized to access Purl on your behalf via OAuth."
+        actions={null}
+      />
+
+      {connectedAppsLoading ? (
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-10 w-full rounded-md" />
+        </div>
+      ) : connectedApps.length === 0 ? (
+        <Typography size="small" className="text-muted-foreground">
+          No connected apps yet.
+        </Typography>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {connectedApps.map((app) => (
+            <ConnectedAppRow
+              key={app.clientId}
+              app={app}
+              onRevoke={() => handleRevokeConnectedApp(app.clientId)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -261,6 +328,82 @@ function ApiKeyRow({
               onClick={() => void handleRevoke()}
             >
               {revoking ? "Revoking…" : "Revoke key"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function ConnectedAppRow({
+  app,
+  onRevoke,
+}: {
+  app: ConnectedApp;
+  onRevoke: () => Promise<void>;
+}) {
+  const [alertOpen, setAlertOpen] = React.useState(false);
+  const [revoking, setRevoking] = React.useState(false);
+
+  const handleRevoke = async () => {
+    setRevoking(true);
+    try {
+      await onRevoke();
+    } finally {
+      setRevoking(false);
+      setAlertOpen(false);
+    }
+  };
+
+  const connectedDate = new Date(app.createdAt).toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+
+  return (
+    <div className="flex items-center justify-between gap-3 py-2">
+      <div className="flex flex-col gap-0.5 min-w-0">
+        <Typography size="small" className="font-medium truncate">
+          {app.name}
+        </Typography>
+        <Typography size="mini" className="text-muted-foreground">
+          Connected {connectedDate}
+        </Typography>
+      </div>
+      <AlertDialog
+        open={alertOpen}
+        onOpenChange={(v) => !revoking && setAlertOpen(v)}
+      >
+        <AlertDialogTrigger asChild>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="cursor-pointer shrink-0"
+          >
+            Revoke
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent size="default" className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect app?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <span className="font-medium">{app.name}</span> will
+              immediately lose access to your Purl account. This cannot be
+              undone — you&apos;d need to reconnect and re-authorize it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={revoking}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={revoking}
+              className="cursor-pointer"
+              onClick={() => void handleRevoke()}
+            >
+              {revoking ? "Revoking…" : "Revoke access"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

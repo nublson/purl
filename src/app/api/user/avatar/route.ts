@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { getBrowserSessionUserId } from "@/lib/require-browser-session";
 import {
   AvatarMaxSizeError,
   AvatarStorageError,
@@ -9,14 +9,10 @@ import {
   AVATAR_MAX_UPLOAD_BYTES,
   avatarMaxSizeExceededMessage,
 } from "@/utils/upload-limits";
-import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  const userId = session?.user?.id;
+  const userId = await getBrowserSessionUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
