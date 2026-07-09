@@ -192,6 +192,29 @@ describe("proxy", () => {
     expect(getPreferences).toHaveBeenCalledWith("user-1");
   });
 
+  describe("MCP route", () => {
+    it("passes through /api/mcp without redirecting to login (bearer auth at handler)", async () => {
+      vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+      const request = new NextRequest("http://localhost/api/mcp", {
+        method: "POST",
+        headers: { authorization: "Bearer oauth-access-token" },
+      });
+      const response = await proxy(request);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("location")).toBeNull();
+    });
+
+    it("passes through /api/mcp subpaths without redirecting to login", async () => {
+      vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+      const request = new NextRequest("http://localhost/api/mcp/messages", {
+        method: "POST",
+      });
+      const response = await proxy(request);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("location")).toBeNull();
+    });
+  });
+
   describe("API v1 routes", () => {
     it("passes through /api/v1/keys without a session", async () => {
       vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
