@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { requireConsentRedirectUri } from "@/lib/oauth-consent-redirect";
 import { Button } from "@/components/ui/button";
 
 export function OAuthConsentActions({ consentCode }: { consentCode: string }) {
@@ -22,10 +23,7 @@ export function OAuthConsentActions({ consentCode }: { consentCode: string }) {
         throw new Error(`Consent request failed with status ${res.status}`);
       }
       const data = (await res.json()) as { redirectURI?: string };
-      if (!data.redirectURI) {
-        throw new Error("No redirect URL returned");
-      }
-      window.location.href = data.redirectURI;
+      window.location.href = requireConsentRedirectUri(data);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to submit your decision",
