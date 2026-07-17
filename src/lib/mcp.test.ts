@@ -62,7 +62,11 @@ const reqWithBearer = (token?: string) =>
   });
 
 describe("verifyToken", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockVerifyApiKey.mockReset();
+    mockGetMcpSession.mockReset();
+  });
 
   it("returns undefined when no bearer token is provided", async () => {
     expect(await verifyToken(reqWithBearer(), undefined)).toBeUndefined();
@@ -134,6 +138,66 @@ describe("verifyToken", () => {
     ).toBeUndefined();
   });
 
+  it.each([
+    ["missing", undefined],
+    ["empty string", ""],
+    ["non-date string", "not-a-date"],
+  ])(
+    "returns undefined when OAuth accessTokenExpiresAt is %s (fail closed)",
+    async (_label, accessTokenExpiresAt) => {
+      mockVerifyApiKey.mockResolvedValue({ valid: false, key: null });
+      mockGetMcpSession.mockResolvedValue({
+        accessToken: "token-with-bad-expiry",
+        clientId: "client-1",
+        userId: "user-2",
+        scopes: "openid",
+        accessTokenExpiresAt,
+      });
+      expect(
+        await verifyToken(
+          reqWithBearer("token-with-bad-expiry"),
+          "token-with-bad-expiry",
+        ),
+      ).toBeUndefined();
+    },
+  );
+
+  it("returns undefined when the OAuth session has no userId", async () => {
+    mockVerifyApiKey.mockResolvedValue({ valid: false, key: null });
+    mockGetMcpSession.mockResolvedValue({
+      accessToken: "oauth-token-1",
+      clientId: "client-1",
+      userId: "",
+      scopes: "openid",
+      accessTokenExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    expect(
+      await verifyToken(reqWithBearer("oauth-token-1"), "oauth-token-1"),
+    ).toBeUndefined();
+  });
+
+  it("treats missing OAuth scopes as an empty array", async () => {
+    mockVerifyApiKey.mockResolvedValue({ valid: false, key: null });
+    mockGetMcpSession.mockResolvedValue({
+      accessToken: "oauth-token-1",
+      clientId: "client-1",
+      userId: "user-2",
+      scopes: null,
+      accessTokenExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const info = await verifyToken(reqWithBearer("oauth-token-1"), "oauth-token-1");
+    expect(info?.scopes).toEqual([]);
+  });
+
+  it("falls back to OAuth when verifyApiKey throws instead of crashing", async () => {
+    mockVerifyApiKey.mockRejectedValue(new Error("Invalid API key."));
+    mockGetMcpSession.mockResolvedValue(null);
+    expect(
+      await verifyToken(reqWithBearer("maybe-oauth-token"), "maybe-oauth-token"),
+    ).toBeUndefined();
+    expect(mockGetMcpSession).toHaveBeenCalled();
+  });
+
   it("returns undefined when getMcpSession throws", async () => {
     mockVerifyApiKey.mockResolvedValue({ valid: false, key: null });
     mockGetMcpSession.mockRejectedValue(new Error("network error"));
@@ -144,6 +208,19 @@ describe("verifyToken", () => {
 describe("getUserId", () => {
   it("throws when no auth info is present", () => {
     expect(() => getUserId({})).toThrow("Unauthorized");
+  });
+
+  it("throws when auth info extra has an empty userId", () => {
+    expect(() =>
+      getUserId({
+        authInfo: {
+          token: "t",
+          clientId: "c",
+          scopes: [],
+          extra: { userId: "" },
+        },
+      }),
+    ).toThrow("Unauthorized");
   });
 
   it("returns the user id from auth info extra", () => {
