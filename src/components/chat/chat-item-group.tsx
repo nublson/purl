@@ -7,7 +7,7 @@ interface ChatItemGroupProps {
 
 export default function ChatItemGroup({ title, children }: ChatItemGroupProps) {
   return (
-    <div className="w-full flex flex-col items-start justify-start gap-2">
+    <div className="w-full min-w-0 md:flex-1 flex flex-col items-start justify-start gap-2">
       <Typography
         component="h3"
         size="mini"

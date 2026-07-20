@@ -97,7 +97,7 @@ export default function AiPage() {
         isLoading={false}
         className="min-h-16"
       />
-      <div className="w-full flex flex-col md:flex-row items-start justify-between gap-8 md:gap-2 px-4 pt-14">
+      <div className="w-full min-w-0 flex flex-col md:flex-row items-start justify-between gap-8 md:gap-2 px-4 pt-14">
         <ChatItemGroup title="Recent chats">
           {isLoadingChats ? (
             <ChatItemSkeleton count={2} />
