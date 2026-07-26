@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type Stripe from "stripe";
 
 const mockConstructEvent = vi.fn();
@@ -36,6 +36,10 @@ describe("POST /api/billing/webhook", () => {
     mockIsProcessed.mockResolvedValue(false);
     mockProcessEvent.mockResolvedValue(undefined);
     mockRecordProcessed.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("returns 500 when STRIPE_WEBHOOK_SECRET is not configured", async () => {

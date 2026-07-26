@@ -97,6 +97,8 @@ describe("POST /api/billing/checkout", () => {
         line_items: [{ price: "price_onetime", quantity: 1 }],
         success_url: "https://app.purl.test/home?checkout=success",
         cancel_url: "https://app.purl.test/home?checkout=canceled",
+        allow_promotion_codes: true,
+        billing_address_collection: "auto",
       }),
     );
   });
@@ -118,7 +120,11 @@ describe("POST /api/billing/checkout", () => {
       data: { stripeCustomerId: "cus_new" },
     });
     expect(mockCheckoutCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ customer: "cus_new" }),
+      expect.objectContaining({
+        customer: "cus_new",
+        allow_promotion_codes: true,
+        billing_address_collection: "auto",
+      }),
     );
   });
 

@@ -20,6 +20,10 @@ function getRequest(url: string): NextRequest {
   return new NextRequest(url, { method: "GET" });
 }
 
+// Authentication is enforced by src/proxy.ts (Next.js middleware), which
+// redirects unauthenticated requests before they reach this handler — this
+// route is not publicly exempted there, so the handler itself intentionally
+// has no in-handler session check for these tests to cover.
 describe("GET /api/pdf-proxy", () => {
   beforeEach(() => {
     mockSafeFetch.mockReset();
