@@ -459,5 +459,30 @@ describe("rateLimitApiRequest", () => {
       expect(mockGetSession).not.toHaveBeenCalled();
       expect(limitMock).toHaveBeenCalledWith("5.5.5.5");
     });
+
+    it("uses userId from OAuth session when getSession resolves a user", async () => {
+      vi.mocked(getMcpRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      mockGetSession.mockResolvedValue({ user: { id: "user-oauth" } });
+      const request = new NextRequest("http://localhost/api/mcp", {
+        method: "POST",
+        headers: { authorization: "Bearer oauth-access-token-xyz" },
+      });
+      await rateLimitApiRequest(request);
+      expect(mockGetSession).toHaveBeenCalledWith({ headers: expect.any(Headers) });
+      expect(limitMock).toHaveBeenCalledWith("user-oauth");
+    });
+
+    it("falls back to raw OAuth token when getSession returns null", async () => {
+      vi.mocked(getMcpRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      mockGetSession.mockResolvedValue(null);
+      const request = new NextRequest("http://localhost/api/mcp", {
+        method: "POST",
+        headers: { authorization: "Bearer oauth-access-token-xyz" },
+      });
+      await rateLimitApiRequest(request);
+      expect(limitMock).toHaveBeenCalledWith("oauth-access-token-xyz");
+    });
   });
 });
