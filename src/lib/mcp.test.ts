@@ -46,6 +46,7 @@ vi.mock("@/lib/entitlements", () => ({
 const {
   verifyToken,
   getUserId,
+  registerPurlTools,
   searchContentTool,
   saveLinkTool,
   listSavedItemsTool,
@@ -60,6 +61,47 @@ const reqWithBearer = (token?: string) =>
   new Request("http://localhost/api/mcp", {
     headers: token ? { authorization: `Bearer ${token}` } : {},
   });
+
+describe("registerPurlTools", () => {
+  it("registers all four MCP tools on the server", () => {
+    const registered: string[] = [];
+    const mockServer = {
+      tool: vi.fn((name: string) => {
+        registered.push(name);
+      }),
+    };
+    registerPurlTools(mockServer as never);
+    expect(registered).toEqual([
+      "search_content",
+      "save_link",
+      "list_saved_items",
+      "get_link",
+    ]);
+  });
+
+  it("registered tool handlers reject requests without authInfo", async () => {
+    const handlers: Array<
+      (args: unknown, extra: unknown) => Promise<unknown>
+    > = [];
+    const mockServer = {
+      tool: vi.fn(
+        (
+          _name: string,
+          _desc: string,
+          _schema: unknown,
+          handler: (args: unknown, extra: unknown) => Promise<unknown>,
+        ) => {
+          handlers.push(handler);
+        },
+      ),
+    };
+    registerPurlTools(mockServer as never);
+
+    await expect(handlers[0]({ query: "react" }, {})).rejects.toThrow(
+      "Unauthorized",
+    );
+  });
+});
 
 describe("verifyToken", () => {
   beforeEach(() => {
