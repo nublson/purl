@@ -58,6 +58,17 @@ describe("POST /api/billing/portal", () => {
     expect(mockPortalCreate).not.toHaveBeenCalled();
   });
 
+  it("returns 400 when subscription row is missing", async () => {
+    mockFindUnique.mockResolvedValue(null);
+    const { POST } = await import("./route");
+    const res = await POST();
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "No billing account yet. Subscribe first.",
+    });
+    expect(mockPortalCreate).not.toHaveBeenCalled();
+  });
+
   it("returns a portal URL for an authenticated user with a customer id", async () => {
     mockFindUnique.mockResolvedValue({ stripeCustomerId: "cus_existing" });
     const { POST } = await import("./route");
