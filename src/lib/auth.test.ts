@@ -36,6 +36,7 @@ describe("auth config", () => {
     expect(mcpPlugin?.options?.oidcConfig?.consentPage).toBe("/oauth/consent");
     expect(mcpPlugin?.options?.oidcConfig?.loginPage).toBe("/login");
   });
+
 });
 
 describe("Bearer token extraction logic", () => {

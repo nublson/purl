@@ -1,28 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const mockGetBrowserSessionUserId = vi.fn();
-const mockGetSession = vi.fn();
+const mockGetBrowserSession = vi.fn();
 const mockEnsureSubscriptionRow = vi.fn();
 const mockCustomerCreate = vi.fn();
 const mockCheckoutCreate = vi.fn();
 const mockSubscriptionUpdate = vi.fn();
 
 vi.mock("server-only", () => ({}));
-vi.mock("next/headers", () => ({
-  headers: vi.fn().mockResolvedValue(new Headers()),
-}));
 
 vi.mock("@/lib/require-browser-session", () => ({
-  getBrowserSessionUserId: mockGetBrowserSessionUserId,
-}));
-
-vi.mock("@/lib/auth", () => ({
-  auth: {
-    api: {
-      getSession: mockGetSession,
-    },
-  },
+  getBrowserSession: mockGetBrowserSession,
 }));
 
 vi.mock("@/lib/subscription-utils", () => ({
@@ -63,8 +51,7 @@ function makeRequest(): NextRequest {
 describe("POST /api/billing/checkout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
-    mockGetSession.mockResolvedValue({
+    mockGetBrowserSession.mockResolvedValue({
       user: { id: "user-1", email: "user@example.com" },
     });
     mockCheckoutCreate.mockResolvedValue({
@@ -74,12 +61,19 @@ describe("POST /api/billing/checkout", () => {
   });
 
   it("returns 401 when there is no browser session (including API-key-only auth)", async () => {
-    mockGetBrowserSessionUserId.mockResolvedValue(null);
+    mockGetBrowserSession.mockResolvedValue(null);
     const { POST } = await import("./route");
     const res = await POST(makeRequest());
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "Unauthorized" });
-    expect(mockGetSession).not.toHaveBeenCalled();
+    expect(mockCheckoutCreate).not.toHaveBeenCalled();
+  });
+
+  it("returns 401 when the browser session has no email", async () => {
+    mockGetBrowserSession.mockResolvedValue({ user: { id: "user-1" } });
+    const { POST } = await import("./route");
+    const res = await POST(makeRequest());
+    expect(res.status).toBe(401);
     expect(mockCheckoutCreate).not.toHaveBeenCalled();
   });
 
