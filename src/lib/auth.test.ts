@@ -12,6 +12,25 @@ describe("auth config", () => {
     ) ?? [];
     expect(pluginIds).toContain("api-key");
   });
+
+  it("includes the mcp plugin with the OAuth consent page configured", async () => {
+    const { auth } = await import("@/lib/auth");
+    type AuthLike = {
+      options?: {
+        plugins?: Array<{
+          id?: string;
+          name?: string;
+          options?: { oidcConfig?: { consentPage?: string } };
+        }>;
+      };
+    };
+    const plugins = (auth as unknown as AuthLike).options?.plugins ?? [];
+    const pluginIds = plugins.map((p) => p.id ?? p.name);
+    expect(pluginIds).toContain("mcp");
+
+    const mcpPlugin = plugins.find((p) => (p.id ?? p.name) === "mcp");
+    expect(mcpPlugin?.options?.oidcConfig?.consentPage).toBe("/oauth/consent");
+  });
 });
 
 describe("Bearer token extraction logic", () => {
