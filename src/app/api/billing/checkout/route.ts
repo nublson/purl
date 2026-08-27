@@ -1,16 +1,13 @@
-import { auth } from "@/lib/auth";
+import { getBrowserSession } from "@/lib/require-browser-session";
 import { getAppBaseUrl } from "@/lib/billing-url";
 import { getStripeOneTimePriceId } from "@/lib/plans";
 import prisma from "@/lib/prisma";
 import { ensureSubscriptionRow } from "@/lib/subscription-utils";
 import { getStripe } from "@/lib/stripe";
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const session = await getBrowserSession();
   const userId = session?.user?.id;
   const userEmail = session?.user?.email;
   if (!userId || !userEmail) {
