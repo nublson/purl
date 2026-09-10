@@ -1,19 +1,24 @@
-import { auth } from "@/lib/auth";
 import { getAppBaseUrl } from "@/lib/billing-url";
 import { getStripeOneTimePriceId } from "@/lib/plans";
 import prisma from "@/lib/prisma";
+import { getBrowserSessionUserId } from "@/lib/require-browser-session";
 import { ensureSubscriptionRow } from "@/lib/subscription-utils";
 import { getStripe } from "@/lib/stripe";
+import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
+  const userId = await getBrowserSessionUserId();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const session = await auth.api.getSession({
     headers: await headers(),
   });
-  const userId = session?.user?.id;
   const userEmail = session?.user?.email;
-  if (!userId || !userEmail) {
+  if (!userEmail) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
