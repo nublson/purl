@@ -4,13 +4,36 @@ vi.mock("@/lib/prisma", () => ({ default: {} }));
 vi.mock("server-only", () => ({}));
 
 describe("auth config", () => {
+  type AuthLike = {
+    options?: {
+      plugins?: Array<{
+        id?: string;
+        name?: string;
+        options?: {
+          oidcConfig?: { consentPage?: string; loginPage?: string };
+        };
+      }>;
+    };
+  };
+
   it("includes the apiKey plugin", async () => {
     const { auth } = await import("@/lib/auth");
-    type AuthLike = { options?: { plugins?: Array<{ id?: string; name?: string }> } };
-    const pluginIds = (auth as unknown as AuthLike).options?.plugins?.map(
-      (p) => p.id ?? p.name
-    ) ?? [];
+    const pluginIds =
+      (auth as unknown as AuthLike).options?.plugins?.map(
+        (p) => p.id ?? p.name,
+      ) ?? [];
     expect(pluginIds).toContain("api-key");
+  });
+
+  it("includes the mcp plugin with OAuth consent and login pages configured", async () => {
+    const { auth } = await import("@/lib/auth");
+    const plugins = (auth as unknown as AuthLike).options?.plugins ?? [];
+    const pluginIds = plugins.map((p) => p.id ?? p.name);
+    expect(pluginIds).toContain("mcp");
+
+    const mcpPlugin = plugins.find((p) => (p.id ?? p.name) === "mcp");
+    expect(mcpPlugin?.options?.oidcConfig?.consentPage).toBe("/oauth/consent");
+    expect(mcpPlugin?.options?.oidcConfig?.loginPage).toBe("/login");
   });
 });
 
