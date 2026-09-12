@@ -1,15 +1,11 @@
-import { auth } from "@/lib/auth";
 import { getAppBaseUrl } from "@/lib/billing-url";
 import prisma from "@/lib/prisma";
+import { getBrowserSessionUserId } from "@/lib/require-browser-session";
 import { getStripe } from "@/lib/stripe";
-import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 export async function POST() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  const userId = session?.user?.id;
+  const userId = await getBrowserSessionUserId();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
