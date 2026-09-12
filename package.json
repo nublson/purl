@@ -95,7 +95,7 @@
     "typescript": "^5",
     "undici": "^7.28.0",
     "vite-tsconfig-paths": "^6.1.1",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.11"
   },
   "pnpm": {
     "overrides": {
