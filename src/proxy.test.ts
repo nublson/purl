@@ -267,6 +267,35 @@ describe("proxy", () => {
     });
   });
 
+  describe("/oauth/consent route", () => {
+    it("redirects to /login when no session (OAuth consent requires a signed-in user)", async () => {
+      vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+      const res = await proxy(createRequest("/oauth/consent"));
+      expect(res.status).toBe(307);
+      expect(res.headers.get("location")).toContain("/login");
+    });
+
+    it("returns next when session exists and user is verified", async () => {
+      vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+        user: { emailVerified: true },
+        session: {},
+      } as never);
+      const res = await proxy(createRequest("/oauth/consent"));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+    });
+
+    it("redirects to /verify-email when session exists but user is not verified", async () => {
+      vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+        user: { emailVerified: false },
+        session: {},
+      } as never);
+      const res = await proxy(createRequest("/oauth/consent"));
+      expect(res.status).toBe(307);
+      expect(res.headers.get("location")).toContain("/verify-email");
+    });
+  });
+
   describe("malformed Authorization header on a private route", () => {
     it("redirects to /login instead of crashing when getSession throws (e.g. an invalid API key)", async () => {
       vi.mocked(auth.auth.api.getSession).mockRejectedValue(
