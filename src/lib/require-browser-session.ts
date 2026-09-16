@@ -16,10 +16,16 @@ import { headers } from "next/headers";
  * routes never send one — its mere presence means this isn't a real browser
  * session request.
  */
-export async function getBrowserSessionUserId(): Promise<string | null> {
+export async function getBrowserSession(): Promise<
+  Awaited<ReturnType<typeof auth.api.getSession>> | null
+> {
   const requestHeaders = await headers();
   if (requestHeaders.get("authorization")) return null;
 
-  const session = await auth.api.getSession({ headers: requestHeaders });
+  return auth.api.getSession({ headers: requestHeaders });
+}
+
+export async function getBrowserSessionUserId(): Promise<string | null> {
+  const session = await getBrowserSession();
   return session?.user?.id ?? null;
 }

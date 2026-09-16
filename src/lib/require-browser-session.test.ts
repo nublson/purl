@@ -12,7 +12,44 @@ vi.mock("next/headers", () => ({
   headers: mockHeaders,
 }));
 
-const { getBrowserSessionUserId } = await import("./require-browser-session");
+const { getBrowserSession, getBrowserSessionUserId } = await import("./require-browser-session");
+
+describe("getBrowserSession", () => {
+  beforeEach(() => {
+    mockGetSession.mockReset();
+    mockHeaders.mockReset();
+  });
+
+  it("returns null and never calls getSession when an Authorization header is present", async () => {
+    mockHeaders.mockResolvedValue(new Headers({ authorization: "Bearer purl_leaked_key" }));
+    mockGetSession.mockResolvedValue({ user: { id: "user-1", email: "a@b.com" }, session: {} });
+
+    const result = await getBrowserSession();
+
+    expect(result).toBeNull();
+    expect(mockGetSession).not.toHaveBeenCalled();
+  });
+
+  it("returns null when there is no Authorization header and no session", async () => {
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetSession.mockResolvedValue(null);
+
+    const result = await getBrowserSession();
+
+    expect(result).toBeNull();
+    expect(mockGetSession).toHaveBeenCalledWith({ headers: expect.any(Headers) });
+  });
+
+  it("returns the session from a real cookie-based request", async () => {
+    const session = { user: { id: "user-1", email: "a@b.com" }, session: {} };
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetSession.mockResolvedValue(session);
+
+    const result = await getBrowserSession();
+
+    expect(result).toEqual(session);
+  });
+});
 
 describe("getBrowserSessionUserId", () => {
   beforeEach(() => {
