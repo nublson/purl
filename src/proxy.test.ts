@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NextRequest } from "next/server";
-import { proxy } from "./proxy";
+import { NextRequest, NextResponse } from "next/server";
+
+const mockRateLimitApiRequest = vi.fn();
+
+vi.mock("@/lib/proxy-rate-limit", () => ({
+  rateLimitApiRequest: mockRateLimitApiRequest,
+}));
 
 vi.mock("@/lib/auth", () => ({
   auth: {
@@ -14,6 +19,7 @@ vi.mock("@/lib/user-preferences", () => ({
   getPreferences: vi.fn().mockResolvedValue({ defaultPage: "home" }),
 }));
 
+const { proxy } = await import("./proxy");
 const auth = await import("@/lib/auth");
 const { getPreferences } = await import("@/lib/user-preferences");
 
@@ -25,6 +31,26 @@ describe("proxy", () => {
   beforeEach(() => {
     vi.mocked(auth.auth.api.getSession).mockReset();
     vi.mocked(getPreferences).mockResolvedValue({ defaultPage: "home" });
+    mockRateLimitApiRequest.mockReset();
+    mockRateLimitApiRequest.mockResolvedValue(null);
+  });
+
+  it("returns 429 immediately when rateLimitApiRequest blocks the request", async () => {
+    mockRateLimitApiRequest.mockResolvedValue(
+      new NextResponse(JSON.stringify({ error: "Too many requests" }), {
+        status: 429,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+      user: { emailVerified: true },
+      session: {},
+    } as never);
+
+    const res = await proxy(createRequest("/home"));
+
+    expect(res.status).toBe(429);
+    expect(auth.auth.api.getSession).not.toHaveBeenCalled();
   });
 
   it("passes OPTIONS through without session lookup (CORS preflight)", async () => {
@@ -126,6 +152,23 @@ describe("proxy", () => {
     const res = await proxy(req);
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toContain("/login");
+  });
+
+  it("redirects to /login for /oauth/consent when no session", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+    const res = await proxy(createRequest("/oauth/consent"));
+    expect(res.status).toBe(307);
+    expect(res.headers.get("location")).toContain("/login");
+  });
+
+  it("returns next for /oauth/consent when a verified session exists", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+      user: { emailVerified: true },
+      session: {},
+    } as never);
+    const res = await proxy(createRequest("/oauth/consent"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
   });
 
   it("redirects to /verify-email for private route when session exists but user is not verified", async () => {
