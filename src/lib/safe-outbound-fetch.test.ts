@@ -4,6 +4,7 @@ import {
   UnsafeOutboundUrlError,
   assertResolvableHostIsPublic,
   assertSafeHttpUrl,
+  isHttpProxyTunnelFailure,
   safeFetch,
 } from "./safe-outbound-fetch";
 
@@ -18,6 +19,18 @@ function restoreDefaultDnsMock() {
       return Promise.resolve(DEFAULT_DNS_ANSWER);
     }) as typeof dns.lookup,
   );
+}
+
+function proxy407Error(): TypeError {
+  const tunnel = new Error(
+    "Proxy response (407) !== 200 when HTTP Tunneling",
+  ) as Error & { code: string };
+  tunnel.code = "UND_ERR_ABORTED";
+  const cancelled = new Error("Request was cancelled.");
+  (cancelled as Error & { cause: unknown }).cause = tunnel;
+  const top = new TypeError("fetch failed");
+  (top as TypeError & { cause: unknown }).cause = cancelled;
+  return top;
 }
 
 describe("assertSafeHttpUrl", () => {
@@ -36,6 +49,19 @@ describe("assertSafeHttpUrl", () => {
   it("returns a URL for valid https", () => {
     const u = assertSafeHttpUrl("https://example.com/path");
     expect(u.hostname).toBe("example.com");
+  });
+});
+
+describe("isHttpProxyTunnelFailure", () => {
+  it("detects nested Undici 407 CONNECT failures", () => {
+    expect(isHttpProxyTunnelFailure(proxy407Error())).toBe(true);
+  });
+
+  it("returns false for unrelated network errors", () => {
+    expect(isHttpProxyTunnelFailure(new TypeError("fetch failed"))).toBe(
+      false,
+    );
+    expect(isHttpProxyTunnelFailure(new Error("ECONNRESET"))).toBe(false);
   });
 });
 
@@ -145,5 +171,38 @@ describe("safeFetch", () => {
     await expect(
       safeFetch("https://example.com/huge", { maxResponseBytes: 1000 }),
     ).rejects.toThrow(UnsafeOutboundUrlError);
+  });
+});
+
+describe("safeFetch HTTP proxy 407 fallback", () => {
+  const PREV_PROXY = process.env.SAFE_OUTBOUND_HTTP_PROXY;
+
+  afterEach(() => {
+    if (PREV_PROXY === undefined) {
+      delete process.env.SAFE_OUTBOUND_HTTP_PROXY;
+    } else {
+      process.env.SAFE_OUTBOUND_HTTP_PROXY = PREV_PROXY;
+    }
+    vi.restoreAllMocks();
+    vi.resetModules();
+  });
+
+  it("retries with direct egress after a proxy CONNECT 407", async () => {
+    process.env.SAFE_OUTBOUND_HTTP_PROXY =
+      "http://user:pass@127.0.0.1:65535";
+    vi.resetModules();
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    fetchSpy
+      .mockRejectedValueOnce(proxy407Error())
+      .mockResolvedValueOnce(new Response("recovered", { status: 200 }));
+
+    const { safeFetch: proxiedSafeFetch, safeOutboundEgressMode } =
+      await import("./safe-outbound-fetch");
+    expect(safeOutboundEgressMode).toBe("http_proxy");
+
+    const res = await proxiedSafeFetch("https://example.com/article");
+    expect(await res.text()).toBe("recovered");
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });

@@ -297,6 +297,43 @@ const { dispatcher: safeFetchDispatcher, mode: safeOutboundEgressMode } =
 
 export { safeOutboundEgressMode };
 
+/**
+ * True when Undici failed the HTTP CONNECT tunnel to {@link SAFE_OUTBOUND_HTTP_PROXY}
+ * (commonly HTTP 407 from bad/expired proxy credentials or allowlist misses).
+ */
+export function isHttpProxyTunnelFailure(err: unknown): boolean {
+  let current: unknown = err;
+  const seen = new Set<unknown>();
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    const msg =
+      current instanceof Error
+        ? current.message
+        : typeof current === "string"
+          ? current
+          : "";
+    if (
+      msg.includes("Proxy response (407)") ||
+      (msg.includes("HTTP Tunneling") && msg.includes("407"))
+    ) {
+      return true;
+    }
+    current =
+      "cause" in current ? (current as { cause: unknown }).cause : undefined;
+  }
+  return false;
+}
+
+function unwrapUnsafeOutboundCause(err: unknown): never {
+  if (
+    err instanceof TypeError &&
+    err.cause instanceof UnsafeOutboundUrlError
+  ) {
+    throw err.cause;
+  }
+  throw err;
+}
+
 export function assertSafeHttpUrl(urlInput: string | URL): URL {
   let url: URL;
   try {
@@ -329,13 +366,15 @@ export type SafeFetchInit = RequestInit & {
   maxResponseBytes?: number;
 };
 
+type SafeFetchDispatcher = Agent | ProxyAgent | Socks5ProxyAgent;
+
 /**
- * Fetch with manual redirects; each request uses the configured egress dispatcher
- * (direct pinned connect, HTTP proxy with pinned connect to the proxy, or SOCKS5).
+ * Fetch with manual redirects using an explicit Undici dispatcher.
  */
-export async function safeFetch(
+async function safeFetchWithDispatcher(
   input: string | URL,
-  init: SafeFetchInit = {},
+  init: SafeFetchInit,
+  dispatcher: SafeFetchDispatcher,
 ): Promise<Response> {
   const {
     maxRedirects = DEFAULT_MAX_REDIRECTS,
@@ -352,17 +391,11 @@ export async function safeFetch(
     try {
       res = await undiciFetch(url.href, {
         ...requestInit,
-        dispatcher: safeFetchDispatcher,
+        dispatcher,
         redirect: "manual",
       } as Parameters<typeof undiciFetch>[1]);
     } catch (err) {
-      if (
-        err instanceof TypeError &&
-        err.cause instanceof UnsafeOutboundUrlError
-      ) {
-        throw err.cause;
-      }
-      throw err;
+      unwrapUnsafeOutboundCause(err);
     }
 
     if (REDIRECT_STATUSES.has(res.status)) {
@@ -400,6 +433,38 @@ export async function safeFetch(
     }
 
     return res as unknown as Response;
+  }
+}
+
+/**
+ * Fetch with manual redirects; each request uses the configured egress dispatcher
+ * (direct pinned connect, HTTP proxy with pinned connect to the proxy, or SOCKS5).
+ *
+ * When {@link SAFE_OUTBOUND_HTTP_PROXY} is set but CONNECT fails with HTTP 407,
+ * retries once via direct pinned egress so article OG scrapes are not wedged by
+ * a misconfigured YouTube-oriented proxy.
+ */
+export async function safeFetch(
+  input: string | URL,
+  init: SafeFetchInit = {},
+): Promise<Response> {
+  try {
+    return await safeFetchWithDispatcher(input, init, safeFetchDispatcher);
+  } catch (err) {
+    if (
+      safeOutboundEgressMode === "http_proxy" &&
+      isHttpProxyTunnelFailure(err)
+    ) {
+      console.warn(
+        "[safeFetch] HTTP proxy CONNECT failed (407); retrying with direct egress",
+      );
+      try {
+        return await safeFetchWithDispatcher(input, init, safeOutboundAgent);
+      } catch (retryErr) {
+        unwrapUnsafeOutboundCause(retryErr);
+      }
+    }
+    unwrapUnsafeOutboundCause(err);
   }
 }
 
