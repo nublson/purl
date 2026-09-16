@@ -148,6 +148,9 @@ function mockOgsSuccess(
     ogTitle?: string;
     ogDescription?: string;
     ogImage?: Array<{ url: string }>;
+    twitterTitle?: string;
+    twitterDescription?: string;
+    twitterImage?: Array<{ url: string }>;
     favicon?: string;
     ogUrl?: string;
   } = {},
@@ -158,6 +161,9 @@ function mockOgsSuccess(
       ogTitle: "Example Domain",
       ogDescription: undefined,
       ogImage: undefined,
+      twitterTitle: undefined,
+      twitterDescription: undefined,
+      twitterImage: undefined,
       favicon: undefined,
       ogUrl: undefined,
       ...overrides,
@@ -512,6 +518,44 @@ describe("scrapeLinkMetadata – web/OGS branch", () => {
     expect(result.title).toBe("example.com");
     expect(result.description).toBeNull();
     expect(result.thumbnail).toBeNull();
+  });
+
+  it("uses twitter:title / description / image when og:* tags are absent", async () => {
+    mockOgsSuccess({
+      ogTitle: undefined,
+      ogDescription: undefined,
+      ogImage: undefined,
+      twitterTitle: "Twitter Card Title",
+      twitterDescription: "Twitter card blurb",
+      twitterImage: [{ url: "https://example.com/img.jpg" }],
+    });
+    const result = await scrapeLinkMetadata("https://example.com/page");
+    expect(result.title).toBe("Twitter Card Title");
+    expect(result.description).toBe("Twitter card blurb");
+    expect(result.thumbnail).toBe("https://example.com/img.jpg");
+  });
+
+  it("passes only the HTML head to ogs for large documents", async () => {
+    const body = "X".repeat(80_000);
+    const html = `<html><head><meta property="og:title" content="Head Title"/></head><body>${body}</body></html>`;
+    safeFetchSpy.mockResolvedValueOnce(
+      new Response(html, {
+        status: 200,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+    );
+    mockOgsSuccess({ ogTitle: "Head Title" });
+
+    const result = await scrapeLinkMetadata("https://example.com/huge");
+    expect(result.title).toBe("Head Title");
+    expect(ogs).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.stringContaining("</head>"),
+      }),
+    );
+    const passedHtml = vi.mocked(ogs).mock.calls[0]?.[0]?.html as string;
+    expect(passedHtml).not.toContain("XXXXX");
+    expect(passedHtml.length).toBeLessThan(html.length);
   });
 });
 

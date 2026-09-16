@@ -10,6 +10,10 @@ import { skipIngest } from "@/lib/ingest-skip";
 import { ingestPdf } from "@/lib/ingest-pdf";
 import { ingestWeb } from "@/lib/ingest-web";
 import { ingestYoutube } from "@/lib/ingest-youtube";
+import {
+  OG_HTML_READ_MAX_BYTES,
+  readHtmlForOpenGraph,
+} from "@/lib/og-html";
 import { validateOgThumbnailUrl } from "@/lib/og-thumbnail-probe";
 import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import prisma from "@/lib/prisma";
@@ -27,7 +31,8 @@ import { after } from "next/server";
 import ogs from "open-graph-scraper";
 import { cache } from "react";
 
-const OGS_HTML_MAX_BYTES = 5 * 1024 * 1024;
+/** Metadata HTML fetch budget (head-only read; allow slower proxy egress). */
+const OGS_FETCH_TIMEOUT_MS = 15_000;
 
 /**
  * Normalizes a URL so we can tell if og:image mistakenly points at the HTML
@@ -256,19 +261,12 @@ export async function scrapeLinkMetadata(url: string): Promise<{
         "User-Agent":
           "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
       },
-      signal: AbortSignal.timeout(8000),
-      maxResponseBytes: OGS_HTML_MAX_BYTES,
+      signal: AbortSignal.timeout(OGS_FETCH_TIMEOUT_MS),
+      // Cap declared size; body is streamed only until </head> (see readHtmlForOpenGraph).
+      maxResponseBytes: OG_HTML_READ_MAX_BYTES * 8,
     });
 
-    const html = await pageResponse.text();
-    if (new TextEncoder().encode(html).byteLength > OGS_HTML_MAX_BYTES) {
-      return {
-        title: domain,
-        description: null,
-        favicon: defaultFavicon,
-        thumbnail: null,
-      };
-    }
+    const html = await readHtmlForOpenGraph(pageResponse);
 
     const { error, result } = await ogs({
       html,
@@ -285,11 +283,16 @@ export async function scrapeLinkMetadata(url: string): Promise<{
     }
 
     const title =
-      (result.ogTitle ?? domain).replace(/\s+/g, " ").trim().slice(0, 500) ||
-      domain;
-    const description = result.ogDescription ?? null;
+      (result.ogTitle ?? result.twitterTitle ?? domain)
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 500) || domain;
+    const description =
+      result.ogDescription ?? result.twitterDescription ?? null;
+    const rawImageUrl =
+      result.ogImage?.[0]?.url ?? result.twitterImage?.[0]?.url;
     let thumbnail = resolveWebOgThumbnail(
-      result.ogImage?.[0]?.url,
+      rawImageUrl,
       url,
       pageResponse.url,
       result.ogUrl,
