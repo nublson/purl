@@ -5,6 +5,7 @@ import {
   assertResolvableHostIsPublic,
   assertSafeHttpUrl,
   isHttpProxyTunnelFailure,
+  limitReadableStreamByBytes,
   safeFetch,
 } from "./safe-outbound-fetch";
 
@@ -171,6 +172,56 @@ describe("safeFetch", () => {
     await expect(
       safeFetch("https://example.com/huge", { maxResponseBytes: 1000 }),
     ).rejects.toThrow(UnsafeOutboundUrlError);
+  });
+});
+
+describe("limitReadableStreamByBytes", () => {
+  function bytesStream(chunks: Uint8Array[]): ReadableStream<Uint8Array> {
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        for (const chunk of chunks) {
+          controller.enqueue(chunk);
+        }
+        controller.close();
+      },
+    });
+  }
+
+  async function readAll(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+    const reader = stream.getReader();
+    const parts: Uint8Array[] = [];
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value?.byteLength) parts.push(value);
+    }
+    const total = parts.reduce((n, p) => n + p.byteLength, 0);
+    const merged = new Uint8Array(total);
+    let offset = 0;
+    for (const part of parts) {
+      merged.set(part, offset);
+      offset += part.byteLength;
+    }
+    return merged;
+  }
+
+  it("forwards the full stream when under the byte cap", async () => {
+    const input = bytesStream([
+      new Uint8Array([1, 2, 3]),
+      new Uint8Array([4, 5]),
+    ]);
+    const limited = limitReadableStreamByBytes(input, 10);
+    const out = await readAll(limited);
+    expect(Array.from(out)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("errors when a chunk would exceed maxBytes", async () => {
+    const input = bytesStream([
+      new Uint8Array([1, 2, 3]),
+      new Uint8Array([4, 5, 6]),
+    ]);
+    const limited = limitReadableStreamByBytes(input, 4);
+    await expect(readAll(limited)).rejects.toThrow(UnsafeOutboundUrlError);
   });
 });
 
