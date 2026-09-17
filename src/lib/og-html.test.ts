@@ -43,4 +43,15 @@ describe("readHtmlForOpenGraph", () => {
     const out = await readHtmlForOpenGraph(res, 8_000);
     expect(Buffer.byteLength(out)).toBeLessThanOrEqual(8_000);
   });
+
+  it("falls back to response.text() when the body stream is unavailable", async () => {
+    const body = "Y".repeat(50_000);
+    const html = `<html><head><title>Fallback</title></head><body>${body}</body></html>`;
+    const res = new Response(html, { status: 200 });
+    Object.defineProperty(res, "body", { value: null });
+
+    const out = await readHtmlForOpenGraph(res);
+    expect(out).toBe("<html><head><title>Fallback</title></head>");
+    expect(out).not.toContain("YYYY");
+  });
 });

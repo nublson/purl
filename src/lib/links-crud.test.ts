@@ -82,6 +82,7 @@ const {
   updateLink,
   deleteLink,
   scrapeLinkMetadata,
+  resolveLinkFromUrl,
   UnauthorizedError,
 } = await import("./links");
 
@@ -520,6 +521,19 @@ describe("scrapeLinkMetadata – web/OGS branch", () => {
     expect(result.thumbnail).toBeNull();
   });
 
+  it("falls back to domain as title when ogs returns an error result without throwing", async () => {
+    vi.mocked(ogs).mockResolvedValue({
+      error: true,
+      result: undefined,
+      html: "",
+      response: {} as Response,
+    } as Awaited<ReturnType<typeof ogs>>);
+    const result = await scrapeLinkMetadata("https://example.com/page");
+    expect(result.title).toBe("example.com");
+    expect(result.description).toBeNull();
+    expect(result.thumbnail).toBeNull();
+  });
+
   it("uses twitter:title / description / image when og:* tags are absent", async () => {
     mockOgsSuccess({
       ogTitle: undefined,
@@ -556,6 +570,56 @@ describe("scrapeLinkMetadata – web/OGS branch", () => {
     const passedHtml = vi.mocked(ogs).mock.calls[0]?.[0]?.html as string;
     expect(passedHtml).not.toContain("XXXXX");
     expect(passedHtml.length).toBeLessThan(html.length);
+  });
+});
+
+// ─── resolveLinkFromUrl ───────────────────────────────────────────────────────
+
+describe("resolveLinkFromUrl", () => {
+  let safeFetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    safeFetchSpy = vi.spyOn(safeOutbound, "safeFetch");
+    safeFetchSpy.mockImplementation(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const href = hrefFromSafeFetchInput(input);
+        const method = init?.method ?? "GET";
+
+        if (method === "HEAD") {
+          return new Response(null, {
+            status: 200,
+            headers: { "content-type": "text/html; charset=utf-8" },
+          });
+        }
+
+        return new Response("<html><head></head><body></body></html>", {
+          status: 200,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        });
+      },
+    );
+    mockOgsSuccess({
+      ogTitle: "Resolved Page",
+      ogDescription: "From metadata",
+    });
+  });
+
+  afterEach(() => {
+    safeFetchSpy.mockRestore();
+    vi.mocked(ogs).mockReset();
+  });
+
+  it("combines content-type detection with scraped metadata", async () => {
+    const result = await resolveLinkFromUrl("https://example.com/article");
+    expect(result).toEqual({
+      url: "https://example.com/article",
+      domain: "example.com",
+      contentType: "WEB",
+      title: "Resolved Page",
+      description: "From metadata",
+      favicon: expect.stringContaining("google.com/s2/favicons"),
+      thumbnail: null,
+    });
   });
 });
 
