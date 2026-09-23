@@ -46,7 +46,8 @@ export function LinkMenu({
 
   async function handleCopyLink() {
     try {
-      await copyToClipboard(link.url);
+      // Uploads store a relative app route; copy an absolute URL.
+      await copyToClipboard(new URL(link.url, window.location.origin).href);
       toast.success("Link copied");
     } catch {
       toast.error("Failed to copy link");
