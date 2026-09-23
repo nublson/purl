@@ -26,7 +26,6 @@ vi.mock("@/lib/prisma", () => ({
 
 vi.mock("@/lib/entitlements", () => ({
   assertCanSaveLink: vi.fn(),
-  shouldRunIngest: vi.fn().mockResolvedValue({ run: false }),
   BillingLimitError: class BillingLimitError extends Error {
     feature = "SAVE_LIMIT";
   },
@@ -34,13 +33,6 @@ vi.mock("@/lib/entitlements", () => ({
 vi.mock("@/lib/realtime-broadcast", () => ({
   broadcastLinksChanged: vi.fn(),
 }));
-vi.mock("@/lib/notify-links-after-ingest", () => ({
-  notifyLinksAfterIngest: vi.fn(),
-}));
-vi.mock("next/server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("next/server")>();
-  return { ...actual, after: vi.fn() };
-});
 
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
@@ -154,11 +146,9 @@ const MOCK_LINK = {
   thumbnail: null,
   domain: "example.com",
   contentType: "WEB" as const,
-  ingestStatus: "COMPLETED" as const,
   createdAt: new Date("2025-01-01T12:00:00.000Z"),
   userId: "user-1",
   storagePath: null,
-  ingestFailureReason: null,
 };
 
 describe("listLinks", () => {

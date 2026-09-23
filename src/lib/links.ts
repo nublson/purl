@@ -1,25 +1,14 @@
-import type {
-  ContentType,
-  IngestFailureReason,
-  IngestStatus,
-} from "@/generated/prisma/enums";
+import type { ContentType } from "@/generated/prisma/enums";
 import { auth } from "@/lib/auth";
-import { assertCanSaveLink, shouldRunIngest } from "@/lib/entitlements";
-import { ingestAudio } from "@/lib/ingest-audio";
-import { skipIngest } from "@/lib/ingest-skip";
-import { ingestPdf } from "@/lib/ingest-pdf";
-import { ingestWeb } from "@/lib/ingest-web";
-import { ingestYoutube } from "@/lib/ingest-youtube";
+import { assertCanSaveLink } from "@/lib/entitlements";
 import {
   OG_HTML_READ_MAX_BYTES,
   readHtmlForOpenGraph,
 } from "@/lib/og-html";
 import { validateOgThumbnailUrl } from "@/lib/og-thumbnail-probe";
-import { notifyLinksAfterIngest } from "@/lib/notify-links-after-ingest";
 import prisma from "@/lib/prisma";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
 import { detectContentType } from "@/lib/server-detect-content-type";
-import { createSignedUploadUrl } from "@/lib/upload-file";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
 import { getUrlDomain } from "@/utils/formatter";
 import type { Link } from "@/utils/links";
@@ -27,7 +16,6 @@ import { isPdfUrl } from "@/utils/pdf";
 import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
 import { isYouTubeUrl } from "@/utils/youtube";
 import { headers } from "next/headers";
-import { after } from "next/server";
 import ogs from "open-graph-scraper";
 import { cache } from "react";
 
@@ -211,8 +199,6 @@ type LinkRow = {
   description: string | null;
   thumbnail: string | null;
   createdAt: Date;
-  ingestStatus: IngestStatus;
-  ingestFailureReason: IngestFailureReason | null;
 };
 
 function mapRowToLink(row: LinkRow): Link {
@@ -225,8 +211,6 @@ function mapRowToLink(row: LinkRow): Link {
     thumbnail: row.thumbnail,
     domain: row.domain,
     contentType: row.contentType,
-    ingestStatus: row.ingestStatus,
-    ingestFailureReason: row.ingestFailureReason,
     createdAt: row.createdAt,
   };
 }
@@ -373,53 +357,7 @@ export const getLinksForCurrentUser = cache(async (): Promise<Link[]> => {
 export type CreateLinkResult = Awaited<ReturnType<typeof prisma.link.create>>;
 export type RefreshLinkResult = Awaited<ReturnType<typeof prisma.link.update>>;
 
-type IngestInput = { linkId: string; url: string; userId: string };
-type IngestHandler = (input: IngestInput) => Promise<void>;
-
-const ingestHandlers: Record<ContentType, IngestHandler | null> = {
-  PDF: ({ linkId, url, userId }) => ingestPdf({ linkId, url, userId }),
-  AUDIO: ({ linkId, url, userId }) => ingestAudio({ linkId, url, userId }),
-  YOUTUBE: ({ linkId, url, userId }) => ingestYoutube({ linkId, url, userId }),
-  WEB: ({ linkId, url, userId }) => ingestWeb({ linkId, url, userId }),
-};
-
-function dispatchIngestHandler(link: {
-  id: string;
-  url: string;
-  contentType: ContentType;
-  userId: string;
-}): void {
-  const handler = ingestHandlers[link.contentType];
-  if (!handler) return;
-  after(() => handler({ linkId: link.id, url: link.url, userId: link.userId }));
-}
-
-async function prepareIngestForLink(link: {
-  id: string;
-  url: string;
-  contentType: ContentType;
-  userId: string;
-}): Promise<void> {
-  const decision = await shouldRunIngest(link.userId);
-  if (!decision.run) {
-    if (decision.skipReason === "extraction_cap") {
-      await prisma.link.update({
-        where: { id: link.id },
-        data: {
-          ingestStatus: "SKIPPED",
-          ingestFailureReason: "EXTRACTION_LIMIT",
-        },
-      });
-    } else {
-      await skipIngest(link.id);
-    }
-    await notifyLinksAfterIngest(link.id);
-    return;
-  }
-  dispatchIngestHandler(link);
-}
-
-/** Re-scrapes link metadata and re-dispatches ingestion for the current user. */
+/** Re-scrapes link metadata for the current user and bumps it to the top of the list. */
 export async function refreshLink(
   id: string,
 ): Promise<RefreshLinkResult | null> {
@@ -440,39 +378,10 @@ export async function refreshLink(
       domain: resolved.domain,
       contentType: resolved.contentType,
       createdAt: new Date(),
-      ingestStatus: "PENDING",
     },
   });
 
-  await prepareIngestForLink(refreshed);
   return refreshed;
-}
-
-/**
- * Re-dispatches ingestion without re-scraping metadata. Use for manual re-ingest
- * (e.g. failed uploads) so storage URLs do not overwrite title/description with
- * blob-path garbage. Duplicate-URL refresh still uses {@link refreshLink}.
- */
-export async function reingestLink(
-  id: string,
-): Promise<RefreshLinkResult | null> {
-  const userId = await getCurrentUserId();
-  const existing = await prisma.link.findFirst({
-    where: { id, userId },
-  });
-  if (!existing) return null;
-
-  const updated = await prisma.link.update({
-    where: { id },
-    data: { ingestStatus: "PENDING" },
-  });
-
-  const urlForIngest = existing.storagePath
-    ? await createSignedUploadUrl(existing.storagePath, 3600)
-    : updated.url;
-
-  await prepareIngestForLink({ ...updated, url: urlForIngest });
-  return updated;
 }
 
 /** Creates a link for the current user after scraping metadata. If a link with the same URL already exists, updates its createdAt and returns it. Throws UnauthorizedError if not authenticated. */
@@ -509,7 +418,6 @@ export async function createLinkForUser(
       userId,
     },
   });
-  await prepareIngestForLink(link);
   return link;
 }
 
@@ -576,16 +484,10 @@ export async function updateLink(
 
   if (Object.keys(updatePayload).length === 0) return existing;
 
-  const updated = await prisma.link.update({
+  return prisma.link.update({
     where: { id },
     data: updatePayload,
   });
-
-  if (urlChanged) {
-    await prepareIngestForLink(updated);
-  }
-
-  return updated;
 }
 
 /** Deletes a link if it belongs to the current user. Returns true if deleted, false if not found or not owned. Throws UnauthorizedError if not authenticated. */

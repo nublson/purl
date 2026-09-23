@@ -18,7 +18,6 @@ import {
   ItemMedia,
   ItemTitle,
 } from "./ui/item";
-import { Spinner } from "./ui/spinner";
 
 interface LinkItemProps {
   link: LinkType;
@@ -42,34 +41,6 @@ export const LinkItem = React.forwardRef<
   ref,
 ) {
   const router = useRouter();
-
-  const lastLinkIdRef = React.useRef(link.id);
-  const [displayIngestStatus, setDisplayIngestStatus] = React.useState<
-    LinkType["ingestStatus"]
-  >(() => link.ingestStatus);
-
-  React.useEffect(() => {
-    if (lastLinkIdRef.current !== link.id) {
-      lastLinkIdRef.current = link.id;
-      setDisplayIngestStatus(link.ingestStatus);
-      return;
-    }
-    setDisplayIngestStatus((prev) => {
-      const incoming = link.ingestStatus;
-      if (
-        (prev === "FAILED" || prev === "SKIPPED") &&
-        (incoming === "PENDING" || incoming === "PROCESSING")
-      ) {
-        return prev;
-      }
-      return incoming;
-    });
-  }, [link.id, link.ingestStatus]);
-
-  const linkForUi = React.useMemo(
-    () => ({ ...link, ingestStatus: displayIngestStatus }),
-    [link, displayIngestStatus],
-  );
 
   const [deletePhase, setDeletePhase] = React.useState<
     "idle" | "animating" | "loading" | "exiting"
@@ -117,19 +88,6 @@ export const LinkItem = React.forwardRef<
     };
   }, [clearCloseTimer, clearOpenTimer]);
 
-  const showIngestPulse =
-    displayIngestStatus === "PENDING" || displayIngestStatus === "PROCESSING";
-
-  function renderLoadingAction(): React.ReactNode {
-    if (
-      displayIngestStatus === "PENDING" ||
-      displayIngestStatus === "PROCESSING"
-    ) {
-      return <Spinner className="size-4" />;
-    }
-    return null;
-  }
-
   if (deletePhase === "loading" || deletePhase === "exiting") {
     return (
       <LinkItemSkeleton
@@ -150,10 +108,8 @@ export const LinkItem = React.forwardRef<
       ref={ref}
       data-cy="link-item"
       role="listitem"
-      aria-busy={showIngestPulse}
       className={cn(
         "w-full p-2 gap-4 grid relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
-        showIngestPulse && "animate-pulse",
         mode === "preview"
           ? "grid-cols-[20px_1fr]"
           : "grid-cols-[20px_1fr_auto]",
@@ -217,9 +173,8 @@ export const LinkItem = React.forwardRef<
             scheduleOpen();
           }}
         >
-          {renderLoadingAction()}
           <LinkMenu
-            link={linkForUi}
+            link={link}
             onDeleteStart={() => {
               setDeletePhase("animating");
             }}
@@ -237,7 +192,7 @@ export const LinkItem = React.forwardRef<
 
   return (
     <LinkPreview
-      link={linkForUi}
+      link={link}
       eagerThumbnail={Boolean(eagerFavicon)}
       open={mode === "default" && previewOpen}
       onOpenChange={() => {

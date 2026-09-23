@@ -1,4 +1,4 @@
-import type { ContentType, IngestStatus } from "@/lib/prisma";
+import type { ContentType } from "@/lib/prisma";
 
 type LinkLike = {
   id: string;
@@ -10,7 +10,6 @@ type LinkLike = {
   domain: string;
   contentType?: ContentType;
   createdAt: Date;
-  ingestStatus: IngestStatus;
 };
 
 export function serializeLink(link: LinkLike) {
@@ -23,7 +22,6 @@ export function serializeLink(link: LinkLike) {
     thumbnail: link.thumbnail,
     domain: link.domain,
     contentType: link.contentType ?? "WEB",
-    ingestStatus: link.ingestStatus,
     createdAt: link.createdAt.toISOString(),
   };
 }

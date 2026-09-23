@@ -11,8 +11,6 @@ function link(createdAt: Date, title: string): Link {
     contentType: "WEB",
     description: null,
     thumbnail: null,
-    ingestStatus: "COMPLETED",
-    ingestFailureReason: null,
     createdAt,
   };
 }
