@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth";
 import {
   getAuthRateLimiter,
-  getChatPostRateLimiter,
   getFeedbackPostRateLimiter,
   getLinksPostRateLimiter,
   getMcpRateLimiter,
@@ -92,15 +91,6 @@ export async function rateLimitApiRequest(
       if (!success) return tooManyRequests(reset);
     }
     return NextResponse.next();
-  }
-
-  if (pathname === "/api/chat" && request.method === "POST") {
-    const limiter = getChatPostRateLimiter();
-    if (limiter) {
-      const { success, reset } = await limiter.limit(ip);
-      if (!success) return tooManyRequests(reset);
-    }
-    return null;
   }
 
   if (pathname === "/api/links" && request.method === "POST") {

@@ -4,7 +4,6 @@ import {
   entitlementsForPlanKey,
   FREE_LIFETIME_SAVE_CAP,
   getStripeOneTimePriceId,
-  PRO_CHAT_MESSAGES_PER_MONTH,
   PRO_EXTRACTIONS_PER_MONTH,
   PRO_ONETIME_PRICE_CENTS,
   publicPlans,
@@ -53,13 +52,11 @@ describe("getStripeOneTimePriceId", () => {
 });
 
 describe("entitlementsForPlanKey", () => {
-  it("FREE tier caps saves, blocks AI and chat", () => {
+  it("FREE tier caps saves and blocks AI", () => {
     const e = entitlementsForPlanKey("FREE");
     expect(e.aiFullAccess).toBe(false);
     expect(e.maxLifetimeSaves).toBe(FREE_LIFETIME_SAVE_CAP);
     expect(e.maxExtractionsPerPeriod).toBe(0);
-    expect(e.maxChatMessagesPerPeriod).toBe(0);
-    expect(e.chatPeriodDays).toBeNull();
     expect(e.extractionPeriodUsesSubscriptionPeriod).toBe(false);
     expect(e.allowFileUploads).toBe(false);
   });
@@ -70,8 +67,6 @@ describe("entitlementsForPlanKey", () => {
       expect(e.aiFullAccess).toBe(true);
       expect(e.maxLifetimeSaves).toBeNull();
       expect(e.maxExtractionsPerPeriod).toBe(PRO_EXTRACTIONS_PER_MONTH);
-      expect(e.maxChatMessagesPerPeriod).toBe(PRO_CHAT_MESSAGES_PER_MONTH);
-      expect(e.chatPeriodDays).toBeNull();
       expect(e.extractionPeriodUsesSubscriptionPeriod).toBe(false);
       expect(e.allowFileUploads).toBe(true);
     }
@@ -93,20 +88,13 @@ describe("publicPlans catalog", () => {
     expect(saveLine).toContain(String(FREE_LIFETIME_SAVE_CAP));
   });
 
-  it("FREE tier features do not mention AI chat", () => {
-    const free = publicPlans.find((p) => p.id === "FREE");
-    expect(free).toBeDefined();
-    const chatLine = free!.features.find((f) =>
-      f.toLowerCase().includes("chat"),
-    );
-    expect(chatLine).toBeUndefined();
-  });
-
-  it("PRO plan chat feature line is aligned with PRO_CHAT_MESSAGES_PER_MONTH", () => {
-    const pro = publicPlans.find((p) => p.id === "PRO");
-    expect(pro).toBeDefined();
-    const chatLine = pro!.features.find((f) => f.toLowerCase().includes("chat"));
-    expect(chatLine).toContain(String(PRO_CHAT_MESSAGES_PER_MONTH));
+  it("no plan advertises AI chat", () => {
+    for (const plan of publicPlans) {
+      const chatLine = plan.features.find((f) =>
+        f.toLowerCase().includes("chat"),
+      );
+      expect(chatLine).toBeUndefined();
+    }
   });
 
   it("PRO plan shows one-time price aligned with PRO_ONETIME_PRICE_CENTS", () => {

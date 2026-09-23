@@ -19,10 +19,10 @@ describe("recordUsage", () => {
   });
 
   it("creates a usage event with userId and kind", async () => {
-    await recordUsage("user-1", "CHAT_MSG");
+    await recordUsage("user-1", "SAVE");
 
     expect(prisma.usageEvent.create).toHaveBeenCalledWith({
-      data: { userId: "user-1", kind: "CHAT_MSG", meta: undefined },
+      data: { userId: "user-1", kind: "SAVE", meta: undefined },
     });
   });
 
@@ -48,13 +48,13 @@ describe("countUsage", () => {
     const since = new Date("2026-01-01T00:00:00.000Z");
     vi.mocked(prisma.usageEvent.count).mockResolvedValue(5);
 
-    const result = await countUsage("user-1", "CHAT_MSG", { since });
+    const result = await countUsage("user-1", "SAVE", { since });
 
     expect(result).toBe(5);
     expect(prisma.usageEvent.count).toHaveBeenCalledWith({
       where: {
         userId: "user-1",
-        kind: "CHAT_MSG",
+        kind: "SAVE",
         createdAt: { gte: since },
       },
     });
