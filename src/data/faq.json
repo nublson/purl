@@ -8,27 +8,17 @@
     {
       "value": "free-trial",
       "title": "Is there a free trial?",
-      "content": "Yes. Every new account starts with a 7-day Pro trial — no credit card required. You get full access to AI extraction, semantic search, chat, and file uploads. After the trial your account moves to the Free plan unless you upgrade."
-    },
-    {
-      "value": "how-does-ai-chat-work",
-      "title": "How does the AI chat work?",
-      "content": "You can ask Purl anything about your saved content in plain English — for example, \"what did I read about machine learning last week?\" Purl searches across all your saved articles, PDFs, and videos and returns a synthesized answer with sources, so you always know where the information came from. AI chat is available on Pro (300 messages/month) and for BYOK users."
+      "content": "Yes. Every new account starts with a 7-day Pro trial — no credit card required. You get full access to AI extraction, semantic search, and file uploads. After the trial your account moves to the Free plan unless you upgrade."
     },
     {
       "value": "free-vs-pro",
       "title": "What's the difference between Free and Pro?",
-      "content": "Free lets you save up to 100 links and search them with full-text search. Pro ($39 one-time) unlocks AI content extraction, semantic search, unlimited saves, and 300 AI chat messages per month — powered by Purl's Anthropic key, no setup required. New accounts start with a 7-day free Pro trial."
+      "content": "Free lets you save up to 100 links and search them with full-text search. Pro ($39 one-time) unlocks AI content extraction, semantic search, file uploads, and unlimited saves. New accounts start with a 7-day free Pro trial."
     },
     {
       "value": "is-my-data-private",
       "title": "Is my saved content private?",
-      "content": "Yes. Your library is private to you — only you can see what you've saved and the answers you receive. Purl does not share your content with other users or use it to train AI models."
-    },
-    {
-      "value": "do-i-need-an-api-key",
-      "title": "Do I need an API key?",
-      "content": "No. Pro uses Purl's Anthropic key — just upgrade and everything works out of the box. If you'd prefer to use your own Anthropic API key (BYOK), you can add it in Settings → Usage and get full Pro-equivalent AI access for free. You'll be billed by Anthropic directly for chat and summaries; Purl covers embedding costs for everyone."
+      "content": "Yes. Your library is private to you — only you can see what you've saved. Purl does not share your content with other users or use it to train AI models."
     }
   ]
 }

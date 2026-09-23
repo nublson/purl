@@ -16,7 +16,7 @@ export const PricingSection = () => {
               </>
             ),
             description:
-              "Save links for free. Pay once to unlock AI extraction, semantic search, and 300 chat messages per month — no subscription, no recurring fees.",
+              "Save links for free. Pay once to unlock AI extraction, semantic search, and file uploads — no subscription, no recurring fees.",
           }}
         />
         <PricingPlans />

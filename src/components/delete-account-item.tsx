@@ -86,7 +86,7 @@ function DeleteAccountButton({ closeDialog }: { closeDialog: () => void }) {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete your account?</AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently removes your saved links, chats, and profile. This
+            This permanently removes your saved links and profile. This
             cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>

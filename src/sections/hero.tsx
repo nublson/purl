@@ -26,8 +26,8 @@ export default function HeroSection() {
               Save Anything. <br /> Understand it deeply.
             </Typography>
             <Typography className="text-center font-light">
-              Purl captures your links, PDFs, videos, and audio — then <br />{" "}
-              lets you ask anything about what you&apos;ve saved.
+              Purl captures your links, PDFs, videos, and audio — <br />{" "}
+              and keeps everything you&apos;ve saved in one place.
             </Typography>
           </div>
         </div>

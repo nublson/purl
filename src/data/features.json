@@ -5,20 +5,9 @@
     "icon": "Link2"
   },
   {
-    "title": "Ask anything with AI",
-    "description": "Ask \"what did I read about X last week?\" and Purl searches across all your saved content to give you a real answer.",
-    "icon": "MessageSquareText"
-  },
-  {
     "title": "Deep PDF understanding",
-    "description": "Upload a PDF and ask questions about it. Purl reads the full document and surfaces exactly what you need.",
+    "description": "Upload a PDF and Purl reads the full document, so it's there whenever you need it.",
     "icon": "ScrollText"
-  },
-
-  {
-    "title": "Bring your own key",
-    "description": "Add your own Anthropic API key in Settings to get full AI access for free. You pay Anthropic directly; Purl covers embeddings.",
-    "icon": "Key"
   },
   {
     "title": "Connect any AI Agent",

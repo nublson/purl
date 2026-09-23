@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is Purl
 
-AI-powered read-it-later app and personal knowledge base. Users save URLs (web, PDF, YouTube, audio); Purl ingests the content, stores chunked text with pgvector embeddings, and answers questions over what was saved. **Vercel AI Gateway** serves **Claude** for streaming chat and **OpenAI** embeddings (`openai/text-embedding-3-small`); **OpenAI Whisper** handles transcription (direct API). Gateway calls attach **`providerOptions.gateway`** with **`user`** and **`tags`** for observability (`feature:chat`, `feature:ingest`, `feature:semantic-search`).
+AI-powered read-it-later app and personal knowledge base. Users save URLs (web, PDF, YouTube, audio); Purl ingests the content and stores chunked text with pgvector embeddings for semantic search (exposed via the MCP server). **Vercel AI Gateway** serves **OpenAI** embeddings (`openai/text-embedding-3-small`); **OpenAI Whisper** handles transcription (direct API). Gateway calls attach **`providerOptions.gateway`** with **`user`** and **`tags`** for observability (`feature:ingest`, `feature:semantic-search`). The in-app AI chat was removed; `/ai` and `/chat` redirect to `/home` in `src/proxy.ts`.
 
-Plans: Free (limited) and Pro ($9/month). New signups get a 7-day Pro trial. Exact caps live in [`docs/commercial-model.md`](docs/commercial-model.md) — treat it as canonical when touching plan logic.
+Plans: Free (limited) and Pro ($39 one-time). New signups get a 7-day Pro trial. Exact caps live in [`docs/commercial-model.md`](docs/commercial-model.md) — treat it as canonical when touching plan logic.
 
 ## Commands
 
@@ -32,8 +32,8 @@ Single Next.js App Router application (not a monorepo).
 ### Route groups
 
 - `src/app/(public)/` — Marketing site (landing, login, signup, terms, privacy)
-- `src/app/(private)/` — Authenticated app: `/home` (save links), `/ai` (chat interface)
-- `src/app/api/` — API routes (links, chats, upload, billing, auth, admin, feedback)
+- `src/app/(private)/` — Authenticated app: `/home` (save links)
+- `src/app/api/` — API routes (links, upload, billing, auth, admin, feedback, v1, MCP)
 - `src/app/sw.ts` — Serwist PWA service worker (compiled to `public/sw.js` on build; **disabled in dev**)
 - `src/app/~offline/` — Static offline fallback page
 
@@ -47,7 +47,6 @@ Business logic. Key modules:
 | `links.ts` | Link CRUD, `scrapeLinkMetadata`, `prepareIngestForLink` |
 | `server-detect-content-type.ts` | SSRF-safe HEAD/sniff to classify URL |
 | `safe-outbound-fetch.ts` | SSRF-hardened fetch wrapper — **all outbound HTTP must go through this** |
-| `chat.ts`, `chat-storage.ts`, `chats.ts` | AI chat with streaming + tool use |
 | `semantic-search.ts`, `embeddings.ts` | pgvector search + embeddings via AI Gateway (per-user `user` + `feature:…` tags on embed calls) |
 | `entitlements.ts`, `usage.ts`, `usage-summary.ts` | Plan enforcement and usage metering |
 | `auth.ts`, `prisma.ts` | Better Auth and Prisma client singletons |
@@ -76,8 +75,6 @@ Free accounts skip extraction (ingest status: `SKIPPED`, metadata only).
 ### Components (`src/components/`)
 
 - `ui/` — Radix UI + shadcn/ui base components
-- `chat/` — Chat interface
-- `ai-elements/` — AI chat UI primitives
 - `animate-ui/` — Motion animations
 - `skeletons/` — Loading states
 
@@ -97,14 +94,13 @@ Vitest, node environment. Test files: `src/**/*.test.ts`.
 - Mocks `undici` fetch to respect `globalThis.fetch` stubs
 - Mocks `node:dns/promises` to return a public IP (passes SSRF guards)
 
-Test patterns: mock `globalThis.fetch`, mock Prisma client calls, mock AI SDK / gateway / OpenAI (Whisper) / Stripe clients. Tests focus on business logic — avoid shallow UI-only wrappers.
+Test patterns: mock `globalThis.fetch`, mock Prisma client calls, mock AI SDK gateway / OpenAI (Whisper) / Stripe clients. Tests focus on business logic — avoid shallow UI-only wrappers.
 
 ## Key gotchas
 
 - **`pnpm dev` does not run `prisma generate`** — run it manually if `src/generated/prisma` is missing.
 - **`pnpm build` does** run `prisma generate` automatically.
 - **ESLint rule:** no namespace imports from `lucide-react` or `@radix-ui/*` — use named imports only.
-- **The home page input bar** saves URLs; AI questions go through the chat interface (`/ai`), not the URL bar.
 - **Email verification**: for local dev, manually set `emailVerified = true` in the DB if you can't receive Resend emails.
 - **Usage UI**: plan usage caps and progress are in **Settings → Usage**, not `/home`. See `src/app/(private)/layout.tsx`, `src/lib/usage-summary.ts`, `src/components/dialog-settings.tsx`.
 - **Serwist (PWA)**: service worker is disabled in `pnpm dev`. Use `pnpm build && pnpm start` to test install/offline behavior.

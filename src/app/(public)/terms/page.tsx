@@ -80,10 +80,10 @@ export default function TermsPage() {
 
       <CopySection title="Plans and billing">
         <Typography size="small">
-          Purl offers three plans: Free ($0), Pro ($39 one-time payment), and
-          BYOK (Bring Your Own Key, free). New accounts receive a 7-day Pro
-          trial — no card required. After the trial, the account downgrades to
-          Free unless the one-time Pro payment is made.
+          Purl offers two plans: Free ($0) and Pro ($39 one-time payment). New
+          accounts receive a 7-day Pro trial — no card required. After the
+          trial, the account downgrades to Free unless the one-time Pro payment
+          is made.
         </Typography>
         <Typography size="small">
           Pro payments are processed by Stripe. Because Pro is a one-time

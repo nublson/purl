@@ -93,8 +93,8 @@ export default function PrivacyPage() {
             ["Stripe", "payment processing"],
             ["Resend", "transactional email"],
             [
-              "OpenAI / Anthropic (via Vercel AI Gateway)",
-              "AI processing of your saved content and chat queries",
+              "OpenAI (via Vercel AI Gateway)",
+              "AI processing of your saved content",
             ],
           ].map(([name, desc]) => (
             <li key={name}>

@@ -21,13 +21,12 @@ A fast, clean bookmarking tool. Save links and come back to them later — no AI
 - AI-generated summaries
 - File uploads (PDF, audio)
 - YouTube & audio transcriptions
-- AI chat
 
 ---
 
 ### Pro — $39 one-time
 
-Full AI processing. Every saved item becomes queryable knowledge. Uses Purl's Anthropic key — no setup required.
+Full AI processing: content extraction, transcripts, embeddings, and semantic search over everything you save.
 
 **New accounts start with a 7-day Pro trial — no card required.** After the trial, the account downgrades to Free unless the one-time payment is made.
 
@@ -35,7 +34,6 @@ Full AI processing. Every saved item becomes queryable knowledge. Uses Purl's An
 |---|---|---|
 | Saved links | Unlimited | — |
 | AI content extractions | 150 / month (resets on the 1st) | Hard stop |
-| AI chat messages | 300 / month (resets on the 1st) | Hard stop |
 
 **Included features**
 - Everything in Free
@@ -44,28 +42,6 @@ Full AI processing. Every saved item becomes queryable knowledge. Uses Purl's An
 - Semantic search
 - PDF & audio file uploads
 - YouTube & audio transcriptions
-- 300 AI chat messages per month (powered by Purl)
-
----
-
-### BYOK — Free
-
-Bring Your Own Key. Full Pro feature set using your own Anthropic API key. Purl absorbs embedding costs.
-
-| Dimension | Limit | Overage |
-|---|---|---|
-| Saved links | Unlimited | — |
-| AI content extractions | Unlimited | — |
-| AI chat messages | Unlimited | — |
-
-**Included features**
-- Everything in Pro
-- AI chat and summaries routed through your own Anthropic API key
-- You pay Anthropic directly for chat and summary usage
-- Purl pays for embeddings (`text-embedding-3-small`) on your behalf
-
-**Required**
-- A valid Anthropic API key (stored encrypted, never exposed client-side)
 
 ---
 
@@ -75,13 +51,7 @@ Bring Your Own Key. Full Pro feature set using your own Anthropic API key. Purl 
 Every AI feature has a real cost — scraping, chunking, embedding, inference. The free tier covers only what costs nothing to serve: metadata storage and full-text search. This keeps the cost model honest and makes the Pro value proposition clear.
 
 **Why one-time payment instead of subscription?**
-Personal productivity tools with a one-time purchase convert better and retain more goodwill. The AI compute cost for a typical Pro user is low enough (~$1–3/month at average usage) that a $39 one-time fee is sustainable long-term, especially as more users adopt BYOK.
-
-**Why offer BYOK for free?**
-Users who already pay Anthropic directly shouldn't pay twice. BYOK removes the biggest conversion objection for technical users and developers. Purl still earns from users who want the convenience of Purl's key (Pro), and absorbs only the negligible embedding cost for BYOK users.
-
-**Why only require the Anthropic key for BYOK?**
-Chat and summaries run on Claude (Anthropic). Embeddings use OpenAI's `text-embedding-3-small` — cheap enough (~$0.0001/1k tokens) that Purl absorbs this for all users rather than adding setup friction.
+Personal productivity tools with a one-time purchase convert better and retain more goodwill. The AI compute cost for a typical Pro user is low enough (~$1–3/month at average usage) that a $39 one-time fee is sustainable long-term.
 
 **Why monthly caps on Pro instead of unlimited?**
-Monthly caps (300 chat / 150 extractions) make AI costs predictable while staying invisible to typical users. At average usage (~50 chats, ~20 extractions per month) users have substantial headroom. Power users who need more can supply their own Anthropic key via BYOK.
+The monthly extraction cap (150) keeps AI costs predictable while staying invisible to typical users (~20 extractions per month at average usage).
