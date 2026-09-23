@@ -19,21 +19,6 @@ enum ContentType {
   AUDIO
 }
 
-enum IngestStatus {
-  PENDING
-  PROCESSING
-  COMPLETED
-  FAILED
-  SKIPPED
-}
-
-enum IngestFailureReason {
-  SCRAPE_FAILED
-  LINK_NOT_FOUND
-  EXTRACTION_LIMIT
-  OTHER
-}
-
 enum PlanKey {
   FREE
   PRO
@@ -46,11 +31,6 @@ enum SubStatus {
   PAST_DUE
   CANCELED
   INCOMPLETE
-}
-
-enum UsageKind {
-  SAVE
-  EXTRACT
 }
 
 model User {
@@ -90,17 +70,6 @@ model Subscription {
   @@map("subscriptions")
 }
 
-model UsageEvent {
-  id        String    @id @default(cuid())
-  userId    String
-  kind      UsageKind
-  createdAt DateTime  @default(now())
-  meta      Json?
-
-  @@index([userId, kind, createdAt])
-  @@map("usage_events")
-}
-
 model ProcessedStripeEvent {
   id         String   @id
   type       String
@@ -110,36 +79,21 @@ model ProcessedStripeEvent {
 }
 
 model Link {
-  id                  String               @id @default(cuid())
-  url                 String
-  title               String
-  favicon             String
-  domain              String
-  contentType         ContentType          @default(WEB)
-  description         String?
-  thumbnail           String?
-  storagePath         String?
-  createdAt           DateTime             @default(now())
-  ingestStatus        IngestStatus         @default(PENDING)
-  ingestFailureReason IngestFailureReason?
-  userId              String
-  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  contents            LinkContent[]
+  id          String      @id @default(cuid())
+  url         String
+  title       String
+  favicon     String
+  domain      String
+  contentType ContentType @default(WEB)
+  description String?
+  thumbnail   String?
+  storagePath String?
+  createdAt   DateTime    @default(now())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
   @@map("links")
-}
-
-model LinkContent {
-  id         String                       @id @default(cuid())
-  linkId     String
-  link       Link                         @relation(fields: [linkId], references: [id], onDelete: Cascade)
-  content    String
-  embedding  Unsupported("vector(1536)")?
-  chunkIndex Int
-  createdAt  DateTime                     @default(now())
-
-  @@map("link_contents")
 }
 
 model Session {
