@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is Purl
 
-AI-powered read-it-later app and personal knowledge base. Users save URLs (web, PDF, YouTube, audio); Purl ingests the content and stores chunked text with pgvector embeddings for semantic search (exposed via the MCP server). **Vercel AI Gateway** serves **OpenAI** embeddings (`openai/text-embedding-3-small`); **OpenAI Whisper** handles transcription (direct API). Gateway calls attach **`providerOptions.gateway`** with **`user`** and **`tags`** for observability (`feature:ingest`, `feature:semantic-search`). The in-app AI chat was removed; `/ai` and `/chat` redirect to `/home` in `src/proxy.ts`.
+Read-it-later app: a home for your "pearls". Users save URLs (web, PDF, YouTube, audio) or upload PDF/audio files; Purl resolves metadata (title, favicon, description, thumbnail) and keeps them in one place. There is no AI layer: the in-app chat and the extraction/embeddings/semantic-search pipeline were removed. `/ai` and `/chat/*` redirect to `/home` via `redirects()` in `next.config.ts`.
 
 Plans: Free (limited) and Pro ($39 one-time). New signups get a 7-day Pro trial. Exact caps live in [`docs/commercial-model.md`](docs/commercial-model.md) — treat it as canonical when touching plan logic.
 
@@ -43,28 +43,22 @@ Business logic. Key modules:
 
 | Module | Purpose |
 |--------|---------|
-| `ingest-web.ts`, `ingest-pdf.ts`, `ingest-youtube.ts`, `ingest-audio.ts` | Content extraction pipeline |
-| `links.ts` | Link CRUD, `scrapeLinkMetadata`, `prepareIngestForLink` |
+| `links.ts` | Link CRUD, `scrapeLinkMetadata`, `resolveLinkFromUrl` |
 | `server-detect-content-type.ts` | SSRF-safe HEAD/sniff to classify URL |
 | `safe-outbound-fetch.ts` | SSRF-hardened fetch wrapper — **all outbound HTTP must go through this** |
-| `semantic-search.ts`, `embeddings.ts` | pgvector search + embeddings via AI Gateway (per-user `user` + `feature:…` tags on embed calls) |
-| `entitlements.ts`, `usage.ts`, `usage-summary.ts` | Plan enforcement and usage metering |
+| `entitlements.ts`, `usage-summary.ts` | Plan enforcement (save cap, uploads) and the Settings → Usage summary |
 | `auth.ts`, `prisma.ts` | Better Auth and Prisma client singletons |
 | `stripe.ts` | Stripe Checkout, Customer Portal, webhook handling |
-| `realtime-broadcast.ts`, `notify-links-after-ingest.ts` | Supabase Realtime sync |
+| `realtime-broadcast.ts` | Supabase Realtime sync |
 | `proxy-rate-limit.ts` | Optional Upstash Redis rate limiting (applied in `src/proxy.ts`) |
 
-### Ingestion flow
+### Save flow
 
-Saving is **synchronous** through metadata + DB insert; heavy work is **async** via Next.js `after()`:
+Saving is fully **synchronous**; there is no background processing:
 
-1. `POST /api/links` or `POST /api/upload` → `detectContentType` + `scrapeLinkMetadata`
-2. Insert `Link` row with `ingestStatus: PENDING`
-3. `after()` → `prepareIngestForLink` (plan check) → handler (`ingestWeb/Pdf/Youtube/Audio`)
-4. Handler: set `PROCESSING` → extract text → chunk → AI Gateway embeddings → upsert `LinkContent` with pgvector → `COMPLETED` or `FAILED`
-5. `notifyLinksAfterIngest` → `broadcastLinksChanged` → Supabase Realtime → client refresh
-
-Free accounts skip extraction (ingest status: `SKIPPED`, metadata only).
+1. `POST /api/links` (or v1 API / MCP `save_link`) → `detectContentType` + `scrapeLinkMetadata`; `POST /api/upload` stores the file in Supabase Storage
+2. Insert (or refresh, for a duplicate URL) the `Link` row
+3. `broadcastLinksChanged` → Supabase Realtime → client refresh
 
 ### Authentication & routing
 
@@ -78,9 +72,9 @@ Free accounts skip extraction (ingest status: `SKIPPED`, metadata only).
 - `animate-ui/` — Motion animations
 - `skeletons/` — Loading states
 
-### Database (Prisma + pgvector)
+### Database (Prisma)
 
-Key enums: `ContentType` (WEB, YOUTUBE, PDF, AUDIO), `IngestStatus` (PENDING, PROCESSING, COMPLETED, FAILED, SKIPPED), `PlanKey` (FREE, PRO, PRO_TRIAL), `MessageRole`.
+Key enums: `ContentType` (WEB, YOUTUBE, PDF, AUDIO), `PlanKey` (FREE, PRO, PRO_TRIAL), `SubStatus`.
 
 Prisma client output: `src/generated/prisma` (gitignored — must be generated).
 
@@ -94,7 +88,7 @@ Vitest, node environment. Test files: `src/**/*.test.ts`.
 - Mocks `undici` fetch to respect `globalThis.fetch` stubs
 - Mocks `node:dns/promises` to return a public IP (passes SSRF guards)
 
-Test patterns: mock `globalThis.fetch`, mock Prisma client calls, mock AI SDK gateway / OpenAI (Whisper) / Stripe clients. Tests focus on business logic — avoid shallow UI-only wrappers.
+Test patterns: mock `globalThis.fetch`, mock Prisma client calls, mock Stripe / Supabase clients. Tests focus on business logic — avoid shallow UI-only wrappers.
 
 ## Key gotchas
 
@@ -107,7 +101,7 @@ Test patterns: mock `globalThis.fetch`, mock Prisma client calls, mock AI SDK ga
 - **Stripe local dev**: run `stripe listen --forward-to localhost:3000/api/billing/webhook` and copy the CLI signing secret into `STRIPE_WEBHOOK_SECRET`.
 - **`SUPABASE_SERVICE_ROLE_KEY`** is server-only. The browser uses only the anon key for Realtime.
 - **All user-supplied URLs must go through `safeFetch`** — never raw `fetch` — to prevent SSRF.
-- **YouTube transcripts on Vercel**: optional `SAFE_OUTBOUND_HTTP_PROXY` — see [`docs/production-outbound-proxy.md`](docs/production-outbound-proxy.md).
+- **Outbound proxy on Vercel**: optional `SAFE_OUTBOUND_HTTP_PROXY` for metadata fetches — see [`docs/production-outbound-proxy.md`](docs/production-outbound-proxy.md).
 
 ## CI
 

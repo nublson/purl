@@ -1,4 +1,6 @@
-# Production outbound proxy (YouTube transcripts)
+# Production outbound proxy
+
+> **Note:** YouTube transcript ingestion was removed along with the rest of the AI pipeline. The proxy is still honored by `safeFetch` for metadata scraping (Open Graph, oEmbed, content-type sniffing); the transcript-specific notes below are kept for history.
 
 Vercel functions use datacenter IPs. YouTube often omits caption tracks in player responses for those IPs, so transcript ingestion can fail while the same video works locally (see [`src/lib/youtube-transcriber.ts`](../src/lib/youtube-transcriber.ts)).
 

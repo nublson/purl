@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Sign up",
   description:
-    "Create a Purl account to save links and get AI-powered answers from your saved content.",
+    "Create a Purl account to save links, PDFs, videos, and audio in one place.",
 };
 
 export default function SignupLayout({

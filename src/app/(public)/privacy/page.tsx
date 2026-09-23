@@ -14,8 +14,7 @@ export default function PrivacyPage() {
       <CopySection title="Overview">
         <Typography size="small">
           Purl (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is a
-          personal knowledge base that lets you save and query content from the
-          web. This policy explains what data we collect, how we use it, and
+          personal library that lets you save content from the web. This policy explains what data we collect, how we use it, and
           your rights.
         </Typography>
       </CopySection>
@@ -30,16 +29,15 @@ export default function PrivacyPage() {
           </li>
           <li>
             <Typography size="small" component="span">
-              <strong className="text-foreground">Saved content</strong> — URLs
-              and the extracted text, metadata, and embeddings of pages you save
-              to Purl.
+              <strong className="text-foreground">Saved content</strong> — URLs,
+              page metadata (title, description, favicon, thumbnail), and files
+              you upload to Purl.
             </Typography>
           </li>
           <li>
             <Typography size="small" component="span">
               <strong className="text-foreground">Usage data</strong> — how many
-              links you&apos;ve saved and AI queries you&apos;ve made, for plan
-              enforcement purposes.
+              links you&apos;ve saved, for plan enforcement purposes.
             </Typography>
           </li>
           <li>
@@ -57,12 +55,6 @@ export default function PrivacyPage() {
           <li>
             <Typography size="small" component="span">
               To provide and improve the Purl service.
-            </Typography>
-          </li>
-          <li>
-            <Typography size="small" component="span">
-              To generate AI-powered summaries and answers over your saved
-              content.
             </Typography>
           </li>
           <li>
@@ -92,10 +84,6 @@ export default function PrivacyPage() {
             ["Supabase", "database and real-time infrastructure"],
             ["Stripe", "payment processing"],
             ["Resend", "transactional email"],
-            [
-              "OpenAI (via Vercel AI Gateway)",
-              "AI processing of your saved content",
-            ],
           ].map(([name, desc]) => (
             <li key={name}>
               <Typography size="small" component="span">

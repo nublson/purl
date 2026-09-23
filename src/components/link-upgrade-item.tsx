@@ -25,7 +25,7 @@ export function LinkUpgradeItem() {
           <ItemTitle>Upgrade to Pro</ItemTitle>
         </div>
         <ItemDescription>
-          Upgrade for AI extraction, YouTube transcripts, and more
+          Upgrade for unlimited saves and file uploads
         </ItemDescription>
       </ItemContent>
       <ItemActions className="w-full">

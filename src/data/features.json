@@ -1,22 +1,22 @@
 [
   {
     "title": "Save any link instantly",
-    "description": "Paste a URL or press Ctrl+V anywhere in the app. Purl fetches the title, favicon, and full content automatically.",
+    "description": "Paste a URL or press Ctrl+V anywhere in the app. Purl fetches the title, favicon, and thumbnail automatically.",
     "icon": "Link2"
   },
   {
-    "title": "Deep PDF understanding",
-    "description": "Upload a PDF and Purl reads the full document, so it's there whenever you need it.",
+    "title": "Keep your files too",
+    "description": "Upload PDFs and audio right next to your links, so everything lives in one place.",
     "icon": "ScrollText"
   },
   {
     "title": "Connect any AI Agent",
-    "description": "Plug Purl into Claude, Cursor, or VS Code over the MCP. Your agent can search and save to your library directly.",
+    "description": "Plug Purl into Claude, Cursor, or VS Code over MCP. Your agent can save to and browse your library directly.",
     "icon": "Plug"
   },
   {
     "title": "Build with the API",
-    "description": "Save links, search, and pull your content into your own scripts and tools with a simple REST API and a Purl key.",
+    "description": "Save, list, and manage your links from your own scripts and tools with a simple REST API and a Purl key.",
     "icon": "Braces"
   }
 ]

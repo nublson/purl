@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 
 export const metadata: Metadata = {
   description:
-    "Purl is an AI-powered read-it-later app. Save links, PDFs, YouTube videos, and audio in one place. Free 7-day trial, no card required.",
+    "Purl is a read-it-later app. Save links, PDFs, YouTube videos, and audio in one place. Free 7-day trial, no card required.",
 };
 
 const FeaturesSection = dynamic(() => import("@/sections/features"), {
