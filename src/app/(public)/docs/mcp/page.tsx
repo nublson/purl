@@ -9,7 +9,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "MCP Server",
   description:
-    "Connect Purl to AI clients (Claude, Cursor, VS Code) over the Model Context Protocol. Search and save to your knowledge base with API key authentication.",
+    "Connect Purl to AI clients (Claude, Cursor, VS Code) over the Model Context Protocol. Save to and browse your library with API key authentication.",
 };
 
 export default function McpDocsPage() {
@@ -32,8 +32,8 @@ export default function McpDocsPage() {
           >
             Model Context Protocol
           </a>{" "}
-          server so AI clients like Claude, Cursor, and VS Code can search and
-          save to your knowledge base directly. It uses the Streamable HTTP
+          server so AI clients like Claude, Cursor, and VS Code can save to and
+          browse your library directly. It uses the Streamable HTTP
           transport and the same API keys as the REST API.
         </Typography>
         <Typography size="mini" className="mt-4 text-muted-foreground">
@@ -58,9 +58,8 @@ export default function McpDocsPage() {
         </Typography>
         <Typography size="small" className="leading-7 text-muted-foreground">
           MCP lets an AI client call tools on your behalf. Once connected, your
-          assistant can run semantic search over everything you&apos;ve saved,
-          save new links, list recent items, and fetch a single item — without
-          leaving the chat. All calls are scoped to the account that owns the
+          assistant can save new links, list recent items, and fetch a single
+          item — without leaving the chat. All calls are scoped to the account that owns the
           API key.
         </Typography>
       </section>
@@ -211,51 +210,11 @@ export default function McpDocsPage() {
 
         <div className="flex flex-col gap-3">
           <Typography size="small" className="font-mono font-medium">
-            search_content
-          </Typography>
-          <Typography size="small" className="leading-7 text-muted-foreground">
-            Semantic search across your saved content. Returns matching items
-            with the relevant text. Requires an active Pro plan (or trial).
-          </Typography>
-          <ParamTable
-            params={[
-              {
-                name: "query",
-                type: "string",
-                required: true,
-                description: "The search query describing the topic.",
-              },
-              {
-                name: "contentType",
-                type: "WEB | YOUTUBE | PDF | AUDIO",
-                description: "Filter by content type.",
-              },
-              {
-                name: "dateFrom",
-                type: "string",
-                description: "ISO 8601 date for the start of the range.",
-              },
-              {
-                name: "dateTo",
-                type: "string",
-                description: "ISO 8601 date for the end of the range.",
-              },
-              {
-                name: "limit",
-                type: "number",
-                description: "Maximum items to return (1–20, default 10).",
-              },
-            ]}
-          />
-        </div>
-
-        <div className="flex flex-col gap-3">
-          <Typography size="small" className="font-mono font-medium">
             save_link
           </Typography>
           <Typography size="small" className="leading-7 text-muted-foreground">
-            Save a URL to your library. Purl ingests the content (web, PDF,
-            YouTube, audio) asynchronously after saving.
+            Save a URL to your library. Works for web pages, PDFs, YouTube
+            videos, and audio.
           </Typography>
           <ParamTable
             params={[
