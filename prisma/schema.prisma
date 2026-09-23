@@ -34,11 +34,6 @@ enum IngestFailureReason {
   OTHER
 }
 
-enum MessageRole {
-  USER
-  ASSISTANT
-}
-
 enum PlanKey {
   FREE
   PRO
@@ -56,24 +51,20 @@ enum SubStatus {
 enum UsageKind {
   SAVE
   EXTRACT
-  CHAT_MSG
 }
 
 model User {
-  id                       String        @id
-  name                     String
-  email                    String
-  emailVerified            Boolean
-  image                    String?
-  createdAt                DateTime
-  updatedAt                DateTime
-  anthropicApiKeyEncrypted String?
-  preferences              Json?
-  sessions                 Session[]
-  accounts                 Account[]
-  links                    Link[]
-  chats                    Chat[]
-  subscription             Subscription?
+  id            String        @id
+  name          String
+  email         String
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime
+  updatedAt     DateTime
+  sessions      Session[]
+  accounts      Account[]
+  links         Link[]
+  subscription  Subscription?
 
   @@unique([email])
   @@map("users")
@@ -134,7 +125,6 @@ model Link {
   userId              String
   user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   contents            LinkContent[]
-  chatMessages        ChatMessage[]
 
   @@index([userId, createdAt])
   @@map("links")
@@ -152,32 +142,6 @@ model LinkContent {
   @@map("link_contents")
 }
 
-model Chat {
-  id        String        @id @default(cuid())
-  title     String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  userId    String
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages  ChatMessage[]
-
-  @@index([userId])
-  @@map("chats")
-}
-
-model ChatMessage {
-  id        String      @id @default(cuid())
-  chatId    String
-  chat      Chat        @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  role      MessageRole
-  content   String
-  createdAt DateTime    @default(now())
-  mentions  Link[]
-
-  @@index([chatId])
-  @@map("chat_messages")
-}
-
 model Session {
   id        String   @id
   expiresAt DateTime
@@ -190,8 +154,8 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([token])
-  @@map("sessions")
   @@index([userId])
+  @@map("sessions")
 }
 
 model Account {
@@ -210,8 +174,8 @@ model Account {
   createdAt             DateTime
   updatedAt             DateTime
 
-  @@map("accounts")
   @@index([userId])
+  @@map("accounts")
 }
 
 model Verification {
@@ -222,8 +186,8 @@ model Verification {
   createdAt  DateTime?
   updatedAt  DateTime?
 
-  @@map("verifications")
   @@index([identifier])
+  @@map("verifications")
 }
 
 model Apikey {
@@ -257,15 +221,15 @@ model Apikey {
 }
 
 model OauthApplication {
-  id           String    @id
+  id           String   @id
   name         String
   icon         String?
   metadata     String?
-  clientId     String    @unique
+  clientId     String   @unique
   clientSecret String?
   redirectUrls String
   type         String
-  disabled     Boolean?  @default(false)
+  disabled     Boolean? @default(false)
   userId       String?
   createdAt    DateTime
   updatedAt    DateTime
