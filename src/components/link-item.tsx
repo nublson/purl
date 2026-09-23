@@ -1,11 +1,8 @@
 "use client";
 
-import { useChatContextSafe } from "@/hooks/use-chat-context";
-import { usePreferences } from "@/hooks/use-preferences";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
-import { MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { X } from "./animate-ui/icons/x";
@@ -13,9 +10,7 @@ import { LinkIcon } from "./link-icon";
 import { LinkMenu } from "./link-menu";
 import { LinkPreview } from "./link-preview";
 import { LinkItemSkeleton } from "./skeletons";
-import { TooltipWrapper } from "./tooltip-wrapper";
 import { Typography } from "./typography";
-import { Button } from "./ui/button";
 import {
   Item,
   ItemActions,
@@ -46,9 +41,7 @@ export const LinkItem = React.forwardRef<
   },
   ref,
 ) {
-  const chatCtx = useChatContextSafe();
   const router = useRouter();
-  const { preferences } = usePreferences();
 
   const lastLinkIdRef = React.useRef(link.id);
   const [displayIngestStatus, setDisplayIngestStatus] = React.useState<
@@ -127,37 +120,14 @@ export const LinkItem = React.forwardRef<
   const showIngestPulse =
     displayIngestStatus === "PENDING" || displayIngestStatus === "PROCESSING";
 
-  function renderLoadingOrChatAction(): React.ReactNode {
+  function renderLoadingAction(): React.ReactNode {
     if (
       displayIngestStatus === "PENDING" ||
       displayIngestStatus === "PROCESSING"
     ) {
       return <Spinner className="size-4" />;
     }
-
-    if (!chatCtx) return null;
-    return (
-      <TooltipWrapper content="Add to chat">
-        <Button
-          aria-label="Add to chat"
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          data-add-to-chat=""
-          className="cursor-pointer text-muted-foreground"
-          onClick={() => {
-            chatCtx.addMention(linkForUi);
-            if (preferences.showChatWidget === false) {
-              router.push("/ai");
-              return;
-            }
-            chatCtx.setIsWidgetOpen(true);
-          }}
-        >
-          <MessageCircle />
-        </Button>
-      </TooltipWrapper>
-    );
+    return null;
   }
 
   if (deletePhase === "loading" || deletePhase === "exiting") {
@@ -247,7 +217,7 @@ export const LinkItem = React.forwardRef<
             scheduleOpen();
           }}
         >
-          {renderLoadingOrChatAction()}
+          {renderLoadingAction()}
           <LinkMenu
             link={linkForUi}
             onDeleteStart={() => {
