@@ -15,13 +15,8 @@ vi.mock("@/lib/auth", () => ({
   },
 }));
 
-vi.mock("@/lib/user-preferences", () => ({
-  getPreferences: vi.fn().mockResolvedValue({ defaultPage: "home" }),
-}));
-
 const { proxy } = await import("./proxy");
 const auth = await import("@/lib/auth");
-const { getPreferences } = await import("@/lib/user-preferences");
 
 function createRequest(pathname: string, method = "GET"): NextRequest {
   return new NextRequest(`http://localhost${pathname}`, { method });
@@ -30,7 +25,6 @@ function createRequest(pathname: string, method = "GET"): NextRequest {
 describe("proxy", () => {
   beforeEach(() => {
     vi.mocked(auth.auth.api.getSession).mockReset();
-    vi.mocked(getPreferences).mockResolvedValue({ defaultPage: "home" });
     mockRateLimitApiRequest.mockReset();
     mockRateLimitApiRequest.mockResolvedValue(null);
   });
@@ -100,19 +94,6 @@ describe("proxy", () => {
     const res = await proxy(req);
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toContain("/home");
-  });
-
-  it("redirects to /ai for /login when session exists and defaultPage preference is ai", async () => {
-    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
-      user: { id: "user-1" },
-      session: {},
-    } as never);
-    vi.mocked(getPreferences).mockResolvedValue({ defaultPage: "ai" });
-    const req = createRequest("/login");
-    const res = await proxy(req);
-    expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toContain("/ai");
-    expect(getPreferences).toHaveBeenCalledWith("user-1");
   });
 
   it("returns next for /privacy when no session", async () => {
@@ -221,18 +202,6 @@ describe("proxy", () => {
     const res = await proxy(req);
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toContain("/home");
-  });
-
-  it("redirects to /ai for /verify-email when verified and defaultPage preference is ai", async () => {
-    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
-      user: { id: "user-1", emailVerified: true },
-      session: {},
-    } as never);
-    vi.mocked(getPreferences).mockResolvedValue({ defaultPage: "ai" });
-    const res = await proxy(createRequest("/verify-email"));
-    expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toContain("/ai");
-    expect(getPreferences).toHaveBeenCalledWith("user-1");
   });
 
   describe("MCP route", () => {
