@@ -6,13 +6,6 @@ import { PasteHandler } from "@/components/paste-handler";
 import { LinkItemSkeleton } from "@/components/skeletons";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import type { LinkGroup as LinkGroupType } from "@/utils/links";
-import {
-  UPLOAD_ERROR_EVENT,
-  UPLOAD_START_EVENT,
-  UPLOAD_SUCCESS_EVENT,
-  type UploadStartDetail,
-  type UploadSuccessDetail,
-} from "@/utils/upload-events";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { LinkGroupEmpty } from "./link-group-empty";
@@ -23,7 +16,6 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
   useRealtimeSync(startTransition);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [prevTodayCount, setPrevTodayCount] = useState(0);
-  const [limitMessage, setLimitMessage] = useState<string | null>(null);
   const [newLinkId, setNewLinkId] = useState<string | null>(null);
 
   const onPasteStart = useCallback((url: string) => {
@@ -40,15 +32,9 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
     [router],
   );
 
-  const onSaveError = useCallback(
-    (detail: { limit?: boolean; message?: string } | null) => {
-      setPendingUrl(null);
-      if (detail?.limit && detail.message) {
-        setLimitMessage(detail.message);
-      }
-    },
-    [],
-  );
+  const onSaveError = useCallback(() => {
+    setPendingUrl(null);
+  }, []);
 
   const todayGroup = groups.find((g) => g.label === "Today");
   const todayLinksCount = todayGroup?.links.length ?? 0;
@@ -70,37 +56,6 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
       });
     }
   }, [isPending, todayLinksCount]);
-
-  useEffect(() => {
-    const onUploadStart = (event: Event) => {
-      const customEvent = event as CustomEvent<UploadStartDetail>;
-      onPasteStart(customEvent.detail?.label ?? "Uploading file...");
-    };
-    const onUploadSuccess = (event: Event) => {
-      const customEvent = event as CustomEvent<UploadSuccessDetail>;
-      const id = customEvent.detail?.id;
-      if (id) {
-        onSaveSuccess(id);
-        return;
-      }
-      startTransition(() => {
-        router.refresh();
-      });
-    };
-    const onUploadError = () => {
-      onSaveError(null);
-    };
-
-    window.addEventListener(UPLOAD_START_EVENT, onUploadStart);
-    window.addEventListener(UPLOAD_SUCCESS_EVENT, onUploadSuccess);
-    window.addEventListener(UPLOAD_ERROR_EVENT, onUploadError);
-
-    return () => {
-      window.removeEventListener(UPLOAD_START_EVENT, onUploadStart);
-      window.removeEventListener(UPLOAD_SUCCESS_EVENT, onUploadSuccess);
-      window.removeEventListener(UPLOAD_ERROR_EVENT, onUploadError);
-    };
-  }, [onPasteStart, onSaveError, onSaveSuccess, router, startTransition]);
 
   return (
     <>

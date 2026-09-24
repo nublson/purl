@@ -1,9 +1,6 @@
 import { Typography } from "@/components/typography";
-import { Separator } from "@/components/ui/separator";
-import { UpgradeCard } from "@/components/upgrade-card";
 import type { UsageMeterData } from "@/components/usage-item";
 import { UsageItem } from "@/components/usage-item";
-import { Fragment } from "react";
 
 export function SettingsUsage({ data }: { data: UsageMeterData | null }) {
   if (!data) {
@@ -18,12 +15,6 @@ export function SettingsUsage({ data }: { data: UsageMeterData | null }) {
 
   return (
     <div className="w-full flex-1 flex flex-col gap-4">
-      {data.effectivePlanKey !== "PRO" && (
-        <Fragment>
-          <UpgradeCard />
-          <Separator />
-        </Fragment>
-      )}
       <UsageItem label="Links" used={data.saves.used} cap={data.saves.cap} />
     </div>
   );

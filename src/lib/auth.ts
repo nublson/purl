@@ -4,7 +4,6 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { apiKey } from "@better-auth/api-key";
 import prisma from "@/lib/prisma";
 import { getResend } from "@/lib/resend";
-import { createTrialSubscription } from "@/lib/subscription-utils";
 
 export const auth = betterAuth({
   plugins: [
@@ -45,19 +44,6 @@ export const auth = betterAuth({
       },
     }),
   ],
-  databaseHooks: {
-    user: {
-      create: {
-        after: async (user) => {
-          try {
-            await createTrialSubscription(user.id);
-          } catch (e) {
-            console.error("createTrialSubscription failed", e);
-          }
-        },
-      },
-    },
-  },
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),

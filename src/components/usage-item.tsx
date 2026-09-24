@@ -4,8 +4,7 @@ import { Typography } from "@/components/typography";
 import { Item, ItemActions, ItemContent, ItemTitle } from "./ui/item";
 
 export type UsageMeterData = {
-  effectivePlanKey: string;
-  saves: { used: number; cap: number | null };
+  saves: { used: number; cap: number };
 };
 
 export type UsageItemProps = {

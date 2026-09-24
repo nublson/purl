@@ -8,29 +8,18 @@
 
 **Live preview:** [https://purl.nublson.com](https://purl.nublson.com)
 
-Purl is a read-it-later app — a home for your "pearls". You paste URLs (or upload files): web pages, PDFs, YouTube videos, and audio. Purl resolves each item's metadata (title, favicon, description, thumbnail) and keeps everything in one place, available from the app, a REST API, and an MCP server.
+Purl is a read-it-later app — a home for your "pearls". You paste URLs: web pages, PDFs, YouTube videos, and audio. Purl resolves each item's metadata (title, favicon, description, thumbnail) and keeps everything in one place, available from the app, a REST API, and an MCP server.
 
-**Plans:** **Free** and **Pro** are enforced server-side (see [`docs/commercial-model.md`](docs/commercial-model.md)). New signups get a **7-day Pro trial** (no card required). **Stripe Checkout** handles the one-time Pro payment; **webhooks** sync status to Postgres.
+Purl is free, with one limit: each account can save up to **1,000 links** (`MAX_SAVED_LINKS` in [`src/lib/limits.ts`](src/lib/limits.ts)).
 
 The product goal: one place to stash material you care about.
 
-## Plans (summary)
-
-| Feature                       | Free | Pro ($39 one-time) |
-| ----------------------------- | ---- | ------------------ |
-| Save links (100 lifetime cap) | Yes  | Unlimited          |
-| Search saved links            | Yes  | Yes                |
-| PDF/audio **upload**          | No   | Yes                |
-
-Exact limits are in [`docs/commercial-model.md`](docs/commercial-model.md).
-
 ## Implemented today
 
-- **Marketing site** — Landing page with hero, features, supported content types, pricing section, and FAQ.
+- **Marketing site** — Landing page (hero with a live preview), docs for the REST API and MCP server, privacy and terms.
 - **Authentication** — Email/password (and related flows) via [Better Auth](https://www.better-auth.com/); optional email verification through [Resend](https://resend.com/).
 - **Save & organize**
   - Add items by URL with automatic content-type detection (web, PDF, YouTube, audio).
-  - **File upload** for PDF and audio (size limits enforced server-side).
   - Links grouped by relative time (e.g. Today, This Week, Last Month).
   - Preview metadata (title, description, favicon, thumbnail where available).
 - **Hardened outbound fetch** — Server-side `safeFetch` with optional proxy/DNS controls (see `AGENTS.md`). An egress proxy can be configured via [`SAFE_OUTBOUND_HTTP_PROXY`](docs/production-outbound-proxy.md).
@@ -44,7 +33,7 @@ Exact limits are in [`docs/commercial-model.md`](docs/commercial-model.md).
 
 Saving a link is fully **synchronous** — there is no background processing.
 
-1. **Input** — `POST /api/links` with a URL (also `/api/v1/links` and the MCP `save_link` tool), or `POST /api/upload` with a PDF/audio file (files go to Supabase Storage).
+1. **Input** — `POST /api/links` with a URL (also `/api/v1/links` and the MCP `save_link` tool).
 2. **Classify & decorate** — Server-side [`detectContentType`](src/lib/server-detect-content-type.ts) (SSRF-safe `HEAD` / sniff) plus [`scrapeLinkMetadata`](src/lib/links.ts) (Open Graph HTML, PDF `Content-Disposition` / size, YouTube oEmbed). Saving an existing URL again refreshes its metadata and moves it to the top.
 3. **Persist** — A `Link` row with title, favicon, thumbnail, domain, and `contentType` (`WEB`, `PDF`, `YOUTUBE`, or `AUDIO`).
 4. **Sync** — [`broadcastLinksChanged`](src/lib/realtime-broadcast.ts) notifies other tabs/devices via Supabase Realtime.
@@ -89,30 +78,16 @@ Runs on **`workflow_dispatch`** (manual): **Merge `develop` into `main`**, then 
 
 ## Security
 
-Purl is built around **untrusted input** (arbitrary URLs and uploaded files). A few layers matter in production:
+Purl is built around **untrusted input** (arbitrary URLs). A few layers matter in production:
 
 - **SSRF-aware outbound fetches** — User-supplied URLs are not passed to raw `fetch`. OG/thumbnail probes, PDF fetch, content-type sniffing, and similar paths go through [`safeFetch`](src/lib/safe-outbound-fetch.ts): HTTP(S) only, blocked private/link-local/reserved targets, redirect handling with per-hop host checks, DNS resolution pinned before connect (mitigates classic DNS rebinding against the pre-check), optional response size caps (e.g. PDF proxy). Optional **egress proxy** and custom DNS servers are documented in [`AGENTS.md`](AGENTS.md).
 - **Authentication & route gating** — [Better Auth](https://www.better-auth.com/) sessions; Next.js [`proxy`](src/proxy.ts) redirects unauthenticated users away from private routes and can require **email verification** before app access.
-- **API authorization** — Sensitive routes (`/api/links`, `/api/upload`, etc.) resolve the session server-side and scope work to the signed-in user.
-- **Rate limiting** — When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set, the proxy applies per-IP limits to **`/api/auth/*`**, **`POST /api/links`**, and **`POST /api/upload`** (see [`proxy-rate-limit.ts`](src/lib/proxy-rate-limit.ts)). Without Upstash, limits are disabled — fine locally, not ideal for production.
+- **API authorization** — Sensitive routes (`/api/links`, `/api/v1/*`, MCP, etc.) resolve the session server-side and scope work to the signed-in user.
+- **Rate limiting** — When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set, the proxy applies per-IP limits to **`/api/auth/*`**, **`POST /api/links`**, and **`POST /api/feedback`** (see [`proxy-rate-limit.ts`](src/lib/proxy-rate-limit.ts)). Without Upstash, limits are disabled — fine locally, not ideal for production.
 - **Secrets & client exposure** — `SUPABASE_SERVICE_ROLE_KEY` and similar values are server-only. The browser uses the Supabase **anon** key for Realtime only; `.env` stays gitignored.
-- **Upload bounds** — Audio uploads enforce a maximum size server-side; PDF proxy streaming is capped (see `safe-outbound-fetch` / upload limits in code).
+- **Response bounds** — PDF proxy streaming is size-capped (see `safe-outbound-fetch`); avatar uploads are size-limited.
 
 **Reporting a vulnerability:** use [GitHub Security Advisories](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability) for this repository so details stay private until patched.
-
-## Stripe (one-time payment)
-
-Billing uses **Stripe Checkout** (`POST /api/billing/checkout`) for the one-time Pro payment, **Customer Portal** (`POST /api/billing/portal`), and **webhooks** (`POST /api/billing/webhook`). Plan entitlements and usage limits are enforced in-app from Postgres (see [`src/lib/entitlements.ts`](src/lib/entitlements.ts)); webhooks keep the plan row in sync.
-
-**Env (see `.env.example`):** `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` (server-only), `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO` (one-time price ID), optional `ADMIN_TOKEN` for `POST /api/admin/grants`.
-
-**Local webhook testing:** create a one-time Pro price in [Stripe Test mode](https://dashboard.stripe.com/test/products), put the price ID in `.env`, then:
-
-```bash
-stripe listen --forward-to localhost:3000/api/billing/webhook
-```
-
-Copy the CLI signing secret into `STRIPE_WEBHOOK_SECRET` for that shell session. Trigger flows with `stripe trigger checkout.session.completed` (and exercise checkout from the app). **Go-live:** recreate the product and a Live webhook endpoint; rotate keys and webhook secret per environment.
 
 ## Setup (local development)
 

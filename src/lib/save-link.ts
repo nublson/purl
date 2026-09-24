@@ -31,7 +31,7 @@ export async function saveLink(rawUrl: string): Promise<SaveLinkResult> {
     if (!res.ok) {
       const msg = data?.error ?? "Failed to save link";
       toast.error(msg);
-      const hitLimit = res.status === 402 || data?.code === "LIMIT_REACHED";
+      const hitLimit = data?.code === "LIMIT_REACHED";
       return hitLimit ? { error: msg, limit: true } : { error: msg };
     }
 

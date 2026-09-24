@@ -2,7 +2,7 @@ import { CodeBlock } from "@/components/docs/code-block";
 import { McpInstallButtons } from "@/components/docs/mcp-install-buttons";
 import { ParamTable } from "@/components/docs/param-table";
 import { Typography } from "@/components/typography";
-import { getAppBaseUrl } from "@/lib/billing-url";
+import { getAppBaseUrl } from "@/lib/app-url";
 import type { Metadata } from "next";
 import Link from "next/link";
 

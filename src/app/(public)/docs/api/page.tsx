@@ -428,10 +428,10 @@ export default function ApiDocsPage() {
               description: "Missing, invalid, or expired API key.",
             },
             {
-              name: "402",
-              type: "Payment Required",
+              name: "403",
+              type: "Forbidden",
               description:
-                "Plan limit reached. Check code: LIMIT_REACHED and feature fields.",
+                "Save limit reached (1,000 links per account). Check code: LIMIT_REACHED and feature fields.",
             },
             {
               name: "404",
@@ -456,7 +456,7 @@ export default function ApiDocsPage() {
         <CodeBlock
           language="json"
           code={`{
-  "error": "Plan limit reached",
+  "error": "You've reached the 1,000-link limit.",
   "code": "LIMIT_REACHED",
   "feature": "SAVE_LIMIT"
 }`}

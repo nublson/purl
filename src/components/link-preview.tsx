@@ -3,15 +3,11 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { usePlan } from "@/hooks/use-plan";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import type { Link } from "@/utils/links";
-import { isUploadFilePath } from "@/utils/upload-file-url";
 import type { ReactNode } from "react";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
-import { LinkUpgradeItem } from "./link-upgrade-item";
 import { PdfThumbnail } from "./pdf-thumbnail";
-import { Separator } from "./ui/separator";
 
 type LinkPreviewProps = {
   children: ReactNode;
@@ -33,8 +29,6 @@ export function LinkPreview({
   onPreviewMouseEnter,
   onPreviewMouseLeave,
 }: LinkPreviewProps) {
-  const { effectivePlanKey } = usePlan();
-  const isFree = effectivePlanKey === "FREE";
   const thumbnailSrc = link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
 
   return (
@@ -53,10 +47,7 @@ export function LinkPreview({
         onMouseLeave={onPreviewMouseLeave}
       >
         {link.contentType === "PDF" ? (
-          <PdfThumbnail
-            url={link.url}
-            linkId={isUploadFilePath(link.url) ? link.id : undefined}
-          />
+          <PdfThumbnail url={link.url} />
         ) : (
           <LinkPreviewThumbnail
             link={link}
@@ -74,12 +65,6 @@ export function LinkPreview({
             </p>
           )}
         </div>
-        {isFree && (
-          <>
-            <Separator />
-            <LinkUpgradeItem />
-          </>
-        )}
       </HoverCardContent>
     </HoverCard>
   );
