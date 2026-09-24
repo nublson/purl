@@ -4,26 +4,25 @@
 
 # Purl
 
-**Save anything. Ask questions. Get answers.**
+**Save anything. Keep it in one place.**
 
 **Live preview:** [https://purl.nublson.com](https://purl.nublson.com)
 
-Purl is an AI-powered read-it-later app and personal knowledge base. You paste URLs (or upload files): web pages, PDFs, YouTube videos, and audio. Purl ingests the content, stores chunked text with vector embeddings, and answers questions by searching what you saved — optionally scoped with `@` mentions to specific items.
+Purl is an AI-powered read-it-later app and personal knowledge base. You paste URLs (or upload files): web pages, PDFs, YouTube videos, and audio. Purl ingests the content and stores chunked text with vector embeddings so it can be searched semantically (e.g. from an MCP client).
 
-**Plans:** **Free**, **Pro**, and **BYOK** are enforced server-side (see [`docs/commercial-model.md`](docs/commercial-model.md)). New signups get a **7-day Pro trial** (no card required). **Stripe Checkout** handles the one-time Pro payment; **webhooks** sync status to Postgres.
+**Plans:** **Free** and **Pro** are enforced server-side (see [`docs/commercial-model.md`](docs/commercial-model.md)). New signups get a **7-day Pro trial** (no card required). **Stripe Checkout** handles the one-time Pro payment; **webhooks** sync status to Postgres.
 
-The product goal: one place to stash material you care about, then query it later with citations instead of digging through bookmarks.
+The product goal: one place to stash material you care about.
 
 ## Plans (summary)
 
-| Feature                       | Free | Pro ($39 one-time) | BYOK (free)     |
-| ----------------------------- | ---- | ------------------ | --------------- |
-| Save links (100 lifetime cap) | Yes  | Unlimited          | Unlimited       |
-| Full-text search              | Yes  | Yes                | Yes             |
-| AI extraction & embeddings    | No   | Yes (150/mo)       | Yes (unlimited) |
-| Semantic search               | No   | Yes                | Yes             |
-| PDF/audio **upload**          | No   | Yes                | Yes             |
-| AI chat                       | No   | 300 msg/mo         | Unlimited       |
+| Feature                       | Free | Pro ($39 one-time) |
+| ----------------------------- | ---- | ------------------ |
+| Save links (100 lifetime cap) | Yes  | Unlimited          |
+| Full-text search              | Yes  | Yes                |
+| AI extraction & embeddings    | No   | Yes (150/mo)       |
+| Semantic search               | No   | Yes                |
+| PDF/audio **upload**          | No   | Yes                |
 
 Exact limits are in [`docs/commercial-model.md`](docs/commercial-model.md).
 
@@ -37,15 +36,11 @@ Exact limits are in [`docs/commercial-model.md`](docs/commercial-model.md).
   - Links grouped by relative time (e.g. Today, This Week, Last Month).
   - Preview metadata (title, description, favicon, thumbnail where available).
 - **Ingestion pipeline** — Fetches or extracts text (including transcripts for YouTube/audio), chunks it, embeds via **Vercel AI Gateway** (`openai/text-embedding-3-small`), stores in Postgres with **pgvector**; tracks per-link ingest status (pending, processing, completed, failed, skipped for edge cases like heavy SPAs).
-- **AI providers** — **Vercel AI Gateway** for streaming chat (Claude) and **embeddings** (`openai/text-embedding-3-small`). **OpenAI** directly for **Whisper** transcription only (`OPENAI_API_KEY`). Keys live in server environment variables only.
-- **AI Gateway observability** — Chat, ingest embeddings, and the chat tool’s semantic search send `providerOptions.gateway` with the signed-in **`user`** id and **`tags`** so the [Vercel AI](https://vercel.com/docs/ai-gateway) dashboard can filter spend and usage by person and surface (`feature:chat`, `env:…` from `VERCEL_ENV` / `NODE_ENV`; `feature:ingest` on save pipelines; `feature:semantic-search` when the model runs vector search over saved chunks).
+- **AI providers** — **Vercel AI Gateway** for **embeddings** (`openai/text-embedding-3-small`). **OpenAI** directly for **Whisper** transcription only (`OPENAI_API_KEY`). Keys live in server environment variables only.
+- **AI Gateway observability** — Ingest embeddings and semantic search send `providerOptions.gateway` with the signed-in **`user`** id and **`tags`** so the [Vercel AI](https://vercel.com/docs/ai-gateway) dashboard can filter spend and usage by person and surface (`env:…` from `VERCEL_ENV` / `NODE_ENV`; `feature:ingest` on save pipelines; `feature:semantic-search` when the model runs vector search over saved chunks).
 - **Hardened outbound fetch** — Server-side `safeFetch` with optional proxy/DNS controls (see `AGENTS.md`). For reliable **YouTube transcripts on Vercel**, configure [`SAFE_OUTBOUND_HTTP_PROXY`](docs/production-outbound-proxy.md) in production.
 - **Realtime list sync** — Supabase Realtime so saves and updates propagate across tabs/devices quickly.
-- **AI chat**
-  - Streaming replies (**Anthropic Claude**) with tool use: list saved items (filters by date/type) and search over stored chunks.
-  - **`@` mentions** to focus the model on specific saved links; mentions persist on messages.
-  - Multiple chats, titles, and message history stored in the database.
-- **Link actions** — Open original, copy URL, edit metadata, re-ingest, delete, add to chat context from the list.
+- **Link actions** — Open original, copy URL, edit metadata, re-ingest, delete.
 - **Operational extras** — Optional Upstash-backed API rate limiting, optional Sentry, Vitest coverage for critical paths.
 - **PWA (installable app)** — [Web App Manifest](public/manifest.json) plus a [Serwist](https://serwist.pages.dev/) service worker ([`src/app/sw.ts`](src/app/sw.ts)) that builds to **`public/sw.js`** (generated on `pnpm build`, gitignored). Enables **Install** in Chrome/Edge and similar where the platform supports it, with runtime caching via Serwist's Next.js defaults and a static offline shell at [`/~offline`](src/app/~offline/page.tsx). **Serwist is disabled in `pnpm dev`** to avoid service-worker cache surprises during development — use **`pnpm build && pnpm start`** (or your production URL) to exercise installability and the SW.
 
@@ -110,7 +105,7 @@ These are called out explicitly because the repo is going public:
 - **UI:** Tailwind CSS, shadcn/ui
 - **Auth:** Better Auth
 - **Database:** PostgreSQL + Prisma (with vector column for embeddings)
-- **AI:** **Vercel AI Gateway** (Claude chat + OpenAI embeddings through gateway) and **OpenAI** (Whisper transcription direct) via the Vercel AI SDK — server environment variables
+- **AI:** **Vercel AI Gateway** (OpenAI embeddings through gateway) and **OpenAI** (Whisper transcription direct) via the Vercel AI SDK — server environment variables
 - **Email (optional in dev):** Resend for verification emails
 - **Realtime:** Supabase client (anon + service role on server)
 - **PWA:** [Serwist](https://serwist.pages.dev/) (`@serwist/next`), web manifest + precache / offline fallback
@@ -141,9 +136,9 @@ Purl is built around **untrusted input** (arbitrary URLs and uploaded files). A 
 
 - **SSRF-aware outbound fetches** — User-supplied URLs are not passed to raw `fetch`. Ingest, OG/thumbnail probes, PDF fetch, content-type sniffing, and similar paths go through [`safeFetch`](src/lib/safe-outbound-fetch.ts): HTTP(S) only, blocked private/link-local/reserved targets, redirect handling with per-hop host checks, DNS resolution pinned before connect (mitigates classic DNS rebinding against the pre-check), optional response size caps (e.g. PDF proxy). Optional **egress proxy** and custom DNS servers are documented in [`AGENTS.md`](AGENTS.md).
 - **Authentication & route gating** — [Better Auth](https://www.better-auth.com/) sessions; Next.js [`proxy`](src/proxy.ts) redirects unauthenticated users away from private routes and can require **email verification** before app access.
-- **API authorization** — Sensitive routes (`/api/chat`, `/api/links`, `/api/upload`, chats, etc.) resolve the session server-side and scope work to the signed-in user (e.g. chat mention IDs are validated against ownership).
-- **Server-managed AI keys** — Chat and embeddings route through **Vercel AI Gateway** (`AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN` after `vercel env pull`). **Whisper** transcription still calls **OpenAI** directly via `OPENAI_API_KEY`. These keys are never exposed to the client.
-- **Rate limiting** — When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set, the proxy applies per-IP limits to **`/api/auth/*`**, **`POST /api/chat`**, **`POST /api/links`**, and **`POST /api/upload`** (see [`proxy-rate-limit.ts`](src/lib/proxy-rate-limit.ts)). Without Upstash, limits are disabled — fine locally, not ideal for production.
+- **API authorization** — Sensitive routes (`/api/links`, `/api/upload`, etc.) resolve the session server-side and scope work to the signed-in user.
+- **Server-managed AI keys** — Embeddings route through **Vercel AI Gateway** (`AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN` after `vercel env pull`). **Whisper** transcription still calls **OpenAI** directly via `OPENAI_API_KEY`. These keys are never exposed to the client.
+- **Rate limiting** — When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set, the proxy applies per-IP limits to **`/api/auth/*`**, **`POST /api/links`**, and **`POST /api/upload`** (see [`proxy-rate-limit.ts`](src/lib/proxy-rate-limit.ts)). Without Upstash, limits are disabled — fine locally, not ideal for production.
 - **Secrets & client exposure** — `SUPABASE_SERVICE_ROLE_KEY` and similar values are server-only. The browser uses the Supabase **anon** key for Realtime only; `.env` stays gitignored.
 - **Upload bounds** — Audio uploads enforce a maximum size server-side; PDF proxy streaming is capped (see `safe-outbound-fetch` / upload limits in code).
 
@@ -184,7 +179,7 @@ Create a `.env` file in the repo root. See `.env.example` for the full list; min
 ```bash
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME"
 
-# AI (server-side): gateway for chat + embeddings; OpenAI key for Whisper only
+# AI (server-side): gateway for embeddings; OpenAI key for Whisper only
 AI_GATEWAY_API_KEY="..." # or use VERCEL_OIDC_TOKEN from `vercel env pull`
 OPENAI_API_KEY="sk-proj-..."
 
@@ -201,7 +196,7 @@ RESEND_FROM="Purl <onboarding@resend.dev>"
 Notes:
 
 - **`DATABASE_URL`** is required (Prisma + Better Auth).
-- **`AI_GATEWAY_API_KEY`** (or **`VERCEL_OIDC_TOKEN`** on Vercel / after `vercel env pull`) is required for **chat** and **embeddings** (ingest + semantic search) via AI Gateway. Enable **AI Gateway** in the Vercel project settings for OIDC-based auth. Optional: configure **per-user** limits in the project AI Gateway settings; the app passes the Better Auth user id on gateway calls.
+- **`AI_GATEWAY_API_KEY`** (or **`VERCEL_OIDC_TOKEN`** on Vercel / after `vercel env pull`) is required for **embeddings** (ingest + semantic search) via AI Gateway. Enable **AI Gateway** in the Vercel project settings for OIDC-based auth. Optional: configure **per-user** limits in the project AI Gateway settings; the app passes the Better Auth user id on gateway calls.
 - **`OPENAI_API_KEY`** is required for **Whisper** transcription (audio ingest / URLs). Omit only if you do not use audio transcription.
 - **Supabase** env vars are required for realtime link list sync. Use **Project Settings → API** in the Supabase dashboard. The service role key must stay server-only.
 - **Resend** is optional for local dev: if `RESEND_API_KEY` is not set, signup can still work, but verification emails will not send.

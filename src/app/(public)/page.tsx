@@ -1,12 +1,11 @@
 import { BelowFoldSectionSkeleton } from "@/components/skeletons";
 import HeroSection from "@/sections/hero";
-import { PurlAISection } from "@/sections/purl-ai";
 import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 
 export const metadata: Metadata = {
   description:
-    "Purl is an AI-powered read-it-later app. Save links, PDFs, YouTube videos, and audio — then ask anything about what you've saved. Free 7-day trial, no card required.",
+    "Purl is an AI-powered read-it-later app. Save links, PDFs, YouTube videos, and audio in one place. Free 7-day trial, no card required.",
 };
 
 const FeaturesSection = dynamic(() => import("@/sections/features"), {
@@ -37,7 +36,6 @@ export default function Home() {
       <HeroSection />
       <FeaturesSection />
       <ContentTypeSection />
-      <PurlAISection />
       <PricingSection />
       <FAQSection />
     </div>

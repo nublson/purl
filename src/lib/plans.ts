@@ -2,7 +2,6 @@ import type { PlanKey } from "@/generated/prisma/enums";
 
 export const FREE_LIFETIME_SAVE_CAP = 100;
 export const PRO_ONETIME_PRICE_CENTS = 3900;
-export const PRO_CHAT_MESSAGES_PER_MONTH = 300;
 export const PRO_EXTRACTIONS_PER_MONTH = 150;
 
 /** Billing catalog: Stripe price ID → paid plan (always PRO on one-time purchase). */
@@ -62,7 +61,6 @@ export const publicPlans: PublicPlan[] = [
       "Semantic search",
       "PDF & audio file uploads",
       "YouTube & audio transcriptions",
-      `${PRO_CHAT_MESSAGES_PER_MONTH} AI chat messages per month`,
     ],
     actionText: "Try for free",
     popular: true,
@@ -70,12 +68,10 @@ export const publicPlans: PublicPlan[] = [
 ];
 
 export type EffectiveEntitlements = {
-  /** When true, user gets full AI ingest, semantic search, uploads, unlimited chat. */
+  /** When true, user gets full AI ingest, semantic search, uploads. */
   aiFullAccess: boolean;
   maxLifetimeSaves: number | null;
   maxExtractionsPerPeriod: number | null;
-  maxChatMessagesPerPeriod: number | null;
-  chatPeriodDays: number | null;
   extractionPeriodUsesSubscriptionPeriod: boolean;
   allowFileUploads: boolean;
 };
@@ -93,8 +89,6 @@ export function entitlementsForPlanKey(
         aiFullAccess: false,
         maxLifetimeSaves: FREE_LIFETIME_SAVE_CAP,
         maxExtractionsPerPeriod: 0,
-        maxChatMessagesPerPeriod: 0,
-        chatPeriodDays: null,
         extractionPeriodUsesSubscriptionPeriod: false,
         allowFileUploads: false,
       };
@@ -104,8 +98,6 @@ export function entitlementsForPlanKey(
         aiFullAccess: true,
         maxLifetimeSaves: null,
         maxExtractionsPerPeriod: PRO_EXTRACTIONS_PER_MONTH,
-        maxChatMessagesPerPeriod: PRO_CHAT_MESSAGES_PER_MONTH,
-        chatPeriodDays: null,
         extractionPeriodUsesSubscriptionPeriod: false,
         allowFileUploads: true,
       };
@@ -119,7 +111,6 @@ export function entitlementsForPlanKey(
 export const LIMIT_FEATURE_CODES = {
   SAVE_LIMIT: "SAVE_LIMIT",
   EXTRACT_LIMIT: "EXTRACT_LIMIT",
-  CHAT_LIMIT: "CHAT_LIMIT",
   UPLOAD_NOT_ALLOWED: "UPLOAD_NOT_ALLOWED",
 } as const;
 

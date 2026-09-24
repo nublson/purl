@@ -7,7 +7,6 @@ import { publicPlans } from "@/lib/plans";
 import * as React from "react";
 import { DialogWrapper } from "./dialog-wrapper";
 import { PricingCard } from "./pricing-card";
-import { Typography } from "./typography";
 
 interface UpgradeDialogProps {
   children: React.ReactNode;
@@ -41,18 +40,6 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
           className="bg-primary/5 p-6 max-w-96"
         />
       ) : null}
-      <div className="flex items-center gap-3 text-muted-foreground">
-        <div className="h-px flex-1 bg-border" />
-        <Typography size="small">or</Typography>
-        <div className="h-px flex-1 bg-border" />
-      </div>
-      <Typography size="small" className="text-center text-muted-foreground">
-        Already have an Anthropic API key?{" "}
-        <span className="font-medium text-foreground">
-          Add it in Settings → Usage
-        </span>{" "}
-        to use all AI features for free.
-      </Typography>
     </div>
   );
 

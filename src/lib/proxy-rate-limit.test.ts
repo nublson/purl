@@ -15,7 +15,6 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@/lib/upstash-rate-limit", () => ({
   getAuthRateLimiter: vi.fn(),
-  getChatPostRateLimiter: vi.fn(),
   getFeedbackPostRateLimiter: vi.fn(),
   getLinksPostRateLimiter: vi.fn(),
   getUploadPostRateLimiter: vi.fn(),
@@ -26,7 +25,6 @@ vi.mock("@/lib/upstash-rate-limit", () => ({
 
 const {
   getAuthRateLimiter,
-  getChatPostRateLimiter,
   getFeedbackPostRateLimiter,
   getLinksPostRateLimiter,
   getUploadPostRateLimiter,
@@ -60,7 +58,6 @@ describe("rateLimitApiRequest", () => {
   beforeEach(() => {
     limitMock.mockReset();
     vi.mocked(getAuthRateLimiter).mockReset();
-    vi.mocked(getChatPostRateLimiter).mockReset();
     vi.mocked(getLinksPostRateLimiter).mockReset();
     vi.mocked(getUploadPostRateLimiter).mockReset();
     vi.mocked(getFeedbackPostRateLimiter).mockReset();
@@ -146,53 +143,6 @@ describe("rateLimitApiRequest", () => {
       await rateLimitApiRequest(makeRequest("/api/auth/session", "GET"));
 
       expect(limitMock).toHaveBeenCalledWith("127.0.0.1");
-    });
-  });
-
-  describe("POST /api/chat", () => {
-    it("returns null when no limiter is configured", async () => {
-      vi.mocked(getChatPostRateLimiter).mockReturnValue(null);
-
-      const result = await rateLimitApiRequest(
-        makeRequest("/api/chat", "POST"),
-      );
-      expect(result).toBeNull();
-    });
-
-    it("returns null when under the limit", async () => {
-      vi.mocked(getChatPostRateLimiter).mockReturnValue(
-        mockLimiter() as never,
-      );
-      limitMock.mockResolvedValue({ success: true, reset: Date.now() + 60_000 });
-
-      const result = await rateLimitApiRequest(
-        makeRequest("/api/chat", "POST"),
-      );
-      expect(result).toBeNull();
-    });
-
-    it("returns 429 when the chat POST limit is exceeded", async () => {
-      vi.mocked(getChatPostRateLimiter).mockReturnValue(
-        mockLimiter() as never,
-      );
-      limitMock.mockResolvedValue({
-        success: false,
-        reset: Date.now() + 60_000,
-      });
-
-      const result = await rateLimitApiRequest(
-        makeRequest("/api/chat", "POST"),
-      );
-
-      expect(result!.status).toBe(429);
-    });
-
-    it("does not limit GET /api/chat", async () => {
-      const result = await rateLimitApiRequest(
-        makeRequest("/api/chat", "GET"),
-      );
-      expect(result).toBeNull();
-      expect(getChatPostRateLimiter).not.toHaveBeenCalled();
     });
   });
 

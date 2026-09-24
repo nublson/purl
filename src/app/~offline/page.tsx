@@ -15,8 +15,8 @@ export default function OfflinePage() {
         You&apos;re offline
       </Typography>
       <Typography className="text-muted-foreground max-w-md font-light">
-        Purl needs a network connection to save links, sync your stash, and use
-        AI chat. Reconnect and try again.
+        Purl needs a network connection to save links and sync your stash.
+        Reconnect and try again.
       </Typography>
       <Button asChild>
         <Link href="/">Back to home</Link>

@@ -1,7 +1,5 @@
 "use client";
 
-import { useChatContextSafe } from "@/hooks/use-chat-context";
-import { usePreferences } from "@/hooks/use-preferences";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { Link as LinkType } from "@/utils/links";
 import {
@@ -9,7 +7,6 @@ import {
   ExternalLink,
   Link,
   Pencil,
-  ScrollText,
   Trash,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -37,8 +34,6 @@ export function LinkMenu({
   onDeleteError,
 }: LinkMenuProps) {
   const router = useRouter();
-  const chatCtx = useChatContextSafe();
-  const { preferences } = usePreferences();
 
   async function handleOpenInNewTab() {
     window.open(link.url, "_blank");
@@ -90,20 +85,6 @@ export function LinkMenu({
       className="w-full"
     >
       <DropdownMenuGroup>
-        <DropdownMenuItem
-          onSelect={() => {
-            if (preferences.showChatWidget === false) {
-              chatCtx?.startNewChat();
-              chatCtx?.triggerSummarize(link);
-              router.push("/chat");
-              return;
-            }
-            chatCtx?.triggerSummarize(link);
-          }}
-        >
-          <ScrollText /> Summarize with AI
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={() => {
             void handleOpenInNewTab();

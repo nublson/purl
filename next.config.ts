@@ -41,11 +41,19 @@ const BASE_SECURITY_HEADERS: { key: string; value: string }[] = [
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(self), geolocation=(), interest-cohort=()",
+    value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
   },
 ];
 
 const nextConfig: NextConfig = {
+  async redirects() {
+    // The in-app AI chat was removed; keep old bookmarks and PWA shortcuts working.
+    return [
+      { source: "/ai", destination: "/home", permanent: true },
+      { source: "/chat", destination: "/home", permanent: true },
+      { source: "/chat/:path*", destination: "/home", permanent: true },
+    ];
+  },
   async headers() {
     if (process.env.NODE_ENV !== "production") {
       return [{ source: "/:path*", headers: [...BASE_SECURITY_HEADERS] }];

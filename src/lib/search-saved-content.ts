@@ -22,7 +22,7 @@ export type SearchSavedContentResult = {
 
 /**
  * Semantic search over a user's saved content, returning chunk text grouped by
- * link title. Shared by the AI chat `searchContent` tool and the MCP server.
+ * link title. Used by the MCP server's `search_content` tool.
  *
  * Gated on `aiFullAccess` — callers without it receive an empty array (Free
  * accounts skip extraction, so there is nothing to search).

@@ -1,4 +1,3 @@
-import { HomeChatWidget } from "@/components/chat/home-chat-widget";
 import { HomeSkeleton } from "@/components/skeletons/home";
 import { Suspense } from "react";
 import { HomeShellLoader } from "./home-shell-loader";
@@ -8,7 +7,6 @@ export default function Home() {
     <div className="wrapper-private flex flex-1 flex-col gap-8 pt-24 pb-20">
       <Suspense fallback={<HomeSkeleton />}>
         <HomeShellLoader />
-        <HomeChatWidget />
       </Suspense>
     </div>
   );

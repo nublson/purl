@@ -5,7 +5,6 @@ import * as React from "react";
 import { DialogWrapper } from "./dialog-wrapper";
 import { SettingsAccount } from "./settings-account";
 import { SettingsIntegrations } from "./settings-integrations";
-import { SettingsPreferences } from "./settings-preferences";
 import { SettingsTabs } from "./settings-tabs";
 import { SettingsUsage } from "./settings-usage";
 import { Badge } from "./ui/badge";
@@ -50,11 +49,6 @@ function SettingsContent({ closeDialog }: { closeDialog: () => void }) {
             </Badge>
           ) : undefined,
           content: <SettingsUsage data={usageSummary} />,
-        },
-        {
-          label: "Preferences",
-          value: "preferences",
-          content: <SettingsPreferences />,
         },
         {
           label: "Integrations",
