@@ -46,7 +46,7 @@ export const UpgradeDialog = ({ children }: UpgradeDialogProps) => {
   return (
     <DialogWrapper
       title="Upgrade to Pro"
-      description="Save links for free. Pay once to unlock the full AI knowledge base."
+      description="Save links for free. Pay once for unlimited saves and file uploads."
       content={content}
       className="dialog-top"
     >

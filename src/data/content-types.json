@@ -8,21 +8,21 @@
     },
     {
       "type": "PDFs",
-      "description": "Upload or link, fully parsed",
+      "description": "Link any PDF, or upload on Pro",
       "icon": "FileText",
-      "access": "Pro"
+      "access": "Free"
     },
     {
       "type": "YouTube",
-      "description": "Full transcripts extracted",
+      "description": "Any video, with title and thumbnail",
       "icon": "TvMinimalPlay",
-      "access": "Pro"
+      "access": "Free"
     },
     {
       "type": "Audio",
-      "description": "Transcribed via Whisper",
+      "description": "Link audio, or upload on Pro",
       "icon": "Headphones",
-      "access": "Pro"
+      "access": "Free"
     }
   ]
 }

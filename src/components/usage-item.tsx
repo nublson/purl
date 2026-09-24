@@ -6,7 +6,6 @@ import { Item, ItemActions, ItemContent, ItemTitle } from "./ui/item";
 export type UsageMeterData = {
   effectivePlanKey: string;
   saves: { used: number; cap: number | null };
-  extractions: { used: number; cap: number | null };
 };
 
 export type UsageItemProps = {

@@ -17,11 +17,6 @@ vi.mock("@/lib/links", () => ({
   readLinkForUser: mockReadLinkForUser,
 }));
 
-const mockSearchSavedContent = vi.fn();
-vi.mock("@/lib/search-saved-content", () => ({
-  searchSavedContent: mockSearchSavedContent,
-}));
-
 const mockBroadcast = vi.fn();
 vi.mock("@/lib/realtime-broadcast", () => ({
   broadcastLinksChanged: mockBroadcast,
@@ -47,7 +42,6 @@ const {
   verifyToken,
   getUserId,
   registerPurlTools,
-  searchContentTool,
   saveLinkTool,
   listSavedItemsTool,
   getLinkTool,
@@ -63,7 +57,7 @@ const reqWithBearer = (token?: string) =>
   });
 
 describe("registerPurlTools", () => {
-  it("registers all four MCP tools on the server", () => {
+  it("registers the three MCP tools on the server", () => {
     const registered: string[] = [];
     const mockServer = {
       tool: vi.fn((name: string) => {
@@ -72,7 +66,6 @@ describe("registerPurlTools", () => {
     };
     registerPurlTools(mockServer as never);
     expect(registered).toEqual([
-      "search_content",
       "save_link",
       "list_saved_items",
       "get_link",
@@ -97,7 +90,7 @@ describe("registerPurlTools", () => {
     };
     registerPurlTools(mockServer as never);
 
-    await expect(handlers[0]({ query: "react" }, {})).rejects.toThrow(
+    await expect(handlers[0]({ url: "https://example.com" }, {})).rejects.toThrow(
       "Unauthorized",
     );
   });
@@ -276,21 +269,6 @@ describe("getUserId", () => {
         },
       }),
     ).toBe("user-9");
-  });
-});
-
-describe("searchContentTool", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("calls searchSavedContent with the feature:mcp tag and returns JSON", async () => {
-    mockSearchSavedContent.mockResolvedValue([{ title: "Doc" }]);
-    const result = await searchContentTool("user-1", { query: "react" });
-    expect(mockSearchSavedContent).toHaveBeenCalledWith(
-      "user-1",
-      { query: "react" },
-      { tags: ["feature:mcp"] },
-    );
-    expect(parse(result)).toEqual([{ title: "Doc" }]);
   });
 });
 

@@ -3,14 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AUDIO_MAX_UPLOAD_BYTES } from "@/utils/upload-limits";
 import { POST } from "./route";
 
-vi.mock("next/server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("next/server")>();
-  return {
-    ...actual,
-    after: vi.fn(),
-  };
-});
-
 vi.mock("@/lib/auth", () => ({
   auth: {
     api: {
@@ -45,14 +37,6 @@ vi.mock("@/lib/upload-file", () => {
   };
 });
 
-vi.mock("@/lib/ingest-pdf", () => ({
-  ingestPdf: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("@/lib/ingest-audio", () => ({
-  ingestAudio: vi.fn().mockResolvedValue(undefined),
-}));
-
 const { auth } = await import("@/lib/auth");
 const { broadcastLinksChanged } = await import("@/lib/realtime-broadcast");
 const {
@@ -72,7 +56,6 @@ const MOCK_LINK = {
   thumbnail: null,
   domain: ".pdf",
   contentType: "PDF" as const,
-  ingestStatus: "PENDING" as const,
   createdAt: CREATED_AT,
   userId: "user-123",
 };
@@ -200,7 +183,6 @@ describe("POST /api/upload", () => {
       thumbnail: null,
       domain: ".pdf",
       contentType: "PDF",
-      ingestStatus: "PENDING",
       createdAt: CREATED_AT.toISOString(),
     });
     expect(broadcastLinksChanged).toHaveBeenCalledWith("user-123");

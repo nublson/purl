@@ -1,7 +1,5 @@
 import { auth } from "@/lib/auth";
 import { BillingLimitError, assertCanUploadFiles } from "@/lib/entitlements";
-import { ingestAudio } from "@/lib/ingest-audio";
-import { ingestPdf } from "@/lib/ingest-pdf";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { serializeLink } from "@/lib/serialize-link";
 import {
@@ -14,7 +12,7 @@ import {
   audioMaxSizeExceededMessage,
 } from "@/utils/upload-limits";
 import { headers } from "next/headers";
-import { after, NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   const session = await auth.api.getSession({
@@ -61,12 +59,6 @@ export async function POST(request: NextRequest) {
       userId,
       Number.isFinite(audioDurationSeconds) ? audioDurationSeconds : undefined,
     );
-    if (link.contentType === "PDF") {
-      after(() => ingestPdf({ linkId: link.id, url: link.url, userId }));
-    }
-    if (link.contentType === "AUDIO") {
-      after(() => ingestAudio({ linkId: link.id, url: link.url, userId }));
-    }
     await broadcastLinksChanged(userId);
     return NextResponse.json(serializeLink(link), { status: 201 });
   } catch (error) {

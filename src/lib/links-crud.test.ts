@@ -3,32 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const realSafeFetch = safeOutbound.safeFetch;
 
-vi.mock("next/server", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("next/server")>();
-  return {
-    ...actual,
-    after: vi.fn(async (cb: () => void | Promise<void>) => {
-      await cb();
-    }),
-  };
-});
-
-vi.mock("@/lib/ingest-pdf", () => ({
-  ingestPdf: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("@/lib/ingest-audio", () => ({
-  ingestAudio: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("@/lib/ingest-web", () => ({
-  ingestWeb: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("@/lib/ingest-youtube", () => ({
-  ingestYoutube: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock("next/headers", () => ({
   headers: vi.fn().mockResolvedValue(new Headers()),
 }));
@@ -51,13 +25,8 @@ vi.mock("@/lib/prisma", () => ({
       delete: vi.fn(),
       count: vi.fn(),
     },
-    linkContent: { findMany: vi.fn() },
     subscription: {
       findUnique: vi.fn(),
-      create: vi.fn(),
-    },
-    usageEvent: {
-      count: vi.fn(),
       create: vi.fn(),
     },
   },
@@ -70,14 +39,9 @@ vi.mock("open-graph-scraper", () => ({
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
 const ogs = (await import("open-graph-scraper")).default;
-const { ingestPdf } = await import("@/lib/ingest-pdf");
-const { ingestAudio } = await import("@/lib/ingest-audio");
-const { ingestWeb } = await import("@/lib/ingest-web");
-const { ingestYoutube } = await import("@/lib/ingest-youtube");
 const {
   createLink,
   refreshLink,
-  reingestLink,
   readLink,
   updateLink,
   deleteLink,
@@ -107,7 +71,6 @@ const MOCK_PRO_SUBSCRIPTION = {
 
 function mockProBillingForLinksTests() {
   vi.mocked(prisma.link.count).mockResolvedValue(0);
-  vi.mocked(prisma.usageEvent.count).mockResolvedValue(0);
   vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
     MOCK_PRO_SUBSCRIPTION as never,
   );
@@ -125,7 +88,6 @@ function makeRow(
     contentType: "WEB" | "YOUTUBE" | "PDF" | "AUDIO";
     createdAt: Date;
     userId: string;
-    ingestStatus: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "SKIPPED";
   }> = {},
 ) {
   return {
@@ -137,7 +99,6 @@ function makeRow(
     description: overrides.description ?? null,
     thumbnail: overrides.thumbnail ?? null,
     contentType: overrides.contentType ?? "WEB",
-    ingestStatus: overrides.ingestStatus ?? "COMPLETED",
     createdAt: overrides.createdAt ?? CREATED_AT,
     userId: overrides.userId ?? "user-123",
   };
@@ -570,10 +531,6 @@ describe("createLink", () => {
     vi.mocked(prisma.link.findFirst).mockReset();
     vi.mocked(prisma.link.update).mockReset();
     vi.mocked(ogs).mockReset();
-    vi.mocked(ingestPdf).mockReset();
-    vi.mocked(ingestAudio).mockReset();
-    vi.mocked(ingestWeb).mockReset();
-    vi.mocked(ingestYoutube).mockReset();
     fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response(null, { status: 200 }));
@@ -619,7 +576,6 @@ describe("createLink", () => {
       thumbnail: "https://img.youtube.com/vi/abc/hqdefault.jpg",
       contentType: "YOUTUBE",
       createdAt: new Date(),
-      ingestStatus: "PENDING",
     });
     vi.mocked(prisma.link.update).mockResolvedValue(refreshed as never);
     fetchSpy.mockResolvedValue(
@@ -646,8 +602,7 @@ describe("createLink", () => {
         domain: "youtu.be",
         contentType: "YOUTUBE",
         createdAt: expect.any(Date),
-        ingestStatus: "PENDING",
-      },
+        },
     });
     expect(result).toEqual(refreshed);
   });
@@ -742,135 +697,6 @@ describe("createLink", () => {
     });
   });
 
-  it("triggers ingestWeb after creating a WEB link", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
-    const row = makeRow({ contentType: "WEB" });
-    vi.mocked(prisma.link.create).mockResolvedValue(row as never);
-    vi.mocked(ingestWeb).mockResolvedValue(undefined);
-
-    await createLink("https://example.com/article");
-
-    expect(vi.mocked(ingestWeb)).toHaveBeenCalledWith({
-      linkId: row.id,
-      url: row.url,
-      userId: "user-123",
-    });
-    expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
-    expect(vi.mocked(ingestAudio)).not.toHaveBeenCalled();
-  });
-
-  it("triggers ingestAudio after creating an AUDIO link", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
-    const row = makeRow({
-      url: "https://example.com/episode.mp3",
-      contentType: "AUDIO",
-    });
-    vi.mocked(prisma.link.create).mockResolvedValue(row as never);
-    vi.mocked(ingestAudio).mockResolvedValue(undefined);
-
-    await createLink("https://example.com/episode.mp3");
-
-    expect(vi.mocked(ingestAudio)).toHaveBeenCalledWith({
-      linkId: row.id,
-      url: row.url,
-      userId: "user-123",
-    });
-    expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
-    expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
-  });
-
-  it("triggers ingestPdf after creating a PDF link", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
-    const row = makeRow({
-      url: "https://example.com/report.pdf",
-      contentType: "PDF",
-    });
-    vi.mocked(prisma.link.create).mockResolvedValue(row as never);
-    vi.mocked(ingestPdf).mockResolvedValue(undefined);
-
-    await createLink("https://example.com/report.pdf");
-
-    expect(vi.mocked(ingestPdf)).toHaveBeenCalledWith({
-      linkId: row.id,
-      url: row.url,
-      userId: "user-123",
-    });
-    expect(vi.mocked(ingestAudio)).not.toHaveBeenCalled();
-    expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
-  });
-
-  it("triggers ingestYoutube after creating a YOUTUBE link", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
-    const row = makeRow({
-      url: "https://youtu.be/dQw4w9WgXcQ",
-      contentType: "YOUTUBE",
-    });
-    vi.mocked(prisma.link.create).mockResolvedValue(row as never);
-    fetchSpy.mockResolvedValue(
-      new Response(
-        JSON.stringify({ title: "Rick Roll", author_name: "Rick Astley" }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
-    );
-
-    await createLink("https://youtu.be/dQw4w9WgXcQ");
-
-    expect(vi.mocked(ingestYoutube)).toHaveBeenCalledWith({
-      linkId: row.id,
-      url: row.url,
-      userId: "user-123",
-    });
-    expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
-    expect(vi.mocked(ingestAudio)).not.toHaveBeenCalled();
-    expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
-  });
-
-  it("re-triggers ingestWeb when a duplicate WEB link is bumped", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-    const existing = makeRow({ contentType: "WEB" });
-    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
-    const bumped = makeRow({ contentType: "WEB", createdAt: new Date() });
-    vi.mocked(prisma.link.update).mockResolvedValue(bumped as never);
-    vi.mocked(ingestWeb).mockResolvedValue(undefined);
-
-    await createLink("https://example.com");
-
-    expect(vi.mocked(ingestWeb)).toHaveBeenCalledWith({
-      linkId: bumped.id,
-      url: bumped.url,
-      userId: "user-123",
-    });
-    expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
-  });
-
-  it("re-triggers ingestAudio when a duplicate AUDIO link is bumped", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-    const existing = makeRow({
-      url: "https://example.com/ep.mp3",
-      contentType: "AUDIO",
-    });
-    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
-    const bumped = makeRow({
-      url: "https://example.com/ep.mp3",
-      contentType: "AUDIO",
-      createdAt: new Date(),
-    });
-    vi.mocked(prisma.link.update).mockResolvedValue(bumped as never);
-    vi.mocked(ingestAudio).mockResolvedValue(undefined);
-
-    await createLink("https://example.com/ep.mp3");
-
-    expect(vi.mocked(ingestAudio)).toHaveBeenCalledWith({
-      linkId: bumped.id,
-      url: bumped.url,
-      userId: "user-123",
-    });
-    expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
-  });
 });
 
 // ─── refreshLink ─────────────────────────────────────────────────────────────
@@ -882,10 +708,6 @@ describe("refreshLink", () => {
     vi.mocked(auth.api.getSession).mockReset();
     vi.mocked(prisma.link.findFirst).mockReset();
     vi.mocked(prisma.link.update).mockReset();
-    vi.mocked(ingestPdf).mockReset();
-    vi.mocked(ingestAudio).mockReset();
-    vi.mocked(ingestWeb).mockReset();
-    vi.mocked(ingestYoutube).mockReset();
     vi.mocked(ogs).mockReset();
     fetchSpy = vi
       .spyOn(globalThis, "fetch")
@@ -913,7 +735,7 @@ describe("refreshLink", () => {
     expect(vi.mocked(prisma.link.update)).not.toHaveBeenCalled();
   });
 
-  it("overwrites all scraped fields, bumps createdAt, and dispatches ingest", async () => {
+  it("overwrites all scraped fields and bumps createdAt", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     const existing = makeRow({
       url: "https://youtu.be/dQw4w9WgXcQ",
@@ -930,7 +752,6 @@ describe("refreshLink", () => {
       thumbnail: "https://img.youtube.com/vi/abc/hqdefault.jpg",
       contentType: "YOUTUBE",
       createdAt: new Date(),
-      ingestStatus: "PENDING",
     });
     vi.mocked(prisma.link.update).mockResolvedValue(refreshed as never);
     fetchSpy.mockResolvedValue(
@@ -956,74 +777,9 @@ describe("refreshLink", () => {
         domain: "youtu.be",
         contentType: "YOUTUBE",
         createdAt: expect.any(Date),
-        ingestStatus: "PENDING",
-      },
-    });
-    expect(vi.mocked(ingestYoutube)).toHaveBeenCalledWith({
-      linkId: refreshed.id,
-      url: refreshed.url,
-      userId: "user-123",
+        },
     });
     expect(result).toEqual(refreshed);
-  });
-});
-
-// ─── reingestLink ────────────────────────────────────────────────────────────
-
-describe("reingestLink", () => {
-  beforeEach(() => {
-    vi.mocked(auth.api.getSession).mockReset();
-    vi.mocked(prisma.link.findFirst).mockReset();
-    vi.mocked(prisma.link.update).mockReset();
-    vi.mocked(ingestPdf).mockReset();
-    vi.mocked(ingestAudio).mockReset();
-    vi.mocked(ingestWeb).mockReset();
-    vi.mocked(ingestYoutube).mockReset();
-    vi.mocked(ogs).mockReset();
-    mockProBillingForLinksTests();
-  });
-
-  it("throws UnauthorizedError when there is no session", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(null);
-    await expect(reingestLink("link-1")).rejects.toThrow(UnauthorizedError);
-  });
-
-  it("returns null when the link does not exist or is not owned by the user", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
-
-    const result = await reingestLink("link-1");
-
-    expect(result).toBeNull();
-    expect(vi.mocked(prisma.link.update)).not.toHaveBeenCalled();
-  });
-
-  it("only sets ingestStatus to PENDING and dispatches ingest without re-scraping metadata", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-    const existing = makeRow({
-      url: "https://storage.example/bucket/177836f2-a9b8-4c1d-9e0f-abc123/resume.pdf",
-      title: "resume",
-      description: "My CV",
-      contentType: "PDF",
-      ingestStatus: "FAILED",
-    });
-    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
-    const updated = { ...existing, ingestStatus: "PENDING" as const };
-    vi.mocked(prisma.link.update).mockResolvedValue(updated as never);
-
-    const result = await reingestLink("link-1");
-
-    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
-      where: { id: "link-1" },
-      data: { ingestStatus: "PENDING" },
-    });
-    expect(vi.mocked(ogs)).not.toHaveBeenCalled();
-    expect(vi.mocked(ingestPdf)).toHaveBeenCalledWith({
-      linkId: updated.id,
-      url: updated.url,
-      userId: "user-123",
-    });
-    expect(result).toEqual(updated);
   });
 });
 
@@ -1081,7 +837,6 @@ describe("readLink", () => {
       description: "A very important story",
       thumbnail: "https://example.com/thumb.jpg",
       contentType: "WEB",
-      ingestStatus: "COMPLETED",
     });
     // userId must not be leaked in the mapped Link shape
     expect(result).not.toHaveProperty("userId");
@@ -1097,10 +852,6 @@ describe("updateLink", () => {
     vi.mocked(auth.api.getSession).mockReset();
     vi.mocked(prisma.link.findFirst).mockReset();
     vi.mocked(prisma.link.update).mockReset();
-    vi.mocked(ingestPdf).mockReset();
-    vi.mocked(ingestAudio).mockReset();
-    vi.mocked(ingestWeb).mockReset();
-    vi.mocked(ingestYoutube).mockReset();
     vi.mocked(ogs).mockReset();
     fetchSpy = vi
       .spyOn(globalThis, "fetch")
@@ -1189,52 +940,6 @@ describe("updateLink", () => {
         }),
       }),
     );
-  });
-
-  it("dispatches ingest for the new contentType when URL changes", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-    const existing = makeRow({
-      url: "https://example.com/article",
-      contentType: "WEB",
-    });
-    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
-    const updated = makeRow({
-      url: "https://example.com/episode.mp3",
-      contentType: "AUDIO",
-    });
-    vi.mocked(prisma.link.update).mockResolvedValue(updated as never);
-    vi.mocked(ingestAudio).mockResolvedValue(undefined);
-
-    await updateLink("link-1", { url: "https://example.com/episode.mp3" });
-
-    expect(vi.mocked(ingestAudio)).toHaveBeenCalledWith({
-      linkId: updated.id,
-      url: updated.url,
-      userId: "user-123",
-    });
-    expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
-    expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
-    expect(vi.mocked(ingestYoutube)).not.toHaveBeenCalled();
-  });
-
-  it("does not dispatch ingest when only title changes", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-    const row = makeRow({
-      url: "https://example.com/article",
-      contentType: "WEB",
-    });
-    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
-    vi.mocked(prisma.link.update).mockResolvedValue({
-      ...row,
-      title: "Updated title",
-    } as never);
-
-    await updateLink("link-1", { title: "Updated title" });
-
-    expect(vi.mocked(ingestPdf)).not.toHaveBeenCalled();
-    expect(vi.mocked(ingestAudio)).not.toHaveBeenCalled();
-    expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
-    expect(vi.mocked(ingestYoutube)).not.toHaveBeenCalled();
   });
 
   it("returns existing link without calling prisma.update when URL is unchanged and no other fields are provided", async () => {

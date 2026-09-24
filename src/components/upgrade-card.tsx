@@ -32,8 +32,7 @@ export function UpgradeCard() {
           <Badge variant="secondary">{price} one-time</Badge>
         </div>
         <Typography size="small" className="text-muted-foreground">
-          Unlock AI extraction, semantic search, file uploads, and unlimited
-          saves.
+          Unlock unlimited saves and PDF & audio uploads.
         </Typography>
         <div className="flex items-center gap-2">
           <Button

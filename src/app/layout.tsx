@@ -21,7 +21,7 @@ const instrumentSerif = Instrument_Serif({
 });
 
 const description =
-  "Purl is an AI-powered read-it-later app. Save any link, PDF, video, or audio file and keep it all in one place.";
+  "Purl is a read-it-later app. Save any link, PDF, video, or audio file and keep it all in one place.";
 
 export const metadata: Metadata = {
   applicationName: "Purl",

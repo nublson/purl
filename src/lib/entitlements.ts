@@ -8,7 +8,6 @@ import {
 } from "@/lib/plans";
 import prisma from "@/lib/prisma";
 import { resolveEffectiveBillingState } from "@/lib/subscription-utils";
-import { countUsage } from "@/lib/usage";
 import { cache } from "react";
 
 export class BillingLimitError extends Error {
@@ -48,24 +47,6 @@ export async function assertCanSaveLink(userId: string): Promise<void> {
       `You've reached the ${max} link limit on the free plan.`,
     );
   }
-}
-
-export async function shouldRunIngest(
-  userId: string,
-): Promise<{ run: boolean; skipReason?: string }> {
-  const { entitlements } = await getEntitlementContext(userId);
-  if (!entitlements.aiFullAccess) {
-    return { run: false, skipReason: "free_metadata_only" };
-  }
-  const cap = entitlements.maxExtractionsPerPeriod;
-  if (cap == null) return { run: true };
-  const used = await countUsage(userId, "EXTRACT", {
-    since: new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1)),
-  });
-  if (used >= cap) {
-    return { run: false, skipReason: "extraction_cap" };
-  }
-  return { run: true };
 }
 
 export async function assertCanUploadFiles(userId: string): Promise<void> {

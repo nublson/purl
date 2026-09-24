@@ -4,7 +4,6 @@ import {
   entitlementsForPlanKey,
   FREE_LIFETIME_SAVE_CAP,
   getStripeOneTimePriceId,
-  PRO_EXTRACTIONS_PER_MONTH,
   PRO_ONETIME_PRICE_CENTS,
   publicPlans,
   stripePriceIdToPlanKey,
@@ -52,22 +51,16 @@ describe("getStripeOneTimePriceId", () => {
 });
 
 describe("entitlementsForPlanKey", () => {
-  it("FREE tier caps saves and blocks AI", () => {
+  it("FREE tier caps saves and blocks uploads", () => {
     const e = entitlementsForPlanKey("FREE");
-    expect(e.aiFullAccess).toBe(false);
     expect(e.maxLifetimeSaves).toBe(FREE_LIFETIME_SAVE_CAP);
-    expect(e.maxExtractionsPerPeriod).toBe(0);
-    expect(e.extractionPeriodUsesSubscriptionPeriod).toBe(false);
     expect(e.allowFileUploads).toBe(false);
   });
 
-  it("PRO and PRO_TRIAL share full AI entitlements with monthly caps", () => {
+  it("PRO and PRO_TRIAL get unlimited saves and uploads", () => {
     for (const key of ["PRO", "PRO_TRIAL"] as const) {
       const e = entitlementsForPlanKey(key);
-      expect(e.aiFullAccess).toBe(true);
       expect(e.maxLifetimeSaves).toBeNull();
-      expect(e.maxExtractionsPerPeriod).toBe(PRO_EXTRACTIONS_PER_MONTH);
-      expect(e.extractionPeriodUsesSubscriptionPeriod).toBe(false);
       expect(e.allowFileUploads).toBe(true);
     }
   });
@@ -88,12 +81,11 @@ describe("publicPlans catalog", () => {
     expect(saveLine).toContain(String(FREE_LIFETIME_SAVE_CAP));
   });
 
-  it("no plan advertises AI chat", () => {
+  it("no plan advertises removed AI features", () => {
     for (const plan of publicPlans) {
-      const chatLine = plan.features.find((f) =>
-        f.toLowerCase().includes("chat"),
-      );
-      expect(chatLine).toBeUndefined();
+      for (const feature of plan.features) {
+        expect(feature.toLowerCase()).not.toMatch(/chat|semantic|extraction|transcription|summar/);
+      }
     }
   });
 

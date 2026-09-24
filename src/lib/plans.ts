@@ -2,7 +2,6 @@ import type { PlanKey } from "@/generated/prisma/enums";
 
 export const FREE_LIFETIME_SAVE_CAP = 100;
 export const PRO_ONETIME_PRICE_CENTS = 3900;
-export const PRO_EXTRACTIONS_PER_MONTH = 150;
 
 /** Billing catalog: Stripe price ID → paid plan (always PRO on one-time purchase). */
 export function stripePriceIdToPlanKey(priceId: string): PlanKey | null {
@@ -50,17 +49,13 @@ export const publicPlans: PublicPlan[] = [
   {
     id: "PRO",
     name: "Pro",
-    description: "Turn your saved content into a searchable AI knowledge base.",
+    description: "Keep every pearl you find, without limits.",
     priceLabel: "$39",
     priceSubLabel: "one-time",
     oneTimeCents: PRO_ONETIME_PRICE_CENTS,
     features: [
       "Unlimited saved links",
-      "AI content extraction — Web, YouTube, PDF & Audio",
-      "AI-generated summaries",
-      "Semantic search",
       "PDF & audio file uploads",
-      "YouTube & audio transcriptions",
     ],
     actionText: "Try for free",
     popular: true,
@@ -68,11 +63,7 @@ export const publicPlans: PublicPlan[] = [
 ];
 
 export type EffectiveEntitlements = {
-  /** When true, user gets full AI ingest, semantic search, uploads. */
-  aiFullAccess: boolean;
   maxLifetimeSaves: number | null;
-  maxExtractionsPerPeriod: number | null;
-  extractionPeriodUsesSubscriptionPeriod: boolean;
   allowFileUploads: boolean;
 };
 
@@ -86,19 +77,13 @@ export function entitlementsForPlanKey(
   switch (planKey) {
     case "FREE":
       return {
-        aiFullAccess: false,
         maxLifetimeSaves: FREE_LIFETIME_SAVE_CAP,
-        maxExtractionsPerPeriod: 0,
-        extractionPeriodUsesSubscriptionPeriod: false,
         allowFileUploads: false,
       };
     case "PRO_TRIAL":
     case "PRO":
       return {
-        aiFullAccess: true,
         maxLifetimeSaves: null,
-        maxExtractionsPerPeriod: PRO_EXTRACTIONS_PER_MONTH,
-        extractionPeriodUsesSubscriptionPeriod: false,
         allowFileUploads: true,
       };
     default: {
@@ -110,7 +95,6 @@ export function entitlementsForPlanKey(
 
 export const LIMIT_FEATURE_CODES = {
   SAVE_LIMIT: "SAVE_LIMIT",
-  EXTRACT_LIMIT: "EXTRACT_LIMIT",
   UPLOAD_NOT_ALLOWED: "UPLOAD_NOT_ALLOWED",
 } as const;
 

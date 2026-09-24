@@ -1,8 +1,4 @@
-import type {
-  ContentType,
-  IngestFailureReason,
-  IngestStatus,
-} from "@/generated/prisma/enums";
+import type { ContentType } from "@/generated/prisma/enums";
 import { getRelativeDateLabel } from "./formatter";
 
 export type Link = {
@@ -14,8 +10,6 @@ export type Link = {
   url: string;
   domain: string;
   contentType: ContentType;
-  ingestStatus: IngestStatus;
-  ingestFailureReason: IngestFailureReason | null;
   createdAt: Date;
 };
 

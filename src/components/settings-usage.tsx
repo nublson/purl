@@ -25,12 +25,6 @@ export function SettingsUsage({ data }: { data: UsageMeterData | null }) {
         </Fragment>
       )}
       <UsageItem label="Links" used={data.saves.used} cap={data.saves.cap} />
-      <UsageItem
-        label="Extractions"
-        period="month"
-        used={data.extractions.used}
-        cap={data.extractions.cap}
-      />
     </div>
   );
 }

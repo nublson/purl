@@ -12,11 +12,11 @@ export const PricingSection = () => {
             title: (
               <>
                 Start free. <br />
-                Upgrade when you want AI memory.
+                Upgrade when you want more room.
               </>
             ),
             description:
-              "Save links for free. Pay once to unlock AI extraction, semantic search, and file uploads — no subscription, no recurring fees.",
+              "Save links for free. Pay once for unlimited saves and PDF & audio uploads — no subscription, no recurring fees.",
           }}
         />
         <PricingPlans />

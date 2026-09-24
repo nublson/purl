@@ -39,9 +39,6 @@ vi.mock("@/lib/prisma", () => ({
       findUnique: vi.fn(),
       create: vi.fn(),
     },
-    usageEvent: {
-      count: vi.fn(),
-    },
   },
 }));
 
@@ -67,7 +64,7 @@ let safeFetchSpy: ReturnType<typeof vi.spyOn>;
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 const CREATED_AT = new Date("2025-06-15T10:00:00Z");
 
-/** Pro subscription so save + ingest paths pass entitlement checks in API tests. */
+/** Pro subscription so save paths pass entitlement checks in API tests. */
 const MOCK_PRO_SUBSCRIPTION = {
   id: "sub-1",
   userId: "user-123",
@@ -93,7 +90,6 @@ const MOCK_LINK = {
   thumbnail: null as string | null,
   domain: "example.com",
   contentType: "WEB" as const,
-  ingestStatus: "PENDING" as const,
   createdAt: CREATED_AT,
   userId: "user-123",
 };
@@ -160,7 +156,6 @@ describe("POST /api/links", () => {
     vi.mocked(prisma.link.create).mockReset();
     vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.link.count).mockResolvedValue(0);
-    vi.mocked(prisma.usageEvent.count).mockResolvedValue(0);
     vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
       MOCK_PRO_SUBSCRIPTION as never,
     );
@@ -289,7 +284,6 @@ describe("POST /api/links", () => {
         thumbnail: null,
         domain: "example.com",
         contentType: "WEB",
-        ingestStatus: "PENDING",
         createdAt: CREATED_AT.toISOString(),
       });
     });
@@ -358,7 +352,6 @@ describe("POST /api/links", () => {
             title: "Example Domain",
             contentType: "WEB",
             createdAt: expect.any(Date),
-            ingestStatus: "PENDING",
           }),
         }),
       );
