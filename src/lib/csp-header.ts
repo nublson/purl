@@ -1,7 +1,7 @@
 /**
  * Production Content-Security-Policy for document responses.
  * Tuned for Next.js App Router, Vercel Analytics/Speed Insights (dev script host),
- * Supabase browser client + Realtime, Sentry, and untrusted `<img>` (https/http).
+ * Supabase browser client + Realtime, and untrusted `<img>` (https/http).
  *
  * `connect-src` must allow the same remote https/http hosts as images where a service
  * worker handles fetches: SW `fetch()` is checked against `connect-src`, not `img-src`,
@@ -25,7 +25,6 @@ export function buildContentSecurityPolicy(): string {
       "https://*.supabase.co",
       "wss://*.supabase.co",
       "https://vitals.vercel-insights.com",
-      "https://*.sentry.io",
       "https:",
       "http:",
     ].join(" "),

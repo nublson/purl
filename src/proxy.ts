@@ -127,10 +127,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  // Skips static files and routes that never need a session: `monitoring` is
-  // the Sentry tunnel (next.config.ts), `_vercel` is Analytics/Speed Insights,
-  // plus the service worker, manifest, robots/sitemap, and asset extensions.
+  // Skips static files and routes that never need a session: `_vercel` is
+  // Analytics/Speed Insights, plus the service worker, manifest,
+  // robots/sitemap, and asset extensions.
   matcher: [
-    "/((?!_next/static|_next/image|_vercel|monitoring|favicon.ico|sw.js|manifest.json|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|js|mjs|css|map|txt|xml|json|webmanifest|woff|woff2)$).*)",
+    "/((?!_next/static|_next/image|_vercel|favicon.ico|sw.js|manifest.json|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|js|mjs|css|map|txt|xml|json|webmanifest|woff|woff2)$).*)",
   ],
 };

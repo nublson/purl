@@ -26,7 +26,6 @@
     "@modelcontextprotocol/sdk": "1.26.0",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
-    "@sentry/nextjs": "^10.47.0",
     "@serwist/next": "^9.5.7",
     "@supabase/realtime-js": "2.99.3",
     "@supabase/supabase-js": "^2.99.3",
@@ -85,7 +84,6 @@
     },
     "onlyBuiltDependencies": [
       "@prisma/engines",
-      "@sentry/cli",
       "cypress",
       "esbuild",
       "msw",
