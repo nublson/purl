@@ -60,6 +60,9 @@ vi.mock("@/lib/prisma", () => ({
       count: vi.fn(),
       create: vi.fn(),
     },
+    user: {
+      findUnique: vi.fn(),
+    },
   },
 }));
 
@@ -82,6 +85,7 @@ const {
   updateLink,
   deleteLink,
   scrapeLinkMetadata,
+  createLinkForUser,
   UnauthorizedError,
 } = await import("./links");
 
@@ -111,6 +115,21 @@ function mockProBillingForLinksTests() {
   vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
     MOCK_PRO_SUBSCRIPTION as never,
   );
+}
+
+const MOCK_FREE_SUBSCRIPTION = {
+  ...MOCK_PRO_SUBSCRIPTION,
+  planKey: "FREE" as const,
+};
+
+function mockFreeBillingForLinksTests() {
+  vi.mocked(prisma.link.count).mockResolvedValue(0);
+  vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
+    MOCK_FREE_SUBSCRIPTION as never,
+  );
+  vi.mocked(prisma.user.findUnique).mockResolvedValue({
+    anthropicApiKeyEncrypted: null,
+  } as never);
 }
 
 function makeRow(
@@ -870,6 +889,49 @@ describe("createLink", () => {
       userId: "user-123",
     });
     expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
+  });
+
+  it("skips ingestion for free-plan users after save (metadata only)", async () => {
+    mockFreeBillingForLinksTests();
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+    const row = makeRow({ contentType: "WEB" });
+    vi.mocked(prisma.link.create).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue({
+      ...row,
+      ingestStatus: "SKIPPED",
+    } as never);
+
+    await createLinkForUser("user-123", "https://example.com/article");
+
+    expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: row.id },
+      data: { ingestStatus: "SKIPPED", ingestFailureReason: null },
+    });
+  });
+
+  it("marks ingestion EXTRACTION_LIMIT when Pro user is at the monthly cap", async () => {
+    mockProBillingForLinksTests();
+    vi.mocked(prisma.usageEvent.count).mockResolvedValue(150);
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+    const row = makeRow({ contentType: "WEB" });
+    vi.mocked(prisma.link.create).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue({
+      ...row,
+      ingestStatus: "SKIPPED",
+      ingestFailureReason: "EXTRACTION_LIMIT",
+    } as never);
+
+    await createLinkForUser("user-123", "https://example.com/article");
+
+    expect(vi.mocked(ingestWeb)).not.toHaveBeenCalled();
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: row.id },
+      data: {
+        ingestStatus: "SKIPPED",
+        ingestFailureReason: "EXTRACTION_LIMIT",
+      },
+    });
   });
 });
 
