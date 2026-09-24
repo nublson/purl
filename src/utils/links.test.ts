@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { groupLinksByDate, type Link } from "./links";
+import {
+  countGroupedLinks,
+  groupLinksByDate,
+  mergeLinkGroups,
+  parseJsonLinkGroups,
+  type Link,
+} from "./links";
 
 function link(createdAt: Date, title: string): Link {
   return {
@@ -85,5 +91,46 @@ describe("groupLinksByDate", () => {
         order.indexOf(labels[i - 1]),
       );
     }
+  });
+});
+
+describe("mergeLinkGroups", () => {
+  const d = new Date(2025, 5, 15);
+
+  it("merges same-label groups, keeps label order, and drops duplicate ids", () => {
+    const a = link(d, "a");
+    const b = link(d, "b");
+    const c = link(d, "c");
+    const merged = mergeLinkGroups(
+      [{ label: "Today", links: [a, b] }],
+      [
+        { label: "Today", links: [b, c] },
+        { label: "Older", links: [link(d, "z")] },
+      ],
+    );
+    expect(merged.map((g) => g.label)).toEqual(["Today", "Older"]);
+    expect(merged[0].links.map((l) => l.title)).toEqual(["a", "b", "c"]);
+    expect(countGroupedLinks(merged)).toBe(4);
+  });
+
+  it("orders merged groups by date label, not arrival order", () => {
+    const merged = mergeLinkGroups(
+      [{ label: "Last Week", links: [link(d, "x")] }],
+      [{ label: "This Week", links: [link(d, "y")] }],
+    );
+    expect(merged.map((g) => g.label)).toEqual(["This Week", "Last Week"]);
+  });
+});
+
+describe("parseJsonLinkGroups", () => {
+  it("restores createdAt as Date", () => {
+    const [group] = parseJsonLinkGroups([
+      {
+        label: "Today",
+        links: [{ ...link(new Date(0), "a"), createdAt: "2025-06-15T10:00:00.000Z" }],
+      },
+    ]);
+    expect(group.links[0].createdAt).toBeInstanceOf(Date);
+    expect(group.links[0].createdAt.toISOString()).toBe("2025-06-15T10:00:00.000Z");
   });
 });

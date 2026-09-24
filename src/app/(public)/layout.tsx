@@ -1,6 +1,6 @@
 import Footer from "@/components/footer";
 import Header from "@/components/header";
-import { PublicHeaderActions } from "@/components/public-header-actions-loader";
+import { PublicHeaderActions } from "@/components/public-header-actions";
 import { Fragment } from "react";
 
 // Keep this JSX in sync with the sibling layout at src/app/oauth/layout.tsx

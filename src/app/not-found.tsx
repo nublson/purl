@@ -1,7 +1,7 @@
 import Footer from "@/components/footer";
 import Header from "@/components/header";
 import { Logo } from "@/components/logo";
-import { PublicHeaderActions } from "@/components/public-header-actions-loader";
+import { PublicHeaderActions } from "@/components/public-header-actions";
 import { Typography } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";

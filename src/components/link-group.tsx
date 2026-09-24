@@ -1,6 +1,5 @@
 import { Link } from "@/utils/links";
-import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { LinkItem } from "./link-item";
 import { ItemGroup } from "./ui/item";
 
@@ -10,7 +9,7 @@ interface LinkGroupProps {
   newLinkId?: string | null;
   prependItems?: ReactNode;
   eagerFirstLinkFavicon?: boolean;
-  mode?: "default" | "preview" | "search";
+  mode?: "default" | "search";
 }
 
 export const LinkGroup = ({
@@ -20,43 +19,25 @@ export const LinkGroup = ({
   eagerFirstLinkFavicon = false,
   mode = "default",
 }: LinkGroupProps) => {
-  const prevIdsRef = useRef<string[]>([]);
-  const initializedRef = useRef(false);
-
-  useEffect(() => {
-    const currentIds = links.map((link) => link.id);
-
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      prevIdsRef.current = currentIds;
-      return;
-    }
-
-    prevIdsRef.current = currentIds;
-  }, [label, links]);
-
   return (
     <div className="w-full flex flex-col justify-start items-start gap-4">
       <p className="text-xs text-muted-foreground font-medium ml-2">{label}</p>
       <ItemGroup className="w-full gap-0">
         {prependItems}
-        <AnimatePresence>
-          {links.map((link, index) => (
-            <motion.div
-              key={link.id}
-              layout
-              transition={{ type: "spring", stiffness: 400, damping: 35 }}
-              initial={false}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <LinkItem
-                link={link}
-                mode={mode}
-                eagerFavicon={eagerFirstLinkFavicon && index === 0}
-              />
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        {links.map((link, index) => (
+          // content-visibility skips layout/paint for off-screen rows; the
+          // intrinsic size (one row) keeps the scrollbar stable.
+          <div
+            key={link.id}
+            className="[content-visibility:auto] [contain-intrinsic-size:auto_50px]"
+          >
+            <LinkItem
+              link={link}
+              mode={mode}
+              eagerFavicon={eagerFirstLinkFavicon && index === 0}
+            />
+          </div>
+        ))}
       </ItemGroup>
     </div>
   );

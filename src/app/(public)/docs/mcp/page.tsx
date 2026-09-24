@@ -254,7 +254,7 @@ export default function McpDocsPage() {
                 name: "cursor",
                 type: "string",
                 description:
-                  "Pagination cursor (ISO date) from a previous response.",
+                  "Pagination cursor from a previous response's nextCursor.",
               },
             ]}
           />

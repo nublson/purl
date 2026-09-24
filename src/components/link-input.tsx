@@ -6,10 +6,10 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { saveLink } from "@/lib/save-link";
 import { useForm } from "@tanstack/react-form";
 import { Plus } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 
 export function LinkInput({
@@ -21,7 +21,7 @@ export function LinkInput({
   onSaveSuccess?: (id: string) => void;
   onSaveError?: (detail: { limit?: boolean; message?: string } | null) => void;
 }) {
-  const router = useRouter();
+  const { notifyLinksChanged } = useLinksSyncActions();
   const form = useForm({
     defaultValues: {
       url: "",
@@ -43,7 +43,7 @@ export function LinkInput({
         onSaveSuccess?.(result.id);
       }
       if (!onSaveSuccess) {
-        router.refresh();
+        notifyLinksChanged();
       }
     },
   });

@@ -36,7 +36,7 @@ vi.mock("@/lib/realtime-broadcast", () => ({
 
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
-const { getLinksForCurrentUser, UnauthorizedError, listLinks } = await import("./links");
+const { getLinksPageForCurrentUser, UnauthorizedError, listLinks } = await import("./links");
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 
@@ -63,7 +63,7 @@ function makeRow(
   };
 }
 
-describe("getLinksForCurrentUser", () => {
+describe("getLinksPageForCurrentUser", () => {
   beforeEach(() => {
     vi.mocked(auth.api.getSession).mockReset();
     vi.mocked(prisma.link.findMany).mockReset();
@@ -73,20 +73,21 @@ describe("getLinksForCurrentUser", () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     vi.mocked(prisma.link.findMany).mockResolvedValue([]);
 
-    const result = await getLinksForCurrentUser();
+    const result = await getLinksPageForCurrentUser(50);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ links: [], nextCursor: null, total: undefined });
   });
 
   it("queries only the authenticated user's links ordered newest-first", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     vi.mocked(prisma.link.findMany).mockResolvedValue([]);
 
-    await getLinksForCurrentUser();
+    await getLinksPageForCurrentUser(50);
 
     expect(vi.mocked(prisma.link.findMany)).toHaveBeenCalledWith({
       where: { userId: "user-123" },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 51,
     });
   });
 
@@ -95,7 +96,7 @@ describe("getLinksForCurrentUser", () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     vi.mocked(prisma.link.findMany).mockResolvedValue([row] as never);
 
-    const result = await getLinksForCurrentUser();
+    const { links: result } = await getLinksPageForCurrentUser(50);
 
     expect(result).toHaveLength(1);
     const link = result[0];
@@ -118,7 +119,7 @@ describe("getLinksForCurrentUser", () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     vi.mocked(prisma.link.findMany).mockResolvedValue(rows as never);
 
-    const result = await getLinksForCurrentUser();
+    const { links: result } = await getLinksPageForCurrentUser(50);
 
     expect(result).toHaveLength(2);
     expect(result[0].id).toBe("link-2");
@@ -129,7 +130,7 @@ describe("getLinksForCurrentUser", () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
     vi.mocked(prisma.link.findMany).mockResolvedValue([]);
 
-    await expect(getLinksForCurrentUser()).rejects.toBeInstanceOf(
+    await expect(getLinksPageForCurrentUser(50)).rejects.toBeInstanceOf(
       UnauthorizedError,
     );
 
@@ -181,7 +182,9 @@ describe("listLinks", () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue(links as never);
     const result = await listLinks({ limit: 50, cursor: null, contentType: null });
     expect(result.links).toHaveLength(50);
-    expect(result.nextCursor).toBe(result.links[49].createdAt.toISOString());
+    expect(result.nextCursor).toBe(
+      `${result.links[49].createdAt.toISOString()}_link-49`,
+    );
   });
 
   it("passes contentType filter to query", async () => {
@@ -195,7 +198,30 @@ describe("listLinks", () => {
     );
   });
 
-  it("uses cursor as lt filter on createdAt", async () => {
+  it("continues after a (createdAt, id) cursor so links sharing a timestamp aren't skipped", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
+    const createdAt = new Date("2025-01-01T12:00:00.000Z");
+    await listLinks({
+      limit: 50,
+      cursor: `${createdAt.toISOString()}_link-7`,
+      contentType: null,
+    });
+    expect(vi.mocked(prisma.link.findMany)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: "user-123",
+          OR: [
+            { createdAt: { lt: createdAt } },
+            { createdAt, id: { lt: "link-7" } },
+          ],
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      }),
+    );
+  });
+
+  it("uses a legacy date-only cursor as lt filter on createdAt", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
     const cursor = "2025-01-01T12:00:00.000Z";

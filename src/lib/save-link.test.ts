@@ -1,3 +1,5 @@
+import { LINKS_CLIENT_ORIGIN } from "@/lib/links-origin";
+import { LINKS_ORIGIN_HEADER } from "@/lib/realtime-constants";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { saveLink } from "./save-link";
 
@@ -79,7 +81,10 @@ describe("saveLink", () => {
 
     expect(fetchSpy).toHaveBeenCalledWith("/api/links", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        [LINKS_ORIGIN_HEADER]: LINKS_CLIENT_ORIGIN,
+      },
       body: JSON.stringify({ url: "https://example.com" }),
     });
     expect(result).toEqual({ id: "link-1" });

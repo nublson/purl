@@ -68,6 +68,7 @@ OG/metadata scraping, content-type sniffing, the PDF proxy, and related paths us
 
 - When implementing an attached plan, treat the plan file as read-only, use the already-created todos instead of creating new ones, mark todos in progress as work advances, and continue until all todos are complete.
 - When the user asks for a branch or PR after implementation, follow the project Git workflow: short-lived feature/fix branches from `develop`, target PRs to `develop`, and avoid direct commits to `main` or `develop`; when Cursor diff-tab actions specify the configured `cursor/` prefix, use `cursor/<short-description>` instead.
+- Open a pull request only when the user explicitly asks for one, and only once all the work for it is done. PRs trigger a paid automated review (Greptile, 50 reviews/month, 1 per PR review), so never open PRs speculatively, split work across several PRs, or push follow-up commits to an open PR without asking. Otherwise, deliver work as isolated local commits on a feature branch.
 - Prefer React context (e.g., `UsageContext`) over custom-event or event-emitter patterns for cross-component reactive state; if an event-based approach is proposed and rejected, migrate to a context instead.
 - When a feature is complete, the user may ask for "isolated commits related to what we did" — group changes into small logical atomic commits per feature area rather than one large catch-all commit.
 - Use existing UI wrappers (`dialog-wrapper`, `dropdown-wrapper`, `alert-dialog-wrapper`) when adding modals, dropdowns, or confirm dialogs; match patterns used elsewhere instead of inlining raw Radix/shadcn primitives.
@@ -80,4 +81,4 @@ OG/metadata scraping, content-type sniffing, the PDF proxy, and related paths us
 - Server-only modules (e.g. those importing Prisma/pg) must not bleed into the client bundle; extract shared types, constants, and pure functions into a `*-shared.ts` sibling file, and guard the server module with `import "server-only"` at the top.
 - Route-level loading skeletons use a component in `src/components/skeletons/` plus a route `loading.tsx` (e.g. `/home`).
 - Docs under `src/app/(public)/docs/` still need a `publicRoutes` entry in `src/proxy.ts` — the `(public)` route group alone does not bypass auth middleware.
-- `publicRoutes` in `src/proxy.ts` supports `match: "exact" | "prefix"` and optional `skipSessionLookup` (e.g. `/docs` and `/api/auth` use prefix matching).
+- `publicRoutes` in `src/proxy.ts` supports `match: "exact" | "prefix"` (e.g. `/docs` and `/api/auth` use prefix matching). Routes with `whenAuthenticated: "next"` skip the session lookup entirely; only `"redirect"` routes (`/login`, `/signup`) resolve the session.

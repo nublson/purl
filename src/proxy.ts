@@ -8,8 +8,6 @@ type PublicRoute = {
   path: string;
   whenAuthenticated: WhenAuthenticated;
   match?: "exact" | "prefix";
-  /** Skip Better Auth session lookup (e.g. auth API handles its own cookies). */
-  skipSessionLookup?: boolean;
 };
 
 const publicRoutes: PublicRoute[] = [
@@ -26,13 +24,12 @@ const publicRoutes: PublicRoute[] = [
     path: "/.well-known",
     match: "prefix",
     whenAuthenticated: "next",
-    skipSessionLookup: true,
   },
+  // Better Auth handles its own cookies.
   {
     path: "/api/auth",
     match: "prefix",
     whenAuthenticated: "next",
-    skipSessionLookup: true,
   },
 ];
 
@@ -72,7 +69,9 @@ export async function proxy(request: NextRequest) {
   }
 
   const publicRoute = isPublicRoute(currentPath);
-  if (publicRoute?.skipSessionLookup) {
+  // Public "next" routes render the same with or without a session, so only
+  // routes that redirect signed-in users (e.g. /login) need the lookup.
+  if (publicRoute?.whenAuthenticated === "next") {
     return NextResponse.next();
   }
 
@@ -128,7 +127,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // Skips static files and routes that never need a session: `monitoring` is
+  // the Sentry tunnel (next.config.ts), `_vercel` is Analytics/Speed Insights,
+  // plus the service worker, manifest, robots/sitemap, and asset extensions.
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|_vercel|monitoring|favicon.ico|sw.js|manifest.json|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|js|mjs|css|map|txt|xml|json|webmanifest|woff|woff2)$).*)",
   ],
 };

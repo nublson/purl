@@ -54,7 +54,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     const link = await createLink(url);
-    await broadcastLinksChanged(link.userId);
+    broadcastLinksChanged(link.userId);
     return addCors(NextResponse.json(serializeLink(link), { status: 201 }));
   } catch (e) {
     if (e instanceof UnauthorizedError) {

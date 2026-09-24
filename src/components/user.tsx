@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
-import { useSession } from "@/lib/auth-client";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   House,
   LogOut,
@@ -22,9 +22,8 @@ import {
 import { UserItem } from "./user-item";
 
 export function User() {
-  const { data: session } = useSession();
+  const { user } = useCurrentUser();
   const { signOut } = useAuth();
-  const user = session?.user ?? null;
 
   return (
     <DropdownWrapper

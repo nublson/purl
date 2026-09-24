@@ -1,5 +1,4 @@
 import type { ContentType } from "@/generated/prisma/enums";
-import { auth } from "@/lib/auth";
 import { assertCanSaveLink } from "@/lib/entitlements";
 import {
   OG_HTML_READ_MAX_BYTES,
@@ -8,6 +7,7 @@ import {
 import { validateOgThumbnailUrl } from "@/lib/og-thumbnail-probe";
 import prisma from "@/lib/prisma";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
+import { getSessionUser } from "@/lib/session";
 import { detectContentType } from "@/lib/server-detect-content-type";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
 import { getUrlDomain } from "@/utils/formatter";
@@ -15,7 +15,6 @@ import type { Link } from "@/utils/links";
 import { isPdfUrl } from "@/utils/pdf";
 import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
 import { isYouTubeUrl } from "@/utils/youtube";
-import { headers } from "next/headers";
 import ogs from "open-graph-scraper";
 import { cache } from "react";
 
@@ -319,9 +318,10 @@ export async function resolveLinkFromUrl(
   url: string,
 ): Promise<ResolvedLinkFields> {
   const domain = getUrlDomain(url);
-  const contentType = (await detectContentType(url)) as ContentType;
-  const { title, description, favicon, thumbnail } =
-    await scrapeLinkMetadata(url);
+  // Independent network work: run the HEAD/sniff and the page scrape in parallel.
+  const [detected, { title, description, favicon, thumbnail }] =
+    await Promise.all([detectContentType(url), scrapeLinkMetadata(url)]);
+  const contentType = detected as ContentType;
   return {
     url,
     domain,
@@ -335,24 +335,58 @@ export async function resolveLinkFromUrl(
 
 /** Resolves the current user id from request context. Throws UnauthorizedError if not authenticated. */
 async function getCurrentUserId(): Promise<string> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  if (!session?.user?.id) throw new UnauthorizedError();
-  return session.user.id;
+  const user = await getSessionUser();
+  if (!user) throw new UnauthorizedError();
+  return user.id;
 }
 
-/** Fetches links for the currently authenticated user (server-only). Deduplicated per request via React cache(). */
-export const getLinksForCurrentUser = cache(async (): Promise<Link[]> => {
+export type LinksPage = {
+  links: Link[];
+  nextCursor: string | null;
+  /** The user's total saved links; only set when `withTotal` is true. */
+  total?: number;
+};
+
+/** One page of the current user's links, newest first. `cursor` is the ISO `createdAt` of the last link already loaded. */
+export const getLinksPageForCurrentUser = cache(
+  async (
+    limit: number,
+    cursor: string | null = null,
+    withTotal = false,
+  ): Promise<LinksPage> => {
+    const userId = await getCurrentUserId();
+    const [{ links, nextCursor }, total] = await Promise.all([
+      listLinksForUser(userId, { limit, cursor, contentType: null }),
+      withTotal ? prisma.link.count({ where: { userId } }) : undefined,
+    ]);
+    return { links: links.map(mapRowToLink), nextCursor, total };
+  },
+);
+
+/** Case-insensitive search over the current user's links (title, URL, domain, description), newest first. An empty query returns the most recent links. */
+export async function searchLinksForCurrentUser(
+  query: string,
+  limit: number,
+): Promise<Link[]> {
   const userId = await getCurrentUserId();
-
+  const q = query.trim();
   const rows = await prisma.link.findMany({
-    where: { userId },
+    where: q
+      ? {
+          userId,
+          OR: [
+            { title: { contains: q, mode: "insensitive" } },
+            { url: { contains: q, mode: "insensitive" } },
+            { domain: { contains: q, mode: "insensitive" } },
+            { description: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : { userId },
     orderBy: { createdAt: "desc" },
+    take: limit,
   });
-
   return rows.map(mapRowToLink);
-});
+}
 
 export type CreateLinkResult = Awaited<ReturnType<typeof prisma.link.create>>;
 export type RefreshLinkResult = Awaited<ReturnType<typeof prisma.link.update>>;
@@ -517,6 +551,27 @@ export async function listLinks(opts: ListLinksOptions): Promise<ListLinksResult
   return listLinksForUser(userId, opts);
 }
 
+/**
+ * Pagination cursors are `<ISO createdAt>_<id>`: the id breaks ties between
+ * links saved in the same millisecond. A bare ISO date (the previous format)
+ * is still accepted.
+ */
+function formatLinksCursor(createdAt: Date, id: string): string {
+  return `${createdAt.toISOString()}_${id}`;
+}
+
+function parseLinksCursor(
+  cursor: string | null,
+): { createdAt: Date; id: string | null } | null {
+  if (!cursor) return null;
+  const sep = cursor.indexOf("_");
+  const datePart = sep === -1 ? cursor : cursor.slice(0, sep);
+  const id = sep === -1 ? null : cursor.slice(sep + 1) || null;
+  const createdAt = new Date(datePart);
+  if (isNaN(createdAt.getTime())) return null;
+  return { createdAt, id };
+}
+
 /** Lists links for an explicit user id. Used where the caller has already resolved the user (e.g. the MCP server via bearer token). */
 export async function listLinksForUser(
   userId: string,
@@ -528,6 +583,7 @@ export async function listLinksForUser(
     userId: string;
     contentType?: ContentType;
     createdAt?: { lt: Date };
+    OR?: ({ createdAt: { lt: Date } } | { createdAt: Date; id: { lt: string } })[];
   };
 
   const where: WhereInput = { userId };
@@ -536,22 +592,29 @@ export async function listLinksForUser(
     where.contentType = contentType as ContentType;
   }
 
-  if (cursor) {
-    const cursorDate = new Date(cursor);
-    if (!isNaN(cursorDate.getTime())) {
-      where.createdAt = { lt: cursorDate };
-    }
+  const position = parseLinksCursor(cursor);
+  if (position?.id) {
+    // Keyset on (createdAt, id): links sharing the boundary timestamp are
+    // continued by id instead of being skipped.
+    where.OR = [
+      { createdAt: { lt: position.createdAt } },
+      { createdAt: position.createdAt, id: { lt: position.id } },
+    ];
+  } else if (position) {
+    // Legacy date-only cursor from older clients.
+    where.createdAt = { lt: position.createdAt };
   }
 
   const rows = await prisma.link.findMany({
     where,
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit + 1,
   });
 
   const hasMore = rows.length > limit;
   const links = hasMore ? rows.slice(0, limit) : rows;
-  const nextCursor = hasMore ? links[links.length - 1].createdAt.toISOString() : null;
+  const last = links[links.length - 1];
+  const nextCursor = hasMore ? formatLinksCursor(last.createdAt, last.id) : null;
 
   return { links, nextCursor };
 }

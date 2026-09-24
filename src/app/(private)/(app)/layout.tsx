@@ -2,28 +2,26 @@ import Header from "@/components/header";
 import { HeaderSearchLinks } from "@/components/header-search-links";
 import { HeaderActionsFallback } from "@/components/skeletons";
 import { User } from "@/components/user";
+import { CurrentUserProvider } from "@/contexts/current-user-context";
+import { LinksSyncProvider } from "@/contexts/links-sync-context";
 import { UsageProvider } from "@/contexts/usage-context";
-import { auth } from "@/lib/auth";
-import { getLinksForCurrentUser } from "@/lib/links";
+import { getSessionUser } from "@/lib/session";
 import { getUsageSummaryForUser } from "@/lib/usage-summary";
-import { headers } from "next/headers";
 import { Suspense } from "react";
 
 async function HeaderActions() {
-  const [links, session] = await Promise.all([
-    getLinksForCurrentUser(),
-    auth.api.getSession({ headers: await headers() }),
-  ]);
-  const userId = session?.user?.id;
-  const usageSummary = userId ? await getUsageSummaryForUser(userId) : null;
+  const user = await getSessionUser();
+  const usageSummary = user ? await getUsageSummaryForUser(user.id) : null;
 
   return (
-    <UsageProvider usageSummary={usageSummary}>
-      <div className="flex items-center justify-end gap-2">
-        <HeaderSearchLinks links={links} />
-        <User />
-      </div>
-    </UsageProvider>
+    <CurrentUserProvider user={user}>
+      <UsageProvider usageSummary={usageSummary}>
+        <div className="flex items-center justify-end gap-2">
+          <HeaderSearchLinks />
+          <User />
+        </div>
+      </UsageProvider>
+    </CurrentUserProvider>
   );
 }
 
@@ -32,12 +30,14 @@ export default function AppShellLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Wraps header and page: header search and the usage meter follow link
+  // changes made in the list, and vice versa.
   return (
-    <>
+    <LinksSyncProvider>
       <Header
         pathname="/home"
         actions={
-          <Suspense fallback={<HeaderActionsFallback variant="private" />}>
+          <Suspense fallback={<HeaderActionsFallback />}>
             <HeaderActions />
           </Suspense>
         }
@@ -45,6 +45,6 @@ export default function AppShellLayout({
       <main className="flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-4 md:px-0">
         {children}
       </main>
-    </>
+    </LinksSyncProvider>
   );
 }

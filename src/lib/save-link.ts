@@ -1,5 +1,6 @@
 "use client";
 
+import { linksOriginHeaders } from "@/lib/links-origin";
 import { isValidUrl } from "@/utils/url";
 import { toast } from "sonner";
 
@@ -19,7 +20,7 @@ export async function saveLink(rawUrl: string): Promise<SaveLinkResult> {
   try {
     const res = await fetch("/api/links", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...linksOriginHeaders },
       body: JSON.stringify({ url }),
     });
 

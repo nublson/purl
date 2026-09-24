@@ -48,3 +48,50 @@ export function groupLinksByDate(links: Link[]): LinkGroup[] {
     links: byLabel.get(label) ?? [],
   })).filter((group) => group.links.length > 0);
 }
+
+/**
+ * Appends `next` groups (an older page) to `current`, merging same-label
+ * groups and dropping links already present. Keeps label order.
+ */
+export function mergeLinkGroups(
+  current: LinkGroup[],
+  next: LinkGroup[],
+): LinkGroup[] {
+  const seen = new Set<string>();
+  const byLabel = new Map<string, Link[]>();
+  for (const group of [...current, ...next]) {
+    const bucket = byLabel.get(group.label) ?? [];
+    for (const link of group.links) {
+      if (seen.has(link.id)) continue;
+      seen.add(link.id);
+      bucket.push(link);
+    }
+    byLabel.set(group.label, bucket);
+  }
+  return LABEL_ORDER.map((label) => ({
+    label,
+    links: byLabel.get(label) ?? [],
+  })).filter((group) => group.links.length > 0);
+}
+
+/** Total number of links across groups. */
+export function countGroupedLinks(groups: LinkGroup[]): number {
+  return groups.reduce((sum, group) => sum + group.links.length, 0);
+}
+
+type JsonLink = Omit<Link, "createdAt"> & { createdAt: string | Date };
+
+/** Restores `createdAt` Dates on links parsed from a JSON API response. */
+export function parseJsonLinks(links: JsonLink[]): Link[] {
+  return links.map((link) => ({ ...link, createdAt: new Date(link.createdAt) }));
+}
+
+/** Restores `createdAt` Dates on groups parsed from a JSON API response. */
+export function parseJsonLinkGroups(
+  groups: { label: string; links: JsonLink[] }[],
+): LinkGroup[] {
+  return groups.map((group) => ({
+    label: group.label,
+    links: parseJsonLinks(group.links),
+  }));
+}

@@ -4,58 +4,147 @@ import { LinkGroup } from "@/components/link-group";
 import { LinkInput } from "@/components/link-input";
 import { PasteHandler } from "@/components/paste-handler";
 import { LinkItemSkeleton } from "@/components/skeletons";
+import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
-import type { LinkGroup as LinkGroupType } from "@/utils/links";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
+import {
+  countGroupedLinks,
+  mergeLinkGroups,
+  parseJsonLinkGroups,
+  type LinkGroup as LinkGroupType,
+} from "@/utils/links";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { LinkGroupEmpty } from "./link-group-empty";
 
-export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-  useRealtimeSync(startTransition);
+type LinksPageResponse = {
+  groups: Parameters<typeof parseJsonLinkGroups>[0];
+  nextCursor: string | null;
+  total?: number;
+};
+
+async function fetchLinksPage(params: URLSearchParams) {
+  const res = await fetch(`/api/links?${params}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Failed to load links (${res.status})`);
+  const data = (await res.json()) as LinksPageResponse;
+  return { ...data, groups: parseJsonLinkGroups(data.groups) };
+}
+
+export function HomeShell({
+  userId,
+  initialGroups,
+  initialNextCursor,
+}: {
+  userId: string | null;
+  initialGroups: LinkGroupType[];
+  initialNextCursor: string | null;
+}) {
+  useRealtimeSync(userId);
+  const { version } = useLinksSyncState();
+  const { setLinksTotal } = useLinksSyncActions();
+  const [groups, setGroups] = useState(initialGroups);
+  const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
-  const [prevTodayCount, setPrevTodayCount] = useState(0);
-  const [newLinkId, setNewLinkId] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Re-seed from the server when the route re-renders with new data.
+  const [seed, setSeed] = useState(initialGroups);
+  if (seed !== initialGroups) {
+    setSeed(initialGroups);
+    setGroups(initialGroups);
+    setNextCursor(initialNextCursor);
+  }
+
+  const groupsRef = useRef(groups);
+  useEffect(() => {
+    groupsRef.current = groups;
+  }, [groups]);
+  const reloadSeq = useRef(0);
+
+  /** Re-fetches exactly as many links as are loaded, so pages stay consistent after inserts/deletes. */
+  const reload = useCallback(async () => {
+    const seq = ++reloadSeq.current;
+    const limit = Math.max(
+      countGroupedLinks(groupsRef.current),
+      HOME_LINKS_PAGE_SIZE,
+    );
+    try {
+      const page = await fetchLinksPage(
+        new URLSearchParams({ limit: String(limit) }),
+      );
+      if (seq !== reloadSeq.current) return;
+      setGroups(page.groups);
+      setNextCursor(page.nextCursor);
+      if (typeof page.total === "number") setLinksTotal(page.total);
+    } catch {
+      // Keep the current list; the next change or reload will retry.
+    }
+  }, [setLinksTotal]);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    const seq = reloadSeq.current;
+    try {
+      const page = await fetchLinksPage(
+        new URLSearchParams({
+          limit: String(HOME_LINKS_PAGE_SIZE),
+          cursor: nextCursor,
+        }),
+      );
+      // A reload started meanwhile already has fresher data.
+      if (seq !== reloadSeq.current) return;
+      setGroups((current) => mergeLinkGroups(current, page.groups));
+      setNextCursor(page.nextCursor);
+    } catch {
+      // Sentinel stays visible; scrolling again retries.
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore]);
+
+  // Reload when a save, edit, delete, or remote update bumps the version
+  // (skipping the version this list mounted with).
+  const handledVersion = useRef(version);
+  useEffect(() => {
+    if (version === handledVersion.current) return;
+    handledVersion.current = version;
+    void reload();
+  }, [version, reload]);
+
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !nextCursor) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) void loadMore();
+      },
+      { rootMargin: "600px 0px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [nextCursor, loadMore]);
 
   const onPasteStart = useCallback((url: string) => {
     setPendingUrl(url);
   }, []);
 
-  const onSaveSuccess = useCallback(
-    (id: string) => {
-      setNewLinkId(id);
-      startTransition(() => {
-        router.refresh();
-      });
-    },
-    [router],
-  );
+  const onSaveSuccess = useCallback(async () => {
+    await reload();
+    setPendingUrl(null);
+  }, [reload]);
 
   const onSaveError = useCallback(() => {
     setPendingUrl(null);
   }, []);
 
   const todayGroup = groups.find((g) => g.label === "Today");
-  const todayLinksCount = todayGroup?.links.length ?? 0;
   const firstGroupWithLinksIndex = groups.findIndex((g) => g.links.length > 0);
-  const newDataArrived = !isPending && todayLinksCount > prevTodayCount;
 
-  // Only show the optimistic row when this device pasted a URL — not when
-  // isPending is true from useRealtimeSync (remote refresh has no pendingUrl).
-  const showSkeleton = pendingUrl !== null && !newDataArrived;
+  // Optimistic row only for a URL this tab is saving.
+  const showSkeleton = pendingUrl !== null;
   const skeletonUrl = pendingUrl ?? "";
   const showSyntheticToday = showSkeleton && !todayGroup;
-
-  useEffect(() => {
-    if (!isPending) {
-      queueMicrotask(() => {
-        setPendingUrl(null);
-        setNewLinkId(null);
-        setPrevTodayCount(todayLinksCount);
-      });
-    }
-  }, [isPending, todayLinksCount]);
 
   return (
     <>
@@ -85,7 +174,6 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
               key={group.label}
               label={group.label}
               links={group.links}
-              newLinkId={group.label === "Today" ? newLinkId : undefined}
               prependItems={
                 group.label === "Today" && showSkeleton ? (
                   <LinkItemSkeleton url={skeletonUrl} animateIn />
@@ -97,6 +185,9 @@ export function HomeShell({ groups }: { groups: LinkGroupType[] }) {
               }
             />
           ))}
+          {nextCursor && (
+            <div ref={sentinelRef} aria-hidden className="h-px w-full" />
+          )}
         </>
       )}
     </>

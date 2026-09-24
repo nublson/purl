@@ -48,7 +48,8 @@ export function LinkIcon({
             sizes={`${imgSize}px`}
             referrerPolicy="no-referrer"
             className={cn(`aspect-square object-contain size-${imgSize}`)}
-            loading={eagerFavicon ? "eager" : undefined}
+            loading={eagerFavicon ? "eager" : "lazy"}
+            decoding="async"
           />
         ) : (
           <Globe

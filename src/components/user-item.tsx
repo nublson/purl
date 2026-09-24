@@ -1,5 +1,6 @@
 "use client";
 
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { updateUser } from "@/lib/auth-client";
 import {
   AVATAR_MAX_UPLOAD_BYTES,
@@ -32,6 +33,7 @@ type AvatarUploadResponse = {
 };
 
 export function UserItem({ user }: UserItemProps) {
+  const { setUser } = useCurrentUser();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const hasImage = Boolean(user.image);
@@ -72,6 +74,8 @@ export function UserItem({ user }: UserItemProps) {
           updateResult.error.message ?? "Failed to update profile",
         );
       }
+      const image = body.image;
+      setUser((current) => (current ? { ...current, image } : current));
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : "Upload failed");

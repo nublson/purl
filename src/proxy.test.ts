@@ -15,7 +15,7 @@ vi.mock("@/lib/auth", () => ({
   },
 }));
 
-const { proxy } = await import("./proxy");
+const { proxy, config } = await import("./proxy");
 const auth = await import("@/lib/auth");
 
 function createRequest(pathname: string, method = "GET"): NextRequest {
@@ -116,6 +116,21 @@ describe("proxy", () => {
     const res = await proxy(req);
     expect(res.status).toBe(200);
     expect(res.headers.get("location")).toBeNull();
+  });
+
+  it.each(["/", "/privacy", "/terms", "/docs", "/docs/mcp"])(
+    "skips the session lookup on public page %s (same response either way)",
+    async (path) => {
+      const res = await proxy(createRequest(path));
+      expect(res.status).toBe(200);
+      expect(auth.auth.api.getSession).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still looks up the session on /login to redirect signed-in users", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+    await proxy(createRequest("/login"));
+    expect(auth.auth.api.getSession).toHaveBeenCalledTimes(1);
   });
 
   it("returns next for /api/auth without session lookup (Better Auth handles its own cookies)", async () => {
@@ -336,5 +351,40 @@ describe("proxy", () => {
       expect(res.status).toBe(200);
       expect(res.headers.get("location")).toBeNull();
     });
+  });
+});
+
+describe("proxy matcher", () => {
+  // Next.js anchors matcher sources; mirror that to check which paths run the proxy.
+  const matcher = new RegExp(`^${config.matcher[0]}$`);
+
+  it.each([
+    "/",
+    "/home",
+    "/login",
+    "/api/links",
+    "/api/links/search",
+    "/api/auth/get-session",
+    "/.well-known/oauth-authorization-server",
+    "/oauth/consent",
+  ])("runs on %s", (path) => {
+    expect(matcher.test(path)).toBe(true);
+  });
+
+  it.each([
+    "/_next/static/chunks/main.js",
+    "/_next/image",
+    "/_vercel/insights/view",
+    "/monitoring",
+    "/sw.js",
+    "/manifest.json",
+    "/robots.txt",
+    "/sitemap.xml",
+    "/logo.svg",
+    "/icon.png",
+    "/favicon.ico",
+    "/fonts/inter.woff2",
+  ])("skips %s", (path) => {
+    expect(matcher.test(path)).toBe(false);
   });
 });
