@@ -122,7 +122,7 @@ export function registerPurlTools(server: McpServer): void {
         .string()
         .optional()
         .describe(
-          "Pagination cursor (ISO date) taken from a previous response's nextCursor",
+          "Pagination cursor taken from a previous response's nextCursor",
         ),
     },
     async (args, extra) => listSavedItemsTool(getUserId(extra), args),

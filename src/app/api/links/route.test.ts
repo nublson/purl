@@ -886,7 +886,7 @@ describe("GET /api/links", () => {
       }),
     );
     expect(body.total).toBe(42);
-    expect(body.nextCursor).toBe(CREATED_AT.toISOString());
+    expect(body.nextCursor).toBe(`${CREATED_AT.toISOString()}_${MOCK_LINK.id}`);
     const ids = body.groups.flatMap(
       (g: { links: { id: string }[] }) => g.links.map((l) => l.id),
     );

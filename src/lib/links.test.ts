@@ -86,7 +86,7 @@ describe("getLinksPageForCurrentUser", () => {
 
     expect(vi.mocked(prisma.link.findMany)).toHaveBeenCalledWith({
       where: { userId: "user-123" },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 51,
     });
   });
@@ -182,7 +182,9 @@ describe("listLinks", () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue(links as never);
     const result = await listLinks({ limit: 50, cursor: null, contentType: null });
     expect(result.links).toHaveLength(50);
-    expect(result.nextCursor).toBe(result.links[49].createdAt.toISOString());
+    expect(result.nextCursor).toBe(
+      `${result.links[49].createdAt.toISOString()}_link-49`,
+    );
   });
 
   it("passes contentType filter to query", async () => {
@@ -196,7 +198,30 @@ describe("listLinks", () => {
     );
   });
 
-  it("uses cursor as lt filter on createdAt", async () => {
+  it("continues after a (createdAt, id) cursor so links sharing a timestamp aren't skipped", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
+    const createdAt = new Date("2025-01-01T12:00:00.000Z");
+    await listLinks({
+      limit: 50,
+      cursor: `${createdAt.toISOString()}_link-7`,
+      contentType: null,
+    });
+    expect(vi.mocked(prisma.link.findMany)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: "user-123",
+          OR: [
+            { createdAt: { lt: createdAt } },
+            { createdAt, id: { lt: "link-7" } },
+          ],
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      }),
+    );
+  });
+
+  it("uses a legacy date-only cursor as lt filter on createdAt", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
     const cursor = "2025-01-01T12:00:00.000Z";

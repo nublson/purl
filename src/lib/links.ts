@@ -551,6 +551,27 @@ export async function listLinks(opts: ListLinksOptions): Promise<ListLinksResult
   return listLinksForUser(userId, opts);
 }
 
+/**
+ * Pagination cursors are `<ISO createdAt>_<id>`: the id breaks ties between
+ * links saved in the same millisecond. A bare ISO date (the previous format)
+ * is still accepted.
+ */
+function formatLinksCursor(createdAt: Date, id: string): string {
+  return `${createdAt.toISOString()}_${id}`;
+}
+
+function parseLinksCursor(
+  cursor: string | null,
+): { createdAt: Date; id: string | null } | null {
+  if (!cursor) return null;
+  const sep = cursor.indexOf("_");
+  const datePart = sep === -1 ? cursor : cursor.slice(0, sep);
+  const id = sep === -1 ? null : cursor.slice(sep + 1) || null;
+  const createdAt = new Date(datePart);
+  if (isNaN(createdAt.getTime())) return null;
+  return { createdAt, id };
+}
+
 /** Lists links for an explicit user id. Used where the caller has already resolved the user (e.g. the MCP server via bearer token). */
 export async function listLinksForUser(
   userId: string,
@@ -562,6 +583,7 @@ export async function listLinksForUser(
     userId: string;
     contentType?: ContentType;
     createdAt?: { lt: Date };
+    OR?: ({ createdAt: { lt: Date } } | { createdAt: Date; id: { lt: string } })[];
   };
 
   const where: WhereInput = { userId };
@@ -570,22 +592,29 @@ export async function listLinksForUser(
     where.contentType = contentType as ContentType;
   }
 
-  if (cursor) {
-    const cursorDate = new Date(cursor);
-    if (!isNaN(cursorDate.getTime())) {
-      where.createdAt = { lt: cursorDate };
-    }
+  const position = parseLinksCursor(cursor);
+  if (position?.id) {
+    // Keyset on (createdAt, id): links sharing the boundary timestamp are
+    // continued by id instead of being skipped.
+    where.OR = [
+      { createdAt: { lt: position.createdAt } },
+      { createdAt: position.createdAt, id: { lt: position.id } },
+    ];
+  } else if (position) {
+    // Legacy date-only cursor from older clients.
+    where.createdAt = { lt: position.createdAt };
   }
 
   const rows = await prisma.link.findMany({
     where,
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit + 1,
   });
 
   const hasMore = rows.length > limit;
   const links = hasMore ? rows.slice(0, limit) : rows;
-  const nextCursor = hasMore ? links[links.length - 1].createdAt.toISOString() : null;
+  const last = links[links.length - 1];
+  const nextCursor = hasMore ? formatLinksCursor(last.createdAt, last.id) : null;
 
   return { links, nextCursor };
 }
