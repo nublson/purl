@@ -1,6 +1,6 @@
 "use client";
 
-import { linksOriginHeaders } from "@/lib/links-events";
+import { linksOriginHeaders } from "@/lib/links-origin";
 import { isValidUrl } from "@/utils/url";
 import { toast } from "sonner";
 

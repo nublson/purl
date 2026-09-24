@@ -4,9 +4,9 @@ import { LinkGroup } from "@/components/link-group";
 import { LinkInput } from "@/components/link-input";
 import { PasteHandler } from "@/components/paste-handler";
 import { LinkItemSkeleton } from "@/components/skeletons";
+import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
-import { emitLinksTotal, onLinksChanged } from "@/lib/links-events";
 import {
   countGroupedLinks,
   mergeLinkGroups,
@@ -39,6 +39,8 @@ export function HomeShell({
   initialNextCursor: string | null;
 }) {
   useRealtimeSync(userId);
+  const { version } = useLinksSyncState();
+  const { setLinksTotal } = useLinksSyncActions();
   const [groups, setGroups] = useState(initialGroups);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
@@ -72,11 +74,11 @@ export function HomeShell({
       if (seq !== reloadSeq.current) return;
       setGroups(page.groups);
       setNextCursor(page.nextCursor);
-      if (typeof page.total === "number") emitLinksTotal(page.total);
+      if (typeof page.total === "number") setLinksTotal(page.total);
     } catch {
       // Keep the current list; the next change or reload will retry.
     }
-  }, []);
+  }, [setLinksTotal]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
@@ -100,7 +102,14 @@ export function HomeShell({
     }
   }, [nextCursor, loadingMore]);
 
-  useEffect(() => onLinksChanged(() => void reload()), [reload]);
+  // Reload when a save, edit, delete, or remote update bumps the version
+  // (skipping the version this list mounted with).
+  const handledVersion = useRef(version);
+  useEffect(() => {
+    if (version === handledVersion.current) return;
+    handledVersion.current = version;
+    void reload();
+  }, [version, reload]);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {

@@ -1,8 +1,8 @@
 "use client";
 
 import type { UsageMeterData } from "@/components/usage-item";
-import { onLinksTotal } from "@/lib/links-events";
-import { createContext, useEffect, useState, type ReactNode } from "react";
+import { useLinksSyncState } from "@/hooks/use-links-sync";
+import { createContext, useMemo, type ReactNode } from "react";
 
 export interface UsageContextValue {
   usageSummary: UsageMeterData | null;
@@ -13,29 +13,26 @@ export const UsageContext = createContext<UsageContextValue>({
 });
 
 export function UsageProvider({
-  usageSummary: initialUsageSummary,
+  usageSummary: serverUsageSummary,
   children,
 }: {
   usageSummary: UsageMeterData | null;
   children: ReactNode;
 }) {
-  const [usageSummary, setUsageSummary] = useState(initialUsageSummary);
-
-  // The link list reloads client-side (no route refresh), so keep the saved
-  // count in sync from its reload responses.
-  useEffect(
-    () =>
-      onLinksTotal((used) =>
-        setUsageSummary((current) =>
-          current ? { saves: { ...current.saves, used } } : current,
-        ),
-      ),
-    [],
+  // The link list reloads client-side (no route refresh), so prefer the saved
+  // count from its latest reload over the server-rendered one.
+  const { total } = useLinksSyncState();
+  const value = useMemo(
+    () => ({
+      usageSummary:
+        serverUsageSummary && total !== null
+          ? { saves: { ...serverUsageSummary.saves, used: total } }
+          : serverUsageSummary,
+    }),
+    [serverUsageSummary, total],
   );
 
   return (
-    <UsageContext.Provider value={{ usageSummary }}>
-      {children}
-    </UsageContext.Provider>
+    <UsageContext.Provider value={value}>{children}</UsageContext.Provider>
   );
 }

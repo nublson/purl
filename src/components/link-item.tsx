@@ -1,6 +1,6 @@
 "use client";
 
-import { emitLinksChanged } from "@/lib/links-events";
+import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
@@ -51,6 +51,7 @@ export const LinkItem = React.forwardRef<
   },
   ref,
 ) {
+  const { notifyLinksChanged } = useLinksSyncActions();
   const [deletePhase, setDeletePhase] = React.useState<
     "idle" | "animating" | "loading" | "exiting"
   >("idle");
@@ -106,7 +107,7 @@ export const LinkItem = React.forwardRef<
         animateOut={deletePhase === "exiting"}
         onAnimationEnd={() => {
           if (deletePhase !== "exiting") return;
-          emitLinksChanged();
+          notifyLinksChanged();
         }}
       />
     );

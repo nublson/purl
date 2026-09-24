@@ -1,7 +1,8 @@
 "use client";
 
 import { copyToClipboard } from "@/lib/clipboard";
-import { emitLinksChanged, linksOriginHeaders } from "@/lib/links-events";
+import { useLinksSyncActions } from "@/hooks/use-links-sync";
+import { linksOriginHeaders } from "@/lib/links-origin";
 import type { Link as LinkType } from "@/utils/links";
 import {
   Ellipsis,
@@ -33,6 +34,8 @@ export function LinkMenu({
   onDeleteSuccess,
   onDeleteError,
 }: LinkMenuProps) {
+  const { notifyLinksChanged } = useLinksSyncActions();
+
   async function handleOpenInNewTab() {
     window.open(link.url, "_blank");
   }
@@ -59,7 +62,7 @@ export function LinkMenu({
           onDeleteSuccess();
           return;
         }
-        emitLinksChanged();
+        notifyLinksChanged();
       } else {
         onDeleteError?.();
         toast.error("Failed to delete link");

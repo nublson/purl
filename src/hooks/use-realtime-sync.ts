@@ -1,16 +1,19 @@
 "use client";
 
-import { emitLinksChanged, LINKS_CLIENT_ORIGIN } from "@/lib/links-events";
+import { useLinksSyncActions } from "@/hooks/use-links-sync";
+import { LINKS_CLIENT_ORIGIN } from "@/lib/links-origin";
 import { LINKS_CHANGED_EVENT } from "@/lib/realtime-constants";
 import { useEffect } from "react";
 
 /**
- * Subscribes to Supabase Realtime for the current user's link list and emits
- * `linksChanged` when another device or tab mutates links. Broadcasts caused by
+ * Subscribes to Supabase Realtime for the current user's link list and calls
+ * `notifyLinksChanged` when another device or tab mutates links. Broadcasts caused by
  * this tab (matching origin) are ignored: the tab already reloaded locally.
  * The Realtime client is imported after mount so it stays off the critical path.
  */
 export function useRealtimeSync(userId: string | null) {
+  const { notifyLinksChanged } = useLinksSyncActions();
+
   useEffect(() => {
     if (!userId) return;
 
@@ -28,7 +31,7 @@ export function useRealtimeSync(userId: string | null) {
           const origin = (message.payload as { origin?: unknown } | undefined)
             ?.origin;
           if (origin === LINKS_CLIENT_ORIGIN) return;
-          emitLinksChanged();
+          notifyLinksChanged();
         })
         .subscribe();
 
@@ -41,5 +44,5 @@ export function useRealtimeSync(userId: string | null) {
       cancelled = true;
       cleanup?.();
     };
-  }, [userId]);
+  }, [userId, notifyLinksChanged]);
 }

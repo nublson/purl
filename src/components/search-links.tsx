@@ -9,7 +9,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { onLinksChanged } from "@/lib/links-events";
+import { useLinksSyncState } from "@/hooks/use-links-sync";
 import { parseJsonLinks, type Link } from "@/utils/links";
 import { Search } from "lucide-react";
 import * as React from "react";
@@ -27,13 +27,8 @@ export default function SearchLinks() {
   const [query, setQuery] = React.useState("");
   const [links, setLinks] = React.useState<Link[]>([]);
   const [loading, setLoading] = React.useState(false);
-  const [version, setVersion] = React.useState(0);
-
   // Re-run the current search when links change (e.g. deleted from results).
-  React.useEffect(
-    () => onLinksChanged(() => setVersion((v) => v + 1)),
-    [],
-  );
+  const { version } = useLinksSyncState();
 
   React.useEffect(() => {
     if (!open) return;

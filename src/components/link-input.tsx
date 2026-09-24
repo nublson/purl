@@ -1,12 +1,12 @@
 "use client";
 
-import { emitLinksChanged } from "@/lib/links-events";
 import { Field } from "@/components/ui/field";
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { saveLink } from "@/lib/save-link";
 import { useForm } from "@tanstack/react-form";
 import { Plus } from "lucide-react";
@@ -21,6 +21,7 @@ export function LinkInput({
   onSaveSuccess?: (id: string) => void;
   onSaveError?: (detail: { limit?: boolean; message?: string } | null) => void;
 }) {
+  const { notifyLinksChanged } = useLinksSyncActions();
   const form = useForm({
     defaultValues: {
       url: "",
@@ -42,7 +43,7 @@ export function LinkInput({
         onSaveSuccess?.(result.id);
       }
       if (!onSaveSuccess) {
-        emitLinksChanged();
+        notifyLinksChanged();
       }
     },
   });

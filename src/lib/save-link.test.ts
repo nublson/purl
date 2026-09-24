@@ -1,4 +1,4 @@
-import { LINKS_CLIENT_ORIGIN } from "@/lib/links-events";
+import { LINKS_CLIENT_ORIGIN } from "@/lib/links-origin";
 import { LINKS_ORIGIN_HEADER } from "@/lib/realtime-constants";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { saveLink } from "./save-link";
