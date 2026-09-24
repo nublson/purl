@@ -15,7 +15,7 @@ pnpm install                  # install deps
 pnpm prisma generate          # generate Prisma client (required before pnpm dev if src/generated/prisma is missing)
 pnpm prisma migrate dev       # run DB migrations locally
 pnpm dev                      # dev server on port 3000
-pnpm build                    # prisma generate + next build (includes Sentry source map upload)
+pnpm build                    # prisma generate + next build
 pnpm start                    # production server (also needed to test PWA/service worker)
 pnpm lint                     # ESLint
 pnpm typecheck                # tsc --noEmit

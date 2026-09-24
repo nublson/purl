@@ -2,7 +2,6 @@ packages: []
 
 allowBuilds:
   '@prisma/engines': true
-  '@sentry/cli': true
   cypress: true
   esbuild: true
   msw: true

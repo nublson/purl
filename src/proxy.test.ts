@@ -375,7 +375,6 @@ describe("proxy matcher", () => {
     "/_next/static/chunks/main.js",
     "/_next/image",
     "/_vercel/insights/view",
-    "/monitoring",
     "/sw.js",
     "/manifest.json",
     "/robots.txt",
