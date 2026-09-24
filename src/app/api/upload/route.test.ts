@@ -40,6 +40,7 @@ vi.mock("@/lib/upload-file", () => {
   }
   return {
     createLinkFromFile: vi.fn(),
+    createSignedUploadUrl: vi.fn(),
     InvalidUploadTypeError,
     UploadStorageError,
   };
@@ -57,9 +58,12 @@ const { auth } = await import("@/lib/auth");
 const { broadcastLinksChanged } = await import("@/lib/realtime-broadcast");
 const {
   createLinkFromFile,
+  createSignedUploadUrl,
   InvalidUploadTypeError,
   UploadStorageError,
 } = await import("@/lib/upload-file");
+const { after } = await import("next/server");
+const { ingestPdf } = await import("@/lib/ingest-pdf");
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 const CREATED_AT = new Date("2026-03-31T10:00:00Z");
@@ -240,5 +244,33 @@ describe("POST /api/upload", () => {
       "user-123",
       undefined,
     );
+  });
+
+  it("hands ingestion a signed storage URL, not the authenticated app route", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(createLinkFromFile).mockResolvedValue({
+      ...MOCK_LINK,
+      url: "/api/links/link-upload-1/file",
+      storagePath: "user-123/uuid.pdf",
+    } as never);
+    vi.mocked(createSignedUploadUrl).mockResolvedValue(
+      "https://files.example.com/signed.pdf",
+    );
+    vi.mocked(after).mockImplementation(((cb: () => unknown) => {
+      void cb();
+    }) as never);
+
+    await POST(
+      postRequest({
+        file: new File(["pdf"], "resume.pdf", { type: "application/pdf" }),
+      }),
+    );
+
+    expect(createSignedUploadUrl).toHaveBeenCalledWith("user-123/uuid.pdf", 3600);
+    expect(ingestPdf).toHaveBeenCalledWith({
+      linkId: "link-upload-1",
+      url: "https://files.example.com/signed.pdf",
+      userId: "user-123",
+    });
   });
 });

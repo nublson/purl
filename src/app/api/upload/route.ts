@@ -6,6 +6,7 @@ import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { serializeLink } from "@/lib/serialize-link";
 import {
   createLinkFromFile,
+  createSignedUploadUrl,
   InvalidUploadTypeError,
   UploadStorageError,
 } from "@/lib/upload-file";
@@ -61,11 +62,16 @@ export async function POST(request: NextRequest) {
       userId,
       Number.isFinite(audioDurationSeconds) ? audioDurationSeconds : undefined,
     );
+    // link.url is the authenticated app route; ingestion fetches the file
+    // server-side, so hand it a signed storage URL instead.
+    const ingestUrl = link.storagePath
+      ? await createSignedUploadUrl(link.storagePath, 3600)
+      : link.url;
     if (link.contentType === "PDF") {
-      after(() => ingestPdf({ linkId: link.id, url: link.url, userId }));
+      after(() => ingestPdf({ linkId: link.id, url: ingestUrl, userId }));
     }
     if (link.contentType === "AUDIO") {
-      after(() => ingestAudio({ linkId: link.id, url: link.url, userId }));
+      after(() => ingestAudio({ linkId: link.id, url: ingestUrl, userId }));
     }
     await broadcastLinksChanged(userId);
     return NextResponse.json(serializeLink(link), { status: 201 });

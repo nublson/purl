@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { serializeLink } from "./serialize-link";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -99,5 +99,25 @@ describe("serializeLink", () => {
       const result = serializeLink(makeLink({ ingestStatus: status }));
       expect(result.ingestStatus).toBe(status);
     }
+  });
+});
+
+describe("serializeLink – uploaded files", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("turns the relative upload file route into an absolute app URL", () => {
+    vi.stubEnv("BETTER_AUTH_URL", "https://purl.example.com/");
+    const result = serializeLink(
+      makeLink({ id: "abc", url: "/api/links/abc/file", contentType: "PDF" }),
+    );
+    expect(result.url).toBe("https://purl.example.com/api/links/abc/file");
+  });
+
+  it("leaves external URLs untouched", () => {
+    vi.stubEnv("BETTER_AUTH_URL", "https://purl.example.com");
+    const result = serializeLink(makeLink({ url: "https://example.com/doc.pdf" }));
+    expect(result.url).toBe("https://example.com/doc.pdf");
   });
 });

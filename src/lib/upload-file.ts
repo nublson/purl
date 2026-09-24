@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { getAdminSupabase } from "@/lib/supabase-admin";
 import type { ContentType } from "@/generated/prisma/enums";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
+import { uploadFilePath } from "@/utils/upload-file-url";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 const UPLOAD_BUCKET = "user-uploads";
@@ -172,19 +173,44 @@ export async function createLinkFromFile(
         })();
 
   const storagePath = await uploadToStorage(filePath, bytes, file.type);
-  const signedUrl = await createSignedUploadUrl(storagePath, 3600);
 
-  return prisma.link.create({
-    data: {
-      url: signedUrl,
-      title,
-      description,
-      favicon: getDefaultFaviconUrl("upload"),
-      thumbnail: null,
-      domain: extension ? `.${extension}` : ".audio",
-      contentType,
-      storagePath,
-      userId,
-    },
+  // The stable file route embeds the link id, so set it right after insert.
+  return prisma.$transaction(async (tx) => {
+    const created = await tx.link.create({
+      data: {
+        url: "",
+        title,
+        description,
+        favicon: getDefaultFaviconUrl("upload"),
+        thumbnail: null,
+        domain: extension ? `.${extension}` : ".audio",
+        contentType,
+        storagePath,
+        userId,
+      },
+    });
+    return tx.link.update({
+      where: { id: created.id },
+      data: { url: uploadFilePath(created.id) },
+    });
   });
+}
+
+/** Short lifetime: callers redirect to or fetch the URL immediately. */
+const FILE_SIGNED_URL_TTL_SECONDS = 300;
+
+/**
+ * Returns a fresh signed URL for an uploaded file owned by `userId`, or null
+ * when the link does not exist, belongs to someone else, or is not an upload.
+ */
+export async function createSignedFileUrlForLink(
+  userId: string,
+  linkId: string,
+): Promise<string | null> {
+  const link = await prisma.link.findFirst({
+    where: { id: linkId, userId },
+    select: { storagePath: true },
+  });
+  if (!link?.storagePath) return null;
+  return createSignedUploadUrl(link.storagePath, FILE_SIGNED_URL_TTL_SECONDS);
 }
