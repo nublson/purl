@@ -1,9 +1,6 @@
-import { HeroPreviewApp } from "@/components/hero-preview-app";
 import SectionSeparator from "@/components/section-separator";
 import { Typography } from "@/components/typography";
 import { Button } from "@/components/ui/button";
-import previewLinksJson from "@/data/preview-links.json" with { type: "json" };
-import type { Link as LinkType } from "@/utils/links";
 import Link from "next/link";
 
 export default function HeroSection() {
@@ -43,10 +40,6 @@ export default function HeroSection() {
         </div>
       </div>
 
-      <HeroPreviewApp
-        urls={previewLinksJson.urls}
-        defaultUrls={previewLinksJson.defaultUrls as unknown as LinkType[]}
-      />
       <SectionSeparator className="absolute bottom-0" />
     </section>
   );

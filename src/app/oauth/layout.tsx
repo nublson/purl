@@ -1,6 +1,6 @@
 import Footer from "@/components/footer";
 import Header from "@/components/header";
-import { PublicHeaderActions } from "@/components/public-header-actions-loader";
+import { PublicHeaderActions } from "@/components/public-header-actions";
 import { Fragment } from "react";
 
 // Intentionally NOT under the (public) route group: that group's layout sets
