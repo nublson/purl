@@ -20,9 +20,8 @@ export default function TermsPage() {
 
       <CopySection title="The service">
         <Typography size="small">
-          Purl is a personal knowledge base that lets you save URLs, extract
-          their content, and ask AI-powered questions over what you&apos;ve
-          saved. We reserve the right to modify or discontinue the service at
+          Purl is a personal library that lets you save URLs and files and
+          come back to them later. We reserve the right to modify or discontinue the service at
           any time with reasonable notice.
         </Typography>
       </CopySection>
@@ -99,14 +98,6 @@ export default function TermsPage() {
           service, you grant us a limited license to store, process, and
           transmit your content solely to provide the service to you. We do not
           claim any rights to your content beyond this.
-        </Typography>
-      </CopySection>
-
-      <CopySection title="AI-generated output">
-        <Typography size="small">
-          Purl uses AI to summarize and answer questions about your saved
-          content. AI output may be inaccurate or incomplete. You are
-          responsible for verifying any information before relying on it.
         </Typography>
       </CopySection>
 

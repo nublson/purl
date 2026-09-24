@@ -101,8 +101,6 @@ describe("links/[id] API route", () => {
         thumbnail: null,
         domain: "example.com",
         contentType: "WEB",
-        ingestStatus: "COMPLETED",
-        ingestFailureReason: null,
         createdAt,
       });
 
@@ -121,7 +119,6 @@ describe("links/[id] API route", () => {
         thumbnail: null,
         domain: "example.com",
         contentType: "WEB",
-        ingestStatus: "COMPLETED",
         createdAt: createdAt.toISOString(),
       });
     });
@@ -175,8 +172,6 @@ describe("links/[id] API route", () => {
         storagePath: null,
         domain: "example.com",
         contentType: "WEB",
-        ingestStatus: "PENDING",
-        ingestFailureReason: null,
         createdAt,
         userId: "user-123",
       });
@@ -206,8 +201,6 @@ describe("links/[id] API route", () => {
         storagePath: null,
         domain: "example.com",
         contentType: "WEB",
-        ingestStatus: "PENDING",
-        ingestFailureReason: null,
         createdAt: new Date("2025-06-15T10:00:00Z"),
         userId: "user-123",
       });

@@ -3,17 +3,17 @@
     {
       "value": "what-content-can-i-save",
       "title": "What types of content can I save?",
-      "content": "Purl supports links (any URL), PDFs, YouTube videos, and audio files. When you save a link, Purl automatically fetches the title, favicon, and full text. PDFs are fully parsed, YouTube videos get their transcripts extracted, and audio is transcribed via Whisper. AI extraction, transcripts, and file uploads require Pro."
+      "content": "Purl supports links (any URL), PDFs, YouTube videos, and audio files. When you save a link, Purl automatically fetches its title, favicon, description, and thumbnail. Uploading PDF and audio files requires Pro."
     },
     {
       "value": "free-trial",
       "title": "Is there a free trial?",
-      "content": "Yes. Every new account starts with a 7-day Pro trial — no credit card required. You get full access to AI extraction, semantic search, and file uploads. After the trial your account moves to the Free plan unless you upgrade."
+      "content": "Yes. Every new account starts with a 7-day Pro trial — no credit card required. You get unlimited saves and file uploads. After the trial your account moves to the Free plan unless you upgrade."
     },
     {
       "value": "free-vs-pro",
       "title": "What's the difference between Free and Pro?",
-      "content": "Free lets you save up to 100 links and search them with full-text search. Pro ($39 one-time) unlocks AI content extraction, semantic search, file uploads, and unlimited saves. New accounts start with a 7-day free Pro trial."
+      "content": "Free lets you save up to 100 links and search them. Pro ($39 one-time) unlocks unlimited saves and PDF & audio uploads. New accounts start with a 7-day free Pro trial."
     },
     {
       "value": "is-my-data-private",

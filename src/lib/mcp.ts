@@ -8,10 +8,6 @@ import {
   readLinkForUser,
 } from "@/lib/links";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
-import {
-  searchSavedContent,
-  type SearchSavedContentInput,
-} from "@/lib/search-saved-content";
 import { serializeLink } from "@/lib/serialize-link";
 import { isValidUrl } from "@/utils/url";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
@@ -47,16 +43,6 @@ export function errorContent(message: string): ToolResult {
     content: [{ type: "text", text: message }],
     isError: true,
   };
-}
-
-export async function searchContentTool(
-  userId: string,
-  args: SearchSavedContentInput,
-): Promise<ToolResult> {
-  const results = await searchSavedContent(userId, args, {
-    tags: ["feature:mcp"],
-  });
-  return jsonContent(results);
 }
 
 export async function saveLinkTool(
@@ -112,33 +98,8 @@ export async function getLinkTool(
 /** Registers Purl's MCP tools on the given server instance. */
 export function registerPurlTools(server: McpServer): void {
   server.tool(
-    "search_content",
-    "Semantic search across the user's saved content. Use for topic-based questions or when you need the actual saved content to answer. Supports optional date and type filters.",
-    {
-      query: z.string().describe("The search query describing the topic"),
-      contentType: contentTypeSchema.optional(),
-      dateFrom: z
-        .string()
-        .optional()
-        .describe("ISO 8601 date string for the start of the date range"),
-      dateTo: z
-        .string()
-        .optional()
-        .describe("ISO 8601 date string for the end of the date range"),
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(20)
-        .optional()
-        .describe("Maximum number of items to return (1-20, default 10)"),
-    },
-    async (args, extra) => searchContentTool(getUserId(extra), args),
-  );
-
-  server.tool(
     "save_link",
-    "Save a URL to the user's library. Purl ingests the content (web, PDF, YouTube, audio) asynchronously after saving.",
+    "Save a URL (web page, PDF, YouTube video, or audio) to the user's library.",
     {
       url: z.string().describe("The URL to save"),
     },

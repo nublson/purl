@@ -1,5 +1,5 @@
 import { getAppBaseUrl } from "@/lib/billing-url";
-import type { ContentType, IngestStatus } from "@/lib/prisma";
+import type { ContentType } from "@/lib/prisma";
 import { isUploadFilePath } from "@/utils/upload-file-url";
 
 type LinkLike = {
@@ -12,7 +12,6 @@ type LinkLike = {
   domain: string;
   contentType?: ContentType;
   createdAt: Date;
-  ingestStatus: IngestStatus;
 };
 
 export function serializeLink(link: LinkLike) {
@@ -26,7 +25,6 @@ export function serializeLink(link: LinkLike) {
     thumbnail: link.thumbnail,
     domain: link.domain,
     contentType: link.contentType ?? "WEB",
-    ingestStatus: link.ingestStatus,
     createdAt: link.createdAt.toISOString(),
   };
 }

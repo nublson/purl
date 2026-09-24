@@ -6,7 +6,7 @@ if (!process.env.DATABASE_URL) {
     "postgresql://vitest:vitest@127.0.0.1:5432/vitest?schema=public";
 }
 
-/** Lets tests import modules that transitively pull in `server-only` (e.g. ingest → notify → realtime-broadcast). */
+/** Lets tests import modules that transitively pull in `server-only` (e.g. links → realtime-broadcast). */
 vi.mock("server-only", () => ({}));
 
 function globalFetchLooksMocked(g: typeof globalThis.fetch): boolean {

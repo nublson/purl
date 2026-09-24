@@ -133,7 +133,6 @@ export default defineConfig({
                 favicon: `https://${domain}/favicon.ico`,
                 domain,
                 userId: user.id,
-                ingestStatus: "SKIPPED",
               },
             });
             return link.id;
@@ -152,9 +151,6 @@ export default defineConfig({
           try {
             const user = await prisma.user.findUnique({ where: { email } });
             if (user) {
-              await prisma.linkContent.deleteMany({
-                where: { link: { userId: user.id } },
-              });
               await prisma.link.deleteMany({ where: { userId: user.id } });
             }
           } finally {
@@ -174,9 +170,6 @@ export default defineConfig({
             const user = await prisma.user.findUnique({ where: { email } });
             if (user) {
               // Delete in FK-safe order
-              await prisma.linkContent.deleteMany({
-                where: { link: { userId: user.id } },
-              });
               await prisma.link.deleteMany({ where: { userId: user.id } });
               await prisma.session.deleteMany({ where: { userId: user.id } });
               await prisma.account.deleteMany({ where: { userId: user.id } });

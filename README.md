@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="thumbnail.jpeg" alt="Purl — Save Anything. Understand it deeply. Personal knowledge base for links, PDFs, video, and audio." width="920" />
+  <img src="thumbnail.jpeg" alt="Purl — Save Anything. Keep what matters. A home for your links, PDFs, video, and audio." width="920" />
 </p>
 
 # Purl
@@ -8,7 +8,7 @@
 
 **Live preview:** [https://purl.nublson.com](https://purl.nublson.com)
 
-Purl is an AI-powered read-it-later app and personal knowledge base. You paste URLs (or upload files): web pages, PDFs, YouTube videos, and audio. Purl ingests the content and stores chunked text with vector embeddings so it can be searched semantically (e.g. from an MCP client).
+Purl is a read-it-later app — a home for your "pearls". You paste URLs (or upload files): web pages, PDFs, YouTube videos, and audio. Purl resolves each item's metadata (title, favicon, description, thumbnail) and keeps everything in one place, available from the app, a REST API, and an MCP server.
 
 **Plans:** **Free** and **Pro** are enforced server-side (see [`docs/commercial-model.md`](docs/commercial-model.md)). New signups get a **7-day Pro trial** (no card required). **Stripe Checkout** handles the one-time Pro payment; **webhooks** sync status to Postgres.
 
@@ -19,9 +19,7 @@ The product goal: one place to stash material you care about.
 | Feature                       | Free | Pro ($39 one-time) |
 | ----------------------------- | ---- | ------------------ |
 | Save links (100 lifetime cap) | Yes  | Unlimited          |
-| Full-text search              | Yes  | Yes                |
-| AI extraction & embeddings    | No   | Yes (150/mo)       |
-| Semantic search               | No   | Yes                |
+| Search saved links            | Yes  | Yes                |
 | PDF/audio **upload**          | No   | Yes                |
 
 Exact limits are in [`docs/commercial-model.md`](docs/commercial-model.md).
@@ -35,61 +33,21 @@ Exact limits are in [`docs/commercial-model.md`](docs/commercial-model.md).
   - **File upload** for PDF and audio (size limits enforced server-side).
   - Links grouped by relative time (e.g. Today, This Week, Last Month).
   - Preview metadata (title, description, favicon, thumbnail where available).
-- **Ingestion pipeline** — Fetches or extracts text (including transcripts for YouTube/audio), chunks it, embeds via **Vercel AI Gateway** (`openai/text-embedding-3-small`), stores in Postgres with **pgvector**; tracks per-link ingest status (pending, processing, completed, failed, skipped for edge cases like heavy SPAs).
-- **AI providers** — **Vercel AI Gateway** for **embeddings** (`openai/text-embedding-3-small`). **OpenAI** directly for **Whisper** transcription only (`OPENAI_API_KEY`). Keys live in server environment variables only.
-- **AI Gateway observability** — Ingest embeddings and semantic search send `providerOptions.gateway` with the signed-in **`user`** id and **`tags`** so the [Vercel AI](https://vercel.com/docs/ai-gateway) dashboard can filter spend and usage by person and surface (`env:…` from `VERCEL_ENV` / `NODE_ENV`; `feature:ingest` on save pipelines; `feature:semantic-search` when the model runs vector search over saved chunks).
-- **Hardened outbound fetch** — Server-side `safeFetch` with optional proxy/DNS controls (see `AGENTS.md`). For reliable **YouTube transcripts on Vercel**, configure [`SAFE_OUTBOUND_HTTP_PROXY`](docs/production-outbound-proxy.md) in production.
+- **Hardened outbound fetch** — Server-side `safeFetch` with optional proxy/DNS controls (see `AGENTS.md`). An egress proxy can be configured via [`SAFE_OUTBOUND_HTTP_PROXY`](docs/production-outbound-proxy.md).
 - **Realtime list sync** — Supabase Realtime so saves and updates propagate across tabs/devices quickly.
-- **Link actions** — Open original, copy URL, edit metadata, re-ingest, delete.
+- **Link actions** — Open original, copy URL, edit metadata, delete.
+- **REST API & MCP** — `/api/v1` and an MCP server (`save_link`, `list_saved_items`, `get_link`) with API-key or OAuth auth.
 - **Operational extras** — Optional Upstash-backed API rate limiting, optional Sentry, Vitest coverage for critical paths.
 - **PWA (installable app)** — [Web App Manifest](public/manifest.json) plus a [Serwist](https://serwist.pages.dev/) service worker ([`src/app/sw.ts`](src/app/sw.ts)) that builds to **`public/sw.js`** (generated on `pnpm build`, gitignored). Enables **Install** in Chrome/Edge and similar where the platform supports it, with runtime caching via Serwist's Next.js defaults and a static offline shell at [`/~offline`](src/app/~offline/page.tsx). **Serwist is disabled in `pnpm dev`** to avoid service-worker cache surprises during development — use **`pnpm build && pnpm start`** (or your production URL) to exercise installability and the SW.
 
-## Ingestion flow
+## Save flow
 
-Saving a link is **synchronous** through metadata resolution and the database row; **heavy work runs afterward** so the API can return quickly.
+Saving a link is fully **synchronous** — there is no background processing.
 
-1. **Input** — `POST /api/links` with a URL, or `POST /api/upload` with a PDF/audio file (files go to Supabase Storage; the `Link` stores the public URL).
-2. **Classify & decorate** — Server-side [`detectContentType`](src/lib/server-detect-content-type.ts) (SSRF-safe `HEAD` / sniff) plus [`scrapeLinkMetadata`](src/lib/links.ts) (Open Graph HTML, PDF `Content-Disposition` / size, YouTube oEmbed). Duplicates of the same URL **refresh** metadata and reset ingestion.
-3. **Persist** — A `Link` row is created (default **`PENDING`**) with title, favicon, thumbnail, domain, and `contentType` (`WEB`, `PDF`, `YOUTUBE`, or `AUDIO`).
-4. **Schedule** — [`prepareIngestForLink`](src/lib/links.ts) enforces plan limits, then uses Next.js [`after()`](https://nextjs.org/docs/app/api-reference/functions/after) to run the right handler: [`ingestWeb`](src/lib/ingest-web.ts), [`ingestPdf`](src/lib/ingest-pdf.ts), [`ingestYoutube`](src/lib/ingest-youtube.ts), or [`ingestAudio`](src/lib/ingest-audio.ts). Free accounts skip extraction (metadata-only; ingest **`SKIPPED`**).
-5. **Pipeline** (each handler) — Set **`PROCESSING`** → fetch or extract plain text → split into chunks (with a synthetic **metadata** chunk first) → **Vercel AI Gateway** embeddings (`openai/text-embedding-3-small`) → replace `LinkContent` rows and attach **pgvector** values → **`COMPLETED`**. Failures set `ingestFailureReason` (`SCRAPE_FAILED`, `LINK_NOT_FOUND`, `OTHER`, etc.) alongside **`FAILED`**. **Re-ingest** reuses the same pipeline without re-scraping listing metadata.
-
-**Web pages (`WEB`).** Article-style HTML is fetched with [`safeFetch`](src/lib/safe-outbound-fetch.ts), parsed in **jsdom**, and the main content is extracted with Mozilla's [**Readability**](https://github.com/mozilla/readability) ([`scrapeWebContent`](src/lib/web-scraper.ts)). That matches how Firefox's reader mode chooses "the article," but it is **not universal**: many **SPAs** and other **client-rendered** sites return a thin HTML shell to crawlers, so Readability finds little or nothing and ingest may **`FAIL`**. A small set of hosts that need a full browser are rejected early (`UnsupportedSpaError` → ingest **`SKIPPED`**).
-
-Realtime subscribers get updates when ingestion finishes via [`notifyLinksAfterIngest`](src/lib/notify-links-after-ingest.ts) (which calls [`broadcastLinksChanged`](src/lib/realtime-broadcast.ts)).
-
-```mermaid
-flowchart TB
-  subgraph save["Save path (responds to client)"]
-    A(["URL or file upload"]) --> B["/api/links or /api/upload"]
-    B --> C["detectContentType + scrapeLinkMetadata (safeFetch)"]
-    C --> D["Insert Link — ingestStatus PENDING"]
-    D --> E["after() → prepareIngestForLink by contentType"]
-  end
-
-  subgraph work["Background ingest"]
-    E --> F["ingestStatus PROCESSING"]
-    F --> G{"Extract text"}
-    G --> W["WEB — jsdom + Mozilla Readability"]
-    G --> P["PDF — page text"]
-    G --> Y["YOUTUBE — transcript"]
-    G --> A2["AUDIO — transcription"]
-    W --> H["Chunk + metadata header"]
-    P --> H
-    Y --> H
-    A2 --> H
-    H --> I["Gateway embeddings"]
-    I --> J["Write LinkContent + pgvector"]
-    J --> K{"Outcome"}
-    K --> K1["COMPLETED"]
-    K --> K2["FAILED (+ ingestFailureReason)"]
-    K --> K3["SKIPPED (known SPA hosts)"]
-  end
-
-  K1 --> R["Realtime: list refresh"]
-  K2 --> R
-  K3 --> R
-```
+1. **Input** — `POST /api/links` with a URL (also `/api/v1/links` and the MCP `save_link` tool), or `POST /api/upload` with a PDF/audio file (files go to Supabase Storage).
+2. **Classify & decorate** — Server-side [`detectContentType`](src/lib/server-detect-content-type.ts) (SSRF-safe `HEAD` / sniff) plus [`scrapeLinkMetadata`](src/lib/links.ts) (Open Graph HTML, PDF `Content-Disposition` / size, YouTube oEmbed). Saving an existing URL again refreshes its metadata and moves it to the top.
+3. **Persist** — A `Link` row with title, favicon, thumbnail, domain, and `contentType` (`WEB`, `PDF`, `YOUTUBE`, or `AUDIO`).
+4. **Sync** — [`broadcastLinksChanged`](src/lib/realtime-broadcast.ts) notifies other tabs/devices via Supabase Realtime.
 
 ## Not implemented yet
 
@@ -104,8 +62,7 @@ These are called out explicitly because the repo is going public:
 - **Web:** Next.js (App Router), React, TypeScript
 - **UI:** Tailwind CSS, shadcn/ui
 - **Auth:** Better Auth
-- **Database:** PostgreSQL + Prisma (with vector column for embeddings)
-- **AI:** **Vercel AI Gateway** (OpenAI embeddings through gateway) and **OpenAI** (Whisper transcription direct) via the Vercel AI SDK — server environment variables
+- **Database:** PostgreSQL + Prisma
 - **Email (optional in dev):** Resend for verification emails
 - **Realtime:** Supabase client (anon + service role on server)
 - **PWA:** [Serwist](https://serwist.pages.dev/) (`@serwist/next`), web manifest + precache / offline fallback
@@ -134,10 +91,9 @@ Runs on **`workflow_dispatch`** (manual): **Merge `develop` into `main`**, then 
 
 Purl is built around **untrusted input** (arbitrary URLs and uploaded files). A few layers matter in production:
 
-- **SSRF-aware outbound fetches** — User-supplied URLs are not passed to raw `fetch`. Ingest, OG/thumbnail probes, PDF fetch, content-type sniffing, and similar paths go through [`safeFetch`](src/lib/safe-outbound-fetch.ts): HTTP(S) only, blocked private/link-local/reserved targets, redirect handling with per-hop host checks, DNS resolution pinned before connect (mitigates classic DNS rebinding against the pre-check), optional response size caps (e.g. PDF proxy). Optional **egress proxy** and custom DNS servers are documented in [`AGENTS.md`](AGENTS.md).
+- **SSRF-aware outbound fetches** — User-supplied URLs are not passed to raw `fetch`. OG/thumbnail probes, PDF fetch, content-type sniffing, and similar paths go through [`safeFetch`](src/lib/safe-outbound-fetch.ts): HTTP(S) only, blocked private/link-local/reserved targets, redirect handling with per-hop host checks, DNS resolution pinned before connect (mitigates classic DNS rebinding against the pre-check), optional response size caps (e.g. PDF proxy). Optional **egress proxy** and custom DNS servers are documented in [`AGENTS.md`](AGENTS.md).
 - **Authentication & route gating** — [Better Auth](https://www.better-auth.com/) sessions; Next.js [`proxy`](src/proxy.ts) redirects unauthenticated users away from private routes and can require **email verification** before app access.
 - **API authorization** — Sensitive routes (`/api/links`, `/api/upload`, etc.) resolve the session server-side and scope work to the signed-in user.
-- **Server-managed AI keys** — Embeddings route through **Vercel AI Gateway** (`AI_GATEWAY_API_KEY` or `VERCEL_OIDC_TOKEN` after `vercel env pull`). **Whisper** transcription still calls **OpenAI** directly via `OPENAI_API_KEY`. These keys are never exposed to the client.
 - **Rate limiting** — When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set, the proxy applies per-IP limits to **`/api/auth/*`**, **`POST /api/links`**, and **`POST /api/upload`** (see [`proxy-rate-limit.ts`](src/lib/proxy-rate-limit.ts)). Without Upstash, limits are disabled — fine locally, not ideal for production.
 - **Secrets & client exposure** — `SUPABASE_SERVICE_ROLE_KEY` and similar values are server-only. The browser uses the Supabase **anon** key for Realtime only; `.env` stays gitignored.
 - **Upload bounds** — Audio uploads enforce a maximum size server-side; PDF proxy streaming is capped (see `safe-outbound-fetch` / upload limits in code).
@@ -164,7 +120,7 @@ Copy the CLI signing secret into `STRIPE_WEBHOOK_SECRET` for that shell session.
 
 - **Node.js:** recent LTS
 - **Package manager:** `pnpm` (this repo includes `pnpm-lock.yaml`)
-- **Postgres:** local or hosted (Supabase works well with pgvector)
+- **Postgres:** local or hosted (Supabase works well)
 
 ### 1) Install dependencies
 
@@ -179,10 +135,6 @@ Create a `.env` file in the repo root. See `.env.example` for the full list; min
 ```bash
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DBNAME"
 
-# AI (server-side): gateway for embeddings; OpenAI key for Whisper only
-AI_GATEWAY_API_KEY="..." # or use VERCEL_OIDC_TOKEN from `vercel env pull`
-OPENAI_API_KEY="sk-proj-..."
-
 # Supabase Realtime — cross-device instant link list sync (same project as Postgres)
 NEXT_PUBLIC_SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJ..."
@@ -196,8 +148,6 @@ RESEND_FROM="Purl <onboarding@resend.dev>"
 Notes:
 
 - **`DATABASE_URL`** is required (Prisma + Better Auth).
-- **`AI_GATEWAY_API_KEY`** (or **`VERCEL_OIDC_TOKEN`** on Vercel / after `vercel env pull`) is required for **embeddings** (ingest + semantic search) via AI Gateway. Enable **AI Gateway** in the Vercel project settings for OIDC-based auth. Optional: configure **per-user** limits in the project AI Gateway settings; the app passes the Better Auth user id on gateway calls.
-- **`OPENAI_API_KEY`** is required for **Whisper** transcription (audio ingest / URLs). Omit only if you do not use audio transcription.
 - **Supabase** env vars are required for realtime link list sync. Use **Project Settings → API** in the Supabase dashboard. The service role key must stay server-only.
 - **Resend** is optional for local dev: if `RESEND_API_KEY` is not set, signup can still work, but verification emails will not send.
 - **Better Auth** secrets and URLs are in `.env.example` — copy those keys for a working auth setup.
@@ -226,7 +176,7 @@ Open `http://localhost:3000`.
 
 ## Testing
 
-Tests use [Vitest](https://vitest.dev/) and focus on critical logic (formatters, link grouping, auth routing, API behavior, ingest pipeline). They intentionally avoid shallow UI-only wrappers.
+Tests use [Vitest](https://vitest.dev/) and focus on critical logic (formatters, link grouping, auth routing, API behavior, metadata scraping). They intentionally avoid shallow UI-only wrappers.
 
 ```bash
 pnpm test        # run once

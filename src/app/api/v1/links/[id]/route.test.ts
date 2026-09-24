@@ -40,7 +40,6 @@ const MOCK_LINK = {
   thumbnail: null,
   domain: "example.com",
   contentType: "WEB",
-  ingestStatus: "COMPLETED",
   createdAt: new Date("2025-01-01T12:00:00.000Z"),
   userId: "user-1",
 };

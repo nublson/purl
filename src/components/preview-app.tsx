@@ -38,8 +38,6 @@ async function buildSyntheticLink(url: string): Promise<Link> {
     thumbnail: null,
     domain,
     contentType,
-    ingestStatus: "COMPLETED",
-    ingestFailureReason: null,
     createdAt: new Date(),
   };
 }
@@ -55,8 +53,6 @@ function buildLinkFromResolved(resolved: ResolvedLinkFields): Link {
     thumbnail: resolved.thumbnail,
     domain: resolved.domain,
     contentType: resolved.contentType,
-    ingestStatus: "COMPLETED",
-    ingestFailureReason: null,
     createdAt: new Date(),
   };
 }
@@ -87,8 +83,6 @@ function parseDefaultLinks(links: Link[]): Link[] {
     thumbnail: l.thumbnail,
     domain: l.domain,
     contentType: l.contentType,
-    ingestStatus: l.ingestStatus ?? "COMPLETED",
-    ingestFailureReason: l.ingestFailureReason ?? null,
     createdAt:
       l.createdAt instanceof Date ? l.createdAt : new Date(String(l.createdAt)),
   }));

@@ -17,7 +17,6 @@ function makeLink(
     thumbnail: null,
     domain: "example.com",
     contentType: "WEB",
-    ingestStatus: "COMPLETED",
     createdAt: BASE_DATE,
     ...overrides,
   };
@@ -38,7 +37,6 @@ describe("serializeLink", () => {
       title: "Test Link",
       favicon: "https://test.dev/favicon.ico",
       domain: "test.dev",
-      ingestStatus: "FAILED",
     });
 
     const result = serializeLink(link);
@@ -48,7 +46,7 @@ describe("serializeLink", () => {
     expect(result.title).toBe("Test Link");
     expect(result.favicon).toBe("https://test.dev/favicon.ico");
     expect(result.domain).toBe("test.dev");
-    expect(result.ingestStatus).toBe("FAILED");
+    expect(result).not.toHaveProperty("ingestStatus");
   });
 
   it("defaults contentType to 'WEB' when the field is undefined", () => {
@@ -91,14 +89,6 @@ describe("serializeLink", () => {
     // Ensure JSON.stringify/parse roundtrip is lossless for the date field
     const roundtripped = JSON.parse(JSON.stringify(result));
     expect(roundtripped.createdAt).toBe(BASE_DATE.toISOString());
-  });
-
-  it("serializes all ingestStatus enum values without error", () => {
-    const statuses = ["PENDING", "PROCESSING", "COMPLETED", "FAILED", "SKIPPED"] as const;
-    for (const status of statuses) {
-      const result = serializeLink(makeLink({ ingestStatus: status }));
-      expect(result.ingestStatus).toBe(status);
-    }
   });
 });
 

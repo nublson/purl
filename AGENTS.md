@@ -4,7 +4,7 @@
 
 ### Overview
 
-Purl is a single Next.js (App Router) application — **not** a monorepo. It uses Prisma with PostgreSQL (Supabase-hosted, with pgvector), Better Auth for authentication, **Vercel AI Gateway** (OpenAI embeddings), and **OpenAI** (Whisper transcription only). Gateway requests include **`user`** (Better Auth id) and **`tags`** (`feature:ingest`, `feature:semantic-search`) for Vercel AI usage dashboards and optional per-user rate limits.
+Purl is a single Next.js (App Router) application — **not** a monorepo. It uses Prisma with PostgreSQL (Supabase-hosted), Better Auth for authentication, and Supabase Storage/Realtime. There is no AI provider integration: the in-app chat and the ingestion/embeddings pipeline were removed.
 
 ### Environment variables
 
@@ -41,13 +41,12 @@ See `README.md` and `package.json` scripts for the full list. Quick reference:
 
 ### Gotchas
 
-- **AI Gateway tagging**: Embeddings use [`src/lib/embeddings.ts`](src/lib/embeddings.ts) via [`src/lib/semantic-search.ts`](src/lib/semantic-search.ts) and ingest handlers (`feature:semantic-search` vs `feature:ingest`, `user`). Whisper stays on `OPENAI_API_KEY` only — not routed through the gateway.
 - **Prisma client must be generated** before `pnpm dev` or `pnpm build` will work. The build script (`pnpm build`) already includes `prisma generate`, but `pnpm dev` does not — run `pnpm prisma generate` first if `src/generated/prisma` is missing.
 - **Sentry build plugin**: The `@sentry/cli` build script is ignored by pnpm. This is expected and does not affect local dev. The warning about `pnpm approve-builds` can be safely ignored.
 - **Email verification on signup**: Resend sends a real email. For local dev/testing, manually set `emailVerified = true` on the user record in the database if you can't receive the verification email.
 - **The in-app AI chat was removed.** `/ai` and `/chat/*` permanently redirect to `/home` via `redirects()` in `next.config.ts`.
 - **`.env` is gitignored** — never commit it.
-- **Uploaded files** live in a private bucket. Their `Link.url` is the relative route `/api/links/{id}/file` (see `src/utils/upload-file-url.ts`), which checks ownership and redirects to a fresh 5-minute signed URL. Never store a signed URL on the row; server code that must fetch the file (ingest, PDF proxy via `?linkId=`) signs from `storagePath` instead. `serializeLink` makes the route absolute for API/MCP clients.
+- **Uploaded files** live in a private bucket. Their `Link.url` is the relative route `/api/links/{id}/file` (see `src/utils/upload-file-url.ts`), which checks ownership and redirects to a fresh 5-minute signed URL. Never store a signed URL on the row; server code that must fetch the file (the PDF proxy via `?linkId=`) signs from `storagePath` instead. `serializeLink` makes the route absolute for API/MCP clients.
 - **Stripe billing**: Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and both `STRIPE_PRICE_PRO_*` price IDs for Checkout to work. Webhook processing uses idempotent `ProcessedStripeEvent` rows; configure a webhook URL that receives `checkout.session.completed`, `customer.subscription.*`, and `invoice.payment_*`. Trial is **internal** (7 days on signup); upgrading goes through Checkout. For local dev, use `stripe listen` and paste the CLI webhook secret into `STRIPE_WEBHOOK_SECRET`.
 - **Billing & limits reference**: When changing plans, caps, or in-app copy, treat [`docs/commercial-model.md`](docs/commercial-model.md) as canonical.
 - **Vitest and Prisma**: `src/vitest.setup.ts` sets a placeholder `DATABASE_URL` when unset so modules that initialize Prisma can load in unit tests before per-file mocks apply.
@@ -55,7 +54,7 @@ See `README.md` and `package.json` scripts for the full list. Quick reference:
 
 ### Outbound URL fetching (`safeFetch`)
 
-Link ingest, OG scraping, PDF/audio fetch, and related paths use [`src/lib/safe-outbound-fetch.ts`](src/lib/safe-outbound-fetch.ts). Optional env (server-only):
+OG/metadata scraping, content-type sniffing, the PDF proxy, and related paths use [`src/lib/safe-outbound-fetch.ts`](src/lib/safe-outbound-fetch.ts). Optional env (server-only):
 
 | Variable | Purpose |
 |----------|---------|
@@ -63,7 +62,7 @@ Link ingest, OG scraping, PDF/audio fetch, and related paths use [`src/lib/safe-
 | `SAFE_OUTBOUND_SOCKS_PROXY` | `socks5://` or `socks://` only. Undici’s SOCKS support is experimental; the TCP connect to the SOCKS server is **not** pinned in-app—prefer HTTP proxy if you need full pinning to the egress hop. Only one of HTTP proxy or SOCKS may be set. |
 | `SAFE_OUTBOUND_DNS_SERVERS` | Comma-separated resolvers passed to `dns.setServers` (e.g. `1.1.1.1,8.8.8.8`). Reduces reliance on the platform default resolver; does not replace DoH or an egress proxy. |
 
-**Staging / production:** The proxy must be reachable from your deployment regions (e.g. Vercel). Configure the proxy to refuse private/upstream SSRF targets where possible. After enabling, smoke-test saving a normal HTTPS link, a PDF URL, and YouTube/audio flows. Proxy auth belongs only in server env, never in client-exposed vars.
+**Staging / production:** The proxy must be reachable from your deployment regions (e.g. Vercel). Configure the proxy to refuse private/upstream SSRF targets where possible. After enabling, smoke-test saving a normal HTTPS link, a PDF URL, and a YouTube URL. Proxy auth belongs only in server env, never in client-exposed vars.
 
 **Production setup (Webshare / Vercel env / redeploy / smoke-test):** See [`docs/production-outbound-proxy.md`](docs/production-outbound-proxy.md).
 
@@ -79,7 +78,6 @@ Link ingest, OG scraping, PDF/audio fetch, and related paths use [`src/lib/safe-
 
 ## Learned Workspace Facts
 
-- `SKIPPED` ingest status covers metadata-only skips such as free-plan extraction limits and known unsupported SPA/full-browser hosts; use `skipIngest` for reusable skip behavior.
 - Widespread `SCRAPE_FAILED` on every URL in local dev often means `SAFE_OUTBOUND_HTTP_PROXY` is set but unreachable or returns HTTP 407; unset it for direct egress or verify the proxy with `curl -x "$SAFE_OUTBOUND_HTTP_PROXY" https://example.com` before debugging scrapers.
 - Server-only modules (e.g. those importing Prisma/pg) must not bleed into the client bundle; extract shared types, constants, and pure functions into a `*-shared.ts` sibling file, and guard the server module with `import "server-only"` at the top.
 - Route-level loading skeletons use a component in `src/components/skeletons/` plus a route `loading.tsx` (e.g. `/home`).

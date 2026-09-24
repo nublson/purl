@@ -147,7 +147,6 @@ export default function ApiDocsPage() {
       "thumbnail": null,
       "domain": "example.com",
       "contentType": "WEB",
-      "ingestStatus": "COMPLETED",
       "createdAt": "2025-01-15T10:30:00.000Z"
     }
   ],
@@ -170,7 +169,7 @@ export default function ApiDocsPage() {
           </div>
           <Typography size="small" className="text-muted-foreground leading-7">
             Saves a URL to your library. Purl automatically detects the content
-            type and queues the link for AI processing if your plan includes it.
+            type and fetches the page metadata.
           </Typography>
           <Typography size="mini" className="font-medium text-foreground">
             Body
@@ -210,7 +209,6 @@ export default function ApiDocsPage() {
   "thumbnail": null,
   "domain": "example.com",
   "contentType": "WEB",
-  "ingestStatus": "PENDING",
   "createdAt": "2025-06-05T12:00:00.000Z"
 }`}
           />
@@ -460,7 +458,7 @@ export default function ApiDocsPage() {
           code={`{
   "error": "Plan limit reached",
   "code": "LIMIT_REACHED",
-  "feature": "ai_extractions"
+  "feature": "SAVE_LIMIT"
 }`}
         />
       </section>
