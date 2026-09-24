@@ -6,7 +6,6 @@ import {
 import { usePlan } from "@/hooks/use-plan";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import type { Link } from "@/utils/links";
-import { isUploadFilePath } from "@/utils/upload-file-url";
 import type { ReactNode } from "react";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
 import { LinkUpgradeItem } from "./link-upgrade-item";
@@ -53,10 +52,7 @@ export function LinkPreview({
         onMouseLeave={onPreviewMouseLeave}
       >
         {link.contentType === "PDF" ? (
-          <PdfThumbnail
-            url={link.url}
-            linkId={isUploadFilePath(link.url) ? link.id : undefined}
-          />
+          <PdfThumbnail url={link.url} />
         ) : (
           <LinkPreviewThumbnail
             link={link}

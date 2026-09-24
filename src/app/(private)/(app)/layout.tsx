@@ -1,7 +1,6 @@
 import Header from "@/components/header";
 import { HeaderSearchLinks } from "@/components/header-search-links";
 import { HeaderActionsFallback } from "@/components/skeletons";
-import { UploadFile } from "@/components/upload-file";
 import { User } from "@/components/user";
 import { UsageProvider } from "@/contexts/usage-context";
 import { auth } from "@/lib/auth";
@@ -22,7 +21,6 @@ async function HeaderActions() {
     <UsageProvider usageSummary={usageSummary}>
       <div className="flex items-center justify-end gap-2">
         <HeaderSearchLinks links={links} />
-        <UploadFile className="hidden md:inline-flex" />
         <User />
       </div>
     </UsageProvider>

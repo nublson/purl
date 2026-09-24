@@ -4,7 +4,6 @@ import {
   getFeedbackPostRateLimiter,
   getLinksPostRateLimiter,
   getMcpRateLimiter,
-  getUploadPostRateLimiter,
   getV1PostRateLimiter,
   getV1RateLimiter,
 } from "@/lib/upstash-rate-limit";
@@ -95,15 +94,6 @@ export async function rateLimitApiRequest(
 
   if (pathname === "/api/links" && request.method === "POST") {
     const limiter = getLinksPostRateLimiter();
-    if (limiter) {
-      const { success, reset } = await limiter.limit(ip);
-      if (!success) return tooManyRequests(reset);
-    }
-    return null;
-  }
-
-  if (pathname === "/api/upload" && request.method === "POST") {
-    const limiter = getUploadPostRateLimiter();
     if (limiter) {
       const { success, reset } = await limiter.limit(ip);
       if (!success) return tooManyRequests(reset);

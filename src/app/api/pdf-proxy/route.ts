@@ -1,49 +1,13 @@
-import { auth } from "@/lib/auth";
 import {
   PDF_PROXY_MAX_RESPONSE_BYTES,
   UnsafeOutboundUrlError,
   limitReadableStreamByBytes,
   safeFetch,
 } from "@/lib/safe-outbound-fetch";
-import { createSignedFileUrlForLink, UploadStorageError } from "@/lib/upload-file";
 import { NextRequest, NextResponse } from "next/server";
 
-/**
- * Uploaded PDFs are passed as `?linkId=` (their stable app URL needs the
- * session, which safeFetch does not forward). Ownership is checked and a
- * fresh signed storage URL is fetched through the same safeFetch path.
- */
-async function resolveUploadedPdfUrl(
-  request: NextRequest,
-  linkId: string,
-): Promise<string | NextResponse> {
-  const session = await auth.api.getSession({ headers: request.headers });
-  const userId = session?.user?.id;
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  try {
-    const signedUrl = await createSignedFileUrlForLink(userId, linkId);
-    if (!signedUrl) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-    return signedUrl;
-  } catch (e) {
-    if (e instanceof UploadStorageError) {
-      return NextResponse.json({ error: "Failed to access file" }, { status: 502 });
-    }
-    throw e;
-  }
-}
-
 export async function GET(request: NextRequest) {
-  const linkId = request.nextUrl.searchParams.get("linkId")?.trim() ?? "";
-  let sourceUrl = request.nextUrl.searchParams.get("url")?.trim() ?? "";
-  if (linkId) {
-    const resolved = await resolveUploadedPdfUrl(request, linkId);
-    if (resolved instanceof NextResponse) return resolved;
-    sourceUrl = resolved;
-  }
+  const sourceUrl = request.nextUrl.searchParams.get("url")?.trim() ?? "";
   if (!sourceUrl) {
     return NextResponse.json({ error: "Missing url query param" }, { status: 400 });
   }

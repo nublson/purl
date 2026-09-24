@@ -17,7 +17,6 @@ vi.mock("@/lib/upstash-rate-limit", () => ({
   getAuthRateLimiter: vi.fn(),
   getFeedbackPostRateLimiter: vi.fn(),
   getLinksPostRateLimiter: vi.fn(),
-  getUploadPostRateLimiter: vi.fn(),
   getV1RateLimiter: vi.fn().mockReturnValue({ limit: limitMock }),
   getV1PostRateLimiter: vi.fn(),
   getMcpRateLimiter: vi.fn(),
@@ -27,7 +26,6 @@ const {
   getAuthRateLimiter,
   getFeedbackPostRateLimiter,
   getLinksPostRateLimiter,
-  getUploadPostRateLimiter,
   getV1RateLimiter,
   getV1PostRateLimiter,
   getMcpRateLimiter,
@@ -59,7 +57,6 @@ describe("rateLimitApiRequest", () => {
     limitMock.mockReset();
     vi.mocked(getAuthRateLimiter).mockReset();
     vi.mocked(getLinksPostRateLimiter).mockReset();
-    vi.mocked(getUploadPostRateLimiter).mockReset();
     vi.mocked(getFeedbackPostRateLimiter).mockReset();
   });
 
@@ -169,24 +166,6 @@ describe("rateLimitApiRequest", () => {
       );
       expect(result).toBeNull();
       expect(getLinksPostRateLimiter).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("POST /api/upload", () => {
-    it("returns 429 when the upload POST limit is exceeded", async () => {
-      vi.mocked(getUploadPostRateLimiter).mockReturnValue(
-        mockLimiter() as never,
-      );
-      limitMock.mockResolvedValue({
-        success: false,
-        reset: Date.now() + 60_000,
-      });
-
-      const result = await rateLimitApiRequest(
-        makeRequest("/api/upload", "POST"),
-      );
-
-      expect(result!.status).toBe(429);
     });
   });
 
