@@ -148,7 +148,6 @@ const MOCK_LINK = {
   contentType: "WEB" as const,
   createdAt: new Date("2025-01-01T12:00:00.000Z"),
   userId: "user-1",
-  storagePath: null,
 };
 
 describe("listLinks", () => {
