@@ -81,4 +81,4 @@ OG/metadata scraping, content-type sniffing, the PDF proxy, and related paths us
 - Server-only modules (e.g. those importing Prisma/pg) must not bleed into the client bundle; extract shared types, constants, and pure functions into a `*-shared.ts` sibling file, and guard the server module with `import "server-only"` at the top.
 - Route-level loading skeletons use a component in `src/components/skeletons/` plus a route `loading.tsx` (e.g. `/home`).
 - Docs under `src/app/(public)/docs/` still need a `publicRoutes` entry in `src/proxy.ts` — the `(public)` route group alone does not bypass auth middleware.
-- `publicRoutes` in `src/proxy.ts` supports `match: "exact" | "prefix"` and optional `skipSessionLookup` (e.g. `/docs` and `/api/auth` use prefix matching).
+- `publicRoutes` in `src/proxy.ts` supports `match: "exact" | "prefix"` (e.g. `/docs` and `/api/auth` use prefix matching). Routes with `whenAuthenticated: "next"` skip the session lookup entirely; only `"redirect"` routes (`/login`, `/signup`) resolve the session.
