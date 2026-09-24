@@ -1,4 +1,4 @@
-import { BillingLimitError } from "@/lib/entitlements";
+import { SaveLimitError } from "@/lib/entitlements";
 import { createLink, listLinks, UnauthorizedError } from "@/lib/links";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { serializeLink } from "@/lib/serialize-link";
@@ -60,11 +60,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     if (e instanceof UnauthorizedError) {
       return addCors(NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
     }
-    if (e instanceof BillingLimitError) {
+    if (e instanceof SaveLimitError) {
       return addCors(
         NextResponse.json(
           { error: e.message, code: "LIMIT_REACHED", feature: e.feature },
-          { status: 402 }
+          { status: 403 }
         )
       );
     }

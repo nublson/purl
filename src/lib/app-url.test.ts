@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getAppBaseUrl } from "./billing-url";
+import { getAppBaseUrl } from "./app-url";
 
 describe("getAppBaseUrl", () => {
   afterEach(() => {

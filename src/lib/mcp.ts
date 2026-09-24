@@ -1,7 +1,7 @@
 import "server-only";
 
 import { auth } from "@/lib/auth";
-import { BillingLimitError } from "@/lib/entitlements";
+import { SaveLimitError } from "@/lib/entitlements";
 import {
   createLinkForUser,
   listLinksForUser,
@@ -58,8 +58,8 @@ export async function saveLinkTool(
     await broadcastLinksChanged(link.userId);
     return jsonContent(serializeLink(link));
   } catch (e) {
-    if (e instanceof BillingLimitError) {
-      return errorContent(`Plan limit reached: ${e.message}`);
+    if (e instanceof SaveLimitError) {
+      return errorContent(`Limit reached: ${e.message}`);
     }
     throw e;
   }

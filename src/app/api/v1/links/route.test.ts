@@ -15,9 +15,8 @@ const mockCreateLink = vi.fn();
 class MockUnauthorizedError extends Error {
   constructor() { super("Unauthorized"); }
 }
-class MockBillingLimitError extends Error {
-  feature: string;
-  constructor(feature: string, message: string) { super(message); this.feature = feature; }
+class MockSaveLimitError extends Error {
+  readonly feature = "SAVE_LIMIT";
 }
 
 vi.mock("@/lib/links", () => ({
@@ -26,7 +25,7 @@ vi.mock("@/lib/links", () => ({
   UnauthorizedError: MockUnauthorizedError,
 }));
 vi.mock("@/lib/entitlements", () => ({
-  BillingLimitError: MockBillingLimitError,
+  SaveLimitError: MockSaveLimitError,
 }));
 
 const MOCK_LINK = {
@@ -153,9 +152,9 @@ describe("POST /api/v1/links", () => {
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   });
 
-  it("returns 402 when billing limit reached", async () => {
+  it("returns 403 LIMIT_REACHED when the save cap is reached", async () => {
     mockCreateLink.mockRejectedValue(
-      new MockBillingLimitError("SAVE_LIMIT", "Limit reached")
+      new MockSaveLimitError("Limit reached")
     );
     const { POST } = await import("./route");
     const res = await POST(
@@ -165,9 +164,13 @@ describe("POST /api/v1/links", () => {
         headers: { "content-type": "application/json" },
       })
     );
-    expect(res.status).toBe(402);
+    expect(res.status).toBe(403);
     const body = await res.json();
-    expect(body.code).toBe("LIMIT_REACHED");
+    expect(body).toEqual({
+      error: "Limit reached",
+      code: "LIMIT_REACHED",
+      feature: "SAVE_LIMIT",
+    });
   });
 
   it("returns 400 for invalid JSON", async () => {

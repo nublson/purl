@@ -27,15 +27,11 @@ vi.mock("@/lib/serialize-link", () => ({
   serializeLink: (link: unknown) => link,
 }));
 
-class MockBillingLimitError extends Error {
-  feature: string;
-  constructor(feature: string, message: string) {
-    super(message);
-    this.feature = feature;
-  }
+class MockSaveLimitError extends Error {
+  readonly feature = "SAVE_LIMIT";
 }
 vi.mock("@/lib/entitlements", () => ({
-  BillingLimitError: MockBillingLimitError,
+  SaveLimitError: MockSaveLimitError,
 }));
 
 const {
@@ -295,13 +291,13 @@ describe("saveLinkTool", () => {
     expect(parse(result)).toMatchObject({ id: "link-1" });
   });
 
-  it("surfaces a plan-limit error as tool error text", async () => {
+  it("surfaces the save-limit error as tool error text", async () => {
     mockCreateLinkForUser.mockRejectedValue(
-      new MockBillingLimitError("save", "Save limit reached"),
+      new MockSaveLimitError("Save limit reached"),
     );
     const result = await saveLinkTool("user-1", "https://example.com");
     expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain("Plan limit reached");
+    expect(result.content[0].text).toBe("Limit reached: Save limit reached");
   });
 });
 

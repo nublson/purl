@@ -7,7 +7,6 @@ import { SettingsAccount } from "./settings-account";
 import { SettingsIntegrations } from "./settings-integrations";
 import { SettingsTabs } from "./settings-tabs";
 import { SettingsUsage } from "./settings-usage";
-import { Badge } from "./ui/badge";
 
 interface SettingsDialogProps {
   children: React.ReactNode;
@@ -32,7 +31,6 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
 
 function SettingsContent({ closeDialog }: { closeDialog: () => void }) {
   const { usageSummary } = useUsage();
-  const isTrial = usageSummary?.effectivePlanKey === "PRO_TRIAL";
 
   return (
     <SettingsTabs
@@ -40,14 +38,6 @@ function SettingsContent({ closeDialog }: { closeDialog: () => void }) {
         {
           label: "Usage",
           value: "usage",
-          badge: isTrial ? (
-            <Badge
-              variant="secondary"
-              className="bg-amber-500/15 text-amber-600 dark:text-amber-400 border-0"
-            >
-              Trial
-            </Badge>
-          ) : undefined,
           content: <SettingsUsage data={usageSummary} />,
         },
         {

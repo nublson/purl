@@ -25,10 +25,6 @@ vi.mock("@/lib/prisma", () => ({
       delete: vi.fn(),
       count: vi.fn(),
     },
-    subscription: {
-      findUnique: vi.fn(),
-      create: vi.fn(),
-    },
   },
 }));
 
@@ -52,28 +48,8 @@ const {
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 const CREATED_AT = new Date("2025-06-15T10:00:00Z");
 
-const MOCK_PRO_SUBSCRIPTION = {
-  id: "sub-1",
-  userId: "user-123",
-  planKey: "PRO" as const,
-  status: "ACTIVE" as const,
-  trialEndsAt: null,
-  compUntil: null,
-  currentPeriodStart: new Date("2025-06-01T00:00:00Z"),
-  currentPeriodEnd: new Date("2025-07-01T00:00:00Z"),
-  stripeCustomerId: null as string | null,
-  stripeSubscriptionId: null as string | null,
-  stripePriceId: null as string | null,
-  cancelAtPeriodEnd: false,
-  trialEndingNotifiedAt: null as Date | null,
-  updatedAt: CREATED_AT,
-};
-
-function mockProBillingForLinksTests() {
+function mockUnderSaveLimit() {
   vi.mocked(prisma.link.count).mockResolvedValue(0);
-  vi.mocked(prisma.subscription.findUnique).mockResolvedValue(
-    MOCK_PRO_SUBSCRIPTION as never,
-  );
 }
 
 function makeRow(
@@ -535,7 +511,7 @@ describe("createLink", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response(null, { status: 200 }));
     mockOgsSuccess();
-    mockProBillingForLinksTests();
+    mockUnderSaveLimit();
   });
 
   afterEach(() => {
@@ -713,7 +689,7 @@ describe("refreshLink", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response(null, { status: 200 }));
     mockOgsSuccess();
-    mockProBillingForLinksTests();
+    mockUnderSaveLimit();
   });
 
   afterEach(() => {

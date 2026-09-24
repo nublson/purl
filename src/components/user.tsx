@@ -3,7 +3,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useSession } from "@/lib/auth-client";
 import {
-  BadgeCheck,
   House,
   LogOut,
   MessageCircleHeart,
@@ -12,7 +11,6 @@ import {
 import Link from "next/link";
 import { FeedbackDialog } from "./dialog-feedback";
 import { SettingsDialog } from "./dialog-settings";
-import { UpgradeDialog } from "./dialog-upgrade";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
@@ -85,16 +83,6 @@ export function User() {
             Settings
           </DropdownMenuItem>
         </SettingsDialog>
-        <UpgradeDialog>
-          <DropdownMenuItem
-            onSelect={(event) => {
-              event.preventDefault();
-            }}
-          >
-            <BadgeCheck />
-            Upgrade
-          </DropdownMenuItem>
-        </UpgradeDialog>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuItem data-cy="sign-out-menu-item" asChild>
