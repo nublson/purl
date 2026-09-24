@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
-import { useCurrentUser } from "@/contexts/current-user-context";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   House,
   LogOut,

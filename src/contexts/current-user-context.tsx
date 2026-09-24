@@ -3,20 +3,19 @@
 import type { SessionUser } from "@/lib/session";
 import {
   createContext,
-  useContext,
   useState,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
 } from "react";
 
-type CurrentUserContextValue = {
+export type CurrentUserContextValue = {
   user: SessionUser | null;
   /** Patch the user after a profile change (e.g. a new avatar). */
   setUser: Dispatch<SetStateAction<SessionUser | null>>;
 };
 
-const CurrentUserContext = createContext<CurrentUserContextValue>({
+export const CurrentUserContext = createContext<CurrentUserContextValue>({
   user: null,
   setUser: () => {},
 });
@@ -38,8 +37,4 @@ export function CurrentUserProvider({
       {children}
     </CurrentUserContext.Provider>
   );
-}
-
-export function useCurrentUser() {
-  return useContext(CurrentUserContext);
 }

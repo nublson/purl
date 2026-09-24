@@ -1,6 +1,6 @@
 "use client";
 
-import { useCurrentUser } from "@/contexts/current-user-context";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { updateUser } from "@/lib/auth-client";
 import {
   AVATAR_MAX_UPLOAD_BYTES,

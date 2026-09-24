@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useCurrentUser } from "@/contexts/current-user-context";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { DeleteAccountItem } from "./delete-account-item";
 import { SettingsItem } from "./settings-item";
 import { Typography } from "./typography";
