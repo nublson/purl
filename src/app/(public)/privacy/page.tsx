@@ -30,21 +30,14 @@ export default function PrivacyPage() {
           <li>
             <Typography size="small" component="span">
               <strong className="text-foreground">Saved content</strong> — URLs,
-              page metadata (title, description, favicon, thumbnail), and files
-              you upload to Purl.
+              and page metadata (title, description, favicon, thumbnail) of the
+              links you save to Purl.
             </Typography>
           </li>
           <li>
             <Typography size="small" component="span">
               <strong className="text-foreground">Usage data</strong> — how many
-              links you&apos;ve saved, for plan enforcement purposes.
-            </Typography>
-          </li>
-          <li>
-            <Typography size="small" component="span">
-              <strong className="text-foreground">Billing data</strong> —
-              payment is handled entirely by Stripe. We do not store card
-              numbers or payment details.
+              links you&apos;ve saved, to enforce the per-account limit.
             </Typography>
           </li>
         </ul>
@@ -59,7 +52,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             <Typography size="small" component="span">
-              To enforce plan limits and process billing.
+              To enforce the per-account link limit.
             </Typography>
           </li>
           <li>
@@ -82,7 +75,6 @@ export default function PrivacyPage() {
           {[
             ["Vercel", "hosting and compute"],
             ["Supabase", "database and real-time infrastructure"],
-            ["Stripe", "payment processing"],
             ["Resend", "transactional email"],
           ].map(([name, desc]) => (
             <li key={name}>

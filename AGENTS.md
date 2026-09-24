@@ -46,11 +46,9 @@ See `README.md` and `package.json` scripts for the full list. Quick reference:
 - **Email verification on signup**: Resend sends a real email. For local dev/testing, manually set `emailVerified = true` on the user record in the database if you can't receive the verification email.
 - **The in-app AI chat was removed.** `/ai` and `/chat/*` permanently redirect to `/home` via `redirects()` in `next.config.ts`.
 - **`.env` is gitignored** — never commit it.
-- **Uploaded files** live in a private bucket. Their `Link.url` is the relative route `/api/links/{id}/file` (see `src/utils/upload-file-url.ts`), which checks ownership and redirects to a fresh 5-minute signed URL. Never store a signed URL on the row; server code that must fetch the file (the PDF proxy via `?linkId=`) signs from `storagePath` instead. `serializeLink` makes the route absolute for API/MCP clients.
-- **Stripe billing**: Set `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and both `STRIPE_PRICE_PRO_*` price IDs for Checkout to work. Webhook processing uses idempotent `ProcessedStripeEvent` rows; configure a webhook URL that receives `checkout.session.completed`, `customer.subscription.*`, and `invoice.payment_*`. Trial is **internal** (7 days on signup); upgrading goes through Checkout. For local dev, use `stripe listen` and paste the CLI webhook secret into `STRIPE_WEBHOOK_SECRET`.
-- **Billing & limits reference**: When changing plans, caps, or in-app copy, treat [`docs/commercial-model.md`](docs/commercial-model.md) as canonical.
+- **Save limit**: every account is capped at `MAX_SAVED_LINKS` (1,000) in `src/lib/limits.ts`; there are no paid plans. Keep in-app copy, the API docs page, and the terms in sync when changing it.
 - **Vitest and Prisma**: `src/vitest.setup.ts` sets a placeholder `DATABASE_URL` when unset so modules that initialize Prisma can load in unit tests before per-file mocks apply.
-- **Plan usage UI**: Usage caps and progress for the signed-in user live in **Settings → Usage**, not on `/home`. The app shell layout loads them with `getUsageSummaryForUser` and passes the result into the settings dialog (`src/app/(private)/(app)/layout.tsx`, `src/lib/usage-summary.ts`, `src/components/dialog-settings.tsx`).
+- **Usage UI**: The link count and cap for the signed-in user live in **Settings → Usage**, not on `/home`. The app shell layout loads them with `getUsageSummaryForUser` and passes the result into the settings dialog (`src/app/(private)/(app)/layout.tsx`, `src/lib/usage-summary.ts`, `src/components/dialog-settings.tsx`).
 
 ### Outbound URL fetching (`safeFetch`)
 
@@ -73,7 +71,7 @@ OG/metadata scraping, content-type sniffing, the PDF proxy, and related paths us
 - Prefer React context (e.g., `UsageContext`) over custom-event or event-emitter patterns for cross-component reactive state; if an event-based approach is proposed and rejected, migrate to a context instead.
 - When a feature is complete, the user may ask for "isolated commits related to what we did" — group changes into small logical atomic commits per feature area rather than one large catch-all commit.
 - Use existing UI wrappers (`dialog-wrapper`, `dropdown-wrapper`, `alert-dialog-wrapper`) when adding modals, dropdowns, or confirm dialogs; match patterns used elsewhere instead of inlining raw Radix/shadcn primitives.
-- Context files should export only the context object and Provider; consumer `useContext` hooks belong in `src/hooks/use-*.ts`, matching the existing `use-plan.ts` / `use-usage.ts` pattern (do not inline hooks in context files).
+- Context files should export only the context object and Provider; consumer `useContext` hooks belong in `src/hooks/use-*.ts`, matching the existing `use-usage.ts` / `use-auth.ts` pattern (do not inline hooks in context files).
 - Prefer extending declarative `publicRoutes` in `src/proxy.ts` (with prefix matching) over ad-hoc special-case path checks when making route trees publicly accessible.
 
 ## Learned Workspace Facts

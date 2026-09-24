@@ -77,18 +77,10 @@ export default function TermsPage() {
         </ul>
       </CopySection>
 
-      <CopySection title="Plans and billing">
+      <CopySection title="Usage limits">
         <Typography size="small">
-          Purl offers two plans: Free ($0) and Pro ($39 one-time payment). New
-          accounts receive a 7-day Pro trial — no card required. After the
-          trial, the account downgrades to Free unless the one-time Pro payment
-          is made.
-        </Typography>
-        <Typography size="small">
-          Pro payments are processed by Stripe. Because Pro is a one-time
-          purchase, there are no recurring charges or cancellations. We reserve
-          the right to change pricing with 30 days&apos; notice to existing
-          users.
+          Purl is free to use. Each account can save up to 1,000 links. We may
+          change this limit with reasonable notice to existing users.
         </Typography>
       </CopySection>
 
