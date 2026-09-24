@@ -14,7 +14,29 @@ vi.mock("@/lib/safe-outbound-fetch", async (importOriginal) => {
   };
 });
 
+vi.mock("@/lib/auth", () => ({
+  auth: {
+    api: {
+      getSession: vi.fn(),
+    },
+  },
+}));
+
+vi.mock("@/lib/upload-file", () => {
+  class UploadStorageError extends Error {
+    readonly name = "UploadStorageError";
+  }
+  return {
+    createSignedFileUrlForLink: vi.fn(),
+    UploadStorageError,
+  };
+});
+
 const { UnsafeOutboundUrlError } = await import("@/lib/safe-outbound-fetch");
+const { auth } = await import("@/lib/auth");
+const { createSignedFileUrlForLink, UploadStorageError } = await import(
+  "@/lib/upload-file"
+);
 
 function getRequest(url: string): NextRequest {
   return new NextRequest(url, { method: "GET" });
@@ -119,5 +141,110 @@ describe("GET /api/pdf-proxy", () => {
       "https://example.com/doc.pdf",
       expect.objectContaining({ cache: "no-store" }),
     );
+  });
+});
+
+describe("GET /api/pdf-proxy?linkId= (uploaded PDFs)", () => {
+  const SIGNED_URL =
+    "https://project.supabase.co/storage/v1/object/sign/user-uploads/u/doc.pdf?token=t";
+
+  beforeEach(() => {
+    mockSafeFetch.mockReset();
+    vi.mocked(auth.api.getSession).mockReset();
+    vi.mocked(createSignedFileUrlForLink).mockReset();
+  });
+
+  function linkRequest(linkId = "link-1") {
+    return getRequest(`http://localhost/api/pdf-proxy?linkId=${linkId}`);
+  }
+
+  it("returns 401 without a session", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+    const { GET } = await import("./route");
+
+    const res = await GET(linkRequest());
+
+    expect(res.status).toBe(401);
+    expect(createSignedFileUrlForLink).not.toHaveBeenCalled();
+    expect(mockSafeFetch).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the upload is not owned by the user", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue({
+      user: { id: "user-1" },
+      session: {},
+    } as never);
+    vi.mocked(createSignedFileUrlForLink).mockResolvedValue(null);
+    const { GET } = await import("./route");
+
+    const res = await GET(linkRequest("someone-elses"));
+
+    expect(res.status).toBe(404);
+    expect(createSignedFileUrlForLink).toHaveBeenCalledWith(
+      "user-1",
+      "someone-elses",
+    );
+    expect(mockSafeFetch).not.toHaveBeenCalled();
+  });
+
+  it("returns 502 when storage cannot sign the file", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue({
+      user: { id: "user-1" },
+      session: {},
+    } as never);
+    vi.mocked(createSignedFileUrlForLink).mockRejectedValue(
+      new UploadStorageError("down"),
+    );
+    const { GET } = await import("./route");
+
+    const res = await GET(linkRequest());
+
+    expect(res.status).toBe(502);
+    expect(mockSafeFetch).not.toHaveBeenCalled();
+  });
+
+  it("fetches the freshly signed URL through safeFetch", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue({
+      user: { id: "user-1" },
+      session: {},
+    } as never);
+    vi.mocked(createSignedFileUrlForLink).mockResolvedValue(SIGNED_URL);
+    mockSafeFetch.mockResolvedValue({
+      ok: true,
+      body: new ReadableStream(),
+      headers: new Headers({ "content-type": "application/pdf" }),
+    });
+    const { GET } = await import("./route");
+
+    const res = await GET(linkRequest());
+
+    expect(res.status).toBe(200);
+    expect(mockSafeFetch).toHaveBeenCalledWith(
+      SIGNED_URL,
+      expect.objectContaining({ cache: "no-store" }),
+    );
+  });
+
+  it("ignores a caller-supplied url when linkId is present", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue({
+      user: { id: "user-1" },
+      session: {},
+    } as never);
+    vi.mocked(createSignedFileUrlForLink).mockResolvedValue(SIGNED_URL);
+    mockSafeFetch.mockResolvedValue({
+      ok: true,
+      body: new ReadableStream(),
+      headers: new Headers(),
+    });
+    const { GET } = await import("./route");
+
+    await GET(
+      getRequest(
+        "http://localhost/api/pdf-proxy?linkId=link-1&url=" +
+          encodeURIComponent("https://evil.example/x.pdf"),
+      ),
+    );
+
+    expect(mockSafeFetch).toHaveBeenCalledWith(SIGNED_URL, expect.anything());
   });
 });

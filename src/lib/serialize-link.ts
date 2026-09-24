@@ -1,4 +1,6 @@
+import { getAppBaseUrl } from "@/lib/billing-url";
 import type { ContentType } from "@/lib/prisma";
+import { isUploadFilePath } from "@/utils/upload-file-url";
 
 type LinkLike = {
   id: string;
@@ -15,7 +17,8 @@ type LinkLike = {
 export function serializeLink(link: LinkLike) {
   return {
     id: link.id,
-    url: link.url,
+    // Uploads store a relative app route; API/MCP clients need an absolute URL.
+    url: isUploadFilePath(link.url) ? `${getAppBaseUrl()}${link.url}` : link.url,
     title: link.title,
     description: link.description,
     favicon: link.favicon,

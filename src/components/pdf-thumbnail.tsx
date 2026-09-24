@@ -4,11 +4,13 @@ import * as React from "react";
 
 type PdfThumbnailProps = {
   url: string;
+  /** Set for uploaded PDFs; the proxy re-signs the private file by link id. */
+  linkId?: string;
 };
 
 type RenderState = "loading" | "done" | "error";
 
-export function PdfThumbnail({ url }: PdfThumbnailProps) {
+export function PdfThumbnail({ url, linkId }: PdfThumbnailProps) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const [renderState, setRenderState] = React.useState<RenderState>("loading");
 
@@ -29,7 +31,9 @@ export function PdfThumbnail({ url }: PdfThumbnailProps) {
         ).toString();
         pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
-        const proxyUrl = `/api/pdf-proxy?url=${encodeURIComponent(url)}`;
+        const proxyUrl = linkId
+          ? `/api/pdf-proxy?linkId=${encodeURIComponent(linkId)}`
+          : `/api/pdf-proxy?url=${encodeURIComponent(url)}`;
         loadingTask = pdfjsLib.getDocument(proxyUrl);
         const pdf = (await loadingTask.promise) as {
           getPage: (pageNumber: number) => Promise<{
@@ -85,7 +89,7 @@ export function PdfThumbnail({ url }: PdfThumbnailProps) {
       renderTask?.cancel();
       loadingTask?.destroy();
     };
-  }, [url]);
+  }, [url, linkId]);
 
   if (renderState === "error") return null;
 
