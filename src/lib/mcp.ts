@@ -55,7 +55,7 @@ export async function saveLinkTool(
   }
   try {
     const link = await createLinkForUser(userId, trimmed);
-    await broadcastLinksChanged(link.userId);
+    broadcastLinksChanged(link.userId);
     return jsonContent(serializeLink(link));
   } catch (e) {
     if (e instanceof SaveLimitError) {

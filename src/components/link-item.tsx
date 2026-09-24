@@ -1,13 +1,12 @@
 "use client";
 
+import { emitLinksChanged } from "@/lib/links-events";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
-import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import * as React from "react";
-import { X } from "./animate-ui/icons/x";
 import { LinkIcon } from "./link-icon";
-import { LinkMenu } from "./link-menu";
 import { LinkPreview } from "./link-preview";
 import { LinkItemSkeleton } from "./skeletons";
 import { Typography } from "./typography";
@@ -19,10 +18,22 @@ import {
   ItemTitle,
 } from "./ui/item";
 
+// Loaded on demand: the menu (dropdown, edit dialog, form library) and the
+// Motion-based delete icon stay out of the initial bundle. The placeholder
+// matches the menu trigger's size to avoid layout shift.
+const LinkMenu = dynamic(
+  () => import("./link-menu").then((m) => m.LinkMenu),
+  { loading: () => <div className="size-8" aria-hidden /> },
+);
+const X = dynamic(
+  () => import("./animate-ui/icons/x").then((m) => m.X),
+  { ssr: false },
+);
+
 interface LinkItemProps {
   link: LinkType;
   eagerFavicon?: boolean;
-  mode?: "default" | "preview" | "search";
+  mode?: "default" | "search";
 }
 
 export const LinkItem = React.forwardRef<
@@ -40,8 +51,6 @@ export const LinkItem = React.forwardRef<
   },
   ref,
 ) {
-  const router = useRouter();
-
   const [deletePhase, setDeletePhase] = React.useState<
     "idle" | "animating" | "loading" | "exiting"
   >("idle");
@@ -97,7 +106,7 @@ export const LinkItem = React.forwardRef<
         animateOut={deletePhase === "exiting"}
         onAnimationEnd={() => {
           if (deletePhase !== "exiting") return;
-          router.refresh();
+          emitLinksChanged();
         }}
       />
     );
@@ -109,10 +118,7 @@ export const LinkItem = React.forwardRef<
       data-cy="link-item"
       role="listitem"
       className={cn(
-        "w-full p-2 gap-4 grid relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
-        mode === "preview"
-          ? "grid-cols-[20px_1fr]"
-          : "grid-cols-[20px_1fr_auto]",
+        "w-full p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
         deletePhase === "animating" &&
           "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
         className,
@@ -160,41 +166,42 @@ export const LinkItem = React.forwardRef<
           </Typography>
         </ItemTitle>
       </ItemContent>
-      {mode !== "preview" && (
-        <ItemActions
-          className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100 transition-opacity duration-200"
-          onMouseEnter={() => {
-            hoveringActionsRef.current = true;
-            clearOpenTimer();
-            clearCloseTimer();
+      <ItemActions
+        className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100 transition-opacity duration-200"
+        onMouseEnter={() => {
+          hoveringActionsRef.current = true;
+          clearOpenTimer();
+          clearCloseTimer();
+        }}
+        onMouseLeave={() => {
+          hoveringActionsRef.current = false;
+          scheduleOpen();
+        }}
+      >
+        <LinkMenu
+          link={link}
+          onDeleteStart={() => {
+            setDeletePhase("animating");
           }}
-          onMouseLeave={() => {
-            hoveringActionsRef.current = false;
-            scheduleOpen();
+          onDeleteSuccess={() => {
+            setDeletePhase("exiting");
           }}
-        >
-          <LinkMenu
-            link={link}
-            onDeleteStart={() => {
-              setDeletePhase("animating");
-            }}
-            onDeleteSuccess={() => {
-              setDeletePhase("exiting");
-            }}
-            onDeleteError={() => {
-              setDeletePhase("idle");
-            }}
-          />
-        </ItemActions>
-      )}
+          onDeleteError={() => {
+            setDeletePhase("idle");
+          }}
+        />
+      </ItemActions>
     </Item>
   );
+
+  // The hover preview only opens in the default list; skip it elsewhere.
+  if (mode !== "default") return content;
 
   return (
     <LinkPreview
       link={link}
       eagerThumbnail={Boolean(eagerFavicon)}
-      open={mode === "default" && previewOpen}
+      open={previewOpen}
       onOpenChange={() => {
         // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.
       }}

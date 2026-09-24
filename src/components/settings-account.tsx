@@ -1,5 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useSession } from "@/lib/auth-client";
+import { useCurrentUser } from "@/contexts/current-user-context";
 import { DeleteAccountItem } from "./delete-account-item";
 import { SettingsItem } from "./settings-item";
 import { Typography } from "./typography";
@@ -7,8 +7,8 @@ import { Button } from "./ui/button";
 
 export function SettingsAccount({ closeDialog }: { closeDialog: () => void }) {
   const { signOut } = useAuth();
-  const { data: session } = useSession();
-  const email = session?.user?.email ?? null;
+  const { user } = useCurrentUser();
+  const email = user?.email ?? null;
 
   return (
     <div className="w-full flex-1 flex flex-col gap-4">

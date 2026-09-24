@@ -186,7 +186,7 @@ describe("links/[id] API route", () => {
       expect(vi.mocked(updateLink)).toHaveBeenCalledWith(ID, {
         url: "https://example.com",
       });
-      expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith("user-123");
+      expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith("user-123", null);
     });
 
     it("passes description explicitly null when provided", async () => {
@@ -262,7 +262,7 @@ describe("links/[id] API route", () => {
       });
 
       expect(res.status).toBe(204);
-      expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith("user-123");
+      expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith("user-123", null);
     });
 
     it("returns 204 without broadcasting when session has no user id", async () => {

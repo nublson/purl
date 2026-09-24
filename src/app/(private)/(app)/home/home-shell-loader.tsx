@@ -1,8 +1,19 @@
 import { HomeShell } from "@/components/home-shell";
-import { getLinksForCurrentUser } from "@/lib/links";
+import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
+import { getLinksPageForCurrentUser } from "@/lib/links";
+import { getSessionUser } from "@/lib/session";
 import { groupLinksByDate } from "@/utils/links";
 
 export async function HomeShellLoader() {
-  const links = await getLinksForCurrentUser();
-  return <HomeShell groups={groupLinksByDate(links)} />;
+  const [{ links, nextCursor }, user] = await Promise.all([
+    getLinksPageForCurrentUser(HOME_LINKS_PAGE_SIZE),
+    getSessionUser(),
+  ]);
+  return (
+    <HomeShell
+      userId={user?.id ?? null}
+      initialGroups={groupLinksByDate(links)}
+      initialNextCursor={nextCursor}
+    />
+  );
 }

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { Link as LinkType } from "@/utils/links";
+import { emitLinksChanged, linksOriginHeaders } from "@/lib/links-events";
 import { useForm } from "@tanstack/react-form";
 import * as React from "react";
 import { toast } from "sonner";
@@ -48,7 +49,7 @@ const EditLinkForm = ({ link, onSuccess }: EditLinkFormProps) => {
       try {
         const res = await fetch(`/api/links/${link.id}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...linksOriginHeaders },
           body: JSON.stringify({
             title: value.title,
             // Persist `null` instead of empty string to match API expectations.
@@ -62,6 +63,7 @@ const EditLinkForm = ({ link, onSuccess }: EditLinkFormProps) => {
         }
 
         toast.success("Link updated");
+        emitLinksChanged();
         onSuccess();
       } catch {
         toast.error("Failed to update link");

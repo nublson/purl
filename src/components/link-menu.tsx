@@ -1,6 +1,7 @@
 "use client";
 
 import { copyToClipboard } from "@/lib/clipboard";
+import { emitLinksChanged, linksOriginHeaders } from "@/lib/links-events";
 import type { Link as LinkType } from "@/utils/links";
 import {
   Ellipsis,
@@ -9,7 +10,6 @@ import {
   Pencil,
   Trash,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { EditDialog } from "./dialog-edit-link";
 import { DropdownWrapper } from "./dropdown-wrapper";
@@ -33,8 +33,6 @@ export function LinkMenu({
   onDeleteSuccess,
   onDeleteError,
 }: LinkMenuProps) {
-  const router = useRouter();
-
   async function handleOpenInNewTab() {
     window.open(link.url, "_blank");
   }
@@ -51,14 +49,17 @@ export function LinkMenu({
   async function handleDelete() {
     onDeleteStart?.();
     try {
-      const res = await fetch(`/api/links/${link.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/links/${link.id}`, {
+        method: "DELETE",
+        headers: linksOriginHeaders,
+      });
       if (res.ok) {
         toast.success("Link deleted");
         if (onDeleteSuccess) {
           onDeleteSuccess();
           return;
         }
-        router.refresh();
+        emitLinksChanged();
       } else {
         onDeleteError?.();
         toast.error("Failed to delete link");

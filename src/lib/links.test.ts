@@ -36,7 +36,7 @@ vi.mock("@/lib/realtime-broadcast", () => ({
 
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
-const { getLinksForCurrentUser, UnauthorizedError, listLinks } = await import("./links");
+const { getLinksPageForCurrentUser, UnauthorizedError, listLinks } = await import("./links");
 
 const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
 
@@ -63,7 +63,7 @@ function makeRow(
   };
 }
 
-describe("getLinksForCurrentUser", () => {
+describe("getLinksPageForCurrentUser", () => {
   beforeEach(() => {
     vi.mocked(auth.api.getSession).mockReset();
     vi.mocked(prisma.link.findMany).mockReset();
@@ -73,20 +73,21 @@ describe("getLinksForCurrentUser", () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     vi.mocked(prisma.link.findMany).mockResolvedValue([]);
 
-    const result = await getLinksForCurrentUser();
+    const result = await getLinksPageForCurrentUser(50);
 
-    expect(result).toEqual([]);
+    expect(result).toEqual({ links: [], nextCursor: null, total: undefined });
   });
 
   it("queries only the authenticated user's links ordered newest-first", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     vi.mocked(prisma.link.findMany).mockResolvedValue([]);
 
-    await getLinksForCurrentUser();
+    await getLinksPageForCurrentUser(50);
 
     expect(vi.mocked(prisma.link.findMany)).toHaveBeenCalledWith({
       where: { userId: "user-123" },
       orderBy: { createdAt: "desc" },
+      take: 51,
     });
   });
 
@@ -95,7 +96,7 @@ describe("getLinksForCurrentUser", () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     vi.mocked(prisma.link.findMany).mockResolvedValue([row] as never);
 
-    const result = await getLinksForCurrentUser();
+    const { links: result } = await getLinksPageForCurrentUser(50);
 
     expect(result).toHaveLength(1);
     const link = result[0];
@@ -118,7 +119,7 @@ describe("getLinksForCurrentUser", () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     vi.mocked(prisma.link.findMany).mockResolvedValue(rows as never);
 
-    const result = await getLinksForCurrentUser();
+    const { links: result } = await getLinksPageForCurrentUser(50);
 
     expect(result).toHaveLength(2);
     expect(result[0].id).toBe("link-2");
@@ -129,7 +130,7 @@ describe("getLinksForCurrentUser", () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(null);
     vi.mocked(prisma.link.findMany).mockResolvedValue([]);
 
-    await expect(getLinksForCurrentUser()).rejects.toBeInstanceOf(
+    await expect(getLinksPageForCurrentUser(50)).rejects.toBeInstanceOf(
       UnauthorizedError,
     );
 

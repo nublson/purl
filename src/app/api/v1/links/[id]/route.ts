@@ -68,7 +68,7 @@ export async function PATCH(
     if (!updated) {
       return addCors(NextResponse.json({ error: "Not found" }, { status: 404 }));
     }
-    await broadcastLinksChanged(updated.userId);
+    broadcastLinksChanged(updated.userId);
     return addCors(NextResponse.json(serializeLink(updated)));
   } catch (e) {
     if (e instanceof UnauthorizedError) {
@@ -91,7 +91,7 @@ export async function DELETE(
     // deleteLink returns boolean — get userId from session for broadcast
     const session = await auth.api.getSession({ headers: await headers() });
     if (session?.user?.id) {
-      await broadcastLinksChanged(session.user.id);
+      broadcastLinksChanged(session.user.id);
     }
     const response = new NextResponse(null, { status: 204 });
     return addCors(response);

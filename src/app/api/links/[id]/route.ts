@@ -7,6 +7,7 @@ import {
   UnauthorizedError,
 } from "@/lib/links";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
+import { LINKS_ORIGIN_HEADER, parseLinksOrigin } from "@/lib/realtime-constants";
 import { serializeLink } from "@/lib/serialize-link";
 import { isValidUrl } from "@/utils/url";
 import { headers } from "next/headers";
@@ -71,7 +72,10 @@ export async function PATCH(
     if (!updated) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    await broadcastLinksChanged(updated.userId);
+    broadcastLinksChanged(
+      updated.userId,
+      parseLinksOrigin(request.headers.get(LINKS_ORIGIN_HEADER)),
+    );
     return NextResponse.json(serializeLink(updated));
   } catch (e) {
     if (e instanceof UnauthorizedError) {
@@ -82,7 +86,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -95,7 +99,10 @@ export async function DELETE(
       headers: await headers(),
     });
     if (session?.user?.id) {
-      await broadcastLinksChanged(session.user.id);
+      broadcastLinksChanged(
+        session.user.id,
+        parseLinksOrigin(request.headers.get(LINKS_ORIGIN_HEADER)),
+      );
     }
     return new NextResponse(null, { status: 204 });
   } catch (e) {

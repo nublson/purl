@@ -1,12 +1,20 @@
 "use client";
 
-import { useUsage } from "@/hooks/use-usage";
+import dynamic from "next/dynamic";
 import * as React from "react";
 import { DialogWrapper } from "./dialog-wrapper";
-import { SettingsAccount } from "./settings-account";
-import { SettingsIntegrations } from "./settings-integrations";
-import { SettingsTabs } from "./settings-tabs";
-import { SettingsUsage } from "./settings-usage";
+import { Skeleton } from "./ui/skeleton";
+
+// Loaded when the dialog first opens: the tabs (usage, integrations, account)
+// stay off /home's initial bundle.
+const SettingsContent = dynamic(() => import("./settings-content"), {
+  loading: () => (
+    <div className="flex flex-col gap-4 px-6">
+      <Skeleton className="h-8 w-full" />
+      <Skeleton className="h-32 w-full" />
+    </div>
+  ),
+});
 
 interface SettingsDialogProps {
   children: React.ReactNode;
@@ -26,31 +34,5 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
     >
       {children}
     </DialogWrapper>
-  );
-}
-
-function SettingsContent({ closeDialog }: { closeDialog: () => void }) {
-  const { usageSummary } = useUsage();
-
-  return (
-    <SettingsTabs
-      tabs={[
-        {
-          label: "Usage",
-          value: "usage",
-          content: <SettingsUsage data={usageSummary} />,
-        },
-        {
-          label: "Integrations",
-          value: "integrations",
-          content: <SettingsIntegrations />,
-        },
-        {
-          label: "Account",
-          value: "account",
-          content: <SettingsAccount closeDialog={closeDialog} />,
-        },
-      ]}
-    />
   );
 }

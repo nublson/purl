@@ -1,5 +1,4 @@
 import type { ContentType } from "@/generated/prisma/enums";
-import { auth } from "@/lib/auth";
 import { assertCanSaveLink } from "@/lib/entitlements";
 import {
   OG_HTML_READ_MAX_BYTES,
@@ -8,6 +7,7 @@ import {
 import { validateOgThumbnailUrl } from "@/lib/og-thumbnail-probe";
 import prisma from "@/lib/prisma";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
+import { getSessionUser } from "@/lib/session";
 import { detectContentType } from "@/lib/server-detect-content-type";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
 import { getUrlDomain } from "@/utils/formatter";
@@ -15,7 +15,6 @@ import type { Link } from "@/utils/links";
 import { isPdfUrl } from "@/utils/pdf";
 import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
 import { isYouTubeUrl } from "@/utils/youtube";
-import { headers } from "next/headers";
 import ogs from "open-graph-scraper";
 import { cache } from "react";
 
@@ -319,9 +318,10 @@ export async function resolveLinkFromUrl(
   url: string,
 ): Promise<ResolvedLinkFields> {
   const domain = getUrlDomain(url);
-  const contentType = (await detectContentType(url)) as ContentType;
-  const { title, description, favicon, thumbnail } =
-    await scrapeLinkMetadata(url);
+  // Independent network work: run the HEAD/sniff and the page scrape in parallel.
+  const [detected, { title, description, favicon, thumbnail }] =
+    await Promise.all([detectContentType(url), scrapeLinkMetadata(url)]);
+  const contentType = detected as ContentType;
   return {
     url,
     domain,
@@ -335,24 +335,58 @@ export async function resolveLinkFromUrl(
 
 /** Resolves the current user id from request context. Throws UnauthorizedError if not authenticated. */
 async function getCurrentUserId(): Promise<string> {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-  if (!session?.user?.id) throw new UnauthorizedError();
-  return session.user.id;
+  const user = await getSessionUser();
+  if (!user) throw new UnauthorizedError();
+  return user.id;
 }
 
-/** Fetches links for the currently authenticated user (server-only). Deduplicated per request via React cache(). */
-export const getLinksForCurrentUser = cache(async (): Promise<Link[]> => {
+export type LinksPage = {
+  links: Link[];
+  nextCursor: string | null;
+  /** The user's total saved links; only set when `withTotal` is true. */
+  total?: number;
+};
+
+/** One page of the current user's links, newest first. `cursor` is the ISO `createdAt` of the last link already loaded. */
+export const getLinksPageForCurrentUser = cache(
+  async (
+    limit: number,
+    cursor: string | null = null,
+    withTotal = false,
+  ): Promise<LinksPage> => {
+    const userId = await getCurrentUserId();
+    const [{ links, nextCursor }, total] = await Promise.all([
+      listLinksForUser(userId, { limit, cursor, contentType: null }),
+      withTotal ? prisma.link.count({ where: { userId } }) : undefined,
+    ]);
+    return { links: links.map(mapRowToLink), nextCursor, total };
+  },
+);
+
+/** Case-insensitive search over the current user's links (title, URL, domain, description), newest first. An empty query returns the most recent links. */
+export async function searchLinksForCurrentUser(
+  query: string,
+  limit: number,
+): Promise<Link[]> {
   const userId = await getCurrentUserId();
-
+  const q = query.trim();
   const rows = await prisma.link.findMany({
-    where: { userId },
+    where: q
+      ? {
+          userId,
+          OR: [
+            { title: { contains: q, mode: "insensitive" } },
+            { url: { contains: q, mode: "insensitive" } },
+            { domain: { contains: q, mode: "insensitive" } },
+            { description: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : { userId },
     orderBy: { createdAt: "desc" },
+    take: limit,
   });
-
   return rows.map(mapRowToLink);
-});
+}
 
 export type CreateLinkResult = Awaited<ReturnType<typeof prisma.link.create>>;
 export type RefreshLinkResult = Awaited<ReturnType<typeof prisma.link.update>>;

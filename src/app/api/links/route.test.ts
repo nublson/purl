@@ -1,7 +1,7 @@
 import * as safeOutbound from "@/lib/safe-outbound-fetch";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { OPTIONS, POST } from "./route";
+import { GET, OPTIONS, POST } from "./route";
 
 const realSafeFetch = safeOutbound.safeFetch;
 
@@ -32,6 +32,7 @@ vi.mock("@/lib/prisma", () => ({
     link: {
       create: vi.fn(),
       findFirst: vi.fn(),
+      findMany: vi.fn(),
       update: vi.fn(),
       count: vi.fn(),
     },
@@ -257,7 +258,7 @@ describe("POST /api/links", () => {
 
       await POST(postRequest({ url: "https://example.com" }));
 
-      expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith("user-123");
+      expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith("user-123", null);
     });
 
     it("returns 201 with the saved link data including scraped title", async () => {
@@ -347,7 +348,7 @@ describe("POST /api/links", () => {
           }),
         }),
       );
-      expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith("user-123");
+      expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith("user-123", null);
     });
 
     it("uses YouTube oEmbed for youtu.be URLs and skips OG scraping", async () => {
@@ -817,5 +818,93 @@ describe("CORS /api/links", () => {
       expect(res.headers.get("Access-Control-Allow-Origin")).toBe(origin);
       expect(res.headers.get("Access-Control-Allow-Credentials")).toBe("true");
     });
+  });
+});
+
+describe("POST /api/links origin echo", () => {
+  it("passes a valid x-purl-origin header to the broadcast", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.link.count).mockResolvedValue(0 as never);
+    vi.mocked(prisma.link.create).mockResolvedValue(MOCK_LINK as never);
+    vi.mocked(broadcastLinksChanged).mockClear();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("<html><head></head></html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      }),
+    );
+
+    const req = new NextRequest("http://localhost/api/links", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-purl-origin": "tab-1" },
+      body: JSON.stringify({ url: "https://example.com" }),
+    });
+    await POST(req);
+
+    expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith(
+      "user-123",
+      "tab-1",
+    );
+  });
+});
+
+describe("GET /api/links", () => {
+  function getRequest(query = ""): NextRequest {
+    return new NextRequest(`http://localhost/api/links${query}`);
+  }
+
+  beforeEach(() => {
+    vi.mocked(prisma.link.findMany).mockReset();
+    vi.mocked(prisma.link.count).mockReset();
+  });
+
+  it("returns 401 when not authenticated", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(null);
+
+    const res = await GET(getRequest());
+
+    expect(res.status).toBe(401);
+  });
+
+  it("returns grouped links, next cursor, and total", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.findMany).mockResolvedValue([
+      MOCK_LINK,
+      { ...MOCK_LINK, id: "link-2" },
+    ] as never);
+    vi.mocked(prisma.link.count).mockResolvedValue(42 as never);
+
+    const res = await GET(getRequest("?limit=1"));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(prisma.link.findMany)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "user-123" },
+        take: 2,
+      }),
+    );
+    expect(body.total).toBe(42);
+    expect(body.nextCursor).toBe(CREATED_AT.toISOString());
+    const ids = body.groups.flatMap(
+      (g: { links: { id: string }[] }) => g.links.map((l) => l.id),
+    );
+    expect(ids).toEqual([MOCK_LINK.id]);
+  });
+
+  it("clamps limit to the save cap and applies the cursor", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.link.count).mockResolvedValue(0 as never);
+
+    await GET(getRequest(`?limit=99999&cursor=${CREATED_AT.toISOString()}`));
+
+    expect(vi.mocked(prisma.link.findMany)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "user-123", createdAt: { lt: CREATED_AT } },
+        take: 1001,
+      }),
+    );
   });
 });
