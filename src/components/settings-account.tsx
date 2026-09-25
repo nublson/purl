@@ -14,6 +14,7 @@ export function SettingsAccount({ closeDialog }: { closeDialog: () => void }) {
       <SettingsItem
         title="Email"
         description={email ?? ""}
+        fullDescription
         actions={null}
       />
       <SettingsItem
