@@ -9,7 +9,7 @@ export default function NotFound() {
   return (
     <Fragment>
       <PublicHeader />
-      <main className="wrapper-center flex-1 flex flex-col items-center justify-center gap-6 px-4 text-center">
+      <main className="w-full flex-1 flex flex-col items-center justify-center gap-6 px-4 pt-20 pb-8 text-center">
         <Logo size={44} />
         <div className="flex flex-col gap-2">
           <Typography variant="h2" component="h1">

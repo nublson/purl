@@ -148,9 +148,8 @@ body {
   @apply max-w-[1200px] w-full mx-auto;
 }
 
-/* Clears the fixed 64px header so centered content never slides under it. */
 .wrapper-center {
-  @apply w-full flex-1 flex flex-col items-center justify-center pt-20 pb-8;
+  @apply w-full flex-1 flex flex-col items-center justify-center py-8;
 }
 
 .dialog-top {
