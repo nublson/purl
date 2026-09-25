@@ -13,7 +13,7 @@ import { Fragment } from "react";
 // redirect, so it lives in its own segment with its own dynamic rendering.
 //
 // The <main> below matches src/app/(public)/layout.tsx -- keep the two in sync.
-// The header is the shared PublicHeader used by the signed-out pages.
+// Unlike the other signed-out pages, this route keeps the PublicHeader.
 export const dynamic = "force-dynamic";
 
 export default function OAuthLayout({
