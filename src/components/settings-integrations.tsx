@@ -156,7 +156,7 @@ export function SettingsIntegrations() {
         <div className="flex gap-2 items-center">
           <Input
             aria-label="Key name"
-              placeholder="Key name (optional)"
+            placeholder="Key name (optional)"
             value={nameInput}
             onChange={(e) => setNameInput(e.target.value)}
             disabled={creating}

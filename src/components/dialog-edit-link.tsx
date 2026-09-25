@@ -60,7 +60,7 @@ const EditLinkForm = ({ link, onSuccess }: EditLinkFormProps) => {
         });
 
         if (!res.ok) {
-          toast.error("Unable to save changes. Check your connection and try again.");
+          toast.error("Unable to save changes. Try again.");
           return;
         }
 

@@ -27,6 +27,7 @@ export default function SearchLinks() {
   const [query, setQuery] = React.useState("");
   const [links, setLinks] = React.useState<Link[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [failed, setFailed] = React.useState(false);
   // Re-run the current search when links change (e.g. deleted from results).
   const { version } = useLinksSyncState();
 
@@ -45,9 +46,11 @@ export default function SearchLinks() {
           links: Parameters<typeof parseJsonLinks>[0];
         };
         setLinks(parseJsonLinks(data.links));
+        setFailed(false);
       } catch {
         if (controller.signal.aborted) return;
         setLinks([]);
+        setFailed(true);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -88,9 +91,11 @@ export default function SearchLinks() {
           <CommandList className="max-h-96">
             {!loading && (
               <CommandEmpty>
-                {query.trim()
-                  ? `No links match “${query.trim()}”.`
-                  : "No links yet."}
+                {failed
+                  ? "Unable to search right now. Try again."
+                  : query.trim()
+                    ? `No links match “${query.trim()}”.`
+                    : "No links yet."}
               </CommandEmpty>
             )}
             <CommandGroup className="p-1.5">

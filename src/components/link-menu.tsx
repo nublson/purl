@@ -65,7 +65,7 @@ export function LinkMenu({
         notifyLinksChanged();
       } else {
         onDeleteError?.();
-        toast.error("Unable to delete the link. Check your connection and try again.");
+        toast.error("Unable to delete the link. Try again.");
       }
     } catch {
       onDeleteError?.();
