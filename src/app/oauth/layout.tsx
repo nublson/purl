@@ -1,5 +1,4 @@
-import Header from "@/components/header";
-import { PublicHeaderActions } from "@/components/public-header-actions";
+import { PublicHeader } from "@/components/public-header";
 import { Fragment } from "react";
 
 // Intentionally NOT under the (public) route group: that group's layout sets
@@ -13,8 +12,8 @@ import { Fragment } from "react";
 // (`consent_code`, `client_id`, `scope`) from Better Auth's mcp plugin
 // redirect, so it lives in its own segment with its own dynamic rendering.
 //
-// The JSX below duplicates src/app/(public)/layout.tsx's chrome -- keep the
-// two in sync (nav changes there should be mirrored here).
+// The <main> below matches src/app/(public)/layout.tsx -- keep the two in sync.
+// The header is the shared PublicHeader used by the signed-out pages.
 export const dynamic = "force-dynamic";
 
 export default function OAuthLayout({
@@ -24,7 +23,7 @@ export default function OAuthLayout({
 }>) {
   return (
     <Fragment>
-      <Header pathname="/" actions={<PublicHeaderActions />} />
+      <PublicHeader />
       <main className="wrapper-public flex-1 flex flex-col items-center justify-start px-4 md:px-6 lg:px-12">
         {children}
       </main>

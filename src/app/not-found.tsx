@@ -1,6 +1,5 @@
-import Header from "@/components/header";
 import { Logo } from "@/components/logo";
-import { PublicHeaderActions } from "@/components/public-header-actions";
+import { PublicHeader } from "@/components/public-header";
 import { Typography } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -9,7 +8,7 @@ import { Fragment } from "react";
 export default function NotFound() {
   return (
     <Fragment>
-      <Header pathname="/" actions={<PublicHeaderActions />} />
+      <PublicHeader />
       <main className="wrapper-center flex-1 flex flex-col items-center justify-center gap-6 px-4 text-center">
         <Logo size={44} />
         <div className="flex flex-col gap-2">
