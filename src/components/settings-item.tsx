@@ -22,7 +22,7 @@ export function SettingsItem({
       <ItemContent>
         <ItemTitle>{title}</ItemTitle>
         {description && (
-          <ItemDescription className="text-xs text-muted-foreground">
+          <ItemDescription className="text-xs text-muted-foreground wrap-anywhere">
             {description}
           </ItemDescription>
         )}

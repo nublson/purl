@@ -147,10 +147,13 @@ export const LinkItem = React.forwardRef<
         rel="noopener noreferrer"
         className="absolute inset-0 z-0 w-full"
       />
-      <ItemMedia variant="image" className={cn("relative size-5 rounded")}>
+      <ItemMedia
+        variant="image"
+        className="relative mt-1.5 size-5 self-start rounded"
+      >
         <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
       </ItemMedia>
-      <ItemContent>
+      <ItemContent className="self-start pt-1.5">
         <ItemTitle>
           <Typography
             size="small"

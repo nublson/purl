@@ -4,7 +4,7 @@ import Link from "next/link";
 /** Static sign-in / sign-up actions for public pages (no session lookup needed). */
 export function PublicHeaderActions() {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3">
       <Button aria-label="Log in" size="sm" variant="outline" asChild>
         <Link href="/login">Log in</Link>
       </Button>
