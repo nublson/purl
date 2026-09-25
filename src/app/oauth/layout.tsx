@@ -1,4 +1,3 @@
-import Footer from "@/components/footer";
 import Header from "@/components/header";
 import { PublicHeaderActions } from "@/components/public-header-actions";
 import { Fragment } from "react";
@@ -15,7 +14,7 @@ import { Fragment } from "react";
 // redirect, so it lives in its own segment with its own dynamic rendering.
 //
 // The JSX below duplicates src/app/(public)/layout.tsx's chrome -- keep the
-// two in sync (nav/footer changes there should be mirrored here).
+// two in sync (nav changes there should be mirrored here).
 export const dynamic = "force-dynamic";
 
 export default function OAuthLayout({
@@ -29,7 +28,6 @@ export default function OAuthLayout({
       <main className="wrapper-public flex-1 flex flex-col items-center justify-start px-4 md:px-6 lg:px-12">
         {children}
       </main>
-      <Footer />
     </Fragment>
   );
 }

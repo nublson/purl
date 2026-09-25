@@ -1,4 +1,3 @@
-import Footer from "@/components/footer";
 import Header from "@/components/header";
 import { Logo } from "@/components/logo";
 import { PublicHeaderActions } from "@/components/public-header-actions";
@@ -32,7 +31,6 @@ export default function NotFound() {
           </Button>
         </div>
       </main>
-      <Footer />
     </Fragment>
   );
 }
