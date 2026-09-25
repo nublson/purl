@@ -28,12 +28,12 @@ export default function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         });
 
         if (res.status === 429) {
-          toast.error("Too many requests. Please try again in a minute.");
+          toast.error("Too many requests. Try again in a minute.");
           return;
         }
 
         if (!res.ok) {
-          let message = "Failed to send feedback";
+          let message = "Unable to send feedback. Try again.";
           try {
             const data = (await res.json()) as { error?: string };
             if (typeof data.error === "string" && data.error) {
@@ -50,7 +50,7 @@ export default function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         form.reset();
         onSuccess();
       } catch {
-        toast.error("Failed to send feedback");
+        toast.error("Unable to send feedback. Check your connection and try again.");
       }
     },
   });
@@ -69,7 +69,7 @@ export default function FeedbackForm({ onSuccess }: FeedbackFormProps) {
           name="feedback"
           validators={{
             onSubmit: ({ value }) =>
-              !value?.trim() ? "Feedback is required." : undefined,
+              !value?.trim() ? "Write your feedback before sending." : undefined,
           }}
         >
           {(field) => (

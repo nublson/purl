@@ -25,7 +25,7 @@ export const FeedbackDialog = ({ children }: FeedbackDialogProps) => {
   return (
     <DialogWrapper
       title="Feedback"
-      description="Please provide feedback on the app."
+      description="Tell me what’s working, what isn’t, or what you’d like next."
       open={open}
       onOpenChange={setOpen}
       content={<FeedbackForm onSuccess={() => setOpen(false)} />}

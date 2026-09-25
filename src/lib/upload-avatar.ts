@@ -80,7 +80,7 @@ export async function uploadUserAvatar(
   userId: string,
 ): Promise<string> {
   if (!file.type.startsWith("image/")) {
-    throw new InvalidAvatarTypeError("Only image files are supported.");
+    throw new InvalidAvatarTypeError("Choose an image file.");
   }
   if (file.size > AVATAR_MAX_UPLOAD_BYTES) {
     throw new AvatarMaxSizeError(avatarMaxSizeExceededMessage());

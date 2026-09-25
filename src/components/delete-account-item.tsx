@@ -25,7 +25,7 @@ export function DeleteAccountItem({
   return (
     <SettingsItem
       title="Delete account"
-      description="Delete your account and all your data."
+      description="Permanently delete your account and saved links."
       actions={<DeleteAccountButton closeDialog={closeDialog} />}
     />
   );
@@ -58,7 +58,7 @@ function DeleteAccountButton({ closeDialog }: { closeDialog: () => void }) {
       });
 
       if (res.error) {
-        toast.error(res.error.message ?? "Could not delete account.");
+        toast.error(res.error.message ?? "Unable to delete your account. Check your password and try again.");
         return;
       }
 
@@ -69,7 +69,7 @@ function DeleteAccountButton({ closeDialog }: { closeDialog: () => void }) {
       router.push("/login");
       router.refresh();
     } catch {
-      toast.error("Could not delete account.");
+      toast.error("Unable to delete your account. Check your connection and try again.");
     } finally {
       setIsDeleting(false);
     }

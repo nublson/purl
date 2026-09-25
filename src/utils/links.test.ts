@@ -46,9 +46,9 @@ describe("groupLinksByDate", () => {
     expect(groups).toHaveLength(3);
     expect(groups[0].label).toBe("Today");
     expect(groups[0].links.map((l) => l.title)).toEqual(["today"]);
-    expect(groups[1].label).toBe("This Week");
+    expect(groups[1].label).toBe("This week");
     expect(groups[1].links.map((l) => l.title)).toEqual(["this week"]);
-    expect(groups[2].label).toBe("Last Week");
+    expect(groups[2].label).toBe("Last week");
     expect(groups[2].links.map((l) => l.title)).toEqual(["last week"]);
   });
 
@@ -66,7 +66,7 @@ describe("groupLinksByDate", () => {
     const links: Link[] = [link(today, "today"), link(lastYear, "last year")];
     const groups = groupLinksByDate(links);
     expect(groups).toHaveLength(2);
-    expect(groups.map((g) => g.label)).toEqual(["Today", "Last Year"]);
+    expect(groups.map((g) => g.label)).toEqual(["Today", "Last year"]);
   });
 
   it("returns groups in canonical label order", () => {
@@ -75,15 +75,15 @@ describe("groupLinksByDate", () => {
     const links: Link[] = [link(lastYear, "old"), link(today, "new")];
     const groups = groupLinksByDate(links);
     const labels = groups.map((g) => g.label);
-    expect(labels).toEqual(["Today", "Last Year"]);
+    expect(labels).toEqual(["Today", "Last year"]);
     const order = [
       "Today",
-      "This Week",
-      "Last Week",
-      "This Month",
-      "Last Month",
-      "This Year",
-      "Last Year",
+      "This week",
+      "Last week",
+      "This month",
+      "Last month",
+      "This year",
+      "Last year",
       "Older",
     ];
     for (let i = 1; i < labels.length; i++) {
@@ -115,10 +115,10 @@ describe("mergeLinkGroups", () => {
 
   it("orders merged groups by date label, not arrival order", () => {
     const merged = mergeLinkGroups(
-      [{ label: "Last Week", links: [link(d, "x")] }],
-      [{ label: "This Week", links: [link(d, "y")] }],
+      [{ label: "Last week", links: [link(d, "x")] }],
+      [{ label: "This week", links: [link(d, "y")] }],
     );
-    expect(merged.map((g) => g.label)).toEqual(["This Week", "Last Week"]);
+    expect(merged.map((g) => g.label)).toEqual(["This week", "Last week"]);
   });
 });
 

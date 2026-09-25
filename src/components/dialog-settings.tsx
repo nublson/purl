@@ -29,7 +29,7 @@ export function SettingsDialog({ children }: SettingsDialogProps) {
       open={open}
       onOpenChange={setOpen}
       title="Settings"
-      description="Manage your settings"
+      description="Usage, integrations, and account"
       content={<SettingsContent closeDialog={() => setOpen(false)} />}
     >
       {children}

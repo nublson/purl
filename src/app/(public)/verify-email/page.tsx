@@ -26,9 +26,9 @@ export default function VerifyEmail() {
       callbackURL: "/home",
     });
     if (res.error) {
-      toast.error(res.error.message ?? "Failed to resend email.");
+      toast.error(res.error.message ?? "Unable to resend the email. Try again in a minute.");
     } else {
-      toast.success("Verification email resent. Please check your inbox.");
+      toast.success("Verification email sent. Check your inbox.");
     }
   }
 
@@ -41,7 +41,7 @@ export default function VerifyEmail() {
       router.refresh();
     } else {
       toast.error(
-        "Email not verified yet. Please check your inbox and try again.",
+        "Your email isn’t verified yet. Open the link in the email we sent, then try again.",
       );
     }
   }
@@ -87,7 +87,7 @@ export default function VerifyEmail() {
             className="w-full"
             onClick={() => signOut()}
           >
-            Sign out
+            Log out
           </Button>
         </CardFooter>
       </Card>

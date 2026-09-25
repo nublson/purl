@@ -60,7 +60,7 @@ const EditLinkForm = ({ link, onSuccess }: EditLinkFormProps) => {
         });
 
         if (!res.ok) {
-          toast.error("Failed to update link");
+          toast.error("Unable to save changes. Check your connection and try again.");
           return;
         }
 
@@ -68,7 +68,7 @@ const EditLinkForm = ({ link, onSuccess }: EditLinkFormProps) => {
         notifyLinksChanged();
         onSuccess();
       } catch {
-        toast.error("Failed to update link");
+        toast.error("Unable to save changes. Check your connection and try again.");
       }
     },
   });
@@ -87,7 +87,7 @@ const EditLinkForm = ({ link, onSuccess }: EditLinkFormProps) => {
           name="title"
           validators={{
             onSubmit: ({ value }) =>
-              !value?.trim() ? "Title is required." : undefined,
+              !value?.trim() ? "Enter a title." : undefined,
           }}
         >
           {(field) => (

@@ -26,7 +26,7 @@ export function OAuthConsentActions({ consentCode }: { consentCode: string }) {
       window.location.href = requireConsentRedirectUri(data);
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to submit your decision",
+        err instanceof Error ? err.message : "Unable to submit your choice. Try again.",
       );
       setSubmitting(null);
     }
@@ -40,7 +40,7 @@ export function OAuthConsentActions({ consentCode }: { consentCode: string }) {
           disabled={submitting !== null}
           onClick={() => void submit(true)}
         >
-          {submitting === "allow" ? "Connecting…" : "Allow"}
+          {submitting === "allow" ? "Allowing…" : "Allow access"}
         </Button>
         <Button
           variant="secondary"

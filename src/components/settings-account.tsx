@@ -14,7 +14,7 @@ export function SettingsAccount({ closeDialog }: { closeDialog: () => void }) {
     <div className="w-full flex-1 flex flex-col gap-4">
       <SettingsItem
         title="Email"
-        description="The email address for your account"
+        description="The email you log in with"
         actions={
           <Typography
             size="small"
@@ -25,8 +25,8 @@ export function SettingsAccount({ closeDialog }: { closeDialog: () => void }) {
         }
       />
       <SettingsItem
-        title="Sign out"
-        description="Sign out of your account"
+        title="Log out"
+        description="Log out of Purl on this device"
         actions={
           <Button
             variant={"secondary"}

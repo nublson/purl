@@ -26,7 +26,7 @@ describe("assertCanSaveLink", () => {
     const err = await assertCanSaveLink("user-1").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(SaveLimitError);
     expect((err as InstanceType<typeof SaveLimitError>).feature).toBe("SAVE_LIMIT");
-    expect((err as Error).message).toBe("You've reached the 1,000-link limit.");
+    expect((err as Error).message).toBe("You've reached the 1,000-link limit. Delete links you no longer need to save new ones.");
   });
 
   it("uses a flat 1,000-link cap for every account", () => {

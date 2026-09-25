@@ -15,9 +15,9 @@ export function LinkGroupEmpty() {
         <EmptyMedia variant="icon">
           <PackageOpen />
         </EmptyMedia>
-        <EmptyTitle>No Links Yet</EmptyTitle>
+        <EmptyTitle>No links yet</EmptyTitle>
         <EmptyDescription>
-          Press ⌘V anywhere on this page to save a link.
+          Paste a link anywhere on this page to save it.
         </EmptyDescription>
       </EmptyHeader>
     </Empty>

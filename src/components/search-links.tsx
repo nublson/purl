@@ -86,7 +86,13 @@ export default function SearchLinks() {
             className="h-full border-0 bg-transparent px-0 py-0 text-base shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"
           />
           <CommandList className="max-h-96">
-            {!loading && <CommandEmpty>No results found.</CommandEmpty>}
+            {!loading && (
+              <CommandEmpty>
+                {query.trim()
+                  ? `No links match “${query.trim()}”.`
+                  : "No links yet."}
+              </CommandEmpty>
+            )}
             <CommandGroup className="p-1.5">
               {links.map((link) => (
                 <CommandItem

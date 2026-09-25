@@ -170,7 +170,7 @@ describe("POST /api/feedback", () => {
     );
 
     expect(res.status).toBe(400);
-    expect(await res.json()).toEqual({ error: "Feedback is too long" });
+    expect(await res.json()).toEqual({ error: "Keep your feedback under 10,000 characters." });
     expect(sendMock).not.toHaveBeenCalled();
   });
 
@@ -204,7 +204,7 @@ describe("POST /api/feedback", () => {
 
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({
-      error: "Feedback is temporarily unavailable",
+      error: "Unable to send feedback right now. Try again later.",
     });
     expect(sendMock).not.toHaveBeenCalled();
   });
@@ -222,7 +222,7 @@ describe("POST /api/feedback", () => {
 
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({
-      error: "Feedback is temporarily unavailable",
+      error: "Unable to send feedback right now. Try again later.",
     });
     expect(sendMock).not.toHaveBeenCalled();
   });
@@ -270,6 +270,6 @@ describe("POST /api/feedback", () => {
     );
 
     expect(res.status).toBe(502);
-    expect(await res.json()).toEqual({ error: "Failed to send feedback" });
+    expect(await res.json()).toEqual({ error: "Unable to send feedback. Try again." });
   });
 });

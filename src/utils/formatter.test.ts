@@ -78,27 +78,27 @@ describe("getRelativeDateLabel", () => {
   });
 
   it("returns This Week for 1-7 days ago", () => {
-    expect(getRelativeDateLabel(new Date(2025, 5, 12))).toBe("This Week"); // 3 days ago
+    expect(getRelativeDateLabel(new Date(2025, 5, 12))).toBe("This week"); // 3 days ago
   });
 
   it("returns Last Week for 8-14 days ago", () => {
-    expect(getRelativeDateLabel(new Date(2025, 5, 5))).toBe("Last Week"); // 10 days ago
+    expect(getRelativeDateLabel(new Date(2025, 5, 5))).toBe("Last week"); // 10 days ago
   });
 
   it("returns This Month for 15-31 days ago", () => {
-    expect(getRelativeDateLabel(new Date(2025, 4, 26))).toBe("This Month"); // 20 days ago
+    expect(getRelativeDateLabel(new Date(2025, 4, 26))).toBe("This month"); // 20 days ago
   });
 
   it("returns Last Month for dates in previous calendar month", () => {
-    expect(getRelativeDateLabel(new Date(2025, 4, 10))).toBe("Last Month"); // May 10
+    expect(getRelativeDateLabel(new Date(2025, 4, 10))).toBe("Last month"); // May 10
   });
 
   it("returns This Year for earlier same year", () => {
-    expect(getRelativeDateLabel(new Date(2025, 0, 20))).toBe("This Year"); // Jan 20
+    expect(getRelativeDateLabel(new Date(2025, 0, 20))).toBe("This year"); // Jan 20
   });
 
   it("returns Last Year for previous year", () => {
-    expect(getRelativeDateLabel(new Date(2024, 8, 1))).toBe("Last Year");
+    expect(getRelativeDateLabel(new Date(2024, 8, 1))).toBe("Last year");
   });
 
   it("returns Older for 2+ years ago", () => {

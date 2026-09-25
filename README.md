@@ -20,7 +20,7 @@ The product goal: one place to stash material you care about.
 - **Authentication** — Email/password (and related flows) via [Better Auth](https://www.better-auth.com/); optional email verification through [Resend](https://resend.com/).
 - **Save & organize**
   - Add items by URL with automatic content-type detection (web, PDF, YouTube, audio).
-  - Links grouped by relative time (e.g. Today, This Week, Last Month).
+  - Links grouped by relative time (e.g. Today, This week, Last month).
   - Preview metadata (title, description, favicon, thumbnail where available).
 - **Hardened outbound fetch** — Server-side `safeFetch` with optional proxy/DNS controls (see `AGENTS.md`). An egress proxy can be configured via [`SAFE_OUTBOUND_HTTP_PROXY`](docs/production-outbound-proxy.md).
 - **Realtime list sync** — Supabase Realtime so saves and updates propagate across tabs/devices quickly.

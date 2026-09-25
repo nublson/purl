@@ -45,7 +45,7 @@ export function LinkMenu({
       await copyToClipboard(link.url);
       toast.success("Link copied");
     } catch {
-      toast.error("Failed to copy link");
+      toast.error("Unable to copy the link. Try again.");
     }
   }
 
@@ -65,11 +65,11 @@ export function LinkMenu({
         notifyLinksChanged();
       } else {
         onDeleteError?.();
-        toast.error("Failed to delete link");
+        toast.error("Unable to delete the link. Check your connection and try again.");
       }
     } catch {
       onDeleteError?.();
-      toast.error("Failed to delete link");
+      toast.error("Unable to delete the link. Check your connection and try again.");
     }
   }
 

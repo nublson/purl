@@ -93,7 +93,7 @@ export function User() {
       <DropdownMenuSeparator />
       <DropdownMenuItem data-cy="sign-out-menu-item" onClick={() => signOut()}>
         <LogOut />
-        Sign out
+        Log out
       </DropdownMenuItem>
     </DropdownWrapper>
   );

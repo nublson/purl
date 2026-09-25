@@ -35,7 +35,7 @@ export default async function OAuthConsentPage({
     where: { clientId },
     select: { name: true },
   });
-  const clientName = client?.name ?? "This App";
+  const clientName = client?.name ?? "This app";
   const scopes = scope ? scope.split(" ") : [];
 
   return (

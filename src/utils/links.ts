@@ -20,12 +20,12 @@ export type LinkGroup = {
 
 const LABEL_ORDER = [
   "Today",
-  "This Week",
-  "Last Week",
-  "This Month",
-  "Last Month",
-  "This Year",
-  "Last Year",
+  "This week",
+  "Last week",
+  "This month",
+  "Last month",
+  "This year",
+  "Last year",
   "Older",
 ] as const;
 
