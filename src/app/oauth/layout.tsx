@@ -1,7 +1,3 @@
-import Header from "@/components/header";
-import { PublicHeaderActions } from "@/components/public-header-actions";
-import { Fragment } from "react";
-
 // Intentionally NOT under the (public) route group: that group's layout sets
 // `dynamic = "force-static"`, which forces `searchParams` (and cookies/headers)
 // to resolve empty for every descendant page — even ones that set their own
@@ -13,8 +9,7 @@ import { Fragment } from "react";
 // (`consent_code`, `client_id`, `scope`) from Better Auth's mcp plugin
 // redirect, so it lives in its own segment with its own dynamic rendering.
 //
-// The JSX below duplicates src/app/(public)/layout.tsx's chrome -- keep the
-// two in sync (nav changes there should be mirrored here).
+// The <main> below matches src/app/(public)/layout.tsx -- keep the two in sync.
 export const dynamic = "force-dynamic";
 
 export default function OAuthLayout({
@@ -23,11 +18,8 @@ export default function OAuthLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <Fragment>
-      <Header pathname="/" actions={<PublicHeaderActions />} />
-      <main className="wrapper-public flex-1 flex flex-col items-center justify-start px-4 md:px-6 lg:px-12">
-        {children}
-      </main>
-    </Fragment>
+    <main className="wrapper-public flex-1 flex flex-col items-center justify-start px-4 md:px-6 lg:px-12">
+      {children}
+    </main>
   );
 }

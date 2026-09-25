@@ -149,7 +149,7 @@ body {
 }
 
 .wrapper-center {
-  @apply w-full flex-1 flex flex-col items-center justify-center;
+  @apply w-full flex-1 flex flex-col items-center justify-center py-8;
 }
 
 .dialog-top {

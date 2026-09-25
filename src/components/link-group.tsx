@@ -21,7 +21,7 @@ export const LinkGroup = ({
 }: LinkGroupProps) => {
   return (
     <div className="w-full flex flex-col justify-start items-start gap-4">
-      <p className="text-xs text-muted-foreground font-medium ml-2">{label}</p>
+      <p className="text-xs text-muted-foreground font-medium ms-2">{label}</p>
       <ItemGroup className="w-full gap-0">
         {prependItems}
         {links.map((link, index) => (

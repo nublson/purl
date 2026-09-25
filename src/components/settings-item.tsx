@@ -1,3 +1,4 @@
+import { cn } from "@/lib/utils";
 import {
   Item,
   ItemActions,
@@ -9,12 +10,15 @@ import {
 interface SettingsItemProps {
   title: string;
   description: string;
+  /** Show the full description instead of clamping it to two lines. */
+  fullDescription?: boolean;
   actions: React.ReactNode;
 }
 
 export function SettingsItem({
   title,
   description,
+  fullDescription = false,
   actions,
 }: SettingsItemProps) {
   return (
@@ -22,7 +26,12 @@ export function SettingsItem({
       <ItemContent>
         <ItemTitle>{title}</ItemTitle>
         {description && (
-          <ItemDescription className="text-xs text-muted-foreground">
+          <ItemDescription
+            className={cn(
+              "text-xs text-muted-foreground wrap-anywhere",
+              fullDescription && "line-clamp-none",
+            )}
+          >
             {description}
           </ItemDescription>
         )}

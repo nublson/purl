@@ -19,7 +19,7 @@ export default async function OAuthConsentPage({
 
   if (!consentCode || !clientId) {
     return (
-      <div className="wrapper-private flex flex-1 flex-col items-center justify-center gap-2 pb-12 pt-24">
+      <div className="wrapper-private flex flex-1 flex-col items-center justify-center gap-2 py-12">
         <Typography variant="h2" component="h1">
           Invalid authorization request
         </Typography>
@@ -39,7 +39,7 @@ export default async function OAuthConsentPage({
   const scopes = scope ? scope.split(" ") : [];
 
   return (
-    <div className="wrapper-private flex flex-1 flex-col items-center justify-center gap-6 pb-12 pt-24">
+    <div className="wrapper-private flex flex-1 flex-col items-center justify-center gap-6 py-12">
       <div className="flex flex-col items-center gap-2 text-center">
         <Typography variant="h2" component="h1">
           Authorize {clientName}

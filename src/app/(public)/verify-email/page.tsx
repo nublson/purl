@@ -1,5 +1,6 @@
 "use client";
 
+import { Logo } from "@/components/logo";
 import { Typography } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,7 +48,8 @@ export default function VerifyEmail() {
   }
 
   return (
-    <div className="wrapper-center">
+    <div className="wrapper-center gap-6">
+      <Logo size={32} pathname="/" />
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>

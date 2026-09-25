@@ -7,7 +7,7 @@ export default function HeroSection() {
   return (
     <section
       id="hero"
-      className="relative w-full h-full overflow-hidden flex flex-col items-center justify-between gap-20 pt-28"
+      className="relative w-full h-full overflow-hidden flex flex-col items-center justify-between gap-20 pt-28 pb-16"
     >
       <div className="w-full flex flex-col items-center justify-center gap-10">
         <div className="text-center flex flex-col gap-8">

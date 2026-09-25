@@ -133,130 +133,134 @@ export function SettingsIntegrations() {
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col gap-4">
-      <SettingsItem
-        title="API keys"
-        description="Use API keys to access Purl from external apps and scripts."
-        actions={
-          <Button
-            variant="secondary"
-            size="sm"
-            className="cursor-pointer"
-            onClick={() => {
-              setShowCreateForm((v) => !v);
-              setNewlyCreatedKey(null);
-            }}
-          >
-            {showCreateForm ? "Cancel" : "Create key"}
-          </Button>
-        }
-      />
-
-      {showCreateForm && (
-        <div className="flex gap-2 items-center">
-          <Input
-            aria-label="Key name"
-            placeholder="Key name (optional)"
-            value={nameInput}
-            onChange={(e) => setNameInput(e.target.value)}
-            disabled={creating}
-            className="flex-1"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") void handleCreate();
-              if (e.key === "Escape") {
-                setShowCreateForm(false);
-                setNameInput("");
-              }
-            }}
-          />
-          <Button
-            size="sm"
-            className="cursor-pointer"
-            onClick={() => void handleCreate()}
-            disabled={creating}
-          >
-            {creating ? "Creating…" : "Create key"}
-          </Button>
-        </div>
-      )}
-
-      {newlyCreatedKey && (
-        <div className="flex flex-col gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
-          <Typography
-            size="small"
-            className="font-medium text-amber-600 dark:text-amber-400"
-          >
-            Copy your key now — it won’t be shown again.
-          </Typography>
-          <div className="flex gap-2 items-center">
-            <Input
-              readOnly
-              value={newlyCreatedKey}
-              className="flex-1 font-mono text-xs"
-              onFocus={(e) => e.target.select()}
-              aria-label="New API key"
-            />
+    <div className="w-full flex-1 flex flex-col gap-8">
+      <section className="flex flex-col gap-3">
+        <SettingsItem
+          title="API keys"
+          description="Use API keys to access Purl from external apps and scripts."
+          actions={
             <Button
               variant="secondary"
               size="sm"
-              className="cursor-pointer shrink-0"
+              className="cursor-pointer"
               onClick={() => {
-                void navigator.clipboard.writeText(newlyCreatedKey);
-                toast.success("API key copied");
+                setShowCreateForm((v) => !v);
+                setNewlyCreatedKey(null);
               }}
             >
-              Copy
+              {showCreateForm ? "Cancel" : "Create key"}
+            </Button>
+          }
+        />
+
+        {showCreateForm && (
+          <div className="flex gap-2 items-center">
+            <Input
+              aria-label="Key name"
+              placeholder="Key name (optional)"
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              disabled={creating}
+              className="flex-1"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleCreate();
+                if (e.key === "Escape") {
+                  setShowCreateForm(false);
+                  setNameInput("");
+                }
+              }}
+            />
+            <Button
+              size="sm"
+              className="cursor-pointer"
+              onClick={() => void handleCreate()}
+              disabled={creating}
+            >
+              {creating ? "Creating…" : "Create key"}
             </Button>
           </div>
-        </div>
-      )}
+        )}
 
-      {loading ? (
-        <div className="flex flex-col gap-3">
-          <Skeleton className="h-10 w-full rounded-md" />
-          <Skeleton className="h-10 w-full rounded-md" />
-        </div>
-      ) : keys.length === 0 ? (
-        <Typography size="small" className="text-muted-foreground">
-          No API keys yet.
-        </Typography>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {keys.map((apiKey) => (
-            <ApiKeyRow
-              key={apiKey.id}
-              apiKey={apiKey}
-              onRevoke={() => handleRevoke(apiKey.id)}
-            />
-          ))}
-        </div>
-      )}
+        {newlyCreatedKey && (
+          <div className="flex flex-col gap-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+            <Typography
+              size="small"
+              className="font-medium text-amber-600 dark:text-amber-400"
+            >
+              Copy your key now — it won’t be shown again.
+            </Typography>
+            <div className="flex gap-2 items-center">
+              <Input
+                readOnly
+                value={newlyCreatedKey}
+                className="flex-1 font-mono text-xs"
+                onFocus={(e) => e.target.select()}
+                aria-label="New API key"
+              />
+              <Button
+                variant="secondary"
+                size="sm"
+                className="cursor-pointer shrink-0"
+                onClick={() => {
+                  void navigator.clipboard.writeText(newlyCreatedKey);
+                  toast.success("API key copied");
+                }}
+              >
+                Copy
+              </Button>
+            </div>
+          </div>
+        )}
 
-      <SettingsItem
-        title="Connected apps"
-        description="Apps you’ve authorized to access Purl on your behalf via OAuth."
-        actions={null}
-      />
+        {loading ? (
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-10 w-full rounded-md" />
+            <Skeleton className="h-10 w-full rounded-md" />
+          </div>
+        ) : keys.length === 0 ? (
+          <Typography size="small" className="text-muted-foreground">
+            No API keys yet.
+          </Typography>
+        ) : (
+          <div className="flex flex-col">
+            {keys.map((apiKey) => (
+              <ApiKeyRow
+                key={apiKey.id}
+                apiKey={apiKey}
+                onRevoke={() => handleRevoke(apiKey.id)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
-      {connectedAppsLoading ? (
-        <div className="flex flex-col gap-3">
-          <Skeleton className="h-10 w-full rounded-md" />
-        </div>
-      ) : connectedApps.length === 0 ? (
-        <Typography size="small" className="text-muted-foreground">
-          No connected apps yet.
-        </Typography>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {connectedApps.map((app) => (
-            <ConnectedAppRow
-              key={app.clientId}
-              app={app}
-              onRevoke={() => handleRevokeConnectedApp(app.clientId)}
-            />
-          ))}
-        </div>
-      )}
+      <section className="flex flex-col gap-3">
+        <SettingsItem
+          title="Connected apps"
+          description="Apps you’ve authorized to access Purl on your behalf via OAuth."
+          actions={null}
+        />
+
+        {connectedAppsLoading ? (
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-10 w-full rounded-md" />
+          </div>
+        ) : connectedApps.length === 0 ? (
+          <Typography size="small" className="text-muted-foreground">
+            No connected apps yet.
+          </Typography>
+        ) : (
+          <div className="flex flex-col">
+            {connectedApps.map((app) => (
+              <ConnectedAppRow
+                key={app.clientId}
+                app={app}
+                onRevoke={() => handleRevokeConnectedApp(app.clientId)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
