@@ -44,7 +44,7 @@ export default async function OAuthConsentPage({
         <Typography variant="h2" component="h1">
           Authorize {clientName}
         </Typography>
-        <Typography size="small" className="text-muted-foreground max-w-md">
+        <Typography size="small" className="text-muted-foreground max-w-md text-pretty">
           {clientName} wants to access your Purl account
           {scopes.length > 0 ? ` (${scopes.join(", ")})` : ""}. It will be able
           to search, save, and read your saved content on your behalf.

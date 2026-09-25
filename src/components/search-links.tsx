@@ -80,7 +80,7 @@ export default function SearchLinks() {
           <CommandInput
             value={query}
             onValueChange={setQuery}
-            placeholder="Search links..."
+            placeholder="Search links…"
             wrapperClassName="p-0 border-b"
             inputGroupClassName="h-10! px-3.5 rounded-t-xl rounded-b-none border-none bg-transparent shadow-none focus-within:border-none focus-within:ring-0 dark:bg-transparent *:data-[slot=input-group-addon]:p-0!"
             className="h-full border-0 bg-transparent px-0 py-0 text-base shadow-none focus-visible:border-0 focus-visible:ring-0 dark:bg-transparent"

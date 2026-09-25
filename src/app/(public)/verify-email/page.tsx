@@ -57,7 +57,7 @@ export default function VerifyEmail() {
           </CardTitle>
           <CardDescription>
             <Typography size="small" className="text-muted-foreground">
-              We&apos;ve sent a verification link to{" "}
+              We’ve sent a verification link to{" "}
               <span className="font-medium text-foreground">
                 {session?.user?.email}
               </span>
@@ -67,7 +67,7 @@ export default function VerifyEmail() {
         </CardHeader>
         <CardContent>
           <Typography size="small" className="text-muted-foreground">
-            If you don&apos;t see the email, check your spam folder or{" "}
+            If you don’t see the email, check your spam folder or{" "}
             <Button
               variant="link"
               className="h-auto p-0 text-muted-foreground cursor-pointer underline underline-offset-4 hover:text-foreground"
@@ -80,7 +80,7 @@ export default function VerifyEmail() {
         </CardContent>
         <CardFooter className="flex flex-col gap-2">
           <Button onClick={handleVerified} className="w-full">
-            I&apos;ve verified my email
+            I’ve verified my email
           </Button>
           <Button
             variant="outline"

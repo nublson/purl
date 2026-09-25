@@ -131,7 +131,10 @@ export function UserItem({ user }: UserItemProps) {
       </ItemMedia>
       <ItemContent className="gap-0">
         <ItemTitle>{user?.name}</ItemTitle>
-        <ItemDescription className="leading-none">
+        <ItemDescription
+          className="line-clamp-1 wrap-anywhere"
+          title={user?.email}
+        >
           {user?.email}
         </ItemDescription>
       </ItemContent>

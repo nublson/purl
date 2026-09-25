@@ -128,7 +128,7 @@ export default function Login() {
               {form.state.isSubmitting ? "Signing in…" : "Sign in"}
             </Button>
             <Typography size="small" className="text-muted-foreground">
-              Don&apos;t have an account?{" "}
+              Don’t have an account?{" "}
               <Link
                 href="/signup"
                 className="text-primary underline-offset-4 hover:underline"

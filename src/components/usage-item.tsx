@@ -23,8 +23,8 @@ export function UsageItem({ label, period, used, cap }: UsageItemProps) {
         <ItemTitle>{label}</ItemTitle>
       </ItemContent>
       <ItemActions>
-        <Typography component="span" size="mini">
-          {used} / {cap == null ? "∞" : cap}{period ? ` · ${period}` : ""}
+        <Typography component="span" size="mini" className="tabular-nums">
+          {used.toLocaleString()} / {cap == null ? "∞" : cap.toLocaleString()}{period ? ` · ${period}` : ""}
         </Typography>
       </ItemActions>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
