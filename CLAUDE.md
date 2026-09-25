@@ -31,7 +31,7 @@ Single Next.js App Router application (not a monorepo).
 
 ### Route groups
 
-- `src/app/(public)/` — Marketing site (landing, login, signup, terms, privacy)
+- `src/app/(public)/` — Marketing site (landing, login, signup, verify-email)
 - `src/app/(private)/` — Authenticated app: `/home` (save links)
 - `src/app/api/` — API routes (links, auth, feedback, user, v1, MCP, pdf-proxy)
 - `src/app/sw.ts` — Serwist PWA service worker (compiled to `public/sw.js` on build; **disabled in dev**)

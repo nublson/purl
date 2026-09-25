@@ -14,9 +14,6 @@ const publicRoutes: PublicRoute[] = [
   { path: "/", whenAuthenticated: "next" },
   { path: "/login", whenAuthenticated: "redirect" },
   { path: "/signup", whenAuthenticated: "redirect" },
-  { path: "/privacy", whenAuthenticated: "next" },
-  { path: "/terms", whenAuthenticated: "next" },
-  { path: "/docs", match: "prefix", whenAuthenticated: "next" },
   // RFC 8615 reserved namespace — anything under .well-known is by convention
   // a public, unauthenticated discovery/metadata document (OAuth server
   // metadata, security.txt, etc.), never a session-bearing app route.
