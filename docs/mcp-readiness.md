@@ -5,7 +5,7 @@ What it would take to expose Purl as a **Model Context Protocol (MCP) server**, 
 > **Update — IMPLEMENTED.** The MCP server now ships. Endpoint: `${BASE_URL}/api/mcp`
 > (Streamable HTTP), authenticated with `purl_…` API keys via `Authorization: Bearer`.
 > Route: [`src/app/api/[transport]/route.ts`](../src/app/api/[transport]/route.ts); tools/auth in
-> [`src/lib/mcp.ts`](../src/lib/mcp.ts); user-facing docs at `/docs/mcp`. Tools: `search_content`,
+> [`src/lib/mcp.ts`](../src/lib/mcp.ts); the public `/docs/mcp` and `/docs/api` pages have since been removed. Tools: `search_content`,
 > `save_link`, `list_saved_items`, `get_link`. The analysis below is kept for historical context.
 >
 > **Update 2 — OAuth 2.1 also implemented.** Contrary to §2/"Open decisions" below (written before
@@ -30,7 +30,7 @@ What it would take to expose Purl as a **Model Context Protocol (MCP) server**, 
 | **Public REST surface** | [`/api/v1/links`](../src/app/api/v1/links/route.ts) (GET/POST), `/api/v1/links/[id]` | Proves the API-key path end-to-end; MCP reuses the same functions. |
 | **Middleware bypass for token routes** | [`src/proxy.ts:44`](../src/proxy.ts) (`/api/v1/*` skips the session redirect) | Same pattern needed for the MCP route — already established. |
 | **Tool definitions** | `listSavedItems` + `searchContent` in [`src/lib/chat.ts`](../src/lib/chat.ts) | The exact tool shapes/descriptions an MCP would expose. Reuse verbatim. |
-| **API docs page** | [`/docs/api`](../src/app/(public)/docs/api/page.tsx) | A place to document the MCP endpoint too. |
+| **API docs page** | `/docs/api` (since removed) | A place to document the MCP endpoint too. |
 | **Plan enforcement & usage** | `assertCanSaveLink`/`assertCanChat`, `recordUsage`, `getEntitlementContext` | Reusable guards so MCP can't bypass caps. |
 
 ---
@@ -121,7 +121,7 @@ Descriptions can be lifted verbatim from the existing chat tools in [`src/lib/ch
 3. **Open the route in `proxy.ts`** (bypass + matcher).
 4. **Wire entitlements/usage/rate-limit + `feature:mcp` tag** into each tool.
 5. **Tests (Vitest):** mock `getSession` → `userId`, assert each tool enforces ownership + plan caps; mirror the `/api/v1` route tests.
-6. **Document** the endpoint and "use your `purl_…` key as a Bearer token" on [`/docs/api`](../src/app/(public)/docs/api/page.tsx).
+6. **Document** the endpoint and "use your `purl_…` key as a Bearer token" on `/docs/api` (since removed).
 
 ---
 
