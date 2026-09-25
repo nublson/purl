@@ -62,7 +62,7 @@ export default function Login() {
               name="email"
               validators={{
                 onSubmit: ({ value }) =>
-                  !value?.trim() ? "Email is required." : undefined,
+                  !value?.trim() ? "Enter your email." : undefined,
               }}
             >
               {(field) => (
@@ -92,7 +92,7 @@ export default function Login() {
               name="password"
               validators={{
                 onSubmit: ({ value }) =>
-                  !value?.trim() ? "Password is required." : undefined,
+                  !value?.trim() ? "Enter your password." : undefined,
               }}
             >
               {(field) => (
@@ -125,7 +125,7 @@ export default function Login() {
               className="w-full"
               disabled={form.state.isSubmitting}
             >
-              {form.state.isSubmitting ? "Signing in…" : "Sign in"}
+              {form.state.isSubmitting ? "Logging in…" : "Log in"}
             </Button>
             <Typography size="small" className="text-muted-foreground">
               Don’t have an account?{" "}

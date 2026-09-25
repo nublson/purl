@@ -61,7 +61,7 @@ export function LinkInput({
         name="url"
         validators={{
           onSubmit: ({ value }) =>
-            !value?.trim() ? "URL is required." : undefined,
+            !value?.trim() ? "Enter a URL to save." : undefined,
         }}
       >
         {(field) => {
@@ -72,6 +72,7 @@ export function LinkInput({
                 <InputGroupInput
                   data-cy="url-input"
                   name={field.name}
+                  aria-label="Link to save"
                   placeholder="Save a link…"
                   value={field.state.value}
                   onBlur={field.handleBlur}

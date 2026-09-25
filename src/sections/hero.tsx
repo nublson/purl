@@ -20,7 +20,7 @@ export default function HeroSection() {
           </Typography>
           <div className="text-center flex flex-col gap-6">
             <Typography component="h1" variant="h1">
-              Save Anything. <br /> Keep what matters.
+              A home for your pearls
             </Typography>
             <Typography className="mx-auto max-w-[42ch] text-center text-pretty">
               Purl captures your links, PDFs, videos, and audio and keeps

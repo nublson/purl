@@ -58,16 +58,16 @@ export function getRelativeDateLabel(date: Date): string {
   const daysAgo = Math.floor(diffMs / (24 * 60 * 60 * 1000));
 
   if (daysAgo === 0) return "Today";
-  if (daysAgo >= 1 && daysAgo <= 7) return "This Week";
-  if (daysAgo >= 8 && daysAgo <= 14) return "Last Week";
-  if (daysAgo >= 15 && daysAgo <= 31) return "This Month";
+  if (daysAgo >= 1 && daysAgo <= 7) return "This week";
+  if (daysAgo >= 8 && daysAgo <= 14) return "Last week";
+  if (daysAgo >= 15 && daysAgo <= 31) return "This month";
 
   const sameYear = then.getFullYear() === now.getFullYear();
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
-  if (then >= lastMonthStart && then <= lastMonthEnd) return "Last Month";
-  if (sameYear) return "This Year";
-  if (then.getFullYear() === now.getFullYear() - 1) return "Last Year";
+  if (then >= lastMonthStart && then <= lastMonthEnd) return "Last month";
+  if (sameYear) return "This year";
+  if (then.getFullYear() === now.getFullYear() - 1) return "Last year";
   return "Older";
 }

@@ -10,10 +10,10 @@ export function useAuth() {
   async function signInWithEmail(credentials: { email: string; password: string }) {
     const res = await signIn.email(credentials);
     if (res.error) {
-      toast.error(res.error.message ?? "Something went wrong.");
+      toast.error(res.error.message ?? "Unable to log in. Check your email and password.");
       return res;
     }
-    toast.success("Signed in successfully.");
+    toast.success("Welcome back.");
     router.replace("/home");
     return res;
   }
@@ -29,10 +29,10 @@ export function useAuth() {
       password: params.password,
     });
     if (res.error) {
-      toast.error(res.error.message ?? "Something went wrong.");
+      toast.error(res.error.message ?? "Unable to create your account. Try again.");
       return res;
     }
-    toast.success("Account created. Please check your email to verify.");
+    toast.success("Account created. Check your email for a verification link.");
     router.push("/verify-email");
     router.refresh();
     return res;

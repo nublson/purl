@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Feedback is required" }, { status: 400 });
   }
   if (feedback.length > MAX_FEEDBACK_LENGTH) {
-    return NextResponse.json({ error: "Feedback is too long" }, { status: 400 });
+    return NextResponse.json({ error: "Keep your feedback under 10,000 characters." }, { status: 400 });
   }
 
   const user = session.user;
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
   if (to.length === 0) {
     console.error("FEEDBACK_TO_EMAIL is not set or empty.");
     return NextResponse.json(
-      { error: "Feedback is temporarily unavailable" },
+      { error: "Unable to send feedback right now. Try again later." },
       { status: 503 },
     );
   }
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
   if (!resend) {
     console.error("RESEND_API_KEY is not set; cannot send feedback.");
     return NextResponse.json(
-      { error: "Feedback is temporarily unavailable" },
+      { error: "Unable to send feedback right now. Try again later." },
       { status: 503 },
     );
   }
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
   if (error) {
     console.error("Failed to send feedback email:", error.message);
     return NextResponse.json(
-      { error: "Failed to send feedback" },
+      { error: "Unable to send feedback. Try again." },
       { status: 502 },
     );
   }

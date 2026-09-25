@@ -181,7 +181,7 @@ describe("POST /api/links", () => {
 
       expect(res.status).toBe(403);
       expect(await res.json()).toEqual({
-        error: "You've reached the 1,000-link limit.",
+        error: "You've reached the 1,000-link limit. Delete links you no longer need to save new ones.",
         code: "LIMIT_REACHED",
         feature: "SAVE_LIMIT",
       });

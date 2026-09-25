@@ -24,7 +24,7 @@ describe("Link management", () => {
   it("new user with no links sees the empty state", () => {
     cy.visit("/home");
     cy.get('[data-cy="link-group-empty"]').should("exist");
-    cy.contains("No Links Yet").should("be.visible");
+    cy.contains("No links yet").should("be.visible");
   });
 
   it("seeded link renders title and domain", () => {
@@ -65,6 +65,6 @@ describe("Link management", () => {
     cy.get('[role="dialog"]').find('[data-cy="link-title"]').should("contain.text", "GitHub");
 
     cy.get('[cmdk-input]').clear().type("xyz-nonexistent-query");
-    cy.contains("No results found.").should("be.visible");
+    cy.contains("No links match").should("be.visible");
   });
 });

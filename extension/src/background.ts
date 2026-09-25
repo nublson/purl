@@ -134,7 +134,7 @@ chrome.action.onClicked.addListener(async (tab) => {
     clearTimeout(timeout);
 
     if (res.status === 401) {
-      await injectToast(tab.id, "error", "Sign in to Purl first");
+      await injectToast(tab.id, "error", "Log in to Purl first");
       return;
     }
     if (res.status === 402) {

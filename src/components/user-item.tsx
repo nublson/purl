@@ -62,23 +62,23 @@ export function UserItem({ user }: UserItemProps) {
         .json()
         .catch(() => null)) as AvatarUploadResponse | null;
       if (!response.ok) {
-        throw new Error(body?.error ?? "Upload failed");
+        throw new Error(body?.error ?? "Unable to upload the photo. Try again.");
       }
       if (!body?.image) {
-        throw new Error("Upload failed");
+        throw new Error("Unable to upload the photo. Try again.");
       }
 
       const updateResult = await updateUser({ image: body.image });
       if (updateResult.error) {
         throw new Error(
-          updateResult.error.message ?? "Failed to update profile",
+          updateResult.error.message ?? "Unable to update your profile. Try again.",
         );
       }
       const image = body.image;
       setUser((current) => (current ? { ...current, image } : current));
     } catch (error) {
       console.error(error);
-      toast.error(error instanceof Error ? error.message : "Upload failed");
+      toast.error(error instanceof Error ? error.message : "Unable to upload the photo. Try again.");
     } finally {
       setIsUploading(false);
     }

@@ -51,14 +51,14 @@ export function SettingsIntegrations() {
       })
       .then((data: ApiKeyItem[]) => setKeys(Array.isArray(data) ? data : []))
       .catch(() => {
-        toast.error("Failed to load API keys");
+        toast.error("Unable to load API keys. Reload to try again.");
         setKeys([]);
       })
       .finally(() => setLoading(false));
   }, []);
 
   const handleCreate = async () => {
-    const name = nameInput.trim() || "API Key";
+    const name = nameInput.trim() || "API key";
     setCreating(true);
     try {
       const res = await fetch("/api/v1/keys", {
@@ -67,7 +67,7 @@ export function SettingsIntegrations() {
         body: JSON.stringify({ name }),
       });
       if (!res.ok) {
-        toast.error("Failed to create API key");
+        toast.error("Unable to create the API key. Try again.");
         return;
       }
       const data = (await res.json()) as CreatedApiKey;
@@ -76,7 +76,7 @@ export function SettingsIntegrations() {
       setShowCreateForm(false);
       setNameInput("");
     } catch {
-      toast.error("Failed to create API key");
+      toast.error("Unable to create the API key. Try again.");
     } finally {
       setCreating(false);
     }
@@ -86,14 +86,14 @@ export function SettingsIntegrations() {
     try {
       const res = await fetch(`/api/v1/keys/${id}`, { method: "DELETE" });
       if (!res.ok) {
-        toast.error("Failed to revoke key");
+        toast.error("Unable to revoke the key. Try again.");
         return;
       }
       setKeys((prev) => prev.filter((k) => k.id !== id));
       setNewlyCreatedKey(null);
       toast.success("API key revoked");
     } catch {
-      toast.error("Failed to revoke key");
+      toast.error("Unable to revoke the key. Try again.");
     }
   };
 
@@ -110,7 +110,7 @@ export function SettingsIntegrations() {
         setConnectedApps(Array.isArray(data) ? data : []),
       )
       .catch(() => {
-        toast.error("Failed to load connected apps");
+        toast.error("Unable to load connected apps. Reload to try again.");
         setConnectedApps([]);
       })
       .finally(() => setConnectedAppsLoading(false));
@@ -122,20 +122,20 @@ export function SettingsIntegrations() {
         method: "DELETE",
       });
       if (!res.ok) {
-        toast.error("Failed to revoke app");
+        toast.error("Unable to disconnect the app. Try again.");
         return;
       }
       setConnectedApps((prev) => prev.filter((a) => a.clientId !== clientId));
       toast.success("App disconnected");
     } catch {
-      toast.error("Failed to revoke app");
+      toast.error("Unable to disconnect the app. Try again.");
     }
   };
 
   return (
     <div className="w-full flex-1 flex flex-col gap-4">
       <SettingsItem
-        title="API Keys"
+        title="API keys"
         description="Use API keys to access Purl from external apps and scripts."
         actions={
           <Button
@@ -155,6 +155,7 @@ export function SettingsIntegrations() {
       {showCreateForm && (
         <div className="flex gap-2 items-center">
           <Input
+            aria-label="Key name"
             placeholder="Key name (optional)"
             value={nameInput}
             onChange={(e) => setNameInput(e.target.value)}
@@ -174,7 +175,7 @@ export function SettingsIntegrations() {
             onClick={() => void handleCreate()}
             disabled={creating}
           >
-            {creating ? "Creating…" : "Create"}
+            {creating ? "Creating…" : "Create key"}
           </Button>
         </div>
       )}
@@ -201,7 +202,7 @@ export function SettingsIntegrations() {
               className="cursor-pointer shrink-0"
               onClick={() => {
                 void navigator.clipboard.writeText(newlyCreatedKey);
-                toast.success("Copied to clipboard");
+                toast.success("API key copied");
               }}
             >
               Copy
@@ -232,7 +233,7 @@ export function SettingsIntegrations() {
       )}
 
       <SettingsItem
-        title="Connected Apps"
+        title="Connected apps"
         description="Apps you’ve authorized to access Purl on your behalf via OAuth."
         actions={null}
       />
@@ -290,7 +291,7 @@ function ApiKeyRow({
     <div className="flex items-center justify-between gap-3 py-2">
       <div className="flex flex-col gap-0.5 min-w-0">
         <Typography size="small" className="font-medium truncate">
-          {apiKey.name ?? "API Key"}
+          {apiKey.name ?? "API key"}
         </Typography>
         <Typography size="mini" className="text-muted-foreground">
           <span className="font-mono">{apiKey.start ?? "purl_…"}</span> ·
@@ -383,12 +384,12 @@ function ConnectedAppRow({
             size="sm"
             className="cursor-pointer shrink-0"
           >
-            Revoke
+            Disconnect
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent nested size="default" className="sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Disconnect app?</AlertDialogTitle>
+            <AlertDialogTitle>Disconnect {app.name}?</AlertDialogTitle>
             <AlertDialogDescription>
               <span className="font-medium">{app.name}</span> will
               immediately lose access to your Purl account. This cannot be
@@ -404,7 +405,7 @@ function ConnectedAppRow({
               className="cursor-pointer"
               onClick={() => void handleRevoke()}
             >
-              {revoking ? "Revoking…" : "Revoke access"}
+              {revoking ? "Disconnecting…" : "Disconnect app"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

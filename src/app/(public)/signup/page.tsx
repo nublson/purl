@@ -84,7 +84,7 @@ export default function Signup() {
               name="email"
               validators={{
                 onSubmit: ({ value }) =>
-                  !value?.trim() ? "Email is required." : undefined,
+                  !value?.trim() ? "Enter your email." : undefined,
               }}
             >
               {(field) => (
@@ -115,9 +115,9 @@ export default function Signup() {
               validators={{
                 onSubmit: ({ value }) =>
                   !value?.trim()
-                    ? "Password is required."
+                    ? "Choose a password."
                     : (value as string).length < 8
-                      ? "Password must be at least 8 characters."
+                      ? "Choose a password with at least 8 characters."
                       : undefined,
               }}
             >
@@ -147,9 +147,9 @@ export default function Signup() {
               name="confirmPassword"
               validators={{
                 onSubmit: ({ value, fieldApi }) => {
-                  if (!value?.trim()) return "Confirm password is required.";
+                  if (!value?.trim()) return "Enter your password again.";
                   if (value !== fieldApi.form.getFieldValue("password")) {
-                    return "Passwords do not match.";
+                    return "Enter the same password in both fields.";
                   }
                   return undefined;
                 },

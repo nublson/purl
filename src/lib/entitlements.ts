@@ -13,7 +13,7 @@ export async function assertCanSaveLink(userId: string): Promise<void> {
   const n = await prisma.link.count({ where: { userId } });
   if (n >= MAX_SAVED_LINKS) {
     throw new SaveLimitError(
-      `You've reached the ${MAX_SAVED_LINKS.toLocaleString("en-US")}-link limit.`,
+      `You've reached the ${MAX_SAVED_LINKS.toLocaleString("en-US")}-link limit. Delete links you no longer need to save new ones.`,
     );
   }
 }

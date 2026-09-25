@@ -13,7 +13,7 @@ export async function saveLink(rawUrl: string): Promise<SaveLinkResult> {
   const url = rawUrl.trim();
 
   if (!isValidUrl(url)) {
-    toast.error("Not a valid URL");
+    toast.error("Enter a full URL, like https://example.com.");
     return null;
   }
 
@@ -30,7 +30,7 @@ export async function saveLink(rawUrl: string): Promise<SaveLinkResult> {
       code?: string;
     };
     if (!res.ok) {
-      const msg = data?.error ?? "Failed to save link";
+      const msg = data?.error ?? "Unable to save the link. Try again.";
       toast.error(msg);
       const hitLimit = data?.code === "LIMIT_REACHED";
       return hitLimit ? { error: msg, limit: true } : { error: msg };
@@ -38,12 +38,12 @@ export async function saveLink(rawUrl: string): Promise<SaveLinkResult> {
 
     const id = data?.id as string | undefined;
     if (!id) {
-      toast.error("Failed to save link");
+      toast.error("Unable to save the link. Try again.");
       return { error: "Invalid response" };
     }
     return { id };
   } catch {
-    toast.error("Failed to save link");
+    toast.error("Unable to save the link. Check your connection and try again.");
     return { error: "Network error" };
   }
 }

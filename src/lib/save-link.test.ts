@@ -25,7 +25,7 @@ describe("saveLink", () => {
     const result = await saveLink("not-a-url");
 
     expect(result).toBeNull();
-    expect(errorMock).toHaveBeenCalledWith("Not a valid URL");
+    expect(errorMock).toHaveBeenCalledWith("Enter a full URL, like https://example.com.");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -59,8 +59,8 @@ describe("saveLink", () => {
 
     const result = await saveLink("https://example.com");
 
-    expect(result).toEqual({ error: "Failed to save link" });
-    expect(errorMock).toHaveBeenCalledWith("Failed to save link");
+    expect(result).toEqual({ error: "Unable to save the link. Try again." });
+    expect(errorMock).toHaveBeenCalledWith("Unable to save the link. Try again.");
   });
 
   it("returns error when request throws", async () => {
@@ -69,7 +69,7 @@ describe("saveLink", () => {
     const result = await saveLink("https://example.com");
 
     expect(result).toEqual({ error: "Network error" });
-    expect(errorMock).toHaveBeenCalledWith("Failed to save link");
+    expect(errorMock).toHaveBeenCalledWith("Unable to save the link. Check your connection and try again.");
   });
 
   it("trims URL, posts link, and returns id on success", async () => {
