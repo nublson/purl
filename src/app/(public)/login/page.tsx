@@ -1,5 +1,6 @@
 "use client";
 
+import { Logo } from "@/components/logo";
 import { Typography } from "@/components/typography";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,7 +43,8 @@ export default function Login() {
         form.handleSubmit();
       }}
     >
-      <div className="flex-1 flex w-full items-center justify-center md:p-4">
+      <div className="flex-1 flex flex-col w-full items-center justify-center gap-6 md:p-4">
+        <Logo size={32} pathname="/" />
         <Card className="w-full max-w-sm">
           <CardHeader>
             <CardTitle>
