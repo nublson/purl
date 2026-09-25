@@ -12,9 +12,9 @@ export default function OfflinePage() {
   return (
     <div className="min-h-full flex flex-col items-center justify-center gap-6 p-6 text-center">
       <Typography component="h1" variant="h2">
-        You&apos;re offline
+        You’re offline
       </Typography>
-      <Typography className="text-muted-foreground max-w-md font-light">
+      <Typography className="text-muted-foreground max-w-md text-pretty">
         Purl needs a network connection to save links and sync your stash.
         Reconnect and try again.
       </Typography>

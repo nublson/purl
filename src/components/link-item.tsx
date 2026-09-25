@@ -154,7 +154,7 @@ export const LinkItem = React.forwardRef<
         <ItemTitle>
           <Typography
             size="small"
-            className="text-accent-foreground font-medium line-clamp-1 break-all"
+            className="text-accent-foreground font-medium line-clamp-2 wrap-anywhere md:line-clamp-1"
           >
             {link.title}
           </Typography>

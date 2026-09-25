@@ -54,7 +54,7 @@ export default function Signup() {
             </CardTitle>
             <CardDescription>
               <Typography size="small" className="text-muted-foreground">
-                Enter your email and choose a password. We&apos;ll send a
+                Enter your email and choose a password. We’ll send a
                 verification link to your email.
               </Typography>
             </CardDescription>

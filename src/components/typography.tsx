@@ -5,16 +5,15 @@ import * as React from "react";
 const typographyVariants = cva("", {
   variants: {
     variant: {
-      h1: "text-7xl md:text-[88px] md:leading-[92.4px] font-normal font-serif text-foreground",
-      h2: "text-4xl md:text-[54px] font-normal font-serif text-foreground leading-[110%] tracking-[-1.5]",
-      h3: "text-2xl font-normal font-serif text-foreground",
-      h4: "text-xl font-normal font-serif text-foreground",
-      monospaced: "text-base font-normal font-serif",
+      h1: "text-6xl sm:text-7xl md:text-display font-normal font-serif tracking-[-0.01em] text-balance text-foreground",
+      h2: "text-4xl leading-[1.1] md:text-title font-normal font-serif tracking-[-0.02em] text-balance text-foreground",
+      h3: "text-2xl leading-tight font-normal font-serif text-balance text-foreground",
+      h4: "text-xl leading-tight font-normal font-serif text-balance text-foreground",
     },
     size: {
-      regular: "text-base leading-6 tracking-normal text-muted-foreground",
-      small: "text-sm leading-[21px] tracking-[0.07px] text-muted-foreground",
-      mini: "text-xs leading-4 tracking-[0.18px] text-muted-foreground",
+      regular: "text-base leading-normal text-muted-foreground",
+      small: "text-sm leading-normal text-muted-foreground",
+      mini: "text-xs leading-snug tracking-[0.015em] text-muted-foreground",
     },
   },
 });
@@ -30,7 +29,7 @@ type TypographyComponent =
   | "span"
   | "a"
   | "li";
-type TypographyVariant = "h1" | "h2" | "h3" | "h4" | "monospaced";
+type TypographyVariant = "h1" | "h2" | "h3" | "h4";
 type TypographySize = "regular" | "small" | "mini";
 
 interface BaseTypographyProps extends React.HTMLAttributes<HTMLElement> {

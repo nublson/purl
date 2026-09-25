@@ -185,7 +185,7 @@ export function SettingsIntegrations() {
             size="small"
             className="font-medium text-amber-600 dark:text-amber-400"
           >
-            Copy your key now — it won&apos;t be shown again.
+            Copy your key now — it won’t be shown again.
           </Typography>
           <div className="flex gap-2 items-center">
             <Input
@@ -233,7 +233,7 @@ export function SettingsIntegrations() {
 
       <SettingsItem
         title="Connected Apps"
-        description="Apps you've authorized to access Purl on your behalf via OAuth."
+        description="Apps you’ve authorized to access Purl on your behalf via OAuth."
         actions={null}
       />
 
@@ -292,8 +292,9 @@ function ApiKeyRow({
         <Typography size="small" className="font-medium truncate">
           {apiKey.name ?? "API Key"}
         </Typography>
-        <Typography size="mini" className="text-muted-foreground font-mono">
-          {apiKey.start ?? "purl_…"} · Created {createdDate}
+        <Typography size="mini" className="text-muted-foreground">
+          <span className="font-mono">{apiKey.start ?? "purl_…"}</span> ·
+          Created {createdDate}
         </Typography>
       </div>
       <AlertDialog
@@ -391,7 +392,7 @@ function ConnectedAppRow({
             <AlertDialogDescription>
               <span className="font-medium">{app.name}</span> will
               immediately lose access to your Purl account. This cannot be
-              undone — you&apos;d need to reconnect and re-authorize it.
+              undone — you’d need to reconnect and re-authorize it.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

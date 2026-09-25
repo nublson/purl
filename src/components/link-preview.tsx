@@ -56,11 +56,11 @@ export function LinkPreview({
           />
         )}
         <div className="p-4 flex flex-col gap-2">
-          <p className="text-accent-foreground text-sm font-medium line-clamp-2">
+          <p className="text-accent-foreground text-sm font-medium line-clamp-2 wrap-anywhere">
             {link.title}
           </p>
           {link.description && (
-            <p className="text-muted-foreground text-xs font-normal line-clamp-3 break-all">
+            <p className="text-muted-foreground text-xs font-normal line-clamp-3 wrap-anywhere">
               {link.description}
             </p>
           )}

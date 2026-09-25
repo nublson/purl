@@ -14,7 +14,7 @@ export default function HeroSection() {
           <Typography
             component="span"
             size="mini"
-            className="text-muted-foreground uppercase"
+            className="text-muted-foreground uppercase tracking-wider"
           >
             Your personal knowledge base
           </Typography>
@@ -22,9 +22,9 @@ export default function HeroSection() {
             <Typography component="h1" variant="h1">
               Save Anything. <br /> Keep what matters.
             </Typography>
-            <Typography className="text-center font-light">
-              Purl captures your links, PDFs, videos, and audio — <br />{" "}
-              and keeps everything you&apos;ve saved in one place.
+            <Typography className="mx-auto max-w-[42ch] text-center text-pretty">
+              Purl captures your links, PDFs, videos, and audio and keeps
+              everything you’ve saved in one place.
             </Typography>
           </div>
         </div>

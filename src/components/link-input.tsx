@@ -72,7 +72,7 @@ export function LinkInput({
                 <InputGroupInput
                   data-cy="url-input"
                   name={field.name}
-                  placeholder="Save a link..."
+                  placeholder="Save a link…"
                   value={field.state.value}
                   onBlur={field.handleBlur}
                   onChange={(event) => field.handleChange(event.target.value)}

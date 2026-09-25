@@ -37,7 +37,7 @@ export function LinkItemSkeleton({
       </ItemMedia>
       <ItemContent>
         <ItemTitle className="flex flex-col gap-1">
-          <p className="text-sm font-normal text-muted-foreground animate-pulse line-clamp-1 break-all">
+          <p className="text-sm font-normal text-muted-foreground animate-pulse line-clamp-1 wrap-anywhere">
             {url}
           </p>
         </ItemTitle>
