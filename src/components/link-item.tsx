@@ -57,6 +57,8 @@ export const LinkItem = React.forwardRef<
     "idle" | "animating" | "loading" | "exiting"
   >("idle");
   const [previewOpen, setPreviewOpen] = React.useState(false);
+  // Whether the current preview was opened by hover (vs keyboard focus).
+  const openedByPointerRef = React.useRef(false);
   const descriptionId = React.useId();
   const anchorRef = React.useRef<HTMLAnchorElement>(null);
   // Row to focus after a delete, so focus doesn't fall back to the page.
@@ -83,7 +85,9 @@ export const LinkItem = React.forwardRef<
     clearOpenTimer();
 
     openTimerRef.current = setTimeout(() => {
-      if (!hoveringActionsRef.current) setPreviewOpen(true);
+      if (hoveringActionsRef.current) return;
+      openedByPointerRef.current = true;
+      setPreviewOpen(true);
     }, previewOpenDelay());
   }, [clearCloseTimer, clearOpenTimer]);
 
@@ -106,7 +110,9 @@ export const LinkItem = React.forwardRef<
   // While this preview is open, other rows open theirs without the delay.
   React.useEffect(() => {
     if (!previewOpen) return;
-    return trackPreviewOpen(() => setPreviewOpen(false));
+    return trackPreviewOpen(() => setPreviewOpen(false), {
+      viaPointer: openedByPointerRef.current,
+    });
   }, [previewOpen]);
 
   if (deletePhase === "loading" || deletePhase === "exiting") {
@@ -168,6 +174,7 @@ export const LinkItem = React.forwardRef<
             // Keyboard users get the same preview mouse users get on hover.
             if (!event.currentTarget.matches(":focus-visible")) return;
             clearCloseTimer();
+            openedByPointerRef.current = false;
             setPreviewOpen(true);
           }}
           onBlur={() => {

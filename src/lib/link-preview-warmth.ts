@@ -18,13 +18,17 @@ export function previewOpenDelay() {
 
 /**
  * Call when a preview opens, with a function that closes it. Any other open
- * preview closes right away so two cards never overlap. Returns the cleanup
- * for when this one closes.
+ * preview closes right away so two cards never overlap. Only pointer opens
+ * warm the list: a keyboard-opened preview says nothing about where the
+ * pointer is. Returns the cleanup for when this one closes.
  */
-export function trackPreviewOpen(close: () => void) {
+export function trackPreviewOpen(
+  close: () => void,
+  { viaPointer }: { viaPointer: boolean },
+) {
   if (closeActive) closeActive();
   closeActive = close;
-  warm = true;
+  if (viaPointer) warm = true;
   openCount += 1;
   return () => {
     openCount -= 1;
@@ -32,7 +36,7 @@ export function trackPreviewOpen(close: () => void) {
   };
 }
 
-/** Call when the pointer leaves the list. */
+/** Call when the pointer leaves the list, and when the list unmounts. */
 export function coolPreviews() {
   warm = false;
 }

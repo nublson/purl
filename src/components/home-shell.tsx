@@ -114,6 +114,10 @@ export function HomeShell({
     void reload();
   }, [version, reload]);
 
+  // Leaving /home without a mouse-leave (e.g. keyboard navigation) must not
+  // carry the "preview already open" state back to the next visit.
+  useEffect(() => coolPreviews, []);
+
   const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const sentinel = sentinelRef.current;
