@@ -8,7 +8,7 @@ import {
 } from "./ui/item";
 
 interface SettingsItemProps {
-  title: string;
+  title: React.ReactNode;
   description: string;
   /** Show the full description instead of clamping it to two lines. */
   fullDescription?: boolean;

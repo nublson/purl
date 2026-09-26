@@ -25,6 +25,7 @@ model User {
   email         String
   emailVerified Boolean
   image         String?
+  username      String    @unique
   createdAt     DateTime
   updatedAt     DateTime
   sessions      Session[]

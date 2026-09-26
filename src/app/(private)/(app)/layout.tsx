@@ -3,6 +3,7 @@ import { HeaderSaveLink } from "@/components/header-save-link";
 import { HeaderSearchLinks } from "@/components/header-search-links";
 import { HeaderActionsFallback } from "@/components/skeletons";
 import { User } from "@/components/user";
+import { getEnabledProviders } from "@/lib/auth-providers";
 import { CurrentUserProvider } from "@/contexts/current-user-context";
 import { LinksSyncProvider } from "@/contexts/links-sync-context";
 import { UsageProvider } from "@/contexts/usage-context";
@@ -13,9 +14,10 @@ import { Suspense } from "react";
 async function HeaderActions() {
   const user = await getSessionUser();
   const usageSummary = user ? await getUsageSummaryForUser(user.id) : null;
+  const enabledProviders = getEnabledProviders();
 
   return (
-    <CurrentUserProvider user={user}>
+    <CurrentUserProvider user={user} enabledProviders={enabledProviders}>
       <UsageProvider usageSummary={usageSummary}>
         <div className="flex items-center justify-end gap-2">
           <HeaderSaveLink />

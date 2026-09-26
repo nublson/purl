@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Purl has a solid technical SEO base and most audit fixes are in place. **Implemented:** landing H1 + value-prop copy (Typography), semantic H1 on login/signup/verify-email, `themeColor` and `manifest.json` in root metadata, verify-email noindex and removed from sitemap.
+Purl has a solid technical SEO base and most audit fixes are in place. **Implemented:** landing H1 + value-prop copy (Typography), `themeColor` and `manifest.json` in root metadata. (The former login/signup/verify-email pages were removed: sign-in is Google/GitHub OAuth from the landing page, plus Apple when configured.)
 
 **Remaining**
 1. **OG image:** Add a default `opengraph-image` so shares show a proper card instead of a fallback.
@@ -37,7 +37,7 @@ Purl has a solid technical SEO base and most audit fixes are in place. **Impleme
 
 **What’s in good shape**
 - `robots.ts`: allows `/`, disallows `/home` and `/api/`, references sitemap.
-- `sitemap.ts`: exists, correct format; contains only indexable public URLs (verify-email removed).
+- `sitemap.ts`: exists, correct format; contains only indexable public URLs.
 - No unintentional blocks; important public pages are allowed.
 
 ### Indexation
@@ -48,7 +48,6 @@ Purl has a solid technical SEO base and most audit fixes are in place. **Impleme
 
 **What’s in good shape**
 - Private layout has `robots: { index: false, follow: false }`.
-- verify-email has `robots: { index: false, follow: false }` and is not in the sitemap.
 - Public pages are indexable; no conflicting noindex on important pages.
 
 ### Technical Foundations
@@ -66,7 +65,7 @@ Purl has a solid technical SEO base and most audit fixes are in place. **Impleme
 
 ### URL structure
 
-- Public URLs are clean and descriptive: `/`, `/login`, `/signup`, `/verify-email`. No issues.
+- Public URLs are clean and descriptive (e.g. `/`, docs, privacy, terms). There are no separate auth pages; sign-in happens on `/`. No issues.
 
 ---
 
@@ -80,7 +79,6 @@ Purl has a solid technical SEO base and most audit fixes are in place. **Impleme
 
 **What’s in good shape**
 - Root: title object with default + template `"%s | Purl"`.
-- Login, Sign up, Verify email: unique titles; length reasonable for SERPs.
 
 ### Meta descriptions
 
@@ -90,7 +88,6 @@ Purl has a solid technical SEO base and most audit fixes are in place. **Impleme
 
 **What’s in good shape**
 - Landing: single H1 via `Typography component="h1" variant="h2"` with "Save links. Ask questions. Get answers."
-- Login, signup, verify-email: semantic H1 via `Typography component="h1"` inside CardTitle (Log in, Create an account, Check your email).
 
 ### Content optimization (landing)
 
@@ -99,11 +96,11 @@ Purl has a solid technical SEO base and most audit fixes are in place. **Impleme
 
 ### Internal linking
 
-- Landing links to `/signup` and `/login`; login/signup cross-link. No orphan public pages. Adequate for current size.
+- Landing hosts the Google/GitHub sign-in buttons directly (no `/login` or `/signup` pages). No orphan public pages. Adequate for current size.
 
 ### Images
 
-- Public marketing/auth pages don’t use images. Link list (private) uses favicons with `alt={link.title}`. No issues for current scope.
+- Public marketing pages don’t use images. Link list (private) uses favicons with `alt={link.title}`. No issues for current scope.
 
 ---
 
@@ -120,10 +117,10 @@ Purl has a solid technical SEO base and most audit fixes are in place. **Impleme
 ### Done (implemented)
 
 1. **Landing page** — H1 "Save links. Ask questions. Get answers." (Typography component="h1" variant="h2"); value-prop copy with keywords; CTA links.
-2. **Auth pages** — Semantic H1 via Typography component="h1" on login, signup, verify-email.
+2. **Auth pages** — Removed; sign-in is OAuth-only from the landing page.
 3. **themeColor** — Root layout metadata (light/dark).
 4. **manifest.json** — Created in `public/`, linked in root metadata.
-5. **verify-email** — `robots: { index: false, follow: false }` in layout; removed from sitemap.
+5. **verify-email** — Page removed along with email/password sign-in.
 
 ### Remaining
 

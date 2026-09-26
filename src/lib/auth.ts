@@ -3,7 +3,14 @@ import { mcp } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { apiKey } from "@better-auth/api-key";
 import prisma from "@/lib/prisma";
-import { getResend } from "@/lib/resend";
+import {
+  ACCOUNT_LINKING,
+  APPLE_TRUSTED_ORIGIN,
+  AUTH_LOGIN_PAGE,
+  getEnabledProviders,
+  getSocialProviders,
+} from "@/lib/auth-providers";
+import { assignUsernameOnCreate } from "@/lib/auth-hooks";
 
 export const auth = betterAuth({
   plugins: [
@@ -34,12 +41,12 @@ export const auth = betterAuth({
       },
     }),
     mcp({
-      loginPage: "/login",
+      loginPage: AUTH_LOGIN_PAGE,
       oidcConfig: {
         // Required by OIDCOptions' type (not optional, unlike consentPage) even
         // though the mcp plugin already forwards the top-level loginPage above --
         // duplicated here only to satisfy the installed Better Auth version's types.
-        loginPage: "/login",
+        loginPage: AUTH_LOGIN_PAGE,
         consentPage: "/oauth/consent",
       },
     }),
@@ -47,43 +54,58 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
+  trustedOrigins: getEnabledProviders(process.env).includes("apple")
+    ? [APPLE_TRUSTED_ORIGIN]
+    : undefined,
+  socialProviders: getSocialProviders(process.env),
+  account: {
+    accountLinking: ACCOUNT_LINKING,
+  },
   user: {
     deleteUser: {
       enabled: true,
+    },
+    additionalFields: {
+      username: {
+        type: "string",
+        // `input: false` already keeps clients from setting this directly.
+        // `required` must stay false: Better Auth's OAuth create path runs
+        // `parseAdditionalUserInputFromProviderProfile(..., "create")`
+        // (node_modules/better-auth/dist/oauth2/link-account.mjs) BEFORE
+        // `databaseHooks.user.create.before` below assigns a username, and
+        // `parseInputData` (dist/db/schema.mjs) throws BAD_REQUEST for a
+        // `required: true` field with no `defaultValue` at that point — every
+        // new OAuth sign-up would fail. The Prisma column is still
+        // `String @unique` (NOT NULL); the hook always supplies the value
+        // before the row is written, so no row is ever created without one.
+        // Regression test: src/lib/auth.test.ts "does not reject OAuth
+        // create profiles because of the username field".
+        required: false,
+        input: false,
+      },
     },
   },
   session: {
     cookieCache: {
       enabled: true,
       maxAge: 5 * 60,
+      // Bumped from the default "1": pre-deploy signed session_data cookies
+      // were cached before `username` existed on the user, and Better Auth
+      // serves a cached cookie's user as-is without re-checking the DB
+      // (dist/api/routes/session.mjs). Changing `version` invalidates every
+      // cookie cache signed under the old version — session.mjs compares it
+      // and falls back to a fresh DB lookup — so no signed-in user can hit
+      // getSessionUser's username check below with a stale, username-less
+      // cached user after this deploys. Bump again if another field is ever
+      // added that old caches wouldn't have and code assumes is present.
+      version: "2",
     },
   },
-  emailAndPassword: {
-    enabled: true,
-  },
-  emailVerification: {
-    sendOnSignUp: true,
-    autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user, url }) => {
-      const resend = getResend();
-      if (!resend) {
-        console.error(
-          "RESEND_API_KEY is not set; skipping verification email.",
-        );
-        return;
-      }
-      const { error } = await resend.emails.send(
-        {
-          from: process.env.RESEND_FROM ?? "Purl <onboarding@resend.dev>",
-          to: user.email,
-          subject: "Verify your email address",
-          html: `<p>Click the link to verify your email: <a href="${url}">${url}</a></p>`,
-        },
-        { idempotencyKey: `verification-email/${user.id}/${Date.now()}` },
-      );
-      if (error) {
-        console.error("Failed to send verification email:", error.message);
-      }
+  databaseHooks: {
+    user: {
+      create: {
+        before: assignUsernameOnCreate,
+      },
     },
   },
 });

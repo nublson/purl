@@ -45,7 +45,7 @@ const {
   UnauthorizedError,
 } = await import("./links");
 
-const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
+const MOCK_SESSION = { user: { id: "user-123", username: "user-123" }, session: {} };
 const CREATED_AT = new Date("2025-06-15T10:00:00Z");
 
 function mockUnderSaveLimit() {

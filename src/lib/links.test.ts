@@ -38,7 +38,7 @@ const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
 const { getLinksPageForCurrentUser, UnauthorizedError, listLinks } = await import("./links");
 
-const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
+const MOCK_SESSION = { user: { id: "user-123", username: "user-123" }, session: {} };
 
 function makeRow(
   overrides: Partial<{

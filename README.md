@@ -17,7 +17,7 @@ The product goal: one place to stash material you care about.
 ## Implemented today
 
 - **Marketing site** — Landing page (hero with a live preview), docs for the REST API and MCP server, privacy and terms.
-- **Authentication** — Email/password (and related flows) via [Better Auth](https://www.better-auth.com/); optional email verification through [Resend](https://resend.com/).
+- **Authentication** — Google and GitHub sign-in on the landing page via [Better Auth](https://www.better-auth.com/) (Apple too when its env vars are set). Every account gets a unique username, editable in Settings, where you can also connect or disconnect sign-in methods; avatars come from the OAuth provider's profile photo.
 - **Save & organize**
   - Add items by URL with automatic content-type detection (web, PDF, YouTube, audio).
   - Links grouped by relative time (e.g. Today, This week, Last month).
@@ -42,7 +42,7 @@ Saving a link is fully **synchronous** — there is no background processing.
 
 These are called out explicitly because the repo is going public:
 
-- **Settings breadth** — Settings include account deletion; broader account preferences (profile edits, password change, notification settings, etc.) are not implemented yet.
+- **Settings breadth** — Settings cover username, sign-in methods, and account deletion; broader account preferences (notification settings, etc.) are not implemented yet.
 
 **Marketing vs. product:** The landing page copy mentions ideas such as **collections** and a **weekly digest**. Those are **not** built in the current schema or app — treat them as roadmap, not shipped features.
 
@@ -52,7 +52,7 @@ These are called out explicitly because the repo is going public:
 - **UI:** Tailwind CSS, shadcn/ui
 - **Auth:** Better Auth
 - **Database:** PostgreSQL + Prisma
-- **Email (optional in dev):** Resend for verification emails
+- **Email (optional in dev):** Resend for feedback emails
 - **Realtime:** Supabase client (anon + service role on server)
 - **PWA:** [Serwist](https://serwist.pages.dev/) (`@serwist/next`), web manifest + precache / offline fallback
 
@@ -81,11 +81,11 @@ Runs on **`workflow_dispatch`** (manual): **Merge `develop` into `main`**, then 
 Purl is built around **untrusted input** (arbitrary URLs). A few layers matter in production:
 
 - **SSRF-aware outbound fetches** — User-supplied URLs are not passed to raw `fetch`. OG/thumbnail probes, PDF fetch, content-type sniffing, and similar paths go through [`safeFetch`](src/lib/safe-outbound-fetch.ts): HTTP(S) only, blocked private/link-local/reserved targets, redirect handling with per-hop host checks, DNS resolution pinned before connect (mitigates classic DNS rebinding against the pre-check), optional response size caps (e.g. PDF proxy). Optional **egress proxy** and custom DNS servers are documented in [`AGENTS.md`](AGENTS.md).
-- **Authentication & route gating** — [Better Auth](https://www.better-auth.com/) sessions; Next.js [`proxy`](src/proxy.ts) redirects unauthenticated users away from private routes and can require **email verification** before app access.
+- **Authentication & route gating** — [Better Auth](https://www.better-auth.com/) sessions; Next.js [`proxy`](src/proxy.ts) redirects unauthenticated users away from private routes. Sign-in is OAuth-only (Google/GitHub, plus Apple when configured); there are no passwords.
 - **API authorization** — Sensitive routes (`/api/links`, `/api/v1/*`, MCP, etc.) resolve the session server-side and scope work to the signed-in user.
 - **Rate limiting** — When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set, the proxy applies per-IP limits to **`/api/auth/*`**, **`POST /api/links`**, and **`POST /api/feedback`** (see [`proxy-rate-limit.ts`](src/lib/proxy-rate-limit.ts)). Without Upstash, limits are disabled — fine locally, not ideal for production.
 - **Secrets & client exposure** — `SUPABASE_SERVICE_ROLE_KEY` and similar values are server-only. The browser uses the Supabase **anon** key for Realtime only; `.env` stays gitignored.
-- **Response bounds** — PDF proxy streaming is size-capped (see `safe-outbound-fetch`); avatar uploads are size-limited.
+- **Response bounds** — PDF proxy streaming is size-capped (see `safe-outbound-fetch`).
 
 **Reporting a vulnerability:** use [GitHub Security Advisories](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability) for this repository so details stay private until patched.
 
@@ -115,7 +115,13 @@ NEXT_PUBLIC_SUPABASE_URL="https://YOUR_PROJECT.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY="eyJ..."
 SUPABASE_SERVICE_ROLE_KEY="eyJ..."
 
-# Optional (used for email verification on signup)
+# Sign-in (OAuth apps with callback {BETTER_AUTH_URL}/api/auth/callback/{google,github})
+GOOGLE_CLIENT_ID="..."
+GOOGLE_CLIENT_SECRET="..."
+GITHUB_CLIENT_ID="..."
+GITHUB_CLIENT_SECRET="..."
+
+# Optional (used to send in-app feedback emails)
 RESEND_API_KEY="re_..."
 RESEND_FROM="Purl <onboarding@resend.dev>"
 ```
@@ -124,7 +130,8 @@ Notes:
 
 - **`DATABASE_URL`** is required (Prisma + Better Auth).
 - **Supabase** env vars are required for realtime link list sync. Use **Project Settings → API** in the Supabase dashboard. The service role key must stay server-only.
-- **Resend** is optional for local dev: if `RESEND_API_KEY` is not set, signup can still work, but verification emails will not send.
+- **Google/GitHub** OAuth credentials are required in production; locally, a provider whose vars are missing is simply hidden. For local dev, use callback URLs `http://localhost:3000/api/auth/callback/{google,github}`. Apple is optional and enabled only when all four `APPLE_*` vars are set (see `.env.example`).
+- **Resend** is optional for local dev: without `RESEND_API_KEY`, in-app feedback can't be sent.
 - **Better Auth** secrets and URLs are in `.env.example` — copy those keys for a working auth setup.
 
 ### 3) Run database migrations

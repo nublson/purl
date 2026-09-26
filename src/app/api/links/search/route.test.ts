@@ -17,7 +17,7 @@ const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
 const { GET } = await import("./route");
 
-const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
+const MOCK_SESSION = { user: { id: "user-123", username: "user-123" }, session: {} };
 
 function searchRequest(q?: string): NextRequest {
   const qs = q === undefined ? "" : `?${new URLSearchParams({ q })}`;

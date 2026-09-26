@@ -12,7 +12,12 @@ import { cn } from "@/lib/utils";
 import * as React from "react";
 
 interface DialogWrapperProps {
-  children: React.ReactNode;
+  /**
+   * Optional trigger element. Omit it for a purely controlled dialog (pass
+   * `open`/`onOpenChange`) that's opened from elsewhere, e.g. a dropdown
+   * menu item whose content isn't always mounted.
+   */
+  children?: React.ReactNode;
   title: string;
   description?: string;
   content?: React.ReactNode;
@@ -36,7 +41,7 @@ export function DialogWrapper({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      {children ? <DialogTrigger asChild>{children}</DialogTrigger> : null}
       <DialogContent
         className={cn(
           "gap-4 px-0 z-51",

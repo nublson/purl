@@ -1,4 +1,4 @@
-// Signed-out pages (landing, login, signup, verify-email) have no header.
+// The landing page — the only signed-out page — has no header.
 export const dynamic = "force-static";
 
 export default function PublicLayout({

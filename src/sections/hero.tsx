@@ -1,8 +1,8 @@
 import { Typography } from "@/components/typography";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import { ProviderButtons } from "@/components/provider-buttons";
+import type { ProviderId } from "@/lib/auth-providers";
 
-export default function HeroSection() {
+export default function HeroSection({ providers }: { providers: ProviderId[] }) {
   return (
     <section id="hero" className="wrapper-center gap-12">
       <div className="text-center flex flex-col gap-6">
@@ -15,12 +15,7 @@ export default function HeroSection() {
         </Typography>
       </div>
       <div className="flex items-center justify-center gap-4">
-        <Button asChild size="lg">
-          <Link href="/signup">Get started</Link>
-        </Button>
-        <Button asChild size="lg" variant="outline">
-          <Link href="/login">Log in</Link>
-        </Button>
+        <ProviderButtons providers={providers} />
       </div>
     </section>
   );

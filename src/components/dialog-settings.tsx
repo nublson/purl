@@ -1,7 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
+import { toast } from "sonner";
+import { connectErrorMessage } from "@/lib/sign-in-errors";
 import { DialogWrapper } from "./dialog-wrapper";
 import { Skeleton } from "./ui/skeleton";
 
@@ -16,23 +19,90 @@ const SettingsContent = dynamic(() => import("./settings-content"), {
   ),
 });
 
-interface SettingsDialogProps {
-  children: React.ReactNode;
+export const SETTINGS_TAB_VALUES = ["usage", "integrations", "account"] as const;
+export type SettingsTabValue = (typeof SETTINGS_TAB_VALUES)[number];
+
+function isSettingsTabValue(value: string | null): value is SettingsTabValue {
+  return (SETTINGS_TAB_VALUES as readonly string[]).includes(value ?? "");
 }
 
-export function SettingsDialog({ children }: SettingsDialogProps) {
-  const [open, setOpen] = React.useState(false);
+interface SettingsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  defaultTab?: SettingsTabValue;
+}
 
+/**
+ * The dialog itself, fully controlled and without a trigger of its own:
+ * `open`/`onOpenChange`/`defaultTab` are owned by the caller (see
+ * `SettingsDeepLink` below for why), which must also render this outside any
+ * dropdown menu content so it's mounted even while the menu is closed.
+ */
+export function SettingsDialog({
+  open,
+  onOpenChange,
+  defaultTab,
+}: SettingsDialogProps) {
   return (
     <DialogWrapper
       className="dialog-top"
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={onOpenChange}
       title="Settings"
       description="Usage, integrations, and account"
-      content={<SettingsContent closeDialog={() => setOpen(false)} />}
-    >
-      {children}
-    </DialogWrapper>
+      content={
+        <SettingsContent
+          closeDialog={() => onOpenChange(false)}
+          defaultTab={defaultTab}
+        />
+      }
+    />
   );
+}
+
+/**
+ * Opens the settings dialog on the tab named by `?settings=` (e.g. after an
+ * OAuth connect redirect back to `/home?settings=account`), then strips just
+ * that param from the URL, keeping the pathname and any other query params.
+ * A failed connect lands on the same URL with Better Auth's `?error=<code>`
+ * (and optionally `error_description`): that is toasted once (stable toast
+ * id, so Strict Mode's double effect doesn't duplicate it) and stripped too.
+ *
+ * Must be mounted somewhere that's always present in the tree from page
+ * load — not inside `SettingsDialog` itself or the dropdown menu that hosts
+ * its trigger. Radix's dropdown/menu content only mounts once the menu has
+ * been opened at least once (no `forceMount` is used anywhere in this repo),
+ * so a `?settings=` param arriving on page load — the whole point of this
+ * component — would never be read if it lived behind that gate. The
+ * caller (`User`) mounts this unconditionally and lifts the dialog's
+ * open/defaultTab state up to itself so this can drive it directly.
+ */
+export function SettingsDeepLink({
+  onOpen,
+}: {
+  onOpen: (tab: SettingsTabValue) => void;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const settingsParam = searchParams.get("settings");
+
+  React.useEffect(() => {
+    if (!isSettingsTabValue(settingsParam)) return;
+    onOpen(settingsParam);
+
+    const params = new URLSearchParams(searchParams.toString());
+    const errorMessage = connectErrorMessage(params.get("error"));
+    if (errorMessage) toast.error(errorMessage, { id: "connect-error" });
+    params.delete("settings");
+    params.delete("error");
+    params.delete("error_description");
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    // Re-running only when the param itself changes avoids looping: after
+    // the replace above, settingsParam becomes null and the guard returns.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsParam]);
+
+  return null;
 }
