@@ -31,7 +31,7 @@ Single Next.js App Router application (not a monorepo).
 
 ### Route groups
 
-- `src/app/(public)/` — Marketing site (landing, login, signup, verify-email)
+- `src/app/(public)/` — Marketing site (landing page with Google/GitHub sign-in)
 - `src/app/(private)/` — Authenticated app: `/home` (save links)
 - `src/app/api/` — API routes (links, auth, feedback, user, v1, MCP, pdf-proxy)
 - `src/app/sw.ts` — Serwist PWA service worker (compiled to `public/sw.js` on build; **disabled in dev**)
@@ -48,6 +48,7 @@ Business logic. Key modules:
 | `safe-outbound-fetch.ts` | SSRF-hardened fetch wrapper — **all outbound HTTP must go through this** |
 | `limits.ts`, `entitlements.ts`, `usage-summary.ts` | Flat save cap and the Settings → Usage link count |
 | `auth.ts`, `prisma.ts` | Better Auth and Prisma client singletons |
+| `usernames.ts` | Username validation/generation rules, changed only via `PATCH /api/user/username` |
 | `realtime-broadcast.ts` | Supabase Realtime sync |
 | `proxy-rate-limit.ts` | Optional Upstash Redis rate limiting (applied in `src/proxy.ts`) |
 
@@ -61,9 +62,10 @@ Saving is fully **synchronous**; there is no background processing:
 
 ### Authentication & routing
 
-- **Better Auth** (`src/lib/auth.ts`) — email/password sessions stored in Postgres
-- **`src/proxy.ts`** — Next.js middleware that gates private routes, applies rate limiting, and (optionally) enforces email verification
+- **Better Auth** (`src/lib/auth.ts`) — sign-in is Google/GitHub OAuth only (Apple is enabled when its env vars exist), sessions stored in Postgres
+- **`src/proxy.ts`** — Next.js middleware that gates private routes and applies rate limiting
 - Session is resolved server-side in API routes: `auth.api.getSession({ headers: request.headers })`
+- Every user has a unique `username` (rules in `src/lib/usernames.ts`), changed only via `PATCH /api/user/username`
 
 ### Components (`src/components/`)
 
@@ -94,7 +96,7 @@ Test patterns: mock `globalThis.fetch`, mock Prisma client calls, mock Supabase 
 - **`pnpm dev` does not run `prisma generate`** — run it manually if `src/generated/prisma` is missing.
 - **`pnpm build` does** run `prisma generate` automatically.
 - **ESLint rule:** no namespace imports from `lucide-react` or `@radix-ui/*` — use named imports only.
-- **Email verification**: for local dev, manually set `emailVerified = true` in the DB if you can't receive Resend emails.
+- **Sign-in is Google/GitHub only** (Apple is enabled when its env vars exist); for local dev, create OAuth apps with localhost callbacks `http://localhost:3000/api/auth/callback/{google,github}`.
 - **Usage UI**: the link count vs. the cap is in **Settings → Usage**, not `/home`. See `src/app/(private)/(app)/layout.tsx`, `src/lib/usage-summary.ts`, `src/components/dialog-settings.tsx`.
 - **Serwist (PWA)**: service worker is disabled in `pnpm dev`. Use `pnpm build && pnpm start` to test install/offline behavior.
 - **`SUPABASE_SERVICE_ROLE_KEY`** is server-only. The browser uses only the anon key for Realtime.

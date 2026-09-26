@@ -3,7 +3,8 @@
 const TEST_URL = "https://nublson.com";
 const INVALID_URL = "not-a-url";
 
-describe("Link saving — core journey", () => {
+// Skipped: needs a test-only login now that sign-in is OAuth-only (see docs/superpowers/specs/2026-09-26-usernames-oauth-signin-design.md §10).
+describe.skip("Link saving — core journey", () => {
   const email = Cypress.env("TEST_USER_EMAIL") as string;
   const password = Cypress.env("TEST_USER_PASSWORD") as string;
   const name = Cypress.env("TEST_USER_NAME") as string;

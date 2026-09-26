@@ -64,12 +64,16 @@ export default defineConfig({
             const hash = await hashPassword(password);
             const now = new Date();
 
+            // Password/credential seeding is kept as-is even though the specs
+            // using it are now skipped; a later follow-up will replace this
+            // with a test-only login instead of a seeded password user.
             const user = await prisma.user.upsert({
               where: { email },
               create: {
                 id: crypto.randomUUID(),
                 email,
                 name,
+                username: `e2e-${crypto.randomUUID().replace(/-/g, "").slice(0, 8)}`,
                 emailVerified: true,
                 createdAt: now,
                 updatedAt: now,
