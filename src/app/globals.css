@@ -139,6 +139,11 @@ body {
     text-underline-position: from-font;
     text-decoration-thickness: from-font;
   }
+  /* One stroke weight for the icon set: 1.5px matches the regular (400)
+     text icons sit beside. CSS beats lucide's stroke-width attribute. */
+  .lucide {
+    stroke-width: 1.5;
+  }
 }
 
 /* Focus rings are box-shadows (`ring-*`) on `outline-none` controls, and
