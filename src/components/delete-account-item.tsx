@@ -68,7 +68,13 @@ function DeleteAccountButton({ closeDialog }: { closeDialog: () => void }) {
       const res = await deleteUser({ callbackURL: "/" });
 
       if (res.error) {
-        if (res.error.code === "SESSION_EXPIRED") {
+        // better-auth 1.6.22's delete-user route throws SESSION_EXPIRED from its
+        // own freshness check; its shared freshSessionMiddleware uses
+        // SESSION_NOT_FRESH. Accept both so an upgrade can't silently change this.
+        if (
+          res.error.code === "SESSION_EXPIRED" ||
+          res.error.code === "SESSION_NOT_FRESH"
+        ) {
           toast.error("For your security, sign in again to delete your account.");
           setAlertOpen(false);
           setConfirmation("");
