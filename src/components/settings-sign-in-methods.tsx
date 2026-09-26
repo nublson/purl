@@ -26,9 +26,28 @@ interface SettingsSignInMethodsProps {
 export function SettingsSignInMethods({ providers }: SettingsSignInMethodsProps) {
   const [connected, setConnected] = React.useState<Set<string>>(new Set());
   const [loading, setLoading] = React.useState(true);
+  // A single pending action for the whole list, not one per row: Better
+  // Auth's "last account" check and the unlink aren't atomic, so two
+  // concurrent Disconnects (one per connected provider) could both pass the
+  // check and leave the user with no way to sign in. While anything is in
+  // flight every Connect/Disconnect button is disabled; the ref also guards
+  // against a second click landing before the disabled state re-renders.
   const [pendingProvider, setPendingProvider] = React.useState<ProviderId | null>(
     null,
   );
+  const actionInFlight = React.useRef(false);
+
+  function beginAction(provider: ProviderId): boolean {
+    if (actionInFlight.current) return false;
+    actionInFlight.current = true;
+    setPendingProvider(provider);
+    return true;
+  }
+
+  function endAction() {
+    actionInFlight.current = false;
+    setPendingProvider(null);
+  }
 
   const loadAccounts = React.useCallback(async () => {
     try {
@@ -51,10 +70,11 @@ export function SettingsSignInMethods({ providers }: SettingsSignInMethodsProps)
     void loadAccounts();
   }, [loadAccounts]);
 
+  const isBusy = pendingProvider !== null;
   const connectedCount = providers.filter((provider) => connected.has(provider)).length;
 
   async function handleConnect(provider: ProviderId) {
-    setPendingProvider(provider);
+    if (!beginAction(provider)) return;
     try {
       const result = await linkSocial({
         provider,
@@ -71,23 +91,25 @@ export function SettingsSignInMethods({ providers }: SettingsSignInMethodsProps)
     } catch {
       toast.error("Unable to connect. Try again.");
     } finally {
-      setPendingProvider(null);
+      endAction();
     }
   }
 
   async function handleDisconnect(provider: ProviderId) {
-    setPendingProvider(provider);
+    if (!beginAction(provider)) return;
     try {
       const result = await unlinkAccount({ providerId: provider });
       if (result.error) {
         toast.error(result.error.message ?? "Unable to disconnect. Try again.");
-        return;
       }
-      await loadAccounts();
     } catch {
       toast.error("Unable to disconnect. Try again.");
     } finally {
-      setPendingProvider(null);
+      // Reload whether or not the unlink succeeded, before re-enabling the
+      // buttons, so the "only connected provider" guard is recomputed from
+      // the server's current list rather than from stale local state.
+      await loadAccounts();
+      endAction();
     }
   }
 
@@ -105,7 +127,7 @@ export function SettingsSignInMethods({ providers }: SettingsSignInMethodsProps)
             variant="secondary"
             size="sm"
             className="cursor-pointer"
-            disabled={loading || isPending || isOnlyConnection}
+            disabled={loading || isBusy || isOnlyConnection}
             onClick={() =>
               void (isConnected ? handleDisconnect(provider) : handleConnect(provider))
             }
