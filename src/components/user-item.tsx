@@ -1,15 +1,6 @@
 "use client";
 
-import { useCurrentUser } from "@/hooks/use-current-user";
-import { updateUser } from "@/lib/auth-client";
-import {
-  AVATAR_MAX_UPLOAD_BYTES,
-  avatarMaxSizeExceededMessage,
-} from "@/utils/upload-limits";
 import { Loader2, Pencil, Upload } from "lucide-react";
-import type { ChangeEvent } from "react";
-import { useRef, useState } from "react";
-import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
   Item,
@@ -25,88 +16,23 @@ interface UserItemProps {
     email: string;
     image?: string;
   };
+  /** Shows a spinner over the avatar while a new photo uploads. */
+  isUploading?: boolean;
 }
 
-type AvatarUploadResponse = {
-  image?: string;
-  error?: string;
-};
-
-export function UserItem({ user }: UserItemProps) {
-  const { setUser } = useCurrentUser();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [isUploading, setIsUploading] = useState(false);
+/**
+ * Account header in the user menu. Display only: the enclosing menu item
+ * opens the photo picker, so this must not contain its own button.
+ */
+export function UserItem({ user, isUploading = false }: UserItemProps) {
   const hasImage = Boolean(user.image);
-
-  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const selectedFile = event.target.files?.[0];
-    event.target.value = "";
-    if (!selectedFile) return;
-
-    if (selectedFile.size > AVATAR_MAX_UPLOAD_BYTES) {
-      toast.error(avatarMaxSizeExceededMessage());
-      return;
-    }
-
-    setIsUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-
-      const response = await fetch("/api/user/avatar", {
-        method: "POST",
-        body: formData,
-      });
-
-      const body = (await response
-        .json()
-        .catch(() => null)) as AvatarUploadResponse | null;
-      if (!response.ok) {
-        throw new Error(body?.error ?? "Unable to upload the photo. Try again.");
-      }
-      if (!body?.image) {
-        throw new Error("Unable to upload the photo. Try again.");
-      }
-
-      const updateResult = await updateUser({ image: body.image });
-      if (updateResult.error) {
-        throw new Error(
-          updateResult.error.message ?? "Unable to update your profile. Try again.",
-        );
-      }
-      const image = body.image;
-      setUser((current) => (current ? { ...current, image } : current));
-    } catch (error) {
-      console.error(error);
-      toast.error(error instanceof Error ? error.message : "Unable to upload the photo. Try again.");
-    } finally {
-      setIsUploading(false);
-    }
-  }
 
   return (
     <Item size="xs" className="w-full p-2">
       <ItemMedia className="group-has-data-[slot=item-description]/item:self-center">
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-        <button
-          type="button"
-          aria-label="Upload profile photo"
-          disabled={isUploading}
-          className="group relative cursor-pointer rounded-full disabled:cursor-not-allowed"
-          onClick={(event) => {
-            event.stopPropagation();
-            event.preventDefault();
-            inputRef.current?.click();
-          }}
-        >
+        <span className="relative rounded-full">
           <Avatar className="size-7">
-            <AvatarImage src={user.image ?? ""} />
+            <AvatarImage src={user.image ?? ""} alt="" />
             <AvatarFallback>
               {isUploading ? (
                 <Loader2 className="size-3.5 animate-spin" />
@@ -118,7 +44,7 @@ export function UserItem({ user }: UserItemProps) {
             </AvatarFallback>
           </Avatar>
           {!isUploading ? (
-            <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-muted/40 opacity-0 transition-opacity group-hover:opacity-100">
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full bg-muted/40 opacity-0 transition-opacity group-hover/dropdown-menu-item:opacity-100 group-focus/dropdown-menu-item:opacity-100">
               <Pencil className="size-3" />
             </span>
           ) : null}
@@ -127,7 +53,7 @@ export function UserItem({ user }: UserItemProps) {
               <Loader2 className="size-3.5 animate-spin" />
             </span>
           ) : null}
-        </button>
+        </span>
       </ItemMedia>
       <ItemContent className="gap-0">
         <ItemTitle>{user?.name}</ItemTitle>
