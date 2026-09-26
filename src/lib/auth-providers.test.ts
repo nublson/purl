@@ -4,6 +4,7 @@ import {
   APPLE_TRUSTED_ORIGIN,
   AUTH_LOGIN_PAGE,
   getEnabledProviders,
+  getSignInButtonProviders,
   getSocialProviders,
 } from "./auth-providers";
 
@@ -41,6 +42,29 @@ describe("getEnabledProviders", () => {
 
   it("skips google or github outside production when their vars are missing", () => {
     expect(getEnabledProviders({ GITHUB_CLIENT_ID: "h", GITHUB_CLIENT_SECRET: "hs" })).toEqual(["github"]);
+  });
+});
+
+describe("getSignInButtonProviders", () => {
+  it("always shows google and github, even with no env vars", () => {
+    expect(getSignInButtonProviders({})).toEqual(["google", "github"]);
+  });
+
+  it("adds apple once all four APPLE_* vars are set", () => {
+    expect(
+      getSignInButtonProviders({
+        APPLE_CLIENT_ID: "a",
+        APPLE_TEAM_ID: "t",
+        APPLE_KEY_ID: "k",
+        APPLE_PRIVATE_KEY: "p",
+      }),
+    ).toEqual(["google", "github", "apple"]);
+  });
+
+  it("omits apple when any APPLE_* var is missing", () => {
+    expect(
+      getSignInButtonProviders({ APPLE_CLIENT_ID: "a", APPLE_TEAM_ID: "t", APPLE_KEY_ID: "k" }),
+    ).toEqual(["google", "github"]);
   });
 });
 

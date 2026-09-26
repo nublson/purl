@@ -62,7 +62,7 @@ function hasAppleVars(env: Partial<NodeJS.ProcessEnv>): boolean {
 /**
  * Which providers are configured (have all required env vars set) for the
  * given environment. Apple only counts once all four of its vars are present.
- * Used by other tasks (e.g. the sign-in page) to decide which buttons to show.
+ * Used by Settings to decide which providers can be connected.
  */
 export function getEnabledProviders(
   env: Partial<NodeJS.ProcessEnv> = process.env,
@@ -72,6 +72,22 @@ export function getEnabledProviders(
   if (hasGithubVars(env)) providers.push("github");
   if (hasAppleVars(env)) providers.push("apple");
   return providers;
+}
+
+/**
+ * Which sign-in buttons the (statically rendered) landing page shows.
+ *
+ * Unlike `getEnabledProviders`, this doesn't look at Google/GitHub env vars:
+ * the landing page is prerendered at build time, and a build may legitimately
+ * run without OAuth secrets (see the `NEXT_PHASE` skip in
+ * `getSocialProviders`), which would otherwise freeze a page with no buttons.
+ * Google and GitHub are mandatory at production runtime (missing vars throw),
+ * so they're always shown; only Apple stays conditional on its env vars.
+ */
+export function getSignInButtonProviders(
+  env: Partial<NodeJS.ProcessEnv> = process.env,
+): ProviderId[] {
+  return ["google", "github", ...(hasAppleVars(env) ? (["apple"] as const) : [])];
 }
 
 /**
