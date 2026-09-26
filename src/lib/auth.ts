@@ -68,7 +68,19 @@ export const auth = betterAuth({
     additionalFields: {
       username: {
         type: "string",
-        required: true,
+        // `input: false` already keeps clients from setting this directly.
+        // `required` must stay false: Better Auth's OAuth create path runs
+        // `parseAdditionalUserInputFromProviderProfile(..., "create")`
+        // (node_modules/better-auth/dist/oauth2/link-account.mjs) BEFORE
+        // `databaseHooks.user.create.before` below assigns a username, and
+        // `parseInputData` (dist/db/schema.mjs) throws BAD_REQUEST for a
+        // `required: true` field with no `defaultValue` at that point — every
+        // new OAuth sign-up would fail. The Prisma column is still
+        // `String @unique` (NOT NULL); the hook always supplies the value
+        // before the row is written, so no row is ever created without one.
+        // Regression test: src/lib/auth.test.ts "does not reject OAuth
+        // create profiles because of the username field".
+        required: false,
         input: false,
       },
     },

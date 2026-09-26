@@ -58,7 +58,7 @@ const ogs = (await import("open-graph-scraper")).default;
 let fetchSpy: ReturnType<typeof vi.spyOn>;
 let safeFetchSpy: ReturnType<typeof vi.spyOn>;
 
-const MOCK_SESSION = { user: { id: "user-123" }, session: {} };
+const MOCK_SESSION = { user: { id: "user-123", username: "user-123" }, session: {} };
 const CREATED_AT = new Date("2025-06-15T10:00:00Z");
 
 const MOCK_LINK = {

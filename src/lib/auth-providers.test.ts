@@ -61,6 +61,32 @@ describe("getSocialProviders", () => {
     const providers = getSocialProviders(base);
     expect(providers?.apple).toBeUndefined();
   });
+
+  it("does not throw during the next build phase even in production, and omits the missing provider", () => {
+    let providers: ReturnType<typeof getSocialProviders> | undefined;
+    expect(() => {
+      providers = getSocialProviders({
+        ...base,
+        GITHUB_CLIENT_ID: undefined,
+        GITHUB_CLIENT_SECRET: undefined,
+        NODE_ENV: "production",
+        NEXT_PHASE: "phase-production-build",
+      });
+    }).not.toThrow();
+    expect(providers?.github).toBeUndefined();
+    expect(providers?.google).toMatchObject({ clientId: "g", clientSecret: "gs" });
+  });
+
+  it("still throws in production once the build phase has passed (e.g. at runtime)", () => {
+    expect(() =>
+      getSocialProviders({
+        ...base,
+        GITHUB_CLIENT_ID: undefined,
+        NODE_ENV: "production",
+        NEXT_PHASE: undefined,
+      }),
+    ).toThrow(/GITHUB_CLIENT_ID/);
+  });
 });
 
 describe("constants", () => {

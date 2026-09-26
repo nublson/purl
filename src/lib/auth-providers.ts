@@ -92,14 +92,25 @@ async function generateAppleClientSecret(env: {
  * misconfigured deploy fails fast); outside production, missing vars just
  * skip that provider so local dev doesn't need every credential set. Apple is
  * always optional and only enabled once all four `APPLE_*` vars are present.
+ *
+ * `auth.ts` is imported at module scope by routes that `next build` needs to
+ * evaluate to collect static params (e.g.
+ * `.well-known/oauth-authorization-server/route.ts`), and `NODE_ENV` is
+ * `"production"` during that build even though real OAuth vars aren't set
+ * yet (they're a deploy-time secret, not a build-time one). Next sets
+ * `NEXT_PHASE=phase-production-build` for exactly that step, so the
+ * production check is skipped then — the missing provider is simply omitted,
+ * the same as in a non-production environment — and only enforced for an
+ * actual `production` runtime request.
  */
 export function getSocialProviders(
   env: Partial<NodeJS.ProcessEnv> = process.env,
 ): BetterAuthOptions["socialProviders"] {
-  const isProduction = env.NODE_ENV === "production";
+  const isProductionRuntime =
+    env.NODE_ENV === "production" && env.NEXT_PHASE !== "phase-production-build";
 
   function requireInProduction(name: "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET" | "GITHUB_CLIENT_ID" | "GITHUB_CLIENT_SECRET") {
-    if (isProduction && !env[name]) {
+    if (isProductionRuntime && !env[name]) {
       throw new Error(`${name} is required in production for social sign-in.`);
     }
   }

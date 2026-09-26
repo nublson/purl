@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import type { BetterAuthOptions } from "better-auth";
 
 vi.mock("@/lib/prisma", () => ({ default: {} }));
 vi.mock("server-only", () => ({}));
@@ -15,6 +16,32 @@ describe("auth config", () => {
       }>;
     };
   };
+
+  it("does not reject OAuth create profiles because of the username field", async () => {
+    // Regression test for a bug where `additionalFields.username` was
+    // `required: true`. Better Auth's OAuth account-creation path calls
+    // `parseAdditionalUserInputFromProviderProfile(options, profile, "create")`
+    // (node_modules/better-auth/dist/oauth2/link-account.mjs) BEFORE
+    // `databaseHooks.user.create.before` runs and assigns a username. With
+    // `required: true` and no `defaultValue`, `parseInputData`
+    // (dist/db/schema.mjs) throws `APIError: username is required` for
+    // every brand-new GitHub/Google/Apple sign-up — this reproduces that
+    // exact call against our real, configured `auth.options` using the
+    // library's own public `better-auth/db` entry point (no DB access; this
+    // only reads schema shape, never hits Prisma).
+    const { parseAdditionalUserInputFromProviderProfile } = await import("better-auth/db");
+    const { auth } = await import("@/lib/auth");
+    const options = (auth as unknown as { options: BetterAuthOptions }).options;
+    const githubLikeProfile = {
+      id: 123456,
+      login: "octocat",
+      email: "octocat@example.com",
+      name: "The Octocat",
+    };
+    expect(() =>
+      parseAdditionalUserInputFromProviderProfile(options, githubLikeProfile, "create"),
+    ).not.toThrow();
+  });
 
   it("includes the apiKey plugin", async () => {
     const { auth } = await import("@/lib/auth");
