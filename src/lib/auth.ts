@@ -89,6 +89,16 @@ export const auth = betterAuth({
     cookieCache: {
       enabled: true,
       maxAge: 5 * 60,
+      // Bumped from the default "1": pre-deploy signed session_data cookies
+      // were cached before `username` existed on the user, and Better Auth
+      // serves a cached cookie's user as-is without re-checking the DB
+      // (dist/api/routes/session.mjs). Changing `version` invalidates every
+      // cookie cache signed under the old version — session.mjs compares it
+      // and falls back to a fresh DB lookup — so no signed-in user can hit
+      // getSessionUser's username check below with a stale, username-less
+      // cached user after this deploys. Bump again if another field is ever
+      // added that old caches wouldn't have and code assumes is present.
+      version: "2",
     },
   },
   databaseHooks: {

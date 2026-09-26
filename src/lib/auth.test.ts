@@ -64,6 +64,19 @@ describe("auth config", () => {
     expect(mcpPlugin?.options?.oidcConfig?.loginPage).toBe("/");
   });
 
+  it("pins the session cookie cache version so pre-username caches are invalidated", async () => {
+    // Regression test for a bug where a session_data cookie cached before
+    // this deploy (signed under Better Auth's default cookieCache version
+    // "1") was served as-is by getSession — including for a user with no
+    // `username` — for up to `maxAge` (5 min) after deploy, crashing
+    // getSessionUser's loud throw. Bumping `version` invalidates every
+    // cache signed under the old version (session.mjs compares the version
+    // and falls back to a fresh DB lookup on mismatch), so this pins the
+    // value rather than letting it silently drift back to the default.
+    const { auth } = await import("@/lib/auth");
+    const options = (auth as unknown as { options: BetterAuthOptions }).options;
+    expect(options.session?.cookieCache?.version).toBe("2");
+  });
 });
 
 describe("Bearer token extraction logic", () => {
