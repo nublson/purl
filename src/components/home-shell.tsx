@@ -189,25 +189,29 @@ export function HomeShell({
               }
             />
           ))}
-          {nextCursor && (
-            <>
-              <div ref={sentinelRef} aria-hidden className="h-px w-full" />
-              {/* Rendered whenever more pages exist, so the status region is
-                  in place before "Loading more links" is announced. Height is
-                  reserved to keep the list from jumping. */}
+          {/* Always rendered with the list, so the status region is in place
+              before "Loading more links" is announced and its height never
+              appears or disappears (including when the last page loads). The
+              scroll sentinel sits inside it, absolutely positioned, so
+              removing it after the last page doesn't shift layout either. */}
+          <div
+            role="status"
+            className="relative flex h-10 w-full items-center justify-center text-muted-foreground"
+          >
+            {nextCursor && (
               <div
-                role="status"
-                className="flex h-10 w-full items-center justify-center text-muted-foreground"
-              >
-                {loadingMore ? (
-                  <>
-                    <BouncingDots size={20} />
-                    <span className="sr-only">Loading more links</span>
-                  </>
-                ) : null}
-              </div>
-            </>
-          )}
+                ref={sentinelRef}
+                aria-hidden
+                className="absolute inset-x-0 top-0 h-px"
+              />
+            )}
+            {loadingMore ? (
+              <>
+                <BouncingDots size={20} />
+                <span className="sr-only">Loading more links</span>
+              </>
+            ) : null}
+          </div>
         </>
       )}
     </>
