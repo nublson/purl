@@ -100,7 +100,7 @@ function randomSuffix(length: number): string {
 
 /**
  * Generates a free username: tries the base, then `base2`…`base50`, then
- * `base-<4 random chars>` repeatedly until `isTaken` reports it's free.
+ * `base-<4 random chars>` (base truncated to 25) repeatedly until `isTaken` reports it's free.
  */
 export async function generateUsername(
   email: string,
@@ -120,8 +120,11 @@ export async function generateUsername(
     }
   }
 
+  // The base can be up to 26 chars; truncate it so `-` plus 4 random chars
+  // still fits the 30-char limit.
+  const randomBase = base.slice(0, 25);
   for (;;) {
-    const candidate = `${base}-${randomSuffix(4)}`;
+    const candidate = `${randomBase}-${randomSuffix(4)}`;
     if (!(await isTaken(candidate))) {
       return candidate;
     }

@@ -30,6 +30,14 @@ describe("generateUsername", () => {
     const u = await generateUsername("nubelson@x.com", null, async (c) => !/^nubelson-[a-z0-9]{4}$/.test(c));
     expect(u).toMatch(/^nubelson-[a-z0-9]{4}$/);
   });
+  it("keeps the random fallback within 30 chars for a 26-char base", async () => {
+    const base = "abcdefghijklmnopqrstuvwxyz";
+    const numbered = new Set([base, ...Array.from({ length: 49 }, (_, i) => `${base}${i + 2}`)]);
+    const u = await generateUsername(`${base}@x.com`, null, async (c) => numbered.has(c));
+    expect(u).toMatch(/^abcdefghijklmnopqrstuvwxy-[a-z0-9]{4}$/);
+    expect(u.length).toBeLessThanOrEqual(30);
+    expect(validateUsername(u).ok).toBe(true);
+  });
   it("always returns a valid username", async () =>
     expect(validateUsername(await generateUsername("日本@x.com", "", async () => false)).ok).toBe(true));
 });
