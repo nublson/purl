@@ -113,7 +113,7 @@ One Prisma migration, `oauth_only_usernames`, applied by hand at deploy time (se
   - Save sends the `PATCH`, patches `CurrentUserContext` with `setUser` (the same way avatar uploads do), calls `getSession({ query: { disableCookieCache: true } })` so Better Auth rewrites its 5-minute session cookie cache, and shows the toast "Username updated".
 - `SessionUser` (`src/lib/session.ts`) gains `username`.
 - **Delete account** (`delete-account-item.tsx`): the password field becomes "Type **@username** to confirm", and the delete button is enabled only on an exact match. It calls `deleteUser({ callbackURL: "/" })` without a password. Better Auth then requires a session younger than `session.freshAge` (default 1 day). On `SESSION_EXPIRED`, the toast says "For your security, sign in again to delete your account." and the user is signed out.
-- **Email row:** unchanged value; description "From your sign-in provider".
+- **Email row:** removed (user request, 2026-09-26); the email comes from the sign-in provider and is not shown in Settings.
 - **Sign-in methods** (`SettingsSignInMethods`): one row per enabled provider.
   - Data comes from `listAccounts()`.
   - **Connect:** `linkSocial({ provider, callbackURL: "/home?settings=account", errorCallbackURL: "/home?settings=account" })`; a returned `?error=` code is toasted (`connectErrorMessage`) and stripped. The Settings dialog has no deep link today, so `SettingsDialog` gains one: on mount, `?settings=<tab>` opens it on that tab, then the param is removed.

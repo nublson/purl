@@ -10,7 +10,6 @@ export function SettingsAccount({ closeDialog }: { closeDialog: () => void }) {
   const { signOut } = useAuth();
   const { user, enabledProviders } = useCurrentUser();
   const username = user?.username ?? null;
-  const email = user?.email ?? null;
 
   return (
     <div className="w-full flex-1 flex flex-col gap-4">
@@ -25,12 +24,6 @@ export function SettingsAccount({ closeDialog }: { closeDialog: () => void }) {
             </Button>
           </DialogEditUsername>
         }
-      />
-      <SettingsItem
-        title={email ?? "Email"}
-        description="From your sign-in provider"
-        fullDescription
-        actions={null}
       />
       <SettingsSignInMethods providers={enabledProviders} />
       <SettingsItem
