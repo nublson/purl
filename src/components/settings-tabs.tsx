@@ -10,11 +10,12 @@ interface SettingsTab {
 
 interface SettingsTabsProps {
   tabs: SettingsTab[];
+  defaultValue?: string;
 }
 
-export function SettingsTabs({ tabs }: SettingsTabsProps) {
+export function SettingsTabs({ tabs, defaultValue }: SettingsTabsProps) {
   return (
-    <Tabs defaultValue={tabs[0].value} className="w-full gap-0">
+    <Tabs defaultValue={defaultValue ?? tabs[0].value} className="w-full gap-0">
       <TabsList
         variant="line"
         className="px-6 w-full overflow-x-auto overflow-y-hidden"

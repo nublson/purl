@@ -8,13 +8,16 @@ import { SettingsUsage } from "./settings-usage";
 
 export default function SettingsContent({
   closeDialog,
+  defaultTab,
 }: {
   closeDialog: () => void;
+  defaultTab?: string;
 }) {
   const { usageSummary } = useUsage();
 
   return (
     <SettingsTabs
+      defaultValue={defaultTab}
       tabs={[
         {
           label: "Usage",
