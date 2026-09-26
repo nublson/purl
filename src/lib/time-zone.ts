@@ -1,16 +1,7 @@
 import "server-only";
 
 import { cookies, headers } from "next/headers";
-import { isValidTimeZone, TIME_ZONE_COOKIE } from "@/utils/time-zone";
-
-/** `decodeURIComponent` that returns the input unchanged if it isn't encoded. */
-function safeDecode(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
-}
+import { isValidTimeZone, safeDecode, TIME_ZONE_COOKIE } from "@/utils/time-zone";
 
 /**
  * Resolves the viewer's time zone with precedence: `tz` cookie →

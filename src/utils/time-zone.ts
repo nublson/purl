@@ -7,7 +7,7 @@
 export const TIME_ZONE_COOKIE = "tz";
 
 /** `decodeURIComponent` that returns the input unchanged if it isn't encoded. */
-function safeDecode(value: string): string {
+export function safeDecode(value: string): string {
   try {
     return decodeURIComponent(value);
   } catch {

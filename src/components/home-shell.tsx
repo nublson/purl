@@ -106,7 +106,9 @@ export function HomeShell({
       });
       if (zone) {
         document.cookie = serializeTimeZoneCookie(zone);
-        void reload();
+        // Cookies can be blocked (e.g. private browsing); only reload if the
+        // write actually took, otherwise this would reload on every mount.
+        if (readTimeZoneCookie(document.cookie) === zone) void reload();
       }
     } catch {
       // Leave the server-grouped list as-is.
