@@ -107,6 +107,7 @@ export const LinkItem = React.forwardRef<
       <LinkItemSkeleton
         icon={<X className="size-5" animate={true} loop={true} />}
         url={link.url}
+        asListItem={false}
         animateIn={deletePhase === "loading"}
         animateOut={deletePhase === "exiting"}
         onAnimationEnd={() => {

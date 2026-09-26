@@ -8,6 +8,11 @@ interface LinkItemSkeletonProps {
   animateIn?: boolean;
   animateOut?: boolean;
   onAnimationEnd?: React.AnimationEventHandler<HTMLDivElement>;
+  /**
+   * Whether this skeleton is itself the list item. False when it replaces a
+   * row whose wrapper already has `role="listitem"` (the delete animation).
+   */
+  asListItem?: boolean;
 }
 
 export function LinkItemSkeleton({
@@ -16,10 +21,11 @@ export function LinkItemSkeleton({
   animateIn = false,
   animateOut = false,
   onAnimationEnd,
+  asListItem = true,
 }: LinkItemSkeletonProps) {
   return (
     <Item
-      role="listitem"
+      role={asListItem ? "listitem" : undefined}
       aria-busy
       onAnimationEnd={onAnimationEnd}
       className={cn(

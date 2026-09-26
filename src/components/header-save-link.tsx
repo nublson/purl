@@ -29,6 +29,7 @@ function safeHttpsUrl(value: string | undefined) {
 }
 
 function isApplePlatform() {
+  if (typeof navigator === "undefined") return false;
   const platform =
     (navigator as Navigator & { userAgentData?: { platform?: string } })
       .userAgentData?.platform ?? navigator.platform;

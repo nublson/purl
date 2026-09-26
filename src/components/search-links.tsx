@@ -29,6 +29,11 @@ export default function SearchLinks() {
   const [loading, setLoading] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
   const [selected, setSelected] = React.useState("");
+  // Query the visible results belong to. Until the debounced search for the
+  // current query returns, old results stay on screen but are disabled so
+  // Enter can't open a stale match.
+  const [resultsFor, setResultsFor] = React.useState<string | null>(null);
+  const stale = resultsFor !== query;
   // Re-run the current search when links change (e.g. deleted from results).
   const { version } = useLinksSyncState();
 
@@ -51,11 +56,13 @@ export default function SearchLinks() {
         // Results arrive async, so cmdk doesn't highlight one itself;
         // start on the first so Enter opens it.
         setSelected(nextLinks[0]?.id ?? "");
+        setResultsFor(query);
         setFailed(false);
       } catch {
         if (controller.signal.aborted) return;
         setLinks([]);
         setFailed(true);
+        setResultsFor(query);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -140,10 +147,12 @@ export default function SearchLinks() {
                 <CommandItem
                   key={link.id}
                   value={link.id}
+                  disabled={stale}
                   onSelect={() => {
                     window.open(link.url, "_blank", "noopener,noreferrer");
                   }}
-                  className="mb-0.5 cursor-pointer p-0 [&>svg]:hidden"
+                  // Keep stale results at full opacity so typing doesn't flicker.
+                  className="mb-0.5 cursor-pointer p-0 data-[disabled=true]:opacity-100 [&>svg]:hidden"
                 >
                   <LinkItem
                     link={link}
