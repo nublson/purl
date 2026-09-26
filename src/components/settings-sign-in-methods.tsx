@@ -59,6 +59,9 @@ export function SettingsSignInMethods({ providers }: SettingsSignInMethodsProps)
       const result = await linkSocial({
         provider,
         callbackURL: "/home?settings=account",
+        // A failed connect returns here with `?error=<code>`, which
+        // `SettingsDeepLink` turns into a toast (see `connectErrorMessage`).
+        errorCallbackURL: "/home?settings=account",
       });
       if (result.error) {
         toast.error(result.error.message ?? "Unable to connect. Try again.");

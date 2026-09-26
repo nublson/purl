@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
+import { toast } from "sonner";
+import { connectErrorMessage } from "@/lib/sign-in-errors";
 import { DialogWrapper } from "./dialog-wrapper";
 import { Skeleton } from "./ui/skeleton";
 
@@ -64,6 +66,9 @@ export function SettingsDialog({
  * Opens the settings dialog on the tab named by `?settings=` (e.g. after an
  * OAuth connect redirect back to `/home?settings=account`), then strips just
  * that param from the URL, keeping the pathname and any other query params.
+ * A failed connect lands on the same URL with Better Auth's `?error=<code>`
+ * (and optionally `error_description`): that is toasted once (stable toast
+ * id, so Strict Mode's double effect doesn't duplicate it) and stripped too.
  *
  * Must be mounted somewhere that's always present in the tree from page
  * load — not inside `SettingsDialog` itself or the dropdown menu that hosts
@@ -89,7 +94,11 @@ export function SettingsDeepLink({
     onOpen(settingsParam);
 
     const params = new URLSearchParams(searchParams.toString());
+    const errorMessage = connectErrorMessage(params.get("error"));
+    if (errorMessage) toast.error(errorMessage, { id: "connect-error" });
     params.delete("settings");
+    params.delete("error");
+    params.delete("error_description");
     const query = params.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
     // Re-running only when the param itself changes avoids looping: after
