@@ -56,6 +56,9 @@ export function HomeShell({
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
+  // The zone the displayed groups were labeled in; pages from another zone
+  // must not be merged into them.
+  const [groupsTimeZone, setGroupsTimeZone] = useState(timeZone);
 
   // Re-seed from the server when the route re-renders with new data.
   const [seed, setSeed] = useState(initialGroups);
@@ -63,6 +66,7 @@ export function HomeShell({
     setSeed(initialGroups);
     setGroups(initialGroups);
     setNextCursor(initialNextCursor);
+    setGroupsTimeZone(timeZone);
   }
 
   const groupsRef = useRef(groups);
@@ -85,6 +89,7 @@ export function HomeShell({
       if (seq !== reloadSeq.current) return;
       setGroups(page.groups);
       setNextCursor(page.nextCursor);
+      if (page.timeZone) setGroupsTimeZone(page.timeZone);
       if (typeof page.total === "number") setLinksTotal(page.total);
     } catch {
       // Keep the current list; the next change or reload will retry.
@@ -129,6 +134,12 @@ export function HomeShell({
       );
       // A reload started meanwhile already has fresher data.
       if (seq !== reloadSeq.current) return;
+      // The time zone changed under the list (e.g. the cookie correction
+      // above): relabel everything instead of mixing headings from two zones.
+      if (page.timeZone && page.timeZone !== groupsTimeZone) {
+        void reload();
+        return;
+      }
       setGroups((current) => mergeLinkGroups(current, page.groups));
       setNextCursor(page.nextCursor);
     } catch {
@@ -136,7 +147,7 @@ export function HomeShell({
     } finally {
       setLoadingMore(false);
     }
-  }, [nextCursor, loadingMore]);
+  }, [nextCursor, loadingMore, groupsTimeZone, reload]);
 
   // Reload when a save, edit, delete, or remote update bumps the version
   // (skipping the version this list mounted with).
