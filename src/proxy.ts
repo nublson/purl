@@ -11,9 +11,11 @@ type PublicRoute = {
 };
 
 const publicRoutes: PublicRoute[] = [
-  { path: "/", whenAuthenticated: "next" },
-  { path: "/login", whenAuthenticated: "redirect" },
-  { path: "/signup", whenAuthenticated: "redirect" },
+  // The landing page is the only signed-out page: signed-out visitors (and
+  // the Better Auth `mcp` plugin's signed-out login redirect, which lands
+  // here with `?client_id=…&response_type=…`) see it, and signed-in users
+  // are bounced to /home.
+  { path: "/", whenAuthenticated: "redirect" },
   // RFC 8615 reserved namespace — anything under .well-known is by convention
   // a public, unauthenticated discovery/metadata document (OAuth server
   // metadata, security.txt, etc.), never a session-bearing app route.
@@ -30,9 +32,7 @@ const publicRoutes: PublicRoute[] = [
   },
 ];
 
-const VERIFY_EMAIL_PATH = "/verify-email";
-const REDIRECT_WHEN_NOT_AUTHENTICATED = "/login";
-const REDIRECT_WHEN_NOT_VERIFIED = "/verify-email";
+const REDIRECT_WHEN_NOT_AUTHENTICATED = "/";
 const DEFAULT_PAGE = "/home";
 
 function matchesPublicRoute(pathname: string, route: PublicRoute): boolean {
@@ -67,7 +67,7 @@ export async function proxy(request: NextRequest) {
 
   const publicRoute = isPublicRoute(currentPath);
   // Public "next" routes render the same with or without a session, so only
-  // routes that redirect signed-in users (e.g. /login) need the lookup.
+  // routes that redirect signed-in users (e.g. /) need the lookup.
   if (publicRoute?.whenAuthenticated === "next") {
     return NextResponse.next();
   }
@@ -101,22 +101,6 @@ export async function proxy(request: NextRequest) {
   if (!publicRoute && !session) {
     const url = request.nextUrl.clone();
     url.pathname = REDIRECT_WHEN_NOT_AUTHENTICATED;
-    return NextResponse.redirect(url);
-  }
-
-  if (currentPath === VERIFY_EMAIL_PATH && session?.user?.emailVerified) {
-    const url = request.nextUrl.clone();
-    url.pathname = DEFAULT_PAGE;
-    return NextResponse.redirect(url);
-  }
-
-  if (currentPath === VERIFY_EMAIL_PATH && session) {
-    return NextResponse.next();
-  }
-
-  if (!publicRoute && session && !session.user.emailVerified) {
-    const url = request.nextUrl.clone();
-    url.pathname = REDIRECT_WHEN_NOT_VERIFIED;
     return NextResponse.redirect(url);
   }
 

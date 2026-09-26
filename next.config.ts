@@ -51,6 +51,11 @@ const nextConfig: NextConfig = {
       { source: "/ai", destination: "/home", permanent: true },
       { source: "/chat", destination: "/home", permanent: true },
       { source: "/chat/:path*", destination: "/home", permanent: true },
+      // The landing page ("/") is now the only signed-out page — email/password
+      // sign-in is gone in favor of Google/GitHub OAuth, so these no longer exist.
+      { source: "/login", destination: "/", permanent: true },
+      { source: "/signup", destination: "/", permanent: true },
+      { source: "/verify-email", destination: "/", permanent: true },
     ];
   },
   async headers() {

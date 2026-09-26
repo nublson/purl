@@ -37,7 +37,7 @@ describe("proxy", () => {
       }),
     );
     vi.mocked(auth.auth.api.getSession).mockResolvedValue({
-      user: { emailVerified: true },
+      user: {},
       session: {},
     } as never);
 
@@ -56,7 +56,7 @@ describe("proxy", () => {
     expect(auth.auth.api.getSession).not.toHaveBeenCalled();
   });
 
-  it("returns next for public route when no session", async () => {
+  it("returns next for a signed-out request to /", async () => {
     vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
     const req = createRequest("/");
     const res = await proxy(req);
@@ -64,49 +64,68 @@ describe("proxy", () => {
     expect(res.headers.get("location")).toBeNull();
   });
 
-  it("redirects to /home for public redirect route (e.g. /login) when session exists", async () => {
-    vi.mocked(auth.auth.api.getSession).mockResolvedValue({ user: {}, session: {} } as never);
-    const req = createRequest("/login");
+  it("returns next for a signed-out request to / with MCP login query params", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+    const req = createRequest("/?client_id=x&response_type=code");
+    const res = await proxy(req);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("redirects a signed-in request to / to /home", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+      user: {},
+      session: {},
+    } as never);
+    const req = createRequest("/");
     const res = await proxy(req);
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toContain("/home");
   });
 
   it.each(["/privacy", "/terms", "/docs", "/docs/mcp", "/docs/api"])(
-    "redirects removed public page %s to /login when no session",
+    "redirects removed public page %s to / when no session",
     async (path) => {
       vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
       const res = await proxy(createRequest(path));
       expect(res.status).toBe(307);
-      expect(res.headers.get("location")).toContain("/login");
+      const location = res.headers.get("location");
+      expect(location).not.toBeNull();
+      expect(new URL(location as string).pathname).toBe("/");
     },
   );
-
-  it("returns next for public next route (e.g. /) when session exists", async () => {
-    vi.mocked(auth.auth.api.getSession).mockResolvedValue({ user: {}, session: {} } as never);
-    const req = createRequest("/");
-    const res = await proxy(req);
-    expect(res.status).toBe(200);
-    expect(res.headers.get("location")).toBeNull();
-  });
 
   it.each(["/", "/.well-known/oauth-authorization-server"])(
     "skips the session lookup on public page %s (same response either way)",
     async (path) => {
+      vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
       const res = await proxy(createRequest(path));
       expect(res.status).toBe(200);
-      expect(auth.auth.api.getSession).not.toHaveBeenCalled();
+      if (path === "/.well-known/oauth-authorization-server") {
+        expect(auth.auth.api.getSession).not.toHaveBeenCalled();
+      }
     },
   );
 
-  it("still looks up the session on /login to redirect signed-in users", async () => {
+  it("skips the session lookup on .well-known routes", async () => {
+    const res = await proxy(
+      createRequest("/.well-known/oauth-authorization-server"),
+    );
+    expect(res.status).toBe(200);
+    expect(auth.auth.api.getSession).not.toHaveBeenCalled();
+  });
+
+  it("looks up the session on / to redirect signed-in users", async () => {
     vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
-    await proxy(createRequest("/login"));
+    await proxy(createRequest("/"));
     expect(auth.auth.api.getSession).toHaveBeenCalledTimes(1);
   });
 
   it("returns next for /api/auth without session lookup (Better Auth handles its own cookies)", async () => {
-    vi.mocked(auth.auth.api.getSession).mockResolvedValue({ user: {}, session: {} } as never);
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+      user: {},
+      session: {},
+    } as never);
     const req = createRequest("/api/auth/session");
     const res = await proxy(req);
     expect(res.status).toBe(200);
@@ -114,24 +133,40 @@ describe("proxy", () => {
     expect(auth.auth.api.getSession).not.toHaveBeenCalled();
   });
 
-  it("redirects to /login for private route when no session", async () => {
+  it("returns next for /api/auth/callback/google without session lookup", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+      user: {},
+      session: {},
+    } as never);
+    const req = createRequest("/api/auth/callback/google");
+    const res = await proxy(req);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+    expect(auth.auth.api.getSession).not.toHaveBeenCalled();
+  });
+
+  it("redirects to / for private route when no session", async () => {
     vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
     const req = createRequest("/home");
     const res = await proxy(req);
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toContain("/login");
+    const location = res.headers.get("location");
+    expect(location).not.toBeNull();
+    expect(new URL(location as string).pathname).toBe("/");
   });
 
-  it("redirects to /login for /oauth/consent when no session", async () => {
+  it("redirects to / for /oauth/consent when no session", async () => {
     vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
     const res = await proxy(createRequest("/oauth/consent"));
     expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toContain("/login");
+    const location = res.headers.get("location");
+    expect(location).not.toBeNull();
+    expect(new URL(location as string).pathname).toBe("/");
   });
 
-  it("returns next for /oauth/consent when a verified session exists", async () => {
+  it("returns next for /oauth/consent when a session exists", async () => {
     vi.mocked(auth.auth.api.getSession).mockResolvedValue({
-      user: { emailVerified: true },
+      user: {},
       session: {},
     } as never);
     const res = await proxy(createRequest("/oauth/consent"));
@@ -139,60 +174,19 @@ describe("proxy", () => {
     expect(res.headers.get("location")).toBeNull();
   });
 
-  it("redirects to /verify-email for private route when session exists but user is not verified", async () => {
+  it("returns next for private route when session exists", async () => {
     vi.mocked(auth.auth.api.getSession).mockResolvedValue({
-      user: { emailVerified: false },
-      session: {},
-    } as never);
-    const req = createRequest("/home");
-    const res = await proxy(req);
-    expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toContain("/verify-email");
-  });
-
-  it("returns next for private route when session exists and user is verified", async () => {
-    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
-      user: { emailVerified: true },
+      user: {},
       session: {},
     } as never);
     const req = createRequest("/home");
     const res = await proxy(req);
     expect(res.status).toBe(200);
     expect(res.headers.get("location")).toBeNull();
-  });
-
-  it("redirects to /login for /verify-email when no session", async () => {
-    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
-    const req = createRequest("/verify-email");
-    const res = await proxy(req);
-    expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toContain("/login");
-  });
-
-  it("returns next for /verify-email when session exists (unverified)", async () => {
-    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
-      user: { emailVerified: false },
-      session: {},
-    } as never);
-    const req = createRequest("/verify-email");
-    const res = await proxy(req);
-    expect(res.status).toBe(200);
-    expect(res.headers.get("location")).toBeNull();
-  });
-
-  it("redirects to /home for /verify-email when session exists (verified)", async () => {
-    vi.mocked(auth.auth.api.getSession).mockResolvedValue({
-      user: { emailVerified: true },
-      session: {},
-    } as never);
-    const req = createRequest("/verify-email");
-    const res = await proxy(req);
-    expect(res.status).toBe(307);
-    expect(res.headers.get("location")).toContain("/home");
   });
 
   describe("MCP route", () => {
-    it("passes through /api/mcp without redirecting to login (bearer auth at handler)", async () => {
+    it("passes through /api/mcp without redirecting to landing (bearer auth at handler)", async () => {
       vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
       const request = new NextRequest("http://localhost/api/mcp", {
         method: "POST",
@@ -203,7 +197,7 @@ describe("proxy", () => {
       expect(response.headers.get("location")).toBeNull();
     });
 
-    it("passes through /api/mcp subpaths without redirecting to login", async () => {
+    it("passes through /api/mcp subpaths without redirecting to landing", async () => {
       vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
       const request = new NextRequest("http://localhost/api/mcp/messages", {
         method: "POST",
@@ -235,7 +229,7 @@ describe("proxy", () => {
 
     it("passes through /api/v1/links with a valid session", async () => {
       vi.mocked(auth.auth.api.getSession).mockResolvedValue({
-        user: { id: "u1", emailVerified: true },
+        user: { id: "u1" },
         session: {},
       } as never);
       const request = new NextRequest("http://localhost/api/v1/links", {
@@ -267,26 +261,18 @@ describe("proxy", () => {
   });
 
   describe("/oauth/consent route", () => {
-    it("redirects to /login when no session", async () => {
+    it("redirects to / when no session", async () => {
       vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
       const res = await proxy(createRequest("/oauth/consent"));
       expect(res.status).toBe(307);
-      expect(res.headers.get("location")).toContain("/login");
+      const location = res.headers.get("location");
+      expect(location).not.toBeNull();
+      expect(new URL(location as string).pathname).toBe("/");
     });
 
-    it("redirects to /verify-email when session exists but user is not verified", async () => {
+    it("returns next when session exists", async () => {
       vi.mocked(auth.auth.api.getSession).mockResolvedValue({
-        user: { emailVerified: false },
-        session: {},
-      } as never);
-      const res = await proxy(createRequest("/oauth/consent"));
-      expect(res.status).toBe(307);
-      expect(res.headers.get("location")).toContain("/verify-email");
-    });
-
-    it("returns next when session exists and user is verified", async () => {
-      vi.mocked(auth.auth.api.getSession).mockResolvedValue({
-        user: { emailVerified: true },
+        user: {},
         session: {},
       } as never);
       const res = await proxy(createRequest("/oauth/consent"));
@@ -296,7 +282,7 @@ describe("proxy", () => {
   });
 
   describe("malformed Authorization header on a private route", () => {
-    it("redirects to /login instead of crashing when getSession throws (e.g. an invalid API key)", async () => {
+    it("redirects to / instead of crashing when getSession throws (e.g. an invalid API key)", async () => {
       vi.mocked(auth.auth.api.getSession).mockRejectedValue(
         new Error("Invalid API key."),
       );
@@ -306,10 +292,12 @@ describe("proxy", () => {
       const res = await proxy(req);
 
       expect(res.status).toBe(307);
-      expect(res.headers.get("location")).toContain("/login");
+      const location = res.headers.get("location");
+      expect(location).not.toBeNull();
+      expect(new URL(location as string).pathname).toBe("/");
     });
 
-    it("redirects to /login instead of crashing on a public redirect route (e.g. /login itself)", async () => {
+    it("returns next on / (public route) instead of crashing when getSession throws", async () => {
       vi.mocked(auth.auth.api.getSession).mockRejectedValue(
         new Error("Invalid API key."),
       );
@@ -318,8 +306,9 @@ describe("proxy", () => {
 
       const res = await proxy(req);
 
-      // "/" is public and treated as unauthenticated (same as a thrown
-      // session lookup), so it should pass through rather than crash.
+      // "/" needs the session lookup (redirect-when-authenticated), but a
+      // thrown lookup is treated as unauthenticated, so it should pass
+      // through rather than crash.
       expect(res.status).toBe(200);
       expect(res.headers.get("location")).toBeNull();
     });
@@ -333,7 +322,6 @@ describe("proxy matcher", () => {
   it.each([
     "/",
     "/home",
-    "/login",
     "/api/links",
     "/api/links/search",
     "/api/auth/get-session",
