@@ -5,8 +5,13 @@ import { useAvatarUpload } from "@/hooks/use-avatar-upload";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { House, LogOut, MessageCircleHeart, SettingsIcon } from "lucide-react";
 import Link from "next/link";
+import * as React from "react";
+import {
+  SettingsDeepLink,
+  SettingsDialog,
+  type SettingsTabValue,
+} from "./dialog-settings";
 import { FeedbackDialog } from "./dialog-feedback";
-import { SettingsDialog } from "./dialog-settings";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
@@ -22,8 +27,25 @@ export function User() {
   const { signOut } = useAuth();
   const { inputRef, isUploading, onFileChange, openPicker } = useAvatarUpload();
 
+  // Owned here, not inside SettingsDialog/its dropdown trigger: Radix only
+  // mounts the dropdown's menu content once it's been opened, so a
+  // ?settings= deep link arriving on page load needs SettingsDeepLink
+  // mounted unconditionally, with the dialog it drives controlled from here.
+  const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [settingsDefaultTab, setSettingsDefaultTab] = React.useState<
+    SettingsTabValue | undefined
+  >(undefined);
+
   return (
     <>
+      <React.Suspense fallback={null}>
+        <SettingsDeepLink
+          onOpen={(tab) => {
+            setSettingsDefaultTab(tab);
+            setSettingsOpen(true);
+          }}
+        />
+      </React.Suspense>
       <input
         ref={inputRef}
         type="file"
@@ -82,7 +104,16 @@ export function User() {
               Share feedback
             </DropdownMenuItem>
           </FeedbackDialog>
-          <SettingsDialog>
+          <SettingsDialog
+            open={settingsOpen}
+            onOpenChange={(open) => {
+              setSettingsOpen(open);
+              // Reset so a later manual open lands on the first tab instead
+              // of whatever a past deep link set.
+              if (!open) setSettingsDefaultTab(undefined);
+            }}
+            defaultTab={settingsDefaultTab}
+          >
             <DropdownMenuItem
               onSelect={(event) => {
                 event.preventDefault();

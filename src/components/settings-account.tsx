@@ -16,8 +16,8 @@ export function SettingsAccount({ closeDialog }: { closeDialog: () => void }) {
   return (
     <div className="w-full flex-1 flex flex-col gap-4">
       <SettingsItem
-        title={username ? `@${username}` : "Username"}
-        description="Others can find and mention you by your username."
+        title="Username"
+        description={username ? `@${username}` : ""}
         fullDescription
         actions={
           <DialogEditUsername>

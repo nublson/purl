@@ -18,12 +18,15 @@ const RESERVED_MESSAGE = "That username is reserved";
 const TAKEN_MESSAGE = "That username is taken";
 const AVAILABILITY_DEBOUNCE_MS = 300;
 
+const AVAILABILITY_CHECK_ERROR_MESSAGE = "Couldn't check availability. Try again.";
+
 type FieldStatus =
   | { kind: "unchanged" }
   | { kind: "invalid"; message: string }
   | { kind: "checking" }
   | { kind: "taken" }
-  | { kind: "available" };
+  | { kind: "available" }
+  | { kind: "check-error" };
 
 interface DialogEditUsernameProps {
   children: React.ReactNode;
@@ -35,7 +38,6 @@ export function DialogEditUsername({ children }: DialogEditUsernameProps) {
   return (
     <DialogWrapper
       title="Edit username"
-      description="Others can find and mention you by your username."
       open={open}
       onOpenChange={setOpen}
       content={<EditUsernameForm onSuccess={() => setOpen(false)} />}
@@ -77,13 +79,25 @@ function EditUsernameForm({ onSuccess }: { onSuccess: () => void }) {
       fetch(`/api/user/username/available?u=${encodeURIComponent(check.username)}`, {
         signal: controller.signal,
       })
-        .then((res) => res.json())
-        .then((data: { available: boolean }) => {
+        .then(async (res) => {
+          if (!res.ok) {
+            // A non-OK response (401/429/500/…) has no `available` field —
+            // treating it as unavailable would show "taken" for a value
+            // that was never actually checked, so surface a neutral error
+            // and keep Save disabled instead.
+            setStatus({ kind: "check-error" });
+            return;
+          }
+          const data = (await res.json()) as { available: boolean };
           setStatus(data.available ? { kind: "available" } : { kind: "taken" });
         })
-        .catch(() => {
-          // Aborted because newer input arrived, or a network error: leave
-          // the "checking" status, which the next change will resolve.
+        .catch((error) => {
+          if (error instanceof DOMException && error.name === "AbortError") {
+            // Newer input arrived; the effect that scheduled this request
+            // has already been cleaned up, so just let it drop.
+            return;
+          }
+          setStatus({ kind: "check-error" });
         });
     }, AVAILABILITY_DEBOUNCE_MS);
 
@@ -102,7 +116,9 @@ function EditUsernameForm({ onSuccess }: { onSuccess: () => void }) {
           ? "Checking availability…"
           : status.kind === "available"
             ? "Username is available"
-            : null;
+            : status.kind === "check-error"
+              ? AVAILABILITY_CHECK_ERROR_MESSAGE
+              : null;
 
   const canSave = status.kind === "available" && !saving;
 
