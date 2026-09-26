@@ -1,6 +1,7 @@
 "use client";
 
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
+import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
@@ -83,7 +84,7 @@ export const LinkItem = React.forwardRef<
 
     openTimerRef.current = setTimeout(() => {
       if (!hoveringActionsRef.current) setPreviewOpen(true);
-    }, 10);
+    }, previewOpenDelay());
   }, [clearCloseTimer, clearOpenTimer]);
 
   const scheduleClose = React.useCallback(() => {
@@ -101,6 +102,12 @@ export const LinkItem = React.forwardRef<
       clearCloseTimer();
     };
   }, [clearCloseTimer, clearOpenTimer]);
+
+  // While this preview is open, other rows open theirs without the delay.
+  React.useEffect(() => {
+    if (!previewOpen) return;
+    return trackPreviewOpen(() => setPreviewOpen(false));
+  }, [previewOpen]);
 
   if (deletePhase === "loading" || deletePhase === "exiting") {
     return (
@@ -125,7 +132,7 @@ export const LinkItem = React.forwardRef<
       ref={ref}
       data-cy="link-item"
       className={cn(
-        "w-full p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
+        "w-full p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
         deletePhase === "animating" &&
           "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
         className,
@@ -198,7 +205,7 @@ export const LinkItem = React.forwardRef<
       </ItemContent>
       {interactive && (
         <ItemActions
-          className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-focus-within/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100 transition-opacity duration-150"
+          className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-focus-within/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100"
           onMouseEnter={() => {
             hoveringActionsRef.current = true;
             clearOpenTimer();

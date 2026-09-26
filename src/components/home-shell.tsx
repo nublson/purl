@@ -7,6 +7,7 @@ import { LinkItemSkeleton } from "@/components/skeletons";
 import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
+import { coolPreviews } from "@/lib/link-preview-warmth";
 import {
   countGroupedLinks,
   mergeLinkGroups,
@@ -165,7 +166,9 @@ export function HomeShell({
       {!groups.length && !showSyntheticToday ? (
         <LinkGroupEmpty />
       ) : (
-        <>
+        // Leaving the list resets the preview hover delay (see
+        // link-preview-warmth); gaps between date groups don't.
+        <div className="flex flex-col gap-8" onMouseLeave={coolPreviews}>
           {showSyntheticToday && (
             <LinkGroup
               label="Today"
@@ -212,7 +215,7 @@ export function HomeShell({
               </>
             ) : null}
           </div>
-        </>
+        </div>
       )}
     </>
   );
