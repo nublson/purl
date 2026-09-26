@@ -17,7 +17,7 @@
 | Email/password | Removed entirely: no `/login`, `/signup`, `/verify-email`, no verification emails. |
 | Sign-in entry point | Landing page `/` hero buttons. `/login` and `/signup` redirect to `/`. |
 | Signed-in user on `/` | Redirected to `/home`. |
-| Existing password accounts | Auto-linked by email on first Google/GitHub sign-in (even if never verified). Accounts with no matching provider email lose access; accepted. |
+| Existing password accounts | Auto-linked by email on first Google/GitHub sign-in (even if the local email was never verified), as long as the provider reports that email as verified. Accounts with no matching verified provider email lose access; accepted. |
 | Username source | Auto-generated at account creation (email local part → name → `user`, numeric suffix on collision); editable in Settings → Account. |
 | Username implementation | Own `additionalFields.username` (`input: false`) + create hook + own API routes. **Not** Better Auth's `username` plugin (password-oriented, adds unused `/sign-in/username` and `displayUsername`). |
 | Provider management | Settings → Account lists providers with Connect / Disconnect; the last provider cannot be disconnected. |
@@ -65,12 +65,13 @@ One Prisma migration, `oauth_only_usernames`, applied by hand at deploy time (se
   account: {
     accountLinking: {
       enabled: true,
-      trustedProviders: ["google", "github", "apple"],
       requireLocalEmailVerified: false, // legacy unverified password users must still link
       allowDifferentEmails: true,        // explicit "Connect" in Settings only
     },
   },
   ```
+  No `trustedProviders`: listing a provider as trusted makes Better Auth skip that provider's `emailVerified` check, so an unverified identity claiming a legacy user's email would be linked and signed in. `requireLocalEmailVerified: false` alone is enough for legacy unverified local users to link.
+
   Rationale for `requireLocalEmailVerified: false`: with password sign-up gone, nobody can create new unverified-email accounts. At worst, a verified provider email owner gains an account someone else created with their email earlier. `allowDifferentEmails` applies only to `linkSocial` from an authenticated session; implicit sign-in linking still matches by email.
 - **Username field:** `user.additionalFields.username = { type: "string", required: true, input: false }`. `input: false` means clients cannot set it through `updateUser` or sign-up; only our route can change it.
 - **Create hook:** `databaseHooks.user.create.before` calls `assignUsernameOnCreate(user)` (exported, testable), which returns `{ data: { ...user, username } }` using `generateUsername` with a Prisma `isTaken` lookup.
@@ -115,7 +116,7 @@ One Prisma migration, `oauth_only_usernames`, applied by hand at deploy time (se
 - **Email row:** unchanged value; description "From your sign-in provider".
 - **Sign-in methods** (`SettingsSignInMethods`): one row per enabled provider.
   - Data comes from `listAccounts()`.
-  - **Connect:** `linkSocial({ provider, callbackURL: "/home?settings=account" })`. The Settings dialog has no deep link today, so `SettingsDialog` gains one: on mount, `?settings=<tab>` opens it on that tab, then the param is removed.
+  - **Connect:** `linkSocial({ provider, callbackURL: "/home?settings=account", errorCallbackURL: "/home?settings=account" })`; a returned `?error=` code is toasted (`connectErrorMessage`) and stripped. The Settings dialog has no deep link today, so `SettingsDialog` gains one: on mount, `?settings=<tab>` opens it on that tab, then the param is removed.
   - **Disconnect:** `unlinkAccount({ providerId })`. It is disabled with a tooltip ("You need at least one way to sign in") when it's the only connected provider.
 - `src/lib/auth-client.ts`: export `linkSocial`, `unlinkAccount`, and `listAccounts`; remove `signUp` and `sendVerificationEmail`.
 - `src/hooks/use-auth.ts`: replace `signInWithEmail` / `signUpWithEmail` with `signInWithProvider(provider)`; keep `signOut`, which now pushes to `/`.
