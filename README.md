@@ -147,6 +147,15 @@ pnpm dev
 
 Open `http://localhost:3000`.
 
+**Optional: a named HTTPS URL with [portless](https://portless.sh/).** With portless installed globally (`npm install -g portless`, Node.js 24+), run `portless run` instead of `pnpm dev`. It runs the `dev` script behind a local proxy at `https://purl.localhost`. Point auth at that URL in `.env.local`, or sign-in rejects the origin:
+
+```bash
+BETTER_AUTH_URL="https://purl.localhost"
+BASE_URL="https://purl.localhost"
+```
+
+In a git worktree, portless prefixes the branch name (for example `https://my-branch.purl.localhost`); set both variables to that URL there.
+
 **PWA / install:** With `pnpm dev`, the service worker is not active. After a production build, `public/sw.js` exists locally; run **`pnpm start`** and open the app in Chromium to use **Install** or to test offline navigation to `/~offline`.
 
 ## Testing

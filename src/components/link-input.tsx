@@ -91,13 +91,19 @@ export function LinkInput({
                   aria-invalid={hasError || undefined}
                   aria-describedby={hasError ? errorId : undefined}
                 />
-                <InputGroupAddon align="inline-end">
+                {/* 4px inset on every side (border included), so the button's
+                    radius is the field's minus 4px. */}
+                <InputGroupAddon
+                  align="inline-end"
+                  className="has-[>button]:-mr-1.25"
+                >
                   <Button
                     data-cy="save-link-button"
                     type="submit"
                     aria-label="Save link"
                     variant="ghost"
                     size="icon-sm"
+                    className="rounded-[calc(var(--radius-md)-4px)]"
                     disabled={form.state.isSubmitting}
                   >
                     <Plus />

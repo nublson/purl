@@ -92,13 +92,13 @@ export function PdfThumbnail({ url }: PdfThumbnailProps) {
   return (
     <>
       {renderState === "loading" && (
-        <div className="w-full aspect-video animate-pulse bg-muted rounded-t-md" />
+        <div className="w-full aspect-video animate-pulse bg-muted rounded-t-lg" />
       )}
       <canvas
         ref={canvasRef}
         className={
           renderState === "done"
-            ? "w-full aspect-video object-cover object-top rounded-t-md"
+            ? "w-full aspect-video object-cover object-top rounded-t-lg outline outline-black/10 -outline-offset-1 dark:outline-white/10"
             : "hidden"
         }
       />

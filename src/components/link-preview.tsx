@@ -42,7 +42,9 @@ export function LinkPreview({
       <HoverCardContent
         side="right"
         align="start"
-        className="p-0 flex-col hidden md:[@media(hover:hover)]:flex z-40"
+        // Seen on every row hover: appear and disappear instantly. Important so
+        // it beats the primitive's animate-in/animate-out rules.
+        className="p-0 flex-col hidden md:[@media(hover:hover)]:flex z-40 data-open:animate-none! data-closed:animate-none!"
         onMouseEnter={onPreviewMouseEnter}
         onMouseLeave={onPreviewMouseLeave}
       >

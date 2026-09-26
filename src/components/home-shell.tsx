@@ -7,12 +7,14 @@ import { LinkItemSkeleton } from "@/components/skeletons";
 import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
+import { coolPreviews } from "@/lib/link-preview-warmth";
 import {
   countGroupedLinks,
   mergeLinkGroups,
   parseJsonLinkGroups,
   type LinkGroup as LinkGroupType,
 } from "@/utils/links";
+import { BouncingDots } from "loading-dev";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { LinkGroupEmpty } from "./link-group-empty";
@@ -112,6 +114,10 @@ export function HomeShell({
     void reload();
   }, [version, reload]);
 
+  // Leaving /home without a mouse-leave (e.g. keyboard navigation) must not
+  // carry the "preview already open" state back to the next visit.
+  useEffect(() => coolPreviews, []);
+
   const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const sentinel = sentinelRef.current;
@@ -164,7 +170,9 @@ export function HomeShell({
       {!groups.length && !showSyntheticToday ? (
         <LinkGroupEmpty />
       ) : (
-        <>
+        // Leaving the list resets the preview hover delay (see
+        // link-preview-warmth); gaps between date groups don't.
+        <div className="flex flex-col gap-8" onMouseLeave={coolPreviews}>
           {showSyntheticToday && (
             <LinkGroup
               label="Today"
@@ -188,10 +196,30 @@ export function HomeShell({
               }
             />
           ))}
-          {nextCursor && (
-            <div ref={sentinelRef} aria-hidden className="h-px w-full" />
-          )}
-        </>
+          {/* Always rendered with the list, so the status region is in place
+              before "Loading more links" is announced and its height never
+              appears or disappears (including when the last page loads). The
+              scroll sentinel sits inside it, absolutely positioned, so
+              removing it after the last page doesn't shift layout either. */}
+          <div
+            role="status"
+            className="relative flex h-10 w-full items-center justify-center text-muted-foreground"
+          >
+            {nextCursor && (
+              <div
+                ref={sentinelRef}
+                aria-hidden
+                className="absolute inset-x-0 top-0 h-px"
+              />
+            )}
+            {loadingMore ? (
+              <>
+                <BouncingDots size={20} />
+                <span className="sr-only">Loading more links</span>
+              </>
+            ) : null}
+          </div>
+        </div>
       )}
     </>
   );
