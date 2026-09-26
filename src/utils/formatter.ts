@@ -49,25 +49,87 @@ export function getUrlDomain(url: string): string {
   }
 }
 
-/** Returns a relative date label for grouping (Today, This Week, Last Week, etc.). */
-export function getRelativeDateLabel(date: Date): string {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const then = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const diffMs = today.getTime() - then.getTime();
-  const daysAgo = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+const MS_PER_DAY = 86_400_000;
 
-  if (daysAgo === 0) return "Today";
-  if (daysAgo >= 1 && daysAgo <= 7) return "This week";
-  if (daysAgo >= 8 && daysAgo <= 14) return "Last week";
-  if (daysAgo >= 15 && daysAgo <= 31) return "This month";
+// Building an Intl.DateTimeFormat is comparatively expensive; grouping can
+// call this for up to 1000 links per request, so the day-parts formatter is
+// cached per zone instead of rebuilt per call.
+const dayPartsFormatters = new Map<string, Intl.DateTimeFormat>();
 
-  const sameYear = then.getFullYear() === now.getFullYear();
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+function getDayPartsFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = dayPartsFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    });
+    dayPartsFormatters.set(timeZone, formatter);
+  }
+  return formatter;
+}
 
-  if (then >= lastMonthStart && then <= lastMonthEnd) return "Last month";
-  if (sameYear) return "This year";
-  if (then.getFullYear() === now.getFullYear() - 1) return "Last year";
-  return "Older";
+// The month name is always rendered in UTC (see getDateGroupLabel), so one
+// formatter covers every call.
+const monthFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  timeZone: "UTC",
+});
+
+/** Returns the integer day index (UTC-based) of a date's calendar day in a given IANA time zone. */
+function toCalendarDay(date: Date, timeZone: string): number {
+  const parts = getDayPartsFormatter(timeZone).formatToParts(date);
+  const year = Number(parts.find((p) => p.type === "year")?.value);
+  const month = Number(parts.find((p) => p.type === "month")?.value);
+  const day = Number(parts.find((p) => p.type === "day")?.value);
+  return Date.UTC(year, month - 1, day) / MS_PER_DAY;
+}
+
+/**
+ * Builds a labeler that reuses the "today"/"this week" reference points
+ * across many calls, instead of recomputing them per date. Used by
+ * `groupLinksByDate` so grouping up to 1000 links only computes `now`'s
+ * calendar day and the start of this week once.
+ */
+export function createDateGroupLabeler(
+  now: Date,
+  timeZone: string,
+): (date: Date) => string {
+  const today = toCalendarDay(now, timeZone);
+  const todayDate = new Date(today * MS_PER_DAY);
+  const todayDow = todayDate.getUTCDay();
+  const todayYear = todayDate.getUTCFullYear();
+  const mondayThisWeek = today - ((todayDow + 6) % 7);
+
+  return (date: Date): string => {
+    const day = toCalendarDay(date, timeZone);
+
+    if (day >= today) return "Today";
+    if (day === today - 1) return "Yesterday";
+    if (day >= mondayThisWeek) return "This week";
+    if (day >= mondayThisWeek - 7) return "Last week";
+
+    const dayDate = new Date(day * MS_PER_DAY);
+    const month = monthFormatter.format(dayDate);
+    const year = dayDate.getUTCFullYear();
+
+    return year === todayYear ? month : `${month} ${year}`;
+  };
+}
+
+/**
+ * Returns a time-zone-aware heading label for grouping links by date:
+ * "Today", "Yesterday", "This week", "Last week", "<Month>" (current year),
+ * or "<Month> <Year>" (earlier years). Weeks start Monday.
+ *
+ * Thin wrapper around `createDateGroupLabeler` for single-date callers (and
+ * tests); grouping many dates at once should build one labeler and reuse it.
+ */
+export function getDateGroupLabel(
+  date: Date,
+  now: Date,
+  timeZone: string,
+): string {
+  return createDateGroupLabeler(now, timeZone)(date);
 }

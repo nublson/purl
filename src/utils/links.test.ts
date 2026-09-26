@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   countGroupedLinks,
   groupLinksByDate,
@@ -22,82 +22,78 @@ function link(createdAt: Date, title: string): Link {
 }
 
 describe("groupLinksByDate", () => {
-  const fixedNow = new Date(2025, 5, 15); // 2025-06-15
+  const opts = { now: new Date("2026-09-26T12:00:00Z"), timeZone: "UTC" };
 
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(fixedNow);
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("groups links into correct buckets by relative date", () => {
-    const today = new Date(2025, 5, 15);
-    const thisWeek = new Date(2025, 5, 12);
-    const lastWeek = new Date(2025, 5, 5);
+  it("groups links under chronological labels", () => {
+    const today = new Date("2026-09-26T09:00:00Z");
+    const yesterday = new Date("2026-09-25T09:00:00Z");
+    const thisWeek = new Date("2026-09-22T09:00:00Z");
+    const lastWeek = new Date("2026-09-15T09:00:00Z");
+    const august = new Date("2026-08-10T09:00:00Z");
+    const december2025 = new Date("2025-12-01T09:00:00Z");
     const links: Link[] = [
-      link(lastWeek, "last week"),
+      link(august, "august"),
       link(today, "today"),
-      link(thisWeek, "this week"),
+      link(december2025, "december2025"),
+      link(lastWeek, "lastWeek"),
+      link(yesterday, "yesterday"),
+      link(thisWeek, "thisWeek"),
     ];
-    const groups = groupLinksByDate(links);
-    expect(groups).toHaveLength(3);
-    expect(groups[0].label).toBe("Today");
-    expect(groups[0].links.map((l) => l.title)).toEqual(["today"]);
-    expect(groups[1].label).toBe("This week");
-    expect(groups[1].links.map((l) => l.title)).toEqual(["this week"]);
-    expect(groups[2].label).toBe("Last week");
-    expect(groups[2].links.map((l) => l.title)).toEqual(["last week"]);
+    const groups = groupLinksByDate(links, opts);
+    expect(groups.map((g) => g.label)).toEqual([
+      "Today",
+      "Yesterday",
+      "This week",
+      "Last week",
+      "August",
+      "December 2025",
+    ]);
   });
 
-  it("sorts links within a group newest-first", () => {
-    const today1 = new Date(2025, 5, 15, 10, 0);
-    const today2 = new Date(2025, 5, 15, 12, 0);
+  it("sorts newest-first within a group", () => {
+    const today1 = new Date("2026-09-26T10:00:00Z");
+    const today2 = new Date("2026-09-26T12:00:00Z");
     const links: Link[] = [link(today1, "first"), link(today2, "second")];
-    const groups = groupLinksByDate(links);
+    const groups = groupLinksByDate(links, opts);
     expect(groups[0].links.map((l) => l.title)).toEqual(["second", "first"]);
   });
 
-  it("filters out empty groups", () => {
-    const today = new Date(2025, 5, 15);
-    const lastYear = new Date(2024, 0, 1);
-    const links: Link[] = [link(today, "today"), link(lastYear, "last year")];
-    const groups = groupLinksByDate(links);
-    expect(groups).toHaveLength(2);
-    expect(groups.map((g) => g.label)).toEqual(["Today", "Last year"]);
+  it("returns [] for no links", () => {
+    expect(groupLinksByDate([], opts)).toEqual([]);
   });
 
-  it("returns groups in canonical label order", () => {
-    const lastYear = new Date(2024, 0, 1);
-    const today = new Date(2025, 5, 15);
-    const links: Link[] = [link(lastYear, "old"), link(today, "new")];
-    const groups = groupLinksByDate(links);
-    const labels = groups.map((g) => g.label);
-    expect(labels).toEqual(["Today", "Last year"]);
-    const order = [
-      "Today",
-      "This week",
-      "Last week",
-      "This month",
-      "Last month",
-      "This year",
-      "Last year",
-      "Older",
-    ];
-    for (let i = 1; i < labels.length; i++) {
-      expect(order.indexOf(labels[i])).toBeGreaterThan(
-        order.indexOf(labels[i - 1]),
-      );
-    }
+  it("falls back to UTC and does not throw for an invalid time zone", () => {
+    const today = new Date("2026-09-26T09:00:00Z");
+    const links: Link[] = [link(today, "today")];
+    const groups = groupLinksByDate(links, {
+      now: opts.now,
+      timeZone: "Mars/Base",
+    });
+    expect(groups.map((g) => g.label)).toEqual(["Today"]);
   });
 });
 
 describe("mergeLinkGroups", () => {
-  const d = new Date(2025, 5, 15);
+  const d = new Date("2026-09-26T09:00:00Z");
 
-  it("merges same-label groups, keeps label order, and drops duplicate ids", () => {
+  it("joins a label split across pages", () => {
+    const a = link(d, "a");
+    const b = link(d, "b");
+    const c = link(d, "c");
+    const merged = mergeLinkGroups(
+      [{ label: "August", links: [a] }],
+      [
+        { label: "August", links: [b] },
+        { label: "July", links: [c] },
+      ],
+    );
+    expect(merged).toEqual([
+      { label: "August", links: [a, b] },
+      { label: "July", links: [c] },
+    ]);
+  });
+
+  it("drops duplicates", () => {
     const a = link(d, "a");
     const b = link(d, "b");
     const c = link(d, "c");
@@ -113,12 +109,9 @@ describe("mergeLinkGroups", () => {
     expect(countGroupedLinks(merged)).toBe(4);
   });
 
-  it("orders merged groups by date label, not arrival order", () => {
-    const merged = mergeLinkGroups(
-      [{ label: "Last week", links: [link(d, "x")] }],
-      [{ label: "This week", links: [link(d, "y")] }],
-    );
-    expect(merged.map((g) => g.label)).toEqual(["This week", "Last week"]);
+  it("with an empty page returns groups unchanged", () => {
+    const groups = [{ label: "Today", links: [link(d, "a")] }];
+    expect(mergeLinkGroups(groups, [])).toEqual(groups);
   });
 });
 

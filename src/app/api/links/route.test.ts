@@ -850,8 +850,13 @@ describe("POST /api/links origin echo", () => {
 });
 
 describe("GET /api/links", () => {
-  function getRequest(query = ""): NextRequest {
-    return new NextRequest(`http://localhost/api/links${query}`);
+  function getRequest(
+    query = "",
+    init?: { cookie?: string; headers?: Record<string, string> },
+  ): NextRequest {
+    const headers = new Headers(init?.headers);
+    if (init?.cookie) headers.set("cookie", init.cookie);
+    return new NextRequest(`http://localhost/api/links${query}`, { headers });
   }
 
   beforeEach(() => {
@@ -906,5 +911,41 @@ describe("GET /api/links", () => {
         take: 1001,
       }),
     );
+  });
+
+  it("groups by the tz cookie's zone and reports it in the response", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-26T00:00:00Z"));
+    try {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      // 23:30 UTC on the 25th is already 08:30 on the 26th in Tokyo (UTC+9),
+      // so the label differs between the two zones.
+      const link = { ...MOCK_LINK, createdAt: new Date("2026-09-25T23:30:00Z") };
+      vi.mocked(prisma.link.findMany).mockResolvedValue([link] as never);
+      vi.mocked(prisma.link.count).mockResolvedValue(1 as never);
+
+      const res = await GET(getRequest("", { cookie: "tz=Asia%2FTokyo" }));
+      const body = await res.json();
+
+      expect(body.timeZone).toBe("Asia/Tokyo");
+      expect(body.groups).toEqual([
+        { label: "Today", links: [expect.objectContaining({ id: link.id })] },
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("falls back to the x-vercel-ip-timezone header when there is no cookie", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.link.count).mockResolvedValue(0 as never);
+
+    const res = await GET(
+      getRequest("", { headers: { "x-vercel-ip-timezone": "America/Sao_Paulo" } }),
+    );
+    const body = await res.json();
+
+    expect(body.timeZone).toBe("America/Sao_Paulo");
   });
 });

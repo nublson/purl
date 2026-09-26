@@ -1,5 +1,6 @@
 import type { ContentType } from "@/generated/prisma/enums";
-import { getRelativeDateLabel } from "./formatter";
+import { createDateGroupLabeler } from "./formatter";
+import { isValidTimeZone } from "./time-zone";
 
 export type Link = {
   id: string;
@@ -18,40 +19,30 @@ export type LinkGroup = {
   links: Link[];
 };
 
-const LABEL_ORDER = [
-  "Today",
-  "This week",
-  "Last week",
-  "This month",
-  "Last month",
-  "This year",
-  "Last year",
-  "Older",
-] as const;
-
-export function groupLinksByDate(links: Link[]): LinkGroup[] {
+export function groupLinksByDate(
+  links: Link[],
+  options: { now?: Date; timeZone: string },
+): LinkGroup[] {
+  const now = options.now ?? new Date();
+  // Grouping must never throw on a bad zone (e.g. a stale/tampered cookie).
+  const timeZone = isValidTimeZone(options.timeZone) ? options.timeZone : "UTC";
+  const getLabel = createDateGroupLabeler(now, timeZone);
   const sorted = [...links].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
   );
   const byLabel = new Map<string, Link[]>();
-  for (const label of LABEL_ORDER) {
-    byLabel.set(label, []);
-  }
   for (const link of sorted) {
-    const label = getRelativeDateLabel(link.createdAt);
+    const label = getLabel(link.createdAt);
     const bucket = byLabel.get(label) ?? [];
     bucket.push(link);
     byLabel.set(label, bucket);
   }
-  return LABEL_ORDER.map((label) => ({
-    label,
-    links: byLabel.get(label) ?? [],
-  })).filter((group) => group.links.length > 0);
+  return [...byLabel.entries()].map(([label, links]) => ({ label, links }));
 }
 
 /**
  * Appends `next` groups (an older page) to `current`, merging same-label
- * groups and dropping links already present. Keeps label order.
+ * groups and dropping links already present. Keeps first-seen label order.
  */
 export function mergeLinkGroups(
   current: LinkGroup[],
@@ -68,10 +59,9 @@ export function mergeLinkGroups(
     }
     byLabel.set(group.label, bucket);
   }
-  return LABEL_ORDER.map((label) => ({
-    label,
-    links: byLabel.get(label) ?? [],
-  })).filter((group) => group.links.length > 0);
+  return [...byLabel.entries()]
+    .map(([label, links]) => ({ label, links }))
+    .filter((group) => group.links.length > 0);
 }
 
 /** Total number of links across groups. */
