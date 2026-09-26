@@ -42,7 +42,7 @@ export function LinkIcon({
           // eslint-disable-next-line @next/next/no-img-element -- user-controlled favicon URLs; avoid next/image optimizer SSRF
           <img
             src={faviconSrc}
-            alt={link.title}
+            alt=""
             width={imgSize}
             height={imgSize}
             sizes={`${imgSize}px`}

@@ -56,6 +56,10 @@ export const LinkItem = React.forwardRef<
     "idle" | "animating" | "loading" | "exiting"
   >("idle");
   const [previewOpen, setPreviewOpen] = React.useState(false);
+  const descriptionId = React.useId();
+  const anchorRef = React.useRef<HTMLAnchorElement>(null);
+  // Row to focus after a delete, so focus doesn't fall back to the page.
+  const focusAfterDeleteRef = React.useRef<HTMLElement | null>(null);
   const hoveringActionsRef = React.useRef(false);
   const hoveringPreviewRef = React.useRef(false);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -113,11 +117,12 @@ export const LinkItem = React.forwardRef<
     );
   }
 
+  const interactive = mode === "default";
+
   const content = (
     <Item
       ref={ref}
       data-cy="link-item"
-      role="listitem"
       className={cn(
         "w-full p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
         deletePhase === "animating" &&
@@ -140,13 +145,33 @@ export const LinkItem = React.forwardRef<
       }}
       {...rest}
     >
-      <a
-        href={link.url}
-        aria-label={link.title}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="absolute inset-0 z-0 w-full"
-      />
+      {/* In search the row is a listbox option that opens the link itself,
+          so it must not contain its own link or menu. */}
+      {interactive && (
+        <a
+          ref={anchorRef}
+          href={link.url}
+          aria-label={`${link.title} (opens in new tab)`}
+          aria-describedby={link.description ? descriptionId : undefined}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="absolute inset-0 z-0 w-full rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring"
+          onFocus={(event) => {
+            // Keyboard users get the same preview mouse users get on hover.
+            if (!event.currentTarget.matches(":focus-visible")) return;
+            clearCloseTimer();
+            setPreviewOpen(true);
+          }}
+          onBlur={() => {
+            if (!hoveringPreviewRef.current) setPreviewOpen(false);
+          }}
+        />
+      )}
+      {interactive && link.description ? (
+        <span id={descriptionId} className="sr-only">
+          {link.description}
+        </span>
+      ) : null}
       <ItemMedia
         variant="image"
         className="relative mt-1.5 size-5 self-start rounded"
@@ -170,31 +195,53 @@ export const LinkItem = React.forwardRef<
           </Typography>
         </ItemTitle>
       </ItemContent>
-      <ItemActions
-        className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100 transition-opacity duration-200"
-        onMouseEnter={() => {
-          hoveringActionsRef.current = true;
-          clearOpenTimer();
-          clearCloseTimer();
-        }}
-        onMouseLeave={() => {
-          hoveringActionsRef.current = false;
-          scheduleOpen();
-        }}
-      >
-        <LinkMenu
-          link={link}
-          onDeleteStart={() => {
-            setDeletePhase("animating");
+      {interactive && (
+        <ItemActions
+          className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-focus-within/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100 transition-opacity duration-200"
+          onMouseEnter={() => {
+            hoveringActionsRef.current = true;
+            clearOpenTimer();
+            clearCloseTimer();
           }}
-          onDeleteSuccess={() => {
-            setDeletePhase("exiting");
+          onMouseLeave={() => {
+            hoveringActionsRef.current = false;
+            scheduleOpen();
           }}
-          onDeleteError={() => {
-            setDeletePhase("idle");
-          }}
-        />
-      </ItemActions>
+        >
+          <LinkMenu
+            link={link}
+            onDeleteStart={() => {
+              const rows = Array.from(
+                document.querySelectorAll<HTMLElement>(
+                  '[data-cy="link-item"] > a[href]',
+                ),
+              );
+              const index = rows.indexOf(anchorRef.current as HTMLElement);
+              focusAfterDeleteRef.current =
+                index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
+              setDeletePhase("animating");
+            }}
+            onDeleteSuccess={() => {
+              setDeletePhase("exiting");
+              // The menu trigger unmounts with the row; move focus to the
+              // neighboring row only if focus was left on the page body.
+              const target = focusAfterDeleteRef.current;
+              requestAnimationFrame(() => {
+                const active = document.activeElement;
+                if (
+                  target?.isConnected &&
+                  (!active || active === document.body)
+                ) {
+                  target.focus();
+                }
+              });
+            }}
+            onDeleteError={() => {
+              setDeletePhase("idle");
+            }}
+          />
+        </ItemActions>
+      )}
     </Item>
   );
 
