@@ -15,8 +15,18 @@ export const AUTH_LOGIN_PAGE = "/";
 /**
  * Account linking: a user who originally signed up with email/password (now
  * removed) or a different OAuth provider can link Google/GitHub/Apple to the
- * same account without re-verifying, and even if the provider reports a
- * different email address than the one already on file.
+ * same account, even if their local email was never verified
+ * (`requireLocalEmailVerified: false`) and, for an explicit Connect from
+ * Settings, even if the provider reports a different email address than the
+ * one already on file (`allowDifferentEmails: true`).
+ *
+ * `trustedProviders` is intentionally absent. Listing a provider as trusted
+ * makes Better Auth skip the provider's own `emailVerified` check, so any
+ * Google/GitHub/Apple identity merely *claiming* a legacy user's email (even
+ * unverified) would be implicitly linked and signed in as that user. Without
+ * it, implicit linking on sign-in only happens when the provider vouches that
+ * the email is verified, and an explicit Connect with an unverified provider
+ * email fails with `unable_to_link_account`.
  *
  * `updateUserInfoOnLink: true` copies the linking provider's name and image
  * onto the user (never the email) — this is how avatars get updated for
@@ -27,7 +37,6 @@ export const AUTH_LOGIN_PAGE = "/";
  */
 export const ACCOUNT_LINKING = {
   enabled: true,
-  trustedProviders: ["google", "github", "apple"] as ProviderId[],
   requireLocalEmailVerified: false,
   allowDifferentEmails: true,
   updateUserInfoOnLink: true,

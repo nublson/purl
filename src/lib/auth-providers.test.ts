@@ -95,9 +95,12 @@ describe("constants", () => {
       enabled: true,
       requireLocalEmailVerified: false,
       allowDifferentEmails: true,
-      trustedProviders: ["google", "github", "apple"],
       updateUserInfoOnLink: true,
     });
+  });
+
+  it("does not trust providers blindly (keeps the provider emailVerified check)", () => {
+    expect("trustedProviders" in ACCOUNT_LINKING).toBe(false);
   });
 
   it("sends MCP sign-in to the landing page", () => {
