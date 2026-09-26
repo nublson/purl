@@ -8,7 +8,9 @@ import { HOME_LINKS_PAGE_SIZE, MAX_SAVED_LINKS } from "@/lib/limits";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { LINKS_ORIGIN_HEADER, parseLinksOrigin } from "@/lib/realtime-constants";
 import { serializeLink } from "@/lib/serialize-link";
+import { resolveRequestTimeZone } from "@/lib/time-zone";
 import { groupLinksByDate } from "@/utils/links";
+import { TIME_ZONE_COOKIE } from "@/utils/time-zone";
 import { isValidUrl } from "@/utils/url";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -47,12 +49,18 @@ export async function GET(request: NextRequest) {
     : HOME_LINKS_PAGE_SIZE;
   const cursor = params.get("cursor");
 
+  const timeZone = resolveRequestTimeZone({
+    cookie: request.cookies.get(TIME_ZONE_COOKIE)?.value,
+    header: request.headers.get("x-vercel-ip-timezone"),
+  });
+
   try {
     const page = await getLinksPageForCurrentUser(limit, cursor, true);
     return NextResponse.json({
-      groups: groupLinksByDate(page.links, { timeZone: "UTC" }),
+      groups: groupLinksByDate(page.links, { timeZone }),
       nextCursor: page.nextCursor,
       total: page.total,
+      timeZone,
     });
   } catch (e) {
     if (e instanceof UnauthorizedError) {

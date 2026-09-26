@@ -14,6 +14,11 @@ import {
   parseJsonLinkGroups,
   type LinkGroup as LinkGroupType,
 } from "@/utils/links";
+import {
+  readTimeZoneCookie,
+  serializeTimeZoneCookie,
+  timeZoneToPersist,
+} from "@/utils/time-zone";
 import { BouncingDots } from "loading-dev";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -23,6 +28,7 @@ type LinksPageResponse = {
   groups: Parameters<typeof parseJsonLinkGroups>[0];
   nextCursor: string | null;
   total?: number;
+  timeZone?: string;
 };
 
 async function fetchLinksPage(params: URLSearchParams) {
@@ -36,10 +42,12 @@ export function HomeShell({
   userId,
   initialGroups,
   initialNextCursor,
+  timeZone,
 }: {
   userId: string | null;
   initialGroups: LinkGroupType[];
   initialNextCursor: string | null;
+  timeZone: string;
 }) {
   useRealtimeSync(userId);
   const { version } = useLinksSyncState();
@@ -82,6 +90,29 @@ export function HomeShell({
       // Keep the current list; the next change or reload will retry.
     }
   }, [setLinksTotal]);
+
+  // If the browser's time zone differs from the one the server resolved (and
+  // from what's already cookied), persist it and reload once so grouping
+  // matches the viewer instead of the server's guess. Runs once on mount:
+  // `reload` is stable and `timeZoneToPersist` only returns non-null the
+  // first time the cookie needs to change, so this can't loop.
+  useEffect(() => {
+    try {
+      const browser = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const zone = timeZoneToPersist({
+        browser,
+        server: timeZone,
+        cookie: readTimeZoneCookie(document.cookie),
+      });
+      if (zone) {
+        document.cookie = serializeTimeZoneCookie(zone);
+        void reload();
+      }
+    } catch {
+      // Leave the server-grouped list as-is.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
