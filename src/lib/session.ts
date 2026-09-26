@@ -10,6 +10,7 @@ export type SessionUser = {
   name: string;
   email: string;
   image: string | null;
+  username: string;
 };
 
 /**
@@ -25,5 +26,6 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
     name: user.name,
     email: user.email,
     image: user.image ?? null,
+    username: user.username,
   };
 });

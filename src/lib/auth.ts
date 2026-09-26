@@ -3,7 +3,14 @@ import { mcp } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { apiKey } from "@better-auth/api-key";
 import prisma from "@/lib/prisma";
-import { getResend } from "@/lib/resend";
+import {
+  ACCOUNT_LINKING,
+  APPLE_TRUSTED_ORIGIN,
+  AUTH_LOGIN_PAGE,
+  getEnabledProviders,
+  getSocialProviders,
+} from "@/lib/auth-providers";
+import { assignUsernameOnCreate } from "@/lib/auth-hooks";
 
 export const auth = betterAuth({
   plugins: [
@@ -34,12 +41,12 @@ export const auth = betterAuth({
       },
     }),
     mcp({
-      loginPage: "/login",
+      loginPage: AUTH_LOGIN_PAGE,
       oidcConfig: {
         // Required by OIDCOptions' type (not optional, unlike consentPage) even
         // though the mcp plugin already forwards the top-level loginPage above --
         // duplicated here only to satisfy the installed Better Auth version's types.
-        loginPage: "/login",
+        loginPage: AUTH_LOGIN_PAGE,
         consentPage: "/oauth/consent",
       },
     }),
@@ -47,9 +54,23 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
+  trustedOrigins: getEnabledProviders(process.env).includes("apple")
+    ? [APPLE_TRUSTED_ORIGIN]
+    : undefined,
+  socialProviders: getSocialProviders(process.env),
+  account: {
+    accountLinking: ACCOUNT_LINKING,
+  },
   user: {
     deleteUser: {
       enabled: true,
+    },
+    additionalFields: {
+      username: {
+        type: "string",
+        required: true,
+        input: false,
+      },
     },
   },
   session: {
@@ -58,32 +79,11 @@ export const auth = betterAuth({
       maxAge: 5 * 60,
     },
   },
-  emailAndPassword: {
-    enabled: true,
-  },
-  emailVerification: {
-    sendOnSignUp: true,
-    autoSignInAfterVerification: true,
-    sendVerificationEmail: async ({ user, url }) => {
-      const resend = getResend();
-      if (!resend) {
-        console.error(
-          "RESEND_API_KEY is not set; skipping verification email.",
-        );
-        return;
-      }
-      const { error } = await resend.emails.send(
-        {
-          from: process.env.RESEND_FROM ?? "Purl <onboarding@resend.dev>",
-          to: user.email,
-          subject: "Verify your email address",
-          html: `<p>Click the link to verify your email: <a href="${url}">${url}</a></p>`,
-        },
-        { idempotencyKey: `verification-email/${user.id}/${Date.now()}` },
-      );
-      if (error) {
-        console.error("Failed to send verification email:", error.message);
-      }
+  databaseHooks: {
+    user: {
+      create: {
+        before: assignUsernameOnCreate,
+      },
     },
   },
 });

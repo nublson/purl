@@ -34,7 +34,7 @@ describe("auth config", () => {
 
     const mcpPlugin = plugins.find((p) => (p.id ?? p.name) === "mcp");
     expect(mcpPlugin?.options?.oidcConfig?.consentPage).toBe("/oauth/consent");
-    expect(mcpPlugin?.options?.oidcConfig?.loginPage).toBe("/login");
+    expect(mcpPlugin?.options?.oidcConfig?.loginPage).toBe("/");
   });
 
 });

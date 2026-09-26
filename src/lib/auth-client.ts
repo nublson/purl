@@ -5,12 +5,14 @@ import type { auth } from "./auth";
 
 export const {
   signIn,
-  signUp,
   signOut,
   useSession,
-  sendVerificationEmail,
+  getSession,
   deleteUser,
   updateUser,
+  linkSocial,
+  unlinkAccount,
+  listAccounts,
 } = createAuthClient({
   plugins: [inferAdditionalFields<typeof auth>(), apiKeyClient()],
 });
