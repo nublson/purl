@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   try {
     const page = await getLinksPageForCurrentUser(limit, cursor, true);
     return NextResponse.json({
-      groups: groupLinksByDate(page.links),
+      groups: groupLinksByDate(page.links, { timeZone: "UTC" }),
       nextCursor: page.nextCursor,
       total: page.total,
     });

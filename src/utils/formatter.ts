@@ -49,29 +49,6 @@ export function getUrlDomain(url: string): string {
   }
 }
 
-/** Returns a relative date label for grouping (Today, This Week, Last Week, etc.). */
-export function getRelativeDateLabel(date: Date): string {
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const then = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const diffMs = today.getTime() - then.getTime();
-  const daysAgo = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-
-  if (daysAgo === 0) return "Today";
-  if (daysAgo >= 1 && daysAgo <= 7) return "This week";
-  if (daysAgo >= 8 && daysAgo <= 14) return "Last week";
-  if (daysAgo >= 15 && daysAgo <= 31) return "This month";
-
-  const sameYear = then.getFullYear() === now.getFullYear();
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-
-  if (then >= lastMonthStart && then <= lastMonthEnd) return "Last month";
-  if (sameYear) return "This year";
-  if (then.getFullYear() === now.getFullYear() - 1) return "Last year";
-  return "Older";
-}
-
 const MS_PER_DAY = 86_400_000;
 
 /** Returns the integer day index (UTC-based) of a date's calendar day in a given IANA time zone. */

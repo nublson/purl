@@ -12,7 +12,7 @@ export async function HomeShellLoader() {
   return (
     <HomeShell
       userId={user?.id ?? null}
-      initialGroups={groupLinksByDate(links)}
+      initialGroups={groupLinksByDate(links, { timeZone: "UTC" })}
       initialNextCursor={nextCursor}
     />
   );
