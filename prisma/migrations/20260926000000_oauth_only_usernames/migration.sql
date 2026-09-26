@@ -55,19 +55,46 @@ WHERE u.id = n.id;
 
 -- 3. Different base groups can still land on the same computed username
 --    (e.g. "nubelson2" derived independently and "nubelson" + numbering).
---    Disambiguate any leftover duplicates with a suffix from the user id.
---    Truncated to 25 chars so the result stays within the 30-char limit.
-WITH dupes AS (
-  SELECT
-    id,
-    username,
-    row_number() OVER (PARTITION BY username ORDER BY "createdAt", id) AS rn
-  FROM "users"
-)
-UPDATE "users" u
-SET username = left(d.username, 25) || '-' || lower(left(u.id, 4))
-FROM dupes d
-WHERE u.id = d.id AND d.rn > 1;
+--    For every row whose username is still shared, keep the earliest
+--    ("createdAt", id) and give each later one the first free
+--    "<base>-<n>" (n = 2, 3, ...), checked against every row, so a rename
+--    can never collide with another existing or already-renamed username.
+--    The base is truncated so the result stays within 30 chars; candidates
+--    always contain a dash, so none can be a reserved name. A temporary
+--    plain index keeps each existence check cheap.
+CREATE INDEX "users_username_backfill_idx" ON "users"("username");
+
+DO $$
+DECLARE
+  dup RECORD;
+  n INTEGER;
+  candidate TEXT;
+BEGIN
+  FOR dup IN
+    SELECT id, username
+    FROM (
+      SELECT
+        id,
+        username,
+        "createdAt",
+        row_number() OVER (PARTITION BY username ORDER BY "createdAt", id) AS rn
+      FROM "users"
+    ) ranked
+    WHERE rn > 1
+    ORDER BY username, "createdAt", id
+  LOOP
+    n := 2;
+    LOOP
+      candidate := left(dup.username, 29 - length(n::text)) || '-' || n;
+      EXIT WHEN NOT EXISTS (SELECT 1 FROM "users" WHERE "username" = candidate);
+      n := n + 1;
+    END LOOP;
+    UPDATE "users" SET "username" = candidate WHERE id = dup.id;
+  END LOOP;
+END
+$$;
+
+DROP INDEX "users_username_backfill_idx";
 
 -- 4. Enforce the constraint going forward.
 ALTER TABLE "users" ALTER COLUMN "username" SET NOT NULL;
