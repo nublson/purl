@@ -61,6 +61,16 @@ describe("groupLinksByDate", () => {
   it("returns [] for no links", () => {
     expect(groupLinksByDate([], opts)).toEqual([]);
   });
+
+  it("falls back to UTC and does not throw for an invalid time zone", () => {
+    const today = new Date("2026-09-26T09:00:00Z");
+    const links: Link[] = [link(today, "today")];
+    const groups = groupLinksByDate(links, {
+      now: opts.now,
+      timeZone: "Mars/Base",
+    });
+    expect(groups.map((g) => g.label)).toEqual(["Today"]);
+  });
 });
 
 describe("mergeLinkGroups", () => {

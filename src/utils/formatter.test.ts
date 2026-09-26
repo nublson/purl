@@ -77,6 +77,12 @@ describe("getDateGroupLabel", () => {
     expect(label("2026-09-13T23:59:59Z")).toBe("September");
   });
 
+  it("now on Sunday: This week vs Last week boundary", () => {
+    const sun = new Date("2026-09-27T12:00:00Z");
+    expect(label("2026-09-21T00:00:00Z", "UTC", sun)).toBe("This week"); // Monday
+    expect(label("2026-09-20T23:59:59Z", "UTC", sun)).toBe("Last week"); // Sunday before
+  });
+
   it("no This week on Monday or Tuesday", () => {
     const tue = new Date("2026-09-22T12:00:00Z");
     expect(label("2026-09-21T09:00:00Z", "UTC", tue)).toBe("Yesterday");

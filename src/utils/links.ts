@@ -1,5 +1,6 @@
 import type { ContentType } from "@/generated/prisma/enums";
-import { getDateGroupLabel } from "./formatter";
+import { createDateGroupLabeler } from "./formatter";
+import { isValidTimeZone } from "./time-zone";
 
 export type Link = {
   id: string;
@@ -23,12 +24,15 @@ export function groupLinksByDate(
   options: { now?: Date; timeZone: string },
 ): LinkGroup[] {
   const now = options.now ?? new Date();
+  // Grouping must never throw on a bad zone (e.g. a stale/tampered cookie).
+  const timeZone = isValidTimeZone(options.timeZone) ? options.timeZone : "UTC";
+  const getLabel = createDateGroupLabeler(now, timeZone);
   const sorted = [...links].sort(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
   );
   const byLabel = new Map<string, Link[]>();
   for (const link of sorted) {
-    const label = getDateGroupLabel(link.createdAt, now, options.timeZone);
+    const label = getLabel(link.createdAt);
     const bucket = byLabel.get(label) ?? [];
     bucket.push(link);
     byLabel.set(label, bucket);
