@@ -10,11 +10,19 @@ export function useAuth() {
   const router = useRouter();
 
   async function signInWithProvider(provider: ProviderId) {
-    const res = await signIn.social({
-      provider,
-      callbackURL: "/home",
-      errorCallbackURL: "/",
-    });
+    let res: Awaited<ReturnType<typeof signIn.social>>;
+    try {
+      res = await signIn.social({
+        provider,
+        callbackURL: "/home",
+        errorCallbackURL: "/",
+      });
+    } catch {
+      // Network failure etc.: show the generic copy instead of an unhandled
+      // rejection. The caller's `finally` re-enables the buttons.
+      toast.error(signInErrorMessage("unknown"), { id: "sign-in-error" });
+      return;
+    }
     if (res.error) {
       const code = "code" in res.error ? (res.error.code as string | undefined) : undefined;
       toast.error(

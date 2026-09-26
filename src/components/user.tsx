@@ -2,8 +2,7 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { House, LogOut, MessageCircleHeart, SettingsIcon } from "lucide-react";
-import Link from "next/link";
+import { LogOut, MessageCircleHeart, SettingsIcon } from "lucide-react";
 import * as React from "react";
 import {
   SettingsDeepLink,
@@ -105,13 +104,6 @@ export function User() {
             </DropdownMenuItem>
           </SettingsDialog>
         </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem data-cy="sign-out-menu-item" asChild>
-          <Link href="/">
-            <House />
-            Home page
-          </Link>
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           data-cy="sign-out-menu-item"

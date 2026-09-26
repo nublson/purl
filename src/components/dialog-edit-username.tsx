@@ -177,21 +177,22 @@ function EditUsernameForm({ onSuccess }: { onSuccess: () => void }) {
             }
             aria-describedby={message ? "username-message" : undefined}
           />
-          {message && (
-            <p
-              id="username-message"
-              className={cn(
-                "text-sm",
-                status.kind === "available"
-                  ? "text-muted-foreground"
-                  : status.kind === "checking"
-                    ? "text-muted-foreground"
-                    : "text-destructive",
-              )}
-            >
-              {message}
-            </p>
-          )}
+          {/* Always mounted (visually hidden while empty) so screen readers
+              reliably announce status changes through the live region. */}
+          <p
+            id="username-message"
+            role="status"
+            aria-live="polite"
+            className={cn(
+              "text-sm",
+              !message && "sr-only",
+              status.kind === "available" || status.kind === "checking"
+                ? "text-muted-foreground"
+                : "text-destructive",
+            )}
+          >
+            {message}
+          </p>
         </Field>
       </FieldGroup>
       <DialogFooter>
