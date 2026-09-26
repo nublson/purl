@@ -14,6 +14,7 @@ import {
   type LinkGroup as LinkGroupType,
 } from "@/utils/links";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { LinkGroupEmpty } from "./link-group-empty";
 
 type LinksPageResponse = {
@@ -132,6 +133,8 @@ export function HomeShell({
   const onSaveSuccess = useCallback(async () => {
     await reload();
     setPendingUrl(null);
+    // The new row is only visual; announce the save for screen readers too.
+    toast.success("Link saved");
   }, [reload]);
 
   const onSaveError = useCallback(() => {

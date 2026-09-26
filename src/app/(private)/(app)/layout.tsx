@@ -1,4 +1,5 @@
 import Header from "@/components/header";
+import { HeaderSaveLink } from "@/components/header-save-link";
 import { HeaderSearchLinks } from "@/components/header-search-links";
 import { HeaderActionsFallback } from "@/components/skeletons";
 import { User } from "@/components/user";
@@ -17,6 +18,7 @@ async function HeaderActions() {
     <CurrentUserProvider user={user}>
       <UsageProvider usageSummary={usageSummary}>
         <div className="flex items-center justify-end gap-2">
+          <HeaderSaveLink />
           <HeaderSearchLinks />
           <User />
         </div>
