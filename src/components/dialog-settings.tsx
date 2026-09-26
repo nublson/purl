@@ -27,18 +27,18 @@ function isSettingsTabValue(value: string | null): value is SettingsTabValue {
 }
 
 interface SettingsDialogProps {
-  children: React.ReactNode;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultTab?: SettingsTabValue;
 }
 
 /**
- * The dialog itself. `open`/`onOpenChange`/`defaultTab` are owned by the
- * caller (see `SettingsDeepLink` below for why) rather than local state here.
+ * The dialog itself, fully controlled and without a trigger of its own:
+ * `open`/`onOpenChange`/`defaultTab` are owned by the caller (see
+ * `SettingsDeepLink` below for why), which must also render this outside any
+ * dropdown menu content so it's mounted even while the menu is closed.
  */
 export function SettingsDialog({
-  children,
   open,
   onOpenChange,
   defaultTab,
@@ -56,9 +56,7 @@ export function SettingsDialog({
           defaultTab={defaultTab}
         />
       }
-    >
-      {children}
-    </DialogWrapper>
+    />
   );
 }
 

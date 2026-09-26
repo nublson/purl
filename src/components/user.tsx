@@ -32,6 +32,12 @@ export function User() {
   const [settingsDefaultTab, setSettingsDefaultTab] = React.useState<
     SettingsTabValue | undefined
   >(undefined);
+  // Set when the "Settings" menu item is chosen; the dialog is opened from
+  // the menu's onCloseAutoFocus, i.e. after the menu has unmounted and
+  // returned focus to the avatar trigger. That way the dialog captures the
+  // trigger (not a menu item that's about to disappear) as the element to
+  // restore focus to when it closes.
+  const openSettingsAfterMenuClose = React.useRef(false);
 
   return (
     <>
@@ -43,9 +49,29 @@ export function User() {
           }}
         />
       </React.Suspense>
+      {/*
+        Rendered outside the dropdown: Radix only mounts menu content while
+        the menu is open, so a dialog living in there couldn't be opened by
+        the deep link above.
+      */}
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={(open) => {
+          setSettingsOpen(open);
+          // Reset so a later manual open lands on the first tab instead
+          // of whatever a past deep link set.
+          if (!open) setSettingsDefaultTab(undefined);
+        }}
+        defaultTab={settingsDefaultTab}
+      />
       <DropdownWrapper
         className="w-52"
         align="end"
+        onCloseAutoFocus={() => {
+          if (!openSettingsAfterMenuClose.current) return;
+          openSettingsAfterMenuClose.current = false;
+          setSettingsOpen(true);
+        }}
         trigger={
           <Button
             data-cy="user-menu-button"
@@ -84,25 +110,16 @@ export function User() {
               Share feedback
             </DropdownMenuItem>
           </FeedbackDialog>
-          <SettingsDialog
-            open={settingsOpen}
-            onOpenChange={(open) => {
-              setSettingsOpen(open);
-              // Reset so a later manual open lands on the first tab instead
-              // of whatever a past deep link set.
-              if (!open) setSettingsDefaultTab(undefined);
+          <DropdownMenuItem
+            onSelect={() => {
+              // Let the menu close normally; onCloseAutoFocus above opens
+              // the dialog once it has.
+              openSettingsAfterMenuClose.current = true;
             }}
-            defaultTab={settingsDefaultTab}
           >
-            <DropdownMenuItem
-              onSelect={(event) => {
-                event.preventDefault();
-              }}
-            >
-              <SettingsIcon />
-              Settings
-            </DropdownMenuItem>
-          </SettingsDialog>
+            <SettingsIcon />
+            Settings
+          </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem
