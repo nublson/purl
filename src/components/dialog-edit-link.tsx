@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { Link as LinkType } from "@/utils/links";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
+import { focusFirstInvalid } from "@/lib/focus-first-invalid";
 import { linksOriginHeaders } from "@/lib/links-origin";
 import { useForm } from "@tanstack/react-form";
 import * as React from "react";
@@ -79,7 +80,9 @@ const EditLinkForm = ({ link, onSuccess }: EditLinkFormProps) => {
       onSubmit={async (e) => {
         e.preventDefault();
         e.stopPropagation();
+        const formElement = e.currentTarget;
         await form.handleSubmit();
+        focusFirstInvalid(formElement);
       }}
     >
       <FieldGroup>
@@ -102,13 +105,15 @@ const EditLinkForm = ({ link, onSuccess }: EditLinkFormProps) => {
                 onChange={(e) => field.handleChange(e.target.value)}
                 autoComplete="off"
                 disabled={form.state.isSubmitting}
+                aria-invalid={field.state.meta.errors?.length ? true : undefined}
+                aria-describedby={
+                  field.state.meta.errors?.length
+                    ? `${field.name}-error`
+                    : undefined
+                }
               />
               {field.state.meta.errors?.length ? (
-                <p
-                  className="text-sm text-destructive"
-                  role="alert"
-                  aria-live="polite"
-                >
+                <p id={`${field.name}-error`} className="text-sm text-destructive">
                   {field.state.meta.errors.join(", ")}
                 </p>
               ) : null}

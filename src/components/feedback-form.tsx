@@ -1,10 +1,12 @@
 "use client";
 
 import { useForm } from "@tanstack/react-form";
+import { focusFirstInvalid } from "@/lib/focus-first-invalid";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { DialogClose, DialogFooter } from "./ui/dialog";
 import { Field, FieldGroup } from "./ui/field";
+import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 
 interface FeedbackFormProps {
@@ -61,7 +63,9 @@ export default function FeedbackForm({ onSuccess }: FeedbackFormProps) {
       onSubmit={async (e) => {
         e.preventDefault();
         e.stopPropagation();
+        const formElement = e.currentTarget;
         await form.handleSubmit();
+        focusFirstInvalid(formElement);
       }}
     >
       <FieldGroup>
@@ -74,6 +78,9 @@ export default function FeedbackForm({ onSuccess }: FeedbackFormProps) {
         >
           {(field) => (
             <Field>
+              <Label htmlFor={field.name} className="sr-only">
+                Feedback
+              </Label>
               <Textarea
                 id={field.name}
                 name={field.name}
@@ -82,15 +89,18 @@ export default function FeedbackForm({ onSuccess }: FeedbackFormProps) {
                 onBlur={field.handleBlur}
                 onChange={(e) => field.handleChange(e.target.value)}
                 autoComplete="off"
+                autoFocus
                 disabled={form.state.isSubmitting}
                 className="max-h-36"
+                aria-invalid={field.state.meta.errors?.length ? true : undefined}
+                aria-describedby={
+                  field.state.meta.errors?.length
+                    ? `${field.name}-error`
+                    : undefined
+                }
               />
               {field.state.meta.errors?.length ? (
-                <p
-                  className="text-sm text-destructive"
-                  role="alert"
-                  aria-live="polite"
-                >
+                <p id={`${field.name}-error`} className="text-sm text-destructive">
                   {field.state.meta.errors.join(", ")}
                 </p>
               ) : null}

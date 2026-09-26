@@ -36,19 +36,26 @@ function DeleteAccountButton({ closeDialog }: { closeDialog: () => void }) {
   const [alertOpen, setAlertOpen] = React.useState(false);
   const [password, setPassword] = React.useState("");
   const [isDeleting, setIsDeleting] = React.useState(false);
+  const [passwordError, setPasswordError] = React.useState<string | null>(null);
+  const passwordRef = React.useRef<HTMLInputElement>(null);
 
   const handleAlertOpenChange = (next: boolean) => {
     if (isDeleting) return;
     setAlertOpen(next);
-    if (!next) setPassword("");
+    if (!next) {
+      setPassword("");
+      setPasswordError(null);
+    }
   };
 
   const handleDelete = async () => {
     const trimmed = password.trim();
     if (!trimmed) {
-      toast.error("Enter your password to confirm.");
+      setPasswordError("Enter your password to confirm.");
+      passwordRef.current?.focus();
       return;
     }
+    setPasswordError(null);
 
     setIsDeleting(true);
     try {
@@ -96,13 +103,26 @@ function DeleteAccountButton({ closeDialog }: { closeDialog: () => void }) {
               Confirm with your password
             </FieldLabel>
             <Input
+              ref={passwordRef}
               id="delete-account-password"
               type="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isDeleting}
+              aria-invalid={passwordError ? true : undefined}
+              aria-describedby={
+                passwordError ? "delete-account-password-error" : undefined
+              }
             />
+            {passwordError ? (
+              <p
+                id="delete-account-password-error"
+                className="text-sm text-destructive"
+              >
+                {passwordError}
+              </p>
+            ) : null}
           </Field>
         </FieldGroup>
         <AlertDialogFooter>
