@@ -63,6 +63,9 @@ importers:
       dotenv:
         specifier: ^17.3.1
         version: 17.3.1
+      loading-dev:
+        specifier: ^0.3.4
+        version: 0.3.4(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       lucide-react:
         specifier: ^0.577.0
         version: 0.577.0(react@19.2.3)
@@ -4622,6 +4625,12 @@ packages:
   loader-runner@4.3.2:
     resolution: {integrity: sha512-DFEqQ3ihfS9blba08cLfYf1NRAIEm+dDjic073DRDc3/JspI/8wYmtDsHwd3+4hwvdxSK7PGaElfTmm0awWJ4w==}
     engines: {node: '>=6.11.5'}
+
+  loading-dev@0.3.4:
+    resolution: {integrity: sha512-vFwHrUk4QFVya4FKvGWP0q1eSJUlFQAQIPI1KScxiLExxCEhlsRAumjtD72m45yKMYX8fGK7i+yxAj+wdYLSkQ==}
+    peerDependencies:
+      react: '>=19.0.0'
+      react-dom: '>=19.0.0'
 
   locate-path@6.0.0:
     resolution: {integrity: sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==}
@@ -10992,6 +11001,11 @@ snapshots:
 
   loader-runner@4.3.2:
     optional: true
+
+  loading-dev@0.3.4(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
+    dependencies:
+      react: 19.2.3
+      react-dom: 19.2.3(react@19.2.3)
 
   locate-path@6.0.0:
     dependencies:

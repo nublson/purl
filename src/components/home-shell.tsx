@@ -13,6 +13,7 @@ import {
   parseJsonLinkGroups,
   type LinkGroup as LinkGroupType,
 } from "@/utils/links";
+import { BouncingDots } from "loading-dev";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { LinkGroupEmpty } from "./link-group-empty";
@@ -189,7 +190,23 @@ export function HomeShell({
             />
           ))}
           {nextCursor && (
-            <div ref={sentinelRef} aria-hidden className="h-px w-full" />
+            <>
+              <div ref={sentinelRef} aria-hidden className="h-px w-full" />
+              {/* Rendered whenever more pages exist, so the status region is
+                  in place before "Loading more links" is announced. Height is
+                  reserved to keep the list from jumping. */}
+              <div
+                role="status"
+                className="flex h-10 w-full items-center justify-center text-muted-foreground"
+              >
+                {loadingMore ? (
+                  <>
+                    <BouncingDots size={20} />
+                    <span className="sr-only">Loading more links</span>
+                  </>
+                ) : null}
+              </div>
+            </>
           )}
         </>
       )}
