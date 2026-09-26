@@ -4,6 +4,10 @@
 -- promoting the OAuth-only deployment (see docs/superpowers/specs/
 -- 2026-09-26-usernames-oauth-signin-design.md, section 9 "Rollout"). Take a
 -- database backup first and rehearse against a branch/copy of the database.
+-- Wrapped in a single transaction so a residual collision on the unique index
+-- (or any other failure) rolls every step back.
+
+BEGIN;
 
 -- 1. Add the column as nullable so existing rows can be backfilled below.
 ALTER TABLE "users" ADD COLUMN "username" TEXT;
@@ -78,3 +82,5 @@ DELETE FROM "accounts" WHERE "providerId" = 'credential';
 --    no OAuth provider linked yet; drop their sessions so they must sign in
 --    again (and get linked) via Google/GitHub.
 DELETE FROM "sessions" WHERE "userId" IN (SELECT id FROM "users" WHERE "emailVerified" = false);
+
+COMMIT;
