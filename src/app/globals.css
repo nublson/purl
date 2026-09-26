@@ -73,7 +73,8 @@ body {
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* Solid focus ring: >=3:1 against background, muted and primary fills. */
+  --ring: oklch(0.556 0 0);
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
@@ -126,7 +127,7 @@ body {
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;
@@ -137,6 +138,34 @@ body {
   a {
     text-underline-position: from-font;
     text-decoration-thickness: from-font;
+  }
+}
+
+/* Focus rings are box-shadows (`ring-*`) on `outline-none` controls, and
+   forced-colors mode strips box-shadows. Give every focused control a system
+   color outline there instead. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px;
+  }
+}
+
+/* Reduced motion: keep the tw-animate-css fades, drop the slides and zooms.
+   Animations still run (and fire `animationend`), so flows that wait on them
+   keep working. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+    --tw-enter-scale: 1 !important;
+    --tw-exit-scale: 1 !important;
+    --tw-enter-rotate: 0 !important;
+    --tw-exit-rotate: 0 !important;
   }
 }
 
