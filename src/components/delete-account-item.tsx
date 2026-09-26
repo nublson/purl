@@ -1,3 +1,5 @@
+import { useAuth } from "@/hooks/use-auth";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { deleteUser } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -33,47 +35,57 @@ export function DeleteAccountItem({
 
 function DeleteAccountButton({ closeDialog }: { closeDialog: () => void }) {
   const router = useRouter();
+  const { signOut } = useAuth();
+  const { user } = useCurrentUser();
+  const username = user?.username ?? "";
   const [alertOpen, setAlertOpen] = React.useState(false);
-  const [password, setPassword] = React.useState("");
+  const [confirmation, setConfirmation] = React.useState("");
   const [isDeleting, setIsDeleting] = React.useState(false);
-  const [passwordError, setPasswordError] = React.useState<string | null>(null);
-  const passwordRef = React.useRef<HTMLInputElement>(null);
+  const confirmationRef = React.useRef<HTMLInputElement>(null);
+
+  // Usernames are stored lowercase, so the comparison is case-sensitive
+  // against the stored (lowercase) username.
+  const normalizedConfirmation = confirmation.trim().replace(/^@/, "");
+  const isMatch =
+    normalizedConfirmation.length > 0 && normalizedConfirmation === username;
 
   const handleAlertOpenChange = (next: boolean) => {
     if (isDeleting) return;
     setAlertOpen(next);
     if (!next) {
-      setPassword("");
-      setPasswordError(null);
+      setConfirmation("");
     }
   };
 
   const handleDelete = async () => {
-    const trimmed = password.trim();
-    if (!trimmed) {
-      setPasswordError("Enter your password to confirm.");
-      passwordRef.current?.focus();
+    if (!isMatch) {
+      confirmationRef.current?.focus();
       return;
     }
-    setPasswordError(null);
 
     setIsDeleting(true);
     try {
-      const res = await deleteUser({
-        password: trimmed,
-        callbackURL: "/login",
-      });
+      const res = await deleteUser({ callbackURL: "/" });
 
       if (res.error) {
-        toast.error(res.error.message ?? "Unable to delete your account. Check your password and try again.");
+        if (res.error.code === "SESSION_EXPIRED") {
+          toast.error("For your security, sign in again to delete your account.");
+          setAlertOpen(false);
+          setConfirmation("");
+          closeDialog();
+          await signOut();
+          return;
+        }
+
+        toast.error(res.error.message ?? "Unable to delete your account. Try again.");
         return;
       }
 
       toast.success("Your account has been deleted.");
       setAlertOpen(false);
-      setPassword("");
+      setConfirmation("");
       closeDialog();
-      router.push("/login");
+      router.push("/");
       router.refresh();
     } catch {
       toast.error("Unable to delete your account. Check your connection and try again.");
@@ -99,30 +111,21 @@ function DeleteAccountButton({ closeDialog }: { closeDialog: () => void }) {
         </AlertDialogHeader>
         <FieldGroup className="gap-4">
           <Field>
-            <FieldLabel htmlFor="delete-account-password">
-              Confirm with your password
+            <FieldLabel htmlFor="delete-account-confirmation">
+              Type <strong>@{username}</strong> to confirm
             </FieldLabel>
             <Input
-              ref={passwordRef}
-              id="delete-account-password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              ref={confirmationRef}
+              id="delete-account-confirmation"
+              type="text"
+              autoComplete="off"
+              autoCapitalize="off"
+              autoCorrect="off"
+              spellCheck={false}
+              value={confirmation}
+              onChange={(e) => setConfirmation(e.target.value)}
               disabled={isDeleting}
-              aria-invalid={passwordError ? true : undefined}
-              aria-describedby={
-                passwordError ? "delete-account-password-error" : undefined
-              }
             />
-            {passwordError ? (
-              <p
-                id="delete-account-password-error"
-                className="text-sm text-destructive"
-              >
-                {passwordError}
-              </p>
-            ) : null}
           </Field>
         </FieldGroup>
         <AlertDialogFooter>
@@ -130,7 +133,7 @@ function DeleteAccountButton({ closeDialog }: { closeDialog: () => void }) {
           <Button
             type="button"
             variant="destructive"
-            disabled={isDeleting}
+            disabled={isDeleting || !isMatch}
             className="cursor-pointer"
             onClick={handleDelete}
           >
