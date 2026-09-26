@@ -14,7 +14,7 @@ export function SignInErrorToast() {
   useEffect(() => {
     if (!error) return;
     const message = signInErrorMessage(error);
-    if (message) toast.error(message);
+    if (message) toast.error(message, { id: "sign-in-error" });
     router.replace("/");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error]);
