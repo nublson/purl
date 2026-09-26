@@ -1,6 +1,7 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { DeleteAccountItem } from "./delete-account-item";
+import { ProfilePhotoItem } from "./profile-photo-item";
 import { SettingsItem } from "./settings-item";
 import { Button } from "./ui/button";
 
@@ -17,6 +18,7 @@ export function SettingsAccount({ closeDialog }: { closeDialog: () => void }) {
         fullDescription
         actions={null}
       />
+      <ProfilePhotoItem />
       <SettingsItem
         title="Log out"
         description="Log out of Purl on this device"

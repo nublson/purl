@@ -19,16 +19,24 @@ export const LinkGroup = ({
   eagerFirstLinkFavicon = false,
   mode = "default",
 }: LinkGroupProps) => {
+  const headingId = `link-group-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
   return (
-    <div className="w-full flex flex-col justify-start items-start gap-4">
-      <p className="text-xs text-muted-foreground font-medium ms-2">{label}</p>
-      <ItemGroup className="w-full gap-0">
+    <section
+      aria-labelledby={headingId}
+      className="w-full flex flex-col justify-start items-start gap-4"
+    >
+      <h2 id={headingId} className="text-xs text-muted-foreground font-medium ms-2">
+        {label}
+      </h2>
+      <ItemGroup aria-labelledby={headingId} className="w-full gap-0">
         {prependItems}
         {links.map((link, index) => (
           // content-visibility skips layout/paint for off-screen rows; the
           // intrinsic size (one row) keeps the scrollbar stable.
           <div
             key={link.id}
+            role="listitem"
             className="[content-visibility:auto] [contain-intrinsic-size:auto_50px]"
           >
             <LinkItem
@@ -39,6 +47,6 @@ export const LinkGroup = ({
           </div>
         ))}
       </ItemGroup>
-    </div>
+    </section>
   );
 };

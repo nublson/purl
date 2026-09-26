@@ -28,6 +28,12 @@ export default function SearchLinks() {
   const [links, setLinks] = React.useState<Link[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
+  const [selected, setSelected] = React.useState("");
+  // Query the visible results belong to. Until the debounced search for the
+  // current query returns, old results stay on screen but are disabled so
+  // Enter can't open a stale match.
+  const [resultsFor, setResultsFor] = React.useState<string | null>(null);
+  const stale = resultsFor !== query;
   // Re-run the current search when links change (e.g. deleted from results).
   const { version } = useLinksSyncState();
 
@@ -45,12 +51,18 @@ export default function SearchLinks() {
         const data = (await res.json()) as {
           links: Parameters<typeof parseJsonLinks>[0];
         };
-        setLinks(parseJsonLinks(data.links));
+        const nextLinks = parseJsonLinks(data.links);
+        setLinks(nextLinks);
+        // Results arrive async, so cmdk doesn't highlight one itself;
+        // start on the first so Enter opens it.
+        setSelected(nextLinks[0]?.id ?? "");
+        setResultsFor(query);
         setFailed(false);
       } catch {
         if (controller.signal.aborted) return;
         setLinks([]);
         setFailed(true);
+        setResultsFor(query);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -60,6 +72,32 @@ export default function SearchLinks() {
       controller.abort();
     };
   }, [open, query, version]);
+
+  // cmdk 1.1.1 never sets `aria-activedescendant` on its input, so screen
+  // readers don't hear which result is highlighted. Mirror the selected
+  // option onto the input whenever cmdk changes `aria-selected`.
+  const syncActiveDescendant = React.useCallback(
+    (input: HTMLInputElement | null) => {
+      const root = input?.closest("[cmdk-root]");
+      if (!input || !root) return;
+      const sync = () => {
+        const option = root.querySelector<HTMLElement>(
+          '[cmdk-item][aria-selected="true"]',
+        );
+        if (option?.id) input.setAttribute("aria-activedescendant", option.id);
+        else input.removeAttribute("aria-activedescendant");
+      };
+      sync();
+      const observer = new MutationObserver(sync);
+      observer.observe(root, {
+        subtree: true,
+        childList: true,
+        attributeFilter: ["aria-selected"],
+      });
+      return () => observer.disconnect();
+    },
+    [],
+  );
 
   return (
     <div className="flex items-center gap-2">
@@ -77,10 +115,16 @@ export default function SearchLinks() {
         onOpenChange={setOpen}
         className="dialog-top top-24! h-auto! w-[90vw]!"
         title="Search links"
-        description="Filter your saved links by title, URL, or domain"
+        description="Filter your saved links by title, URL, or domain. Press Enter to open the highlighted link in a new tab."
       >
-        <Command className="gap-0 p-0" shouldFilter={false}>
+        <Command
+          className="gap-0 p-0"
+          shouldFilter={false}
+          value={selected}
+          onValueChange={setSelected}
+        >
           <CommandInput
+            ref={syncActiveDescendant}
             value={query}
             onValueChange={setQuery}
             placeholder="Search links…"
@@ -103,7 +147,12 @@ export default function SearchLinks() {
                 <CommandItem
                   key={link.id}
                   value={link.id}
-                  className="mb-0.5 cursor-pointer p-0 [&>svg]:hidden"
+                  disabled={stale}
+                  onSelect={() => {
+                    window.open(link.url, "_blank", "noopener,noreferrer");
+                  }}
+                  // Keep stale results at full opacity so typing doesn't flicker.
+                  className="mb-0.5 cursor-pointer p-0 data-[disabled=true]:opacity-100 [&>svg]:hidden"
                 >
                   <LinkItem
                     link={link}

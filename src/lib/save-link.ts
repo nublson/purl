@@ -47,3 +47,19 @@ export async function saveLink(rawUrl: string): Promise<SaveLinkResult> {
     return { error: "Network error" };
   }
 }
+
+/** DOM event the header "Paste link" action uses to hand a URL to /home. */
+export const SAVE_URL_EVENT = "purl:save-url";
+
+/**
+ * Asks the mounted page to save `url` through its paste flow (optimistic row,
+ * list refresh). Returns false when no page handled it, so the caller can
+ * save directly instead.
+ */
+export function requestSaveUrl(url: string): boolean {
+  const event = new CustomEvent<string>(SAVE_URL_EVENT, {
+    detail: url,
+    cancelable: true,
+  });
+  return !window.dispatchEvent(event);
+}

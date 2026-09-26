@@ -27,7 +27,10 @@ export function UsageItem({ label, period, used, cap }: UsageItemProps) {
           {used.toLocaleString()} / {cap == null ? "∞" : cap.toLocaleString()}{period ? ` · ${period}` : ""}
         </Typography>
       </ItemActions>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+      <div
+        aria-hidden
+        className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+      >
         <div
           className="h-full rounded-full bg-primary transition-[width]"
           style={{ width: `${pct}%` }}

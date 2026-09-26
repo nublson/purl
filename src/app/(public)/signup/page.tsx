@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { focusFirstInvalid } from "@/lib/focus-first-invalid";
 import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
 
@@ -39,10 +40,12 @@ export default function Signup() {
   return (
     <form
       className="wrapper-center h-full"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        form.handleSubmit();
+        const formElement = e.currentTarget;
+        await form.handleSubmit();
+        focusFirstInvalid(formElement);
       }}
     >
       <div className="flex-1 flex flex-col w-full items-center justify-center gap-6 md:p-4">
@@ -103,9 +106,18 @@ export default function Signup() {
                     onChange={(e) => field.handleChange(e.target.value)}
                     autoComplete="email"
                     disabled={form.state.isSubmitting}
+                    aria-invalid={field.state.meta.errors?.length ? true : undefined}
+                    aria-describedby={
+                      field.state.meta.errors?.length
+                        ? `${field.name}-error`
+                        : undefined
+                    }
                   />
                   {field.state.meta.errors?.length ? (
-                    <p className="text-sm text-destructive" role="alert">
+                    <p
+                      id={`${field.name}-error`}
+                      className="text-sm text-destructive"
+                    >
                       {field.state.meta.errors.join(", ")}
                     </p>
                   ) : null}
@@ -136,9 +148,24 @@ export default function Signup() {
                     onChange={(e) => field.handleChange(e.target.value)}
                     autoComplete="new-password"
                     disabled={form.state.isSubmitting}
+                    aria-invalid={field.state.meta.errors?.length ? true : undefined}
+                    aria-describedby={
+                      field.state.meta.errors?.length
+                        ? `${field.name}-hint ${field.name}-error`
+                        : `${field.name}-hint`
+                    }
                   />
+                  <p
+                    id={`${field.name}-hint`}
+                    className="text-xs text-muted-foreground"
+                  >
+                    At least 8 characters.
+                  </p>
                   {field.state.meta.errors?.length ? (
-                    <p className="text-sm text-destructive" role="alert">
+                    <p
+                      id={`${field.name}-error`}
+                      className="text-sm text-destructive"
+                    >
                       {field.state.meta.errors.join(", ")}
                     </p>
                   ) : null}
@@ -170,9 +197,18 @@ export default function Signup() {
                     onChange={(e) => field.handleChange(e.target.value)}
                     autoComplete="new-password"
                     disabled={form.state.isSubmitting}
+                    aria-invalid={field.state.meta.errors?.length ? true : undefined}
+                    aria-describedby={
+                      field.state.meta.errors?.length
+                        ? `${field.name}-error`
+                        : undefined
+                    }
                   />
                   {field.state.meta.errors?.length ? (
-                    <p className="text-sm text-destructive" role="alert">
+                    <p
+                      id={`${field.name}-error`}
+                      className="text-sm text-destructive"
+                    >
                       {field.state.meta.errors.join(", ")}
                     </p>
                   ) : null}

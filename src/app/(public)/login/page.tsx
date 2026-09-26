@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { focusFirstInvalid } from "@/lib/focus-first-invalid";
 import { useForm } from "@tanstack/react-form";
 import Link from "next/link";
 
@@ -37,10 +38,12 @@ export default function Login() {
     <form
       className="wrapper-center h-full"
       aria-busy={form.state.isSubmitting}
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        form.handleSubmit();
+        const formElement = e.currentTarget;
+        await form.handleSubmit();
+        focusFirstInvalid(formElement);
       }}
     >
       <div className="flex-1 flex flex-col w-full items-center justify-center gap-6 md:p-4">
@@ -81,9 +84,18 @@ export default function Login() {
                     onChange={(e) => field.handleChange(e.target.value)}
                     autoComplete="email"
                     disabled={form.state.isSubmitting}
+                    aria-invalid={field.state.meta.errors?.length ? true : undefined}
+                    aria-describedby={
+                      field.state.meta.errors?.length
+                        ? `${field.name}-error`
+                        : undefined
+                    }
                   />
                   {field.state.meta.errors?.length ? (
-                    <p className="text-sm text-destructive" role="alert">
+                    <p
+                      id={`${field.name}-error`}
+                      className="text-sm text-destructive"
+                    >
                       {field.state.meta.errors.join(", ")}
                     </p>
                   ) : null}
@@ -110,9 +122,18 @@ export default function Login() {
                     onChange={(e) => field.handleChange(e.target.value)}
                     autoComplete="current-password"
                     disabled={form.state.isSubmitting}
+                    aria-invalid={field.state.meta.errors?.length ? true : undefined}
+                    aria-describedby={
+                      field.state.meta.errors?.length
+                        ? `${field.name}-error`
+                        : undefined
+                    }
                   />
                   {field.state.meta.errors?.length ? (
-                    <p className="text-sm text-destructive" role="alert">
+                    <p
+                      id={`${field.name}-error`}
+                      className="text-sm text-destructive"
+                    >
                       {field.state.meta.errors.join(", ")}
                     </p>
                   ) : null}

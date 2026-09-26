@@ -36,7 +36,7 @@ export function LinkPreviewThumbnail({
         // eslint-disable-next-line @next/next/no-img-element -- user-controlled OG URLs; avoid next/image optimizer SSRF
         <img
           src={thumbnailSrc}
-          alt={link.title}
+          alt=""
           width={200}
           height={200}
           sizes="256px"
