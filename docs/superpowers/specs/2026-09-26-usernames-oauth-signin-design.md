@@ -38,10 +38,7 @@ model User {
 }
 ```
 
-Migration is split across two releases (see Rollout):
-
-1. `add_username`: add `username TEXT NULL` + unique index; backfill every row.
-2. `username_not_null`: `ALTER COLUMN username SET NOT NULL`.
+One Prisma migration, `oauth_only_usernames`, applied by hand at deploy time (see §7 and Rollout). It adds the column, fills usernames in SQL, sets `NOT NULL` + unique, and removes password accounts and unverified sessions.
 
 `Account` and `Session` schemas are unchanged. `Account.password` stays in the schema (Better Auth's model) but no rows will use it.
 
@@ -53,7 +50,6 @@ Migration is split across two releases (see Rollout):
 - `validateUsername(input)`: returns `{ ok: true, username }` or `{ ok: false, reason: "format" | "reserved" }`.
 - `usernameBaseFrom(email, name)`: pure. Takes the email local part, drops a `+tag`, strips accents, lowercases, replaces invalid characters, collapses and trims `-`/`_`, and truncates to 26 characters (leaving room for a suffix). If the result is under 3 characters, it tries the same on `name`, then falls back to `user`. A reserved result gets `-1`.
 - `generateUsername(email, name, isTaken)`: base, then `base2`, `base3`, … until `isTaken` is false. For bases too short to hold a suffix, or after 50 tries, it uses `base-<4 random [a-z0-9]>`.
-- `planUsernames(users)`: pure. Assigns unique usernames to a batch, used by the backfill script, and handles collisions within the batch as well as against existing names.
 
 ## 3. Auth configuration — `src/lib/auth.ts`
 
@@ -106,20 +102,20 @@ Migration is split across two releases (see Rollout):
 ### Landing hero — `src/sections/hero.tsx`
 - Replace "Get started" / "Log in" with `ProviderButtons`: "Continue with Google" (primary) and "Continue with GitHub" (outline), plus "Continue with Apple" when enabled. Icons are inline SVGs in `src/components/provider-icons.tsx`.
 - Click calls `signIn.social({ provider, callbackURL, errorCallbackURL: "/" })`. The clicked button shows a spinner and all buttons are disabled until navigation.
-- `callbackURL = buildSignInCallbackURL(currentSearchParams)` in `src/lib/sign-in-callback.ts` (pure):
-  - Without MCP/OIDC authorize params, it returns `/home`.
-  - With them, it returns the URL that resumes the MCP authorization. **The exact resume URL must be confirmed against the installed `mcp` plugin during planning.**
+- `callbackURL` is always `/home`. MCP authorization resumes by itself: when the `mcp` plugin sends a signed-out user to `loginPage`, it sets a signed `oidc_login_prompt` cookie (10 min). Its after-hook runs on every auth endpoint that sets a session cookie, including `/api/auth/callback/{google,github}`, and redirects to consent.
 - `SignInErrorToast` (client): reads `?error=`, maps known codes (`account_not_linked`, `access_denied`, fallback) to a friendly toast, then removes the param with `router.replace`.
 
 ### Settings → Account — `src/components/settings-account.tsx`
 - **Username row:** shows `@username`, with an **Edit** button that opens `DialogEditUsername` (built on `DialogWrapper`).
   - The input shows client-side `validateUsername` feedback immediately, and a debounced (300 ms) availability check against `/available`.
   - Messages: "Use 3–30 lowercase letters, numbers, - or _", "That username is reserved", "That username is taken".
-  - Save sends the `PATCH`, then refreshes the session (`useSession().refetch()` or equivalent) and shows the toast "Username updated".
+  - Save sends the `PATCH`, patches `CurrentUserContext` with `setUser` (the same way avatar uploads do), calls `getSession({ query: { disableCookieCache: true } })` so Better Auth rewrites its 5-minute session cookie cache, and shows the toast "Username updated".
+- `SessionUser` (`src/lib/session.ts`) gains `username`.
+- **Delete account** (`delete-account-item.tsx`): the password field becomes "Type **@username** to confirm", and the delete button is enabled only on an exact match. It calls `deleteUser({ callbackURL: "/" })` without a password. Better Auth then requires a session younger than `session.freshAge` (default 1 day). On `SESSION_EXPIRED`, the toast says "For your security, sign in again to delete your account." and the user is signed out.
 - **Email row:** unchanged value; description "From your sign-in provider".
 - **Sign-in methods** (`SettingsSignInMethods`): one row per enabled provider.
   - Data comes from `listAccounts()`.
-  - **Connect:** `linkSocial({ provider, callbackURL })`, returning to the app with the Settings dialog on Account (use the existing way of opening Settings, or add a `?settings=account` param if none exists; confirm in planning).
+  - **Connect:** `linkSocial({ provider, callbackURL: "/home?settings=account" })`. The Settings dialog has no deep link today, so `SettingsDialog` gains one: on mount, `?settings=<tab>` opens it on that tab, then the param is removed.
   - **Disconnect:** `unlinkAccount({ providerId })`. It is disabled with a tooltip ("You need at least one way to sign in") when it's the only connected provider.
 - `src/lib/auth-client.ts`: export `linkSocial`, `unlinkAccount`, and `listAccounts`; remove `signUp` and `sendVerificationEmail`.
 - `src/hooks/use-auth.ts`: replace `signInWithEmail` / `signUpWithEmail` with `signInWithProvider(provider)`; keep `signOut`, which now pushes to `/`.
@@ -128,26 +124,25 @@ Migration is split across two releases (see Rollout):
 - `src/app/(public)/login/`, `signup/`, `verify-email/`, and any components used only by them.
 - Update the `(public)/layout.tsx` comment.
 
-## 7. One-off data migration — `scripts/migrate-oauth-only.ts`
+## 7. Data migration — `prisma/migrations/<ts>_oauth_only_usernames/migration.sql`
 
-Run with `pnpm tsx scripts/migrate-oauth-only.ts --step=<name> [--dry-run]`:
+One migration, in one transaction:
 
-- `--step=backfill-usernames` (release 1): loads users with `username IS NULL`, runs `planUsernames` against existing usernames, and updates in batches.
-- `--step=cleanup` (release 2, at deploy): in one transaction,
-  - `DELETE FROM accounts WHERE "providerId" = 'credential'`
-  - `DELETE FROM sessions WHERE "userId" IN (SELECT id FROM users WHERE "emailVerified" = false)`
-
-  It prints counts; `--dry-run` prints counts without writing.
+1. `ALTER TABLE users ADD COLUMN username TEXT;`
+2. Fill it in SQL. The base is the email local part without its `+tag`, lowercased, with characters outside `[a-z0-9_-]` removed and leading `-`/`_` trimmed, cut to 26 characters. Under 3 characters becomes `user`; a reserved word gets `-1`. Duplicates are numbered by `row_number()` over `createdAt` (first keeps `base`, then `base2`, …). Any value still duplicated after that gets `-<first 4 chars of id>`. (Accents are dropped rather than transliterated; users can rename.)
+3. `ALTER COLUMN username SET NOT NULL` and `CREATE UNIQUE INDEX users_username_key`.
+4. `DELETE FROM accounts WHERE "providerId" = 'credential';`
+5. `DELETE FROM sessions WHERE "userId" IN (SELECT id FROM users WHERE "emailVerified" = false);`
 
 Why delete credential rows: they are unusable without password sign-in, and Better Auth counts them as linked accounts. Left in place, they would let a user disconnect every social provider and be locked out.
 
 ## 8. Testing
 
 Unit tests (Vitest, node):
-- `src/lib/usernames.test.ts`: normalize, validate (length, charset, leading character, reserved), `usernameBaseFrom` (`Nubel.Son+news@x.com` → `nubelson`, accents, short prefix → name → `user`), `generateUsername` collisions, `planUsernames` in-batch collisions.
+- `src/lib/usernames.test.ts`: normalize, validate (length, charset, leading character, reserved), `usernameBaseFrom` (`Nubel.Son+news@x.com` → `nubelson`, accents, short prefix → name → `user`), `generateUsername` collisions.
 - `src/lib/auth-providers.test.ts`: Apple only when all four env vars are set; the production error when Google or GitHub are missing.
 - `assignUsernameOnCreate` test: sets `username`, respects collisions.
-- `src/lib/sign-in-callback.test.ts`: `/home` by default; the MCP resume URL when authorize params are present; ignores unrelated params.
+- The migration SQL is checked against a local database seeded with colliding, short, reserved, and `+tag` emails (see the plan).
 - `src/app/api/user/username/route.test.ts` and `available/route.test.ts`: 401 / 400 / 409 (including P2002) / 200 paths.
 - `src/proxy.test.ts`: signed-out private → `/`; signed-in `/` → `/home`; signed-out `/` → next; verification tests removed.
 
@@ -162,13 +157,17 @@ Manual checks (localhost, real OAuth apps):
 
 ## 9. Rollout
 
-1. **Release 1:** the `add_username` migration and `backfill-usernames`. This is additive and safe with the current auth code. Rehearse on a Supabase branch database first.
-2. **Setup (manual):** create Google and GitHub OAuth apps with callbacks `https://<domain>/api/auth/callback/google` and `/github`, plus localhost equivalents. Set the env vars in Vercel and `.env.example`.
-3. **Release 2:** the `username_not_null` migration plus the new auth code and UI. Run `--step=cleanup` as part of the deploy (dry-run first). Deleting credential rows is irreversible, so take a database backup before it.
+1. **Setup (manual):** create Google and GitHub OAuth apps with callbacks `https://<domain>/api/auth/callback/google` and `/github`, plus localhost equivalents. Set the env vars in Vercel and `.env.example`.
+2. **Rehearse:** apply the migration to a Supabase branch database (or a production copy) and check the resulting usernames and counts.
+3. **Deploy:** take a database backup, apply the migration (`pnpm prisma migrate deploy`), then promote the new deployment right away. In the gap between the two, password sign-in and email sign-up stop working; keep it to minutes.
 4. **Optional:** a one-time email to existing users: "Purl now uses Google/GitHub sign-in; use the same email you signed up with."
 
-## Open items to confirm during planning
+## 10. Cypress end-to-end tests
 
-- The exact MCP authorize resume URL for `callbackURL` with the installed `mcp` plugin (§6).
-- How the Settings dialog is opened today, to pick the `linkSocial` return URL (§6).
-- The session refresh method after a username change with `cookieCache` enabled (5 min): ensure the new username is not served stale.
+They are not run in CI. `cypress/e2e/auth.cy.ts` is deleted. `links.cy.ts` and `link-management.cy.ts` are skipped with `describe.skip` and a comment saying they need a test-only login after the switch to OAuth. `cy.loginByApi` is left in place until then.
+
+## Open items (resolved during planning)
+
+- MCP resume: handled by the `mcp` plugin's `oidc_login_prompt` cookie and after-hook; `callbackURL` is always `/home` (§6).
+- Settings deep link: added as `?settings=<tab>` (§6).
+- Session cache after a username change: `getSession({ query: { disableCookieCache: true } })` plus a `setUser` patch (§6).
