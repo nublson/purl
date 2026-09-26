@@ -71,3 +71,51 @@ export function getRelativeDateLabel(date: Date): string {
   if (then.getFullYear() === now.getFullYear() - 1) return "Last year";
   return "Older";
 }
+
+const MS_PER_DAY = 86_400_000;
+
+/** Returns the integer day index (UTC-based) of a date's calendar day in a given IANA time zone. */
+function toCalendarDay(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(date);
+  const year = Number(parts.find((p) => p.type === "year")?.value);
+  const month = Number(parts.find((p) => p.type === "month")?.value);
+  const day = Number(parts.find((p) => p.type === "day")?.value);
+  return Date.UTC(year, month - 1, day) / MS_PER_DAY;
+}
+
+/**
+ * Returns a time-zone-aware heading label for grouping links by date:
+ * "Today", "Yesterday", "This week", "Last week", "<Month>" (current year),
+ * or "<Month> <Year>" (earlier years). Weeks start Monday.
+ */
+export function getDateGroupLabel(
+  date: Date,
+  now: Date,
+  timeZone: string,
+): string {
+  const today = toCalendarDay(now, timeZone);
+  const day = toCalendarDay(date, timeZone);
+
+  if (day >= today) return "Today";
+  if (day === today - 1) return "Yesterday";
+
+  const todayDow = new Date(today * MS_PER_DAY).getUTCDay();
+  const mondayThisWeek = today - ((todayDow + 6) % 7);
+  if (day >= mondayThisWeek) return "This week";
+  if (day >= mondayThisWeek - 7) return "Last week";
+
+  const dayDate = new Date(day * MS_PER_DAY);
+  const month = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    timeZone: "UTC",
+  }).format(dayDate);
+  const year = dayDate.getUTCFullYear();
+  const todayYear = new Date(today * MS_PER_DAY).getUTCFullYear();
+
+  return year === todayYear ? month : `${month} ${year}`;
+}
