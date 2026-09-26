@@ -31,7 +31,7 @@ export function LinkPreviewThumbnail({
     !showThumb && Boolean(faviconSrc) && !faviconFailed;
 
   return (
-    <div className="relative w-full aspect-video overflow-hidden rounded-t-md bg-muted/30 flex items-center justify-center">
+    <div className="relative w-full aspect-video overflow-hidden rounded-t-lg bg-muted/30 flex items-center justify-center">
       {showThumb && thumbnailSrc ? (
         // eslint-disable-next-line @next/next/no-img-element -- user-controlled OG URLs; avoid next/image optimizer SSRF
         <img
@@ -43,7 +43,7 @@ export function LinkPreviewThumbnail({
           loading={eagerThumbnail ? "eager" : "lazy"}
           referrerPolicy="strict-origin-when-cross-origin"
           onError={() => setThumbFailed(true)}
-          className="absolute inset-0 h-full w-full object-cover"
+          className="absolute inset-0 h-full w-full object-cover outline outline-black/10 -outline-offset-1 dark:outline-white/10"
         />
       ) : showFavicon && faviconSrc ? (
         // eslint-disable-next-line @next/next/no-img-element

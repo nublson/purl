@@ -152,7 +152,7 @@ export default function SearchLinks() {
                     window.open(link.url, "_blank", "noopener,noreferrer");
                   }}
                   // Keep stale results at full opacity so typing doesn't flicker.
-                  className="mb-0.5 cursor-pointer p-0 data-[disabled=true]:opacity-100 [&>svg]:hidden"
+                  className="mb-0.5 cursor-pointer p-0 in-data-[slot=dialog-content]:rounded-md! data-[disabled=true]:opacity-100 [&>svg]:hidden"
                 >
                   <LinkItem
                     link={link}
