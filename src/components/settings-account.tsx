@@ -2,7 +2,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { DialogEditUsername } from "./dialog-edit-username";
 import { DeleteAccountItem } from "./delete-account-item";
-import { ProfilePhotoItem } from "./profile-photo-item";
 import { SettingsItem } from "./settings-item";
 import { SettingsSignInMethods } from "./settings-sign-in-methods";
 import { Button } from "./ui/button";
@@ -34,7 +33,6 @@ export function SettingsAccount({ closeDialog }: { closeDialog: () => void }) {
         actions={null}
       />
       <SettingsSignInMethods providers={enabledProviders} />
-      <ProfilePhotoItem />
       <SettingsItem
         title="Log out"
         description="Log out of Purl on this device"

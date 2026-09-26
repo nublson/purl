@@ -17,12 +17,20 @@ export const AUTH_LOGIN_PAGE = "/";
  * removed) or a different OAuth provider can link Google/GitHub/Apple to the
  * same account without re-verifying, and even if the provider reports a
  * different email address than the one already on file.
+ *
+ * `updateUserInfoOnLink: true` copies the linking provider's name and image
+ * onto the user (never the email) — this is how avatars get updated for
+ * legacy accounts on their first OAuth sign-in, now that avatar upload is
+ * gone and the app relies entirely on the OAuth provider's profile photo. Do
+ * not add `overrideUserInfoOnSignIn`: it also rewrites the email on every
+ * sign-in, which we don't want.
  */
 export const ACCOUNT_LINKING = {
   enabled: true,
   trustedProviders: ["google", "github", "apple"] as ProviderId[],
   requireLocalEmailVerified: false,
   allowDifferentEmails: true,
+  updateUserInfoOnLink: true,
 };
 
 function hasGoogleVars(env: Partial<NodeJS.ProcessEnv>): boolean {

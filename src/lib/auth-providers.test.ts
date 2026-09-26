@@ -96,6 +96,7 @@ describe("constants", () => {
       requireLocalEmailVerified: false,
       allowDifferentEmails: true,
       trustedProviders: ["google", "github", "apple"],
+      updateUserInfoOnLink: true,
     });
   });
 

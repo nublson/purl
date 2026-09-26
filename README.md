@@ -85,7 +85,7 @@ Purl is built around **untrusted input** (arbitrary URLs). A few layers matter i
 - **API authorization** — Sensitive routes (`/api/links`, `/api/v1/*`, MCP, etc.) resolve the session server-side and scope work to the signed-in user.
 - **Rate limiting** — When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set, the proxy applies per-IP limits to **`/api/auth/*`**, **`POST /api/links`**, and **`POST /api/feedback`** (see [`proxy-rate-limit.ts`](src/lib/proxy-rate-limit.ts)). Without Upstash, limits are disabled — fine locally, not ideal for production.
 - **Secrets & client exposure** — `SUPABASE_SERVICE_ROLE_KEY` and similar values are server-only. The browser uses the Supabase **anon** key for Realtime only; `.env` stays gitignored.
-- **Response bounds** — PDF proxy streaming is size-capped (see `safe-outbound-fetch`); avatar uploads are size-limited.
+- **Response bounds** — PDF proxy streaming is size-capped (see `safe-outbound-fetch`).
 
 **Reporting a vulnerability:** use [GitHub Security Advisories](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability) for this repository so details stay private until patched.
 

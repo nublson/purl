@@ -12,7 +12,7 @@ import {
 
 export type CurrentUserContextValue = {
   user: SessionUser | null;
-  /** Patch the user after a profile change (e.g. a new avatar). */
+  /** Patch the user after a profile change (e.g. a new username). */
   setUser: Dispatch<SetStateAction<SessionUser | null>>;
   /** Sign-in providers configured for this deployment (Settings → Account). */
   enabledProviders: ProviderId[];

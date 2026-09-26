@@ -1,7 +1,6 @@
 "use client";
 
 import { useAuth } from "@/hooks/use-auth";
-import { useAvatarUpload } from "@/hooks/use-avatar-upload";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { House, LogOut, MessageCircleHeart, SettingsIcon } from "lucide-react";
 import Link from "next/link";
@@ -25,7 +24,6 @@ import { UserItem } from "./user-item";
 export function User() {
   const { user } = useCurrentUser();
   const { signOut } = useAuth();
-  const { inputRef, isUploading, onFileChange, openPicker } = useAvatarUpload();
 
   // Owned here, not inside SettingsDialog/its dropdown trigger: Radix only
   // mounts the dropdown's menu content once it's been opened, so a
@@ -46,13 +44,6 @@ export function User() {
           }}
         />
       </React.Suspense>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="hidden"
-        onChange={onFileChange}
-      />
       <DropdownWrapper
         className="w-52"
         align="end"
@@ -76,23 +67,13 @@ export function User() {
         }
       >
         <DropdownMenuGroup>
-          <DropdownMenuItem
-            aria-label={`${user?.name ?? ""}, ${user?.email ?? ""}. Change profile photo`}
-            disabled={isUploading}
-            onSelect={(event) => {
-              event.preventDefault();
-              openPicker();
+          <UserItem
+            user={{
+              image: user?.image ?? "",
+              name: user?.name ?? "",
+              email: user?.email ?? "",
             }}
-          >
-            <UserItem
-              isUploading={isUploading}
-              user={{
-                image: user?.image ?? "",
-                name: user?.name ?? "",
-                email: user?.email ?? "",
-              }}
-            />
-          </DropdownMenuItem>
+          />
           <DropdownMenuSeparator />
           <FeedbackDialog>
             <DropdownMenuItem
