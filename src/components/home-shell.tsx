@@ -258,7 +258,10 @@ export function HomeShell({
             )}
             {loadingMore ? (
               <>
-                <BouncingDots size={20} />
+                {/* The library sizes dots at 22% of `size` (4.4px here), which
+                    lands them on fractional pixels and antialiasing smears
+                    them into ovals. Pin dot and gap to whole pixels. */}
+                <BouncingDots size={20} className="gap-1! *:size-1!" />
                 <span className="sr-only">Loading more links</span>
               </>
             ) : null}
