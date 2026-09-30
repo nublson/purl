@@ -21,7 +21,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const rawContentType = searchParams.get("contentType");
   const contentType =
     rawContentType && VALID_CONTENT_TYPES.has(rawContentType) ? rawContentType : null;
-  const folderId = searchParams.get("folderId") ?? undefined;
+  // An empty `folderId` means "no folder filter", same as omitting it.
+  const folderId = searchParams.get("folderId") || undefined;
 
   try {
     const result = await listLinks({ limit, cursor, contentType, folderId });
@@ -57,14 +58,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const folderId = typeof body?.folderId === "string" ? body.folderId : undefined;
+  // An empty `folderId` means "no folder", same as omitting it.
+  const folderId =
+    typeof body?.folderId === "string" && body.folderId !== ""
+      ? body.folderId
+      : undefined;
 
   try {
     const link = folderId
       ? await createLink(url, { folderId })
       : await createLink(url);
     broadcastLinksChanged(link.userId);
-    return addCors(NextResponse.json(serializeLink(link), { status: 201 }));
+    return addCors(
+      NextResponse.json(
+        { ...serializeLink(link), moved: link.moved },
+        { status: 201 }
+      )
+    );
   } catch (e) {
     if (e instanceof UnauthorizedError) {
       return addCors(NextResponse.json({ error: "Unauthorized" }, { status: 401 }));

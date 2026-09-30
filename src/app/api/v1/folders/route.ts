@@ -1,5 +1,6 @@
 import { mapFolderError } from "@/lib/folder-errors";
 import { createFolder, listFoldersForUser } from "@/lib/folders";
+import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { getSessionUser } from "@/lib/session";
 import { type NextRequest, NextResponse } from "next/server";
 import { addCors, corsPreflightResponse } from "../cors";
@@ -35,6 +36,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     const folder = await createFolder(user.id, name);
+    broadcastLinksChanged(user.id);
     return addCors(NextResponse.json(folder, { status: 201 }));
   } catch (e) {
     const mapped = mapFolderError(e);

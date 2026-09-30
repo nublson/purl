@@ -46,6 +46,7 @@ const MOCK_LINK = {
   contentType: "WEB",
   createdAt: new Date("2025-01-01T12:00:00.000Z"),
   userId: "user-1",
+  moved: false,
 };
 
 describe("GET /api/v1/links", () => {
@@ -120,6 +121,15 @@ describe("GET /api/v1/links", () => {
     );
   });
 
+  it("treats an empty folderId as no folder filter", async () => {
+    mockListLinks.mockResolvedValue({ links: [], nextCursor: null });
+    const { GET } = await import("./route");
+    await GET(new NextRequest("http://localhost/api/v1/links?folderId="));
+    expect(mockListLinks).toHaveBeenCalledWith(
+      expect.not.objectContaining({ folderId: expect.anything() })
+    );
+  });
+
   it("returns 404 for an unknown folderId", async () => {
     mockListLinks.mockRejectedValue(new MockFolderNotFoundError());
     const { GET } = await import("./route");
@@ -185,7 +195,35 @@ describe("POST /api/v1/links", () => {
     expect(res.status).toBe(201);
     const body = await res.json();
     expect(body.id).toBe("link-1");
+    expect(body.moved).toBe(false);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  });
+
+  it("reports moved: true when a duplicate URL changed folders", async () => {
+    mockCreateLink.mockResolvedValue({ ...MOCK_LINK, moved: true });
+    const { POST } = await import("./route");
+    const res = await POST(
+      new NextRequest("http://localhost/api/v1/links", {
+        method: "POST",
+        body: JSON.stringify({ url: "https://example.com", folderId: "folder-1" }),
+        headers: { "content-type": "application/json" },
+      })
+    );
+    expect(res.status).toBe(201);
+    expect((await res.json()).moved).toBe(true);
+  });
+
+  it("treats an empty folderId as no folder", async () => {
+    mockCreateLink.mockResolvedValue(MOCK_LINK);
+    const { POST } = await import("./route");
+    await POST(
+      new NextRequest("http://localhost/api/v1/links", {
+        method: "POST",
+        body: JSON.stringify({ url: "https://example.com", folderId: "" }),
+        headers: { "content-type": "application/json" },
+      })
+    );
+    expect(mockCreateLink).toHaveBeenCalledWith("https://example.com");
   });
 
   it("returns 403 LIMIT_REACHED when the save cap is reached", async () => {

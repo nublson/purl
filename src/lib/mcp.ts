@@ -56,11 +56,12 @@ export async function saveLinkTool(
     return errorContent("Invalid or missing URL.");
   }
   try {
+    // A falsy `folderId` (omitted or "") means "no folder".
     const link = folderId
       ? await createLinkForUser(userId, trimmed, { folderId })
       : await createLinkForUser(userId, trimmed);
     broadcastLinksChanged(link.userId);
-    return jsonContent(serializeLink(link));
+    return jsonContent({ ...serializeLink(link), moved: link.moved });
   } catch (e) {
     if (e instanceof SaveLimitError) {
       return errorContent(`Limit reached: ${e.message}`);
@@ -88,7 +89,8 @@ export async function listSavedItemsTool(
       limit: args.limit ?? 50,
       cursor: args.cursor ?? null,
       contentType: args.contentType ?? null,
-      folderId: args.folderId,
+      // An empty `folderId` means "no folder filter", same as omitting it.
+      folderId: args.folderId || undefined,
     });
     return jsonContent({
       data: result.links.map(serializeLink),
@@ -149,7 +151,10 @@ export function registerPurlTools(server: McpServer): void {
         .describe(
           "Pagination cursor taken from a previous response's nextCursor",
         ),
-      folderId: z.string().optional(),
+      folderId: z
+        .string()
+        .optional()
+        .describe("Folder id from list_folders to filter by"),
     },
     async (args, extra) => listSavedItemsTool(getUserId(extra), args),
   );

@@ -324,6 +324,29 @@ describe("saveLinkTool", () => {
     );
   });
 
+  it("treats an empty folderId as no folder", async () => {
+    mockCreateLinkForUser.mockResolvedValue({
+      id: "link-1",
+      userId: "user-1",
+      moved: false,
+    });
+    await saveLinkTool("user-1", "https://example.com", "");
+    expect(mockCreateLinkForUser).toHaveBeenCalledWith(
+      "user-1",
+      "https://example.com",
+    );
+  });
+
+  it("includes moved in the result", async () => {
+    mockCreateLinkForUser.mockResolvedValue({
+      id: "link-1",
+      userId: "user-1",
+      moved: true,
+    });
+    const result = await saveLinkTool("user-1", "https://example.com", "folder-1");
+    expect(parse(result)).toMatchObject({ id: "link-1", moved: true });
+  });
+
   it("returns a tool error for a foreign or unknown folder", async () => {
     mockCreateLinkForUser.mockRejectedValue(new MockFolderNotFoundError());
     const result = await saveLinkTool("user-1", "https://example.com", "missing");
@@ -361,6 +384,13 @@ describe("listSavedItemsTool", () => {
       contentType: null,
       folderId: "folder-1",
     });
+  });
+
+  it("treats an empty folderId as no folder filter", async () => {
+    mockListLinksForUser.mockResolvedValue({ links: [], nextCursor: null });
+    await listSavedItemsTool("user-1", { folderId: "" });
+    const [, opts] = mockListLinksForUser.mock.calls[0];
+    expect(opts.folderId).toBeUndefined();
   });
 
   it("returns a tool error for a foreign or unknown folder", async () => {

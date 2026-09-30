@@ -11,6 +11,11 @@ vi.mock("@/lib/session", () => ({
   getSessionUser: mockGetSessionUser,
 }));
 
+const mockBroadcast = vi.fn();
+vi.mock("@/lib/realtime-broadcast", () => ({
+  broadcastLinksChanged: mockBroadcast,
+}));
+
 const mockListFoldersForUser = vi.fn();
 const mockCreateFolder = vi.fn();
 vi.mock("@/lib/folders", async () => {
@@ -143,6 +148,17 @@ describe("POST /api/v1/folders", () => {
     expect(await res.json()).toEqual(created);
     expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Reading");
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(mockBroadcast).toHaveBeenCalledWith("user-1");
+  });
+
+  it("does not broadcast when creation fails", async () => {
+    mockGetSessionUser.mockResolvedValue({ id: "user-1" });
+    mockCreateFolder.mockRejectedValue(
+      new FolderNameError("taken", "You already have a folder with that name."),
+    );
+    const res = await POST(postRequest({ name: "Reading" }));
+    expect(res.status).toBe(409);
+    expect(mockBroadcast).not.toHaveBeenCalled();
   });
 });
 
