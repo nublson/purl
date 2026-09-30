@@ -32,8 +32,8 @@ Single Next.js App Router application (not a monorepo).
 ### Route groups
 
 - `src/app/(public)/` — Marketing site (landing page with Google/GitHub sign-in)
-- `src/app/(private)/` — Authenticated app: `/home` (save links)
-- `src/app/api/` — API routes (links, auth, feedback, user, v1, MCP, pdf-proxy)
+- `src/app/(private)/` — Authenticated app: `/home` (save links), `/folders/[slug]` (one folder's links)
+- `src/app/api/` — API routes (links, folders, auth, feedback, user, v1, MCP, pdf-proxy)
 - `src/app/sw.ts` — Serwist PWA service worker (compiled to `public/sw.js` on build; **disabled in dev**)
 - `src/app/~offline/` — Static offline fallback page
 
@@ -46,6 +46,8 @@ Business logic. Key modules:
 | `links.ts` | Link CRUD, `scrapeLinkMetadata`, `resolveLinkFromUrl` |
 | `server-detect-content-type.ts` | SSRF-safe HEAD/sniff to classify URL |
 | `safe-outbound-fetch.ts` | SSRF-hardened fetch wrapper — **all outbound HTTP must go through this** |
+| `folders.ts` | Folder CRUD, slugs, `FolderSummary`, folder cap (`MAX_FOLDERS`) and ownership checks |
+| `folder-errors.ts` | `mapFolderError` — shared folder error → HTTP response mapping for `/api/folders` and `/api/v1/folders` |
 | `limits.ts`, `entitlements.ts`, `usage-summary.ts` | Flat save cap and the Settings → Usage link count |
 | `auth.ts`, `prisma.ts` | Better Auth and Prisma client singletons |
 | `usernames.ts` | Username validation/generation rules, changed only via `PATCH /api/user/username` |
@@ -59,6 +61,12 @@ Saving is fully **synchronous**; there is no background processing:
 1. `POST /api/links` (or v1 API / MCP `save_link`) → `assertCanSaveLink` → `detectContentType` + `scrapeLinkMetadata`
 2. Insert (or refresh, for a duplicate URL) the `Link` row
 3. `broadcastLinksChanged` → Supabase Realtime → client refresh
+
+### Folders
+
+- A link belongs to at most one folder: `Folder` model, `Link.folderId` (`onDelete: SetNull`, so deleting a folder unfiles its links unless deleted `withLinks`). Cap: `MAX_FOLDERS = 100` (`src/lib/limits.ts`).
+- Routes: `/folders/[slug]` page; `/api/folders` + `/api/folders/[id]` (app) and `/api/v1/folders` (API key); `folderId` on the links endpoints (filter on GET, file on POST — a duplicate URL is moved and the response reports `moved`; `folderId: null` on app `PATCH /api/links/[id]` unfiles); MCP `list_folders`, plus `folderId` on `save_link` / `list_saved_items`.
+- Client folder state comes only from `FoldersProvider` (`src/contexts/folders-context.tsx`) via `src/hooks/use-folders.ts` (`useFolders`, `useCurrentFolder`, `useFolderActions`). The current folder is resolved by the folder page (server-side, handed down through `CurrentFolderProvider`), so saves there file by folder id.
 
 ### Authentication & routing
 

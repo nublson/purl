@@ -46,7 +46,6 @@ const { assertFolderOwned, FolderNotFoundError } = await import("@/lib/folders")
 const {
   createLink,
   createLinkForUser,
-  refreshLink,
   readLink,
   updateLink,
   deleteLink,
@@ -702,9 +701,7 @@ describe("createLinkForUser – folders", () => {
     // everything (metadata + folderId) scoped by the `existing` row it
     // already looked up via `{ userId, url }`, with no session lookup in
     // the path at all — this is what makes it safe for session-less
-    // callers such as MCP. A prior version of this code routed through
-    // refreshLink(), which does resolve the user from the session; that
-    // coupling is gone from this path now (see the fix report).
+    // callers such as MCP.
     vi.mocked(auth.api.getSession).mockReset();
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(null, { status: 200 }),
@@ -935,89 +932,6 @@ describe("moveLinkToFolder", () => {
   });
 });
 
-// ─── refreshLink ─────────────────────────────────────────────────────────────
-
-describe("refreshLink", () => {
-  let fetchSpy: ReturnType<typeof vi.spyOn>;
-
-  beforeEach(() => {
-    vi.mocked(auth.api.getSession).mockReset();
-    vi.mocked(prisma.link.findFirst).mockReset();
-    vi.mocked(prisma.link.update).mockReset();
-    vi.mocked(ogs).mockReset();
-    fetchSpy = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue(new Response(null, { status: 200 }));
-    mockOgsSuccess();
-    mockUnderSaveLimit();
-  });
-
-  afterEach(() => {
-    fetchSpy.mockRestore();
-  });
-
-  it("throws UnauthorizedError when there is no session", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(null);
-    await expect(refreshLink("link-1")).rejects.toThrow(UnauthorizedError);
-  });
-
-  it("returns null when the link does not exist or is not owned by the user", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
-
-    const result = await refreshLink("link-1");
-
-    expect(result).toBeNull();
-    expect(vi.mocked(prisma.link.update)).not.toHaveBeenCalled();
-  });
-
-  it("overwrites all scraped fields and bumps createdAt", async () => {
-    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
-    const existing = makeRow({
-      url: "https://youtu.be/dQw4w9WgXcQ",
-      title: "Old title",
-      description: "Old description",
-      thumbnail: null,
-      contentType: "WEB",
-    });
-    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
-    const refreshed = makeRow({
-      url: "https://youtu.be/dQw4w9WgXcQ",
-      title: "Rick Roll",
-      description: "Rick Astley",
-      thumbnail: "https://img.youtube.com/vi/abc/hqdefault.jpg",
-      contentType: "YOUTUBE",
-      createdAt: new Date(),
-    });
-    vi.mocked(prisma.link.update).mockResolvedValue(refreshed as never);
-    fetchSpy.mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          title: "Rick Roll",
-          author_name: "Rick Astley",
-          thumbnail_url: "https://img.youtube.com/vi/abc/hqdefault.jpg",
-        }),
-        { status: 200, headers: { "Content-Type": "application/json" } },
-      ),
-    );
-
-    const result = await refreshLink("link-1");
-
-    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
-      where: { id: "link-1" },
-      data: {
-        title: "Rick Roll",
-        description: "Rick Astley",
-        favicon: expect.stringContaining("google.com/s2/favicons"),
-        thumbnail: "https://img.youtube.com/vi/abc/hqdefault.jpg",
-        domain: "youtu.be",
-        contentType: "YOUTUBE",
-        createdAt: expect.any(Date),
-        },
-    });
-    expect(result).toEqual(refreshed);
-  });
-});
 
 // ─── readLink ─────────────────────────────────────────────────────────────────
 

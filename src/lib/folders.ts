@@ -68,7 +68,10 @@ export function slugifyFolderName(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   const slug = base || "folder";
-  return slug.length > MAX_SLUG_LENGTH ? slug.slice(0, MAX_SLUG_LENGTH) : slug;
+  // Slicing can cut right after a separator; trim it so the slug never ends in `-`.
+  return slug.length > MAX_SLUG_LENGTH
+    ? slug.slice(0, MAX_SLUG_LENGTH).replace(/-+$/, "")
+    : slug;
 }
 
 /** Validates and trims a folder name, throwing `FolderNameError` for empty or over-long input. */

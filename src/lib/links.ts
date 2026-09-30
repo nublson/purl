@@ -407,44 +407,16 @@ function isForeignKeyConstraintError(error: unknown): boolean {
   );
 }
 
-/** Re-scrapes link metadata for the current user and bumps it to the top of the list. */
-export async function refreshLink(
-  id: string,
-): Promise<RefreshLinkResult | null> {
-  const userId = await getCurrentUserId();
-  const existing = await prisma.link.findFirst({
-    where: { id, userId },
-  });
-  if (!existing) return null;
-
-  const resolved = await resolveLinkFromUrl(existing.url);
-  const refreshed = await prisma.link.update({
-    where: { id },
-    data: {
-      title: resolved.title,
-      description: resolved.description,
-      favicon: resolved.favicon,
-      thumbnail: resolved.thumbnail,
-      domain: resolved.domain,
-      contentType: resolved.contentType,
-      createdAt: new Date(),
-    },
-  });
-
-  return refreshed;
-}
-
 /**
  * Resolves metadata for `existing.url` and writes it — title, description,
  * favicon, thumbnail, domain, contentType, and a `createdAt` bump — plus
  * `folderId` when given, all in a single update scoped by `existing.id`.
  *
- * Unlike `refreshLink`, this does not resolve the acting user from the
- * session: `createLinkForUser` already scoped `existing` to `userId` via
- * `{ userId, url }` before calling this, so it works for session-less
- * callers too (e.g. MCP). It also avoids `refreshLink`'s two-write race on a
- * folder move — the metadata bump and the folder change land in one
- * statement, so a failure can't leave the row refreshed in its old folder.
+ * It does not resolve the acting user from the session: `createLinkForUser`
+ * already scoped `existing` to `userId` via `{ userId, url }` before calling
+ * this, so it works for session-less callers too (e.g. MCP). The metadata
+ * bump and any folder change land in one statement, so a failure can't leave
+ * the row refreshed in its old folder.
  */
 async function refreshExistingLink(
   existing: { id: string; url: string },

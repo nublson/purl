@@ -162,7 +162,7 @@ describe("links/[id] API route", () => {
 
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({
-        error: "At least one of url, title, or description is required",
+        error: "At least one of url, title, description, or folderId is required",
       });
     });
 

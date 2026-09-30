@@ -59,7 +59,7 @@ export async function PATCH(
 
   if (!hasUrl && !hasTitle && !hasDescription && !hasFolderId) {
     return NextResponse.json(
-      { error: "At least one of url, title, or description is required" },
+      { error: "At least one of url, title, description, or folderId is required" },
       { status: 400 },
     );
   }

@@ -50,6 +50,8 @@ describe("slugifyFolderName", () => {
     ["  Trip   to  Japan ", "trip-to-japan"],
     ["🍣", "folder"],
     ["a".repeat(80), "a".repeat(50)],
+    // The 50-char cut lands right after the separator: no trailing "-".
+    [`${"a".repeat(49)} more text`, "a".repeat(49)],
   ])("slugifyFolderName(%j) → %j", (name, expected) => {
     expect(slugifyFolderName(name)).toBe(expected);
   });
