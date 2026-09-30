@@ -290,4 +290,15 @@ describe("listLinks", () => {
     ).rejects.toThrow(FolderNotFoundError);
     expect(vi.mocked(prisma.link.findMany)).not.toHaveBeenCalled();
   });
+
+  it("treats an empty-string folderId as a real filter, not 'no filter' (runs the ownership check)", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(assertFolderOwned).mockRejectedValue(new FolderNotFoundError());
+
+    await expect(
+      listLinks({ limit: 50, cursor: null, contentType: null, folderId: "" }),
+    ).rejects.toThrow(FolderNotFoundError);
+    expect(vi.mocked(assertFolderOwned)).toHaveBeenCalledWith("user-123", "");
+    expect(vi.mocked(prisma.link.findMany)).not.toHaveBeenCalled();
+  });
 });
