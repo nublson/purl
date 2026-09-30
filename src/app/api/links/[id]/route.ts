@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { FolderNotFoundError } from "@/lib/folders";
+import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
 import {
   readLink,
   updateLink,
@@ -82,12 +82,42 @@ export async function PATCH(
   try {
     const { id } = await context.params;
 
+    // Resolve the session and check folder ownership up front, before any
+    // write runs. This avoids the combined-body failure mode where
+    // `updateLink` commits its write and then a foreign/unknown folder
+    // fails the move with no rollback: catching that here means a combined
+    // PATCH either does nothing or does both, never a half-applied update.
+    let folderUserId: string | undefined;
+    if (hasFolderId) {
+      const session = await auth.api.getSession({ headers: await headers() });
+      folderUserId = session?.user?.id;
+      if (!folderUserId) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const requestedFolderId = body.folderId ?? null;
+      if (requestedFolderId !== null) {
+        // Throws FolderNotFoundError, handled by the outer catch — before
+        // `updateLink` below ever runs.
+        await assertFolderOwned(folderUserId, requestedFolderId);
+      }
+    }
+
     let updated: Parameters<typeof serializeLink>[0] | null = null;
     // `moveLinkToFolder` takes an explicit userId (it doesn't resolve the
     // session itself, unlike `updateLink`) and its return type doesn't carry
     // `userId`, so track the id to broadcast with separately rather than
-    // reading it off `updated`.
+    // reading it off `updated`. Also doubles as the "did a write happen"
+    // flag: broadcast whenever this is set, even if a later step errors.
     let broadcastUserId: string | undefined;
+
+    const broadcastIfWritten = () => {
+      if (broadcastUserId) {
+        broadcastLinksChanged(
+          broadcastUserId,
+          parseLinksOrigin(request.headers.get(LINKS_ORIGIN_HEADER)),
+        );
+      }
+    };
 
     if (hasOtherFields) {
       const result = await updateLink(id, data);
@@ -99,26 +129,25 @@ export async function PATCH(
     }
 
     if (hasFolderId) {
-      const session = await auth.api.getSession({ headers: await headers() });
-      const userId = session?.user?.id;
-      if (!userId) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      try {
+        const moved = await moveLinkToFolder(
+          folderUserId!,
+          id,
+          body.folderId ?? null,
+        );
+        if (!moved) {
+          broadcastIfWritten();
+          return NextResponse.json({ error: "Not found" }, { status: 404 });
+        }
+        updated = moved;
+        broadcastUserId = folderUserId;
+      } catch (e) {
+        broadcastIfWritten();
+        throw e;
       }
-      const moved = await moveLinkToFolder(userId, id, body.folderId ?? null);
-      if (!moved) {
-        return NextResponse.json({ error: "Not found" }, { status: 404 });
-      }
-      updated = moved;
-      broadcastUserId = userId;
     }
 
-    // `updated`/`broadcastUserId` are always set here: hasOtherFields or
-    // hasFolderId is guaranteed by the "nothing to update" guard above, and
-    // each branch either returns early or assigns both.
-    broadcastLinksChanged(
-      broadcastUserId!,
-      parseLinksOrigin(request.headers.get(LINKS_ORIGIN_HEADER)),
-    );
+    broadcastIfWritten();
     return NextResponse.json(serializeLink(updated!));
   } catch (e) {
     if (e instanceof UnauthorizedError) {

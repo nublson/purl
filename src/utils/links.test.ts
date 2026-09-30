@@ -7,7 +7,7 @@ import {
   type Link,
 } from "./links";
 
-function link(createdAt: Date, title: string): Link {
+function link(createdAt: Date, title: string, folderId: string | null = null): Link {
   return {
     id: `id-${title}`,
     favicon: "",
@@ -18,6 +18,7 @@ function link(createdAt: Date, title: string): Link {
     description: null,
     thumbnail: null,
     createdAt,
+    folderId,
   };
 }
 
@@ -125,5 +126,20 @@ describe("parseJsonLinkGroups", () => {
     ]);
     expect(group.links[0].createdAt).toBeInstanceOf(Date);
     expect(group.links[0].createdAt.toISOString()).toBe("2025-06-15T10:00:00.000Z");
+  });
+
+  it("preserves folderId", () => {
+    const [group] = parseJsonLinkGroups([
+      {
+        label: "Today",
+        links: [
+          {
+            ...link(new Date(0), "a", "folder-1"),
+            createdAt: "2025-06-15T10:00:00.000Z",
+          },
+        ],
+      },
+    ]);
+    expect(group.links[0].folderId).toBe("folder-1");
   });
 });

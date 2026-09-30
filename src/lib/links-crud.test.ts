@@ -885,6 +885,9 @@ describe("moveLinkToFolder", () => {
       data: { folderId: "folder-1" },
     });
     expect(result).not.toBeNull();
+    // Regression: mapRowToLink previously dropped folderId, so the caller
+    // (e.g. the PATCH route) could never see the moved-to folder.
+    expect(result?.folderId).toBe("folder-1");
   });
 
   it("moves a link to null (un-foldering it)", async () => {
@@ -902,6 +905,7 @@ describe("moveLinkToFolder", () => {
       data: { folderId: null },
     });
     expect(result).not.toBeNull();
+    expect(result?.folderId).toBeNull();
   });
 
   it("rejects a foreign folderId with FolderNotFoundError and does not update", async () => {

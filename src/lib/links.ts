@@ -199,6 +199,7 @@ type LinkRow = {
   description: string | null;
   thumbnail: string | null;
   createdAt: Date;
+  folderId?: string | null;
 };
 
 function mapRowToLink(row: LinkRow): Link {
@@ -212,6 +213,7 @@ function mapRowToLink(row: LinkRow): Link {
     domain: row.domain,
     contentType: row.contentType,
     createdAt: row.createdAt,
+    folderId: row.folderId ?? null,
   };
 }
 

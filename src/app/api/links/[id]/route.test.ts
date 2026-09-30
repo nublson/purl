@@ -22,7 +22,7 @@ vi.mock("@/lib/folders", () => {
     readonly name = "FolderNotFoundError";
   }
 
-  return { FolderNotFoundError };
+  return { FolderNotFoundError, assertFolderOwned: vi.fn() };
 });
 
 vi.mock("@/lib/realtime-broadcast", () => ({
@@ -45,7 +45,7 @@ const links = await import("@/lib/links");
 const { readLink, updateLink, deleteLink, moveLinkToFolder, UnauthorizedError } =
   links;
 
-const { FolderNotFoundError } = await import("@/lib/folders");
+const { FolderNotFoundError, assertFolderOwned } = await import("@/lib/folders");
 const { broadcastLinksChanged } = await import("@/lib/realtime-broadcast");
 const { auth } = await import("@/lib/auth");
 
@@ -73,6 +73,7 @@ describe("links/[id] API route", () => {
     vi.mocked(updateLink).mockReset();
     vi.mocked(deleteLink).mockReset();
     vi.mocked(moveLinkToFolder).mockReset();
+    vi.mocked(assertFolderOwned).mockReset().mockResolvedValue(undefined);
     vi.mocked(broadcastLinksChanged).mockClear();
     vi.mocked(auth.api.getSession).mockReset();
   });
@@ -114,6 +115,7 @@ describe("links/[id] API route", () => {
         domain: "example.com",
         contentType: "WEB",
         createdAt,
+        folderId: null,
       });
 
       const req = createRequest(`/api/links/${ID}`, { method: "GET" });
@@ -394,6 +396,119 @@ describe("links/[id] API route", () => {
 
       expect(res.status).toBe(401);
       expect(vi.mocked(moveLinkToFolder)).not.toHaveBeenCalled();
+    });
+
+    describe("combined folderId + other fields", () => {
+      it("returns 404 and does not call updateLink when folderId is a foreign folder", async () => {
+        vi.mocked(auth.api.getSession).mockResolvedValue({
+          user: { id: "user-123" },
+          session: {},
+        } as never);
+        vi.mocked(assertFolderOwned).mockRejectedValue(new FolderNotFoundError());
+
+        const res = await PATCH(
+          patchRequest({ title: "New title", folderId: "someone-elses" }),
+          { params: Promise.resolve({ id: ID }) },
+        );
+
+        expect(res.status).toBe(404);
+        expect(await res.json()).toEqual({ error: "Folder not found" });
+        expect(vi.mocked(updateLink)).not.toHaveBeenCalled();
+        expect(vi.mocked(moveLinkToFolder)).not.toHaveBeenCalled();
+        expect(vi.mocked(broadcastLinksChanged)).not.toHaveBeenCalled();
+      });
+
+      it("applies both the field update and the folder move, broadcasting once", async () => {
+        vi.mocked(auth.api.getSession).mockResolvedValue({
+          user: { id: "user-123" },
+          session: {},
+        } as never);
+        vi.mocked(updateLink).mockResolvedValue({
+          id: ID,
+          url: "https://example.com",
+          title: "New title",
+          description: null,
+          favicon: "https://example.com/favicon.ico",
+          thumbnail: null,
+          domain: "example.com",
+          contentType: "WEB",
+          createdAt: new Date("2025-06-15T10:00:00Z"),
+          userId: "user-123",
+          folderId: null,
+        });
+        vi.mocked(moveLinkToFolder).mockResolvedValue({
+          id: ID,
+          url: "https://example.com",
+          title: "New title",
+          description: null,
+          favicon: "https://example.com/favicon.ico",
+          thumbnail: null,
+          domain: "example.com",
+          contentType: "WEB",
+          createdAt: new Date("2025-06-15T10:00:00Z"),
+          folderId: "folder-1",
+        } as never);
+
+        const res = await PATCH(
+          patchRequest({ title: "New title", folderId: "folder-1" }),
+          { params: Promise.resolve({ id: ID }) },
+        );
+
+        expect(res.status).toBe(200);
+        expect(vi.mocked(updateLink)).toHaveBeenCalledWith(ID, {
+          title: "New title",
+        });
+        expect(vi.mocked(moveLinkToFolder)).toHaveBeenCalledWith(
+          "user-123",
+          ID,
+          "folder-1",
+        );
+        const json = await res.json();
+        expect(json.title).toBe("New title");
+        expect(json.folderId).toBe("folder-1");
+        expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith(
+          "user-123",
+          null,
+        );
+      });
+
+      it("still broadcasts when updateLink wrote but the folder move then fails", async () => {
+        vi.mocked(auth.api.getSession).mockResolvedValue({
+          user: { id: "user-123" },
+          session: {},
+        } as never);
+        vi.mocked(updateLink).mockResolvedValue({
+          id: ID,
+          url: "https://example.com",
+          title: "New title",
+          description: null,
+          favicon: "https://example.com/favicon.ico",
+          thumbnail: null,
+          domain: "example.com",
+          contentType: "WEB",
+          createdAt: new Date("2025-06-15T10:00:00Z"),
+          userId: "user-123",
+          folderId: null,
+        });
+        // Ownership check passes, but the write itself races against a
+        // folder deleted in between (mirrors the P2003 mapping in
+        // moveLinkToFolder).
+        vi.mocked(moveLinkToFolder).mockRejectedValue(new FolderNotFoundError());
+
+        const res = await PATCH(
+          patchRequest({ title: "New title", folderId: "folder-1" }),
+          { params: Promise.resolve({ id: ID }) },
+        );
+
+        expect(res.status).toBe(404);
+        expect(await res.json()).toEqual({ error: "Folder not found" });
+        expect(vi.mocked(updateLink)).toHaveBeenCalled();
+        expect(vi.mocked(broadcastLinksChanged)).toHaveBeenCalledWith(
+          "user-123",
+          null,
+        );
+      });
     });
   });
 

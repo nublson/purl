@@ -12,6 +12,7 @@ export type Link = {
   domain: string;
   contentType: ContentType;
   createdAt: Date;
+  folderId: string | null;
 };
 
 export type LinkGroup = {
