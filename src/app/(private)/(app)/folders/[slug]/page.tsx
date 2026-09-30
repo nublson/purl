@@ -1,4 +1,5 @@
 import { HomeSkeleton } from "@/components/skeletons/home";
+import { CurrentFolderProvider } from "@/contexts/current-folder-context";
 import { getFolderBySlug, type FolderSummary } from "@/lib/folders";
 import { getSessionUser } from "@/lib/session";
 import type { Metadata } from "next";
@@ -47,9 +48,15 @@ export default async function FolderPage({
           switcher) and empty state are wired in here in a follow-up pass.
           Until then, this heading only covers accessibility/SEO. */}
       <h1 className="sr-only">{folder.name}</h1>
-      <Suspense fallback={<HomeSkeleton />}>
-        <FolderShellLoader folderId={folder.id} />
-      </Suspense>
+      {/* Hands the server-resolved folder to the client subtree so
+          `useCurrentFolder()` files saves here by id, even if the client
+          folder list no longer matches this URL's slug (renamed/deleted in
+          another tab). */}
+      <CurrentFolderProvider folder={folder}>
+        <Suspense fallback={<HomeSkeleton />}>
+          <FolderShellLoader folderId={folder.id} />
+        </Suspense>
+      </CurrentFolderProvider>
     </div>
   );
 }

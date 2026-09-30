@@ -1,5 +1,6 @@
 "use client";
 
+import { useCurrentFolderContext } from "@/contexts/current-folder-context";
 import { useFoldersContext } from "@/contexts/folders-context";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import {
@@ -10,6 +11,7 @@ import {
   type ActionResult,
 } from "@/lib/folder-client";
 import type { FolderSummary } from "@/lib/folders";
+import { resolveCurrentFolder } from "@/lib/current-folder";
 import { MAX_FOLDERS } from "@/lib/limits";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
@@ -27,18 +29,25 @@ export function useFolders(): {
   return { folders, isLoading, max: MAX_FOLDERS };
 }
 
-/** The folder for the current `/folders/[slug]` route, or null everywhere else (e.g. /home). */
+/**
+ * The folder for the current `/folders/[slug]` route, or null everywhere else (e.g. /home).
+ *
+ * Inside the folder page (wrapped in `CurrentFolderProvider`) this is keyed on
+ * the page's server-resolved folder **id**: the fresh entry from the folder
+ * list when it's there (so a rename's new name/slug/linkCount shows up), else
+ * the page's own copy (e.g. the folder was deleted in another tab — the save
+ * then fails loudly with "Folder not found" instead of landing unfiled).
+ * Outside that subtree (e.g. the layout's header) it falls back to matching
+ * the URL slug against the folder list.
+ */
 export function useCurrentFolder(): FolderSummary | null {
   const pathname = usePathname();
   const params = useParams<{ slug?: string | string[] }>();
   const { folders } = useFoldersContext();
-
-  if (!pathname?.startsWith("/folders/")) return null;
-
+  const pageFolder = useCurrentFolderContext();
   const slug = Array.isArray(params?.slug) ? params.slug[0] : params?.slug;
-  if (!slug) return null;
 
-  return folders.find((folder) => folder.slug === slug) ?? null;
+  return resolveCurrentFolder({ pageFolder, folders, pathname, slug });
 }
 
 export function useFolderActions(): {

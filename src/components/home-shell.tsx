@@ -188,8 +188,9 @@ export function HomeShell({
     setPendingUrl(null);
     // The new row is only visual; announce the save for screen readers too.
     // On a folder page, `saveLink` (via LinkInput/PasteHandler's own
-    // `useCurrentFolder()`) already toasted "Saved to {name}"/"Moved to
-    // {name}" for this save — skip the generic toast so it isn't doubled.
+    // `useCurrentFolder()`, which inside the page's CurrentFolderProvider
+    // always resolves to this `folderId`) already toasted "Saved to
+    // {name}"/"Moved to {name}" — skip the generic toast so it isn't doubled.
     if (!folderId) toast.success("Link saved");
   }, [reload, folderId]);
 
