@@ -48,6 +48,7 @@ const {
   createLinkForUser,
   readLink,
   updateLink,
+  updateLinkForUser,
   deleteLink,
   moveLinkToFolder,
   scrapeLinkMetadata,
@@ -742,6 +743,34 @@ describe("createLinkForUser – folders", () => {
     expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
   });
 
+  it("maps a Prisma P2003 (foreign key) error on a new-URL create to FolderNotFoundError", async () => {
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+    // assertFolderOwned passed, but the folder was deleted before the insert.
+    vi.mocked(prisma.link.create).mockRejectedValue(
+      Object.assign(new Error("Foreign key constraint failed"), {
+        code: "P2003",
+      }),
+    );
+
+    await expect(
+      createLinkForUser("user-123", "https://example.com", {
+        folderId: "folder-1",
+      }),
+    ).rejects.toThrow(FolderNotFoundError);
+  });
+
+  it("rethrows non-FK errors from a new-URL create unchanged", async () => {
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+    const boom = Object.assign(new Error("boom"), { code: "P1001" });
+    vi.mocked(prisma.link.create).mockRejectedValue(boom);
+
+    await expect(
+      createLinkForUser("user-123", "https://example.com", {
+        folderId: "folder-1",
+      }),
+    ).rejects.toBe(boom);
+  });
+
   it("moves an existing URL to a different folderId in a single update and returns moved: true", async () => {
     const existing = makeRow({ folderId: "folder-1" });
     vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
@@ -1119,6 +1148,137 @@ describe("updateLink", () => {
       where: { id: "link-1" },
       data: { title: "Updated" },
     });
+  });
+});
+
+// ─── updateLinkForUser ───────────────────────────────────────────────────────
+
+describe("updateLinkForUser", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.mocked(auth.api.getSession).mockReset();
+    vi.mocked(prisma.link.findFirst).mockReset();
+    vi.mocked(prisma.link.update).mockReset();
+    vi.mocked(ogs).mockReset();
+    fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 200 }));
+    mockOgsSuccess();
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it("scopes the lookup to the given user and returns null for a link it doesn't own", async () => {
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+
+    const result = await updateLinkForUser("user-123", "link-1", {
+      title: "New",
+      folderId: "folder-1",
+    });
+
+    expect(result).toBeNull();
+    expect(vi.mocked(prisma.link.findFirst)).toHaveBeenCalledWith({
+      where: { id: "link-1", userId: "user-123" },
+    });
+    expect(vi.mocked(prisma.link.update)).not.toHaveBeenCalled();
+    // Explicit user: no session lookup.
+    expect(vi.mocked(auth.api.getSession)).not.toHaveBeenCalled();
+  });
+
+  it("writes the field edits and folderId in ONE update", async () => {
+    const row = makeRow();
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue({
+      ...row,
+      title: "New title",
+      folderId: "folder-1",
+    } as never);
+
+    const result = await updateLinkForUser("user-123", "link-1", {
+      title: "New title",
+      folderId: "folder-1",
+    });
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: "link-1" },
+      data: { title: "New title", folderId: "folder-1" },
+    });
+    expect(result?.folderId).toBe("folder-1");
+  });
+
+  it("includes folderId: null to unfile alongside the edit", async () => {
+    const row = makeRow({ folderId: "folder-1" });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue({
+      ...row,
+      description: null,
+      folderId: null,
+    } as never);
+
+    await updateLinkForUser("user-123", "link-1", {
+      description: null,
+      folderId: null,
+    });
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: "link-1" },
+      data: { description: null, folderId: null },
+    });
+  });
+
+  it("re-scrapes a changed URL and carries folderId in the same update", async () => {
+    const existing = makeRow({ url: "https://example.com" });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
+    vi.mocked(prisma.link.update).mockResolvedValue(existing as never);
+
+    await updateLinkForUser("user-123", "link-1", {
+      url: "https://example.org/page",
+      folderId: "folder-1",
+    });
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          url: "https://example.org/page",
+          domain: "example.org",
+          folderId: "folder-1",
+        }),
+      }),
+    );
+  });
+
+  it("leaves folderId out of the write when it isn't given", async () => {
+    const row = makeRow({ folderId: "folder-1" });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue(row as never);
+
+    await updateLinkForUser("user-123", "link-1", { title: "T" });
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: "link-1" },
+      data: { title: "T" },
+    });
+  });
+
+  it("maps a P2003 (folder deleted before the write) to FolderNotFoundError", async () => {
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(makeRow() as never);
+    vi.mocked(prisma.link.update).mockRejectedValue(
+      Object.assign(new Error("Foreign key constraint failed"), {
+        code: "P2003",
+      }),
+    );
+
+    await expect(
+      updateLinkForUser("user-123", "link-1", {
+        title: "New title",
+        folderId: "folder-1",
+      }),
+    ).rejects.toThrow(FolderNotFoundError);
   });
 });
 

@@ -3,6 +3,7 @@ import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
 import {
   readLink,
   updateLink,
+  updateLinkForUser,
   deleteLink,
   moveLinkToFolder,
   type UpdateLinkData,
@@ -82,73 +83,48 @@ export async function PATCH(
   try {
     const { id } = await context.params;
 
-    // Resolve the session and check folder ownership up front, before any
-    // write runs. This avoids the combined-body failure mode where
-    // `updateLink` commits its write and then a foreign/unknown folder
-    // fails the move with no rollback: catching that here means a combined
-    // PATCH either does nothing or does both, never a half-applied update.
-    let folderUserId: string | undefined;
-    if (hasFolderId) {
-      const session = await auth.api.getSession({ headers: await headers() });
-      folderUserId = session?.user?.id;
-      if (!folderUserId) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
-      const requestedFolderId = body.folderId ?? null;
-      if (requestedFolderId !== null) {
-        // Throws FolderNotFoundError, handled by the outer catch — before
-        // `updateLink` below ever runs.
-        await assertFolderOwned(folderUserId, requestedFolderId);
-      }
-    }
+    const broadcast = (userId: string) =>
+      broadcastLinksChanged(
+        userId,
+        parseLinksOrigin(request.headers.get(LINKS_ORIGIN_HEADER)),
+      );
 
-    let updated: Parameters<typeof serializeLink>[0] | null = null;
-    // `moveLinkToFolder` takes an explicit userId (it doesn't resolve the
-    // session itself, unlike `updateLink`) and its return type doesn't carry
-    // `userId`, so track the id to broadcast with separately rather than
-    // reading it off `updated`. Also doubles as the "did a write happen"
-    // flag: broadcast whenever this is set, even if a later step errors.
-    let broadcastUserId: string | undefined;
-
-    const broadcastIfWritten = () => {
-      if (broadcastUserId) {
-        broadcastLinksChanged(
-          broadcastUserId,
-          parseLinksOrigin(request.headers.get(LINKS_ORIGIN_HEADER)),
-        );
-      }
-    };
-
-    if (hasOtherFields) {
+    if (!hasFolderId) {
+      // Fields only: `updateLink` resolves the session itself.
       const result = await updateLink(id, data);
       if (!result) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
-      updated = result;
-      broadcastUserId = result.userId;
+      broadcast(result.userId);
+      return NextResponse.json(serializeLink(result));
     }
 
-    if (hasFolderId) {
-      try {
-        const moved = await moveLinkToFolder(
-          folderUserId!,
-          id,
-          body.folderId ?? null,
-        );
-        if (!moved) {
-          broadcastIfWritten();
-          return NextResponse.json({ error: "Not found" }, { status: 404 });
-        }
-        updated = moved;
-        broadcastUserId = folderUserId;
-      } catch (e) {
-        broadcastIfWritten();
-        throw e;
-      }
+    // Resolve the session and check folder ownership up front, before any
+    // write runs, so a foreign/unknown folder is a fast 404 with nothing
+    // written.
+    const session = await auth.api.getSession({ headers: await headers() });
+    const userId = session?.user?.id;
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const folderId = body.folderId ?? null;
+    if (folderId !== null) {
+      // Throws FolderNotFoundError, handled by the outer catch.
+      await assertFolderOwned(userId, folderId);
     }
 
-    broadcastIfWritten();
-    return NextResponse.json(serializeLink(updated!));
+    // folderId only: a plain move. Combined: one `updateLinkForUser` write
+    // carrying both the field edits and the folderId, so a folder deleted
+    // after the check above fails the whole write (FolderNotFoundError →
+    // 404) rather than leaving the edit committed behind an error.
+    const updated = hasOtherFields
+      ? await updateLinkForUser(userId, id, { ...data, folderId })
+      : await moveLinkToFolder(userId, id, folderId);
+    if (!updated) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    broadcast(userId);
+    return NextResponse.json(serializeLink(updated));
   } catch (e) {
     if (e instanceof UnauthorizedError) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

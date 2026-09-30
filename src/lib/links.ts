@@ -507,19 +507,29 @@ export async function createLinkForUser(
 
   const resolved = await resolveLinkFromUrl(url);
 
-  const link = await prisma.link.create({
-    data: {
-      url: resolved.url,
-      title: resolved.title,
-      description: resolved.description,
-      favicon: resolved.favicon,
-      thumbnail: resolved.thumbnail,
-      domain: resolved.domain,
-      contentType: resolved.contentType,
-      userId,
-      ...(opts?.folderId !== undefined ? { folderId: opts.folderId } : {}),
-    },
-  });
+  let link: CreateLinkResult;
+  try {
+    link = await prisma.link.create({
+      data: {
+        url: resolved.url,
+        title: resolved.title,
+        description: resolved.description,
+        favicon: resolved.favicon,
+        thumbnail: resolved.thumbnail,
+        domain: resolved.domain,
+        contentType: resolved.contentType,
+        userId,
+        ...(opts?.folderId !== undefined ? { folderId: opts.folderId } : {}),
+      },
+    });
+  } catch (error) {
+    // Same race as the refresh branch above: the folder was deleted after
+    // assertFolderOwned. Surface it as FolderNotFoundError (404), not a 500.
+    if (isForeignKeyConstraintError(error)) {
+      throw new FolderNotFoundError();
+    }
+    throw error;
+  }
   return { ...link, moved: false };
 }
 
@@ -554,6 +564,30 @@ export async function updateLink(
   data: UpdateLinkData,
 ): Promise<UpdateLinkResult | null> {
   const userId = await getCurrentUserId();
+  return updateLinkForUser(userId, id, data);
+}
+
+export type UpdateLinkForUserData = UpdateLinkData & {
+  /** Present (string or null) to also move/unfile the link in the same write; omitted leaves the folder untouched. */
+  folderId?: string | null;
+};
+
+/**
+ * Updates a link owned by an explicit `userId` — url/title/description (a
+ * changed url re-scrapes metadata, exactly as `updateLink`) and, when
+ * `data.folderId` is present, its folder — in a SINGLE `prisma.link.update`,
+ * so a combined edit + move either fully lands or doesn't land at all.
+ *
+ * Returns null when the link isn't found or isn't owned by `userId`. Callers
+ * should check folder ownership (`assertFolderOwned`) before calling; a folder
+ * deleted between that check and this write surfaces as
+ * `FolderNotFoundError` (mapped from the P2003 FK violation).
+ */
+export async function updateLinkForUser(
+  userId: string,
+  id: string,
+  data: UpdateLinkForUserData,
+): Promise<UpdateLinkResult | null> {
   const existing = await prisma.link.findFirst({
     where: { id, userId },
   });
@@ -584,12 +618,23 @@ export async function updateLink(
       updatePayload.description = data.description;
   }
 
+  if (data.folderId !== undefined) {
+    updatePayload.folderId = data.folderId;
+  }
+
   if (Object.keys(updatePayload).length === 0) return existing;
 
-  return prisma.link.update({
-    where: { id },
-    data: updatePayload,
-  });
+  try {
+    return await prisma.link.update({
+      where: { id },
+      data: updatePayload,
+    });
+  } catch (error) {
+    if (isForeignKeyConstraintError(error)) {
+      throw new FolderNotFoundError();
+    }
+    throw error;
+  }
 }
 
 /**
