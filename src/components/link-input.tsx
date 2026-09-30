@@ -6,6 +6,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { useCurrentFolder } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { focusFirstInvalid } from "@/lib/focus-first-invalid";
 import { saveLink } from "@/lib/save-link";
@@ -24,6 +25,7 @@ export function LinkInput({
   onSaveError?: (detail: { limit?: boolean; message?: string } | null) => void;
 }) {
   const { notifyLinksChanged } = useLinksSyncActions();
+  const currentFolder = useCurrentFolder();
   const errorId = useId();
   const form = useForm({
     defaultValues: {
@@ -31,7 +33,12 @@ export function LinkInput({
     },
     onSubmit: async ({ value, formApi }) => {
       onSaveStart?.(value.url);
-      const result = await saveLink(value.url);
+      const result = await saveLink(
+        value.url,
+        currentFolder
+          ? { folder: { id: currentFolder.id, name: currentFolder.name } }
+          : undefined,
+      );
       if (!result || !("id" in result)) {
         onSaveError?.(
           result && "error" in result

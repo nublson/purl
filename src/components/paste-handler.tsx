@@ -1,5 +1,6 @@
 "use client";
 
+import { useCurrentFolder } from "@/hooks/use-folders";
 import { useCallback, useEffect } from "react";
 import { SAVE_URL_EVENT, saveLink } from "@/lib/save-link";
 
@@ -12,11 +13,18 @@ export function PasteHandler({
   onSaveSuccess?: (newLinkId: string) => void;
   onSaveError?: (detail: { limit?: boolean; message?: string } | null) => void;
 }) {
+  const currentFolder = useCurrentFolder();
+
   const save = useCallback(
     async (text: string) => {
       onPasteStart?.(text);
 
-      const result = await saveLink(text);
+      const result = await saveLink(
+        text,
+        currentFolder
+          ? { folder: { id: currentFolder.id, name: currentFolder.name } }
+          : undefined,
+      );
       if (!result || !("id" in result)) {
         onSaveError?.(
           result && "error" in result
@@ -28,7 +36,7 @@ export function PasteHandler({
 
       if (result.id) onSaveSuccess?.(result.id);
     },
-    [onPasteStart, onSaveSuccess, onSaveError],
+    [onPasteStart, onSaveSuccess, onSaveError, currentFolder],
   );
 
   const handlePaste = useCallback(

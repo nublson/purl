@@ -1,7 +1,9 @@
 "use client";
 
+import { useCurrentFolder } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { requestSaveUrl, saveLink } from "@/lib/save-link";
+import { usePathname } from "next/navigation";
 import { Chromium, ClipboardPaste, ExternalLink, Plus } from "lucide-react";
 import { useId } from "react";
 import { toast } from "sonner";
@@ -44,6 +46,8 @@ function isApplePlatform() {
  */
 export function HeaderSaveLink() {
   const { notifyLinksChanged } = useLinksSyncActions();
+  const currentFolder = useCurrentFolder();
+  const pathname = usePathname();
   const hintId = useId();
 
   async function handlePasteLink() {
@@ -61,12 +65,29 @@ export function HeaderSaveLink() {
       return;
     }
 
-    // Prefer the page's paste flow (optimistic row, list refresh).
+    // Prefer the page's paste flow (optimistic row, list refresh). On a
+    // folder page this files into the page's own folder (by id): the page's
+    // PasteHandler sits inside its CurrentFolderProvider, this header doesn't.
     if (requestSaveUrl(text)) return;
 
-    const result = await saveLink(text);
+    // Fallback (no page handler mounted yet, e.g. the folder page is still
+    // streaming): `currentFolder` here comes from the URL slug. On a folder
+    // route where that lookup misses, don't silently save unfiled.
+    if (!currentFolder && pathname?.startsWith("/folders/")) {
+      toast.error("Unable to save to this folder yet. Try again in a moment.");
+      return;
+    }
+
+    const result = await saveLink(
+      text,
+      currentFolder
+        ? { folder: { id: currentFolder.id, name: currentFolder.name } }
+        : undefined,
+    );
     if (result && "id" in result) {
-      toast.success("Link saved");
+      // saveLink already toasts "Saved to {name}"/"Moved to {name}" when a
+      // folder is passed; avoid a second "Link saved" toast on top of it.
+      if (!currentFolder) toast.success("Link saved");
       notifyLinksChanged();
     }
   }

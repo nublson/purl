@@ -1,5 +1,6 @@
 import type { ContentType } from "@/generated/prisma/enums";
 import { assertCanSaveLink } from "@/lib/entitlements";
+import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
 import {
   OG_HTML_READ_MAX_BYTES,
   readHtmlForOpenGraph,
@@ -198,6 +199,7 @@ type LinkRow = {
   description: string | null;
   thumbnail: string | null;
   createdAt: Date;
+  folderId?: string | null;
 };
 
 function mapRowToLink(row: LinkRow): Link {
@@ -211,6 +213,7 @@ function mapRowToLink(row: LinkRow): Link {
     domain: row.domain,
     contentType: row.contentType,
     createdAt: row.createdAt,
+    folderId: row.folderId ?? null,
   };
 }
 
@@ -353,10 +356,13 @@ export const getLinksPageForCurrentUser = cache(
     limit: number,
     cursor: string | null = null,
     withTotal = false,
+    folderId?: string,
   ): Promise<LinksPage> => {
     const userId = await getCurrentUserId();
+    // `total` always reflects the user's overall saved-link count (the Usage
+    // meter), regardless of `folderId` filtering the returned page.
     const [{ links, nextCursor }, total] = await Promise.all([
-      listLinksForUser(userId, { limit, cursor, contentType: null }),
+      listLinksForUser(userId, { limit, cursor, contentType: null, folderId }),
       withTotal ? prisma.link.count({ where: { userId } }) : undefined,
     ]);
     return { links: links.map(mapRowToLink), nextCursor, total };
@@ -391,19 +397,34 @@ export async function searchLinksForCurrentUser(
 export type CreateLinkResult = Awaited<ReturnType<typeof prisma.link.create>>;
 export type RefreshLinkResult = Awaited<ReturnType<typeof prisma.link.update>>;
 
-/** Re-scrapes link metadata for the current user and bumps it to the top of the list. */
-export async function refreshLink(
-  id: string,
-): Promise<RefreshLinkResult | null> {
-  const userId = await getCurrentUserId();
-  const existing = await prisma.link.findFirst({
-    where: { id, userId },
-  });
-  if (!existing) return null;
+/** True when `error` is a Prisma foreign-key-constraint violation (P2003) — e.g. a `folderId` pointing at a folder deleted between an ownership check and the write. */
+function isForeignKeyConstraintError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2003"
+  );
+}
 
+/**
+ * Resolves metadata for `existing.url` and writes it — title, description,
+ * favicon, thumbnail, domain, contentType, and a `createdAt` bump — plus
+ * `folderId` when given, all in a single update scoped by `existing.id`.
+ *
+ * It does not resolve the acting user from the session: `createLinkForUser`
+ * already scoped `existing` to `userId` via `{ userId, url }` before calling
+ * this, so it works for session-less callers too (e.g. MCP). The metadata
+ * bump and any folder change land in one statement, so a failure can't leave
+ * the row refreshed in its old folder.
+ */
+async function refreshExistingLink(
+  existing: { id: string; url: string },
+  folderId?: string,
+): Promise<RefreshLinkResult> {
   const resolved = await resolveLinkFromUrl(existing.url);
-  const refreshed = await prisma.link.update({
-    where: { id },
+  return prisma.link.update({
+    where: { id: existing.id },
     data: {
       title: resolved.title,
       description: resolved.description,
@@ -412,47 +433,104 @@ export async function refreshLink(
       domain: resolved.domain,
       contentType: resolved.contentType,
       createdAt: new Date(),
+      ...(folderId !== undefined ? { folderId } : {}),
     },
   });
-
-  return refreshed;
 }
+
+export type CreateLinkOptions = {
+  folderId?: string;
+};
 
 /** Creates a link for the current user after scraping metadata. If a link with the same URL already exists, updates its createdAt and returns it. Throws UnauthorizedError if not authenticated. */
-export async function createLink(url: string): Promise<CreateLinkResult> {
+export async function createLink(
+  url: string,
+  opts?: CreateLinkOptions,
+): Promise<CreateLinkResult & { moved: boolean }> {
   const userId = await getCurrentUserId();
-  return createLinkForUser(userId, url);
+  return createLinkForUser(userId, url, opts);
 }
 
-/** Creates a link for an explicit user id. Used where the caller has already resolved the user (e.g. the MCP server via bearer token). */
+/**
+ * Creates a link for an explicit user id. Used where the caller has already
+ * resolved the user (e.g. the MCP server via bearer token).
+ *
+ * `opts.folderId`, when given, must be owned by `userId` (checked via
+ * `assertFolderOwned`, which throws `FolderNotFoundError` otherwise). For a
+ * new URL the link is created directly in that folder. For an existing URL,
+ * the folder is only changed when `opts.folderId` is explicitly provided and
+ * differs from the link's current folder — re-saving with no `folderId`
+ * leaves the link's folder untouched. `moved` reports whether the folder
+ * changed as a result of this call.
+ */
 export async function createLinkForUser(
   userId: string,
   url: string,
-): Promise<CreateLinkResult> {
+  opts?: CreateLinkOptions,
+): Promise<CreateLinkResult & { moved: boolean }> {
+  if (opts?.folderId !== undefined) {
+    await assertFolderOwned(userId, opts.folderId);
+  }
+
   const existing = await prisma.link.findFirst({
     where: { userId, url },
   });
+
   if (existing) {
-    return (await refreshLink(existing.id)) ?? existing;
+    const requestedFolderId = opts?.folderId;
+    const folderChanged =
+      requestedFolderId !== undefined &&
+      requestedFolderId !== existing.folderId;
+
+    let refreshed: RefreshLinkResult;
+    try {
+      // Single write: metadata bump and (when it changed) folderId land in
+      // one statement, scoped by `existing.id` — not the session (see the
+      // doc comment on refreshExistingLink).
+      refreshed = await refreshExistingLink(
+        existing,
+        folderChanged ? requestedFolderId : undefined,
+      );
+    } catch (error) {
+      // The folder could have been deleted between assertFolderOwned above
+      // and this write; surface that race as FolderNotFoundError (404),
+      // not a raw Prisma FK violation (500).
+      if (isForeignKeyConstraintError(error)) {
+        throw new FolderNotFoundError();
+      }
+      throw error;
+    }
+    return { ...refreshed, moved: folderChanged };
   }
 
   await assertCanSaveLink(userId);
 
   const resolved = await resolveLinkFromUrl(url);
 
-  const link = await prisma.link.create({
-    data: {
-      url: resolved.url,
-      title: resolved.title,
-      description: resolved.description,
-      favicon: resolved.favicon,
-      thumbnail: resolved.thumbnail,
-      domain: resolved.domain,
-      contentType: resolved.contentType,
-      userId,
-    },
-  });
-  return link;
+  let link: CreateLinkResult;
+  try {
+    link = await prisma.link.create({
+      data: {
+        url: resolved.url,
+        title: resolved.title,
+        description: resolved.description,
+        favicon: resolved.favicon,
+        thumbnail: resolved.thumbnail,
+        domain: resolved.domain,
+        contentType: resolved.contentType,
+        userId,
+        ...(opts?.folderId !== undefined ? { folderId: opts.folderId } : {}),
+      },
+    });
+  } catch (error) {
+    // Same race as the refresh branch above: the folder was deleted after
+    // assertFolderOwned. Surface it as FolderNotFoundError (404), not a 500.
+    if (isForeignKeyConstraintError(error)) {
+      throw new FolderNotFoundError();
+    }
+    throw error;
+  }
+  return { ...link, moved: false };
 }
 
 /** Fetches a single link if it belongs to the current user; otherwise null. Throws UnauthorizedError if not authenticated. */
@@ -486,6 +564,30 @@ export async function updateLink(
   data: UpdateLinkData,
 ): Promise<UpdateLinkResult | null> {
   const userId = await getCurrentUserId();
+  return updateLinkForUser(userId, id, data);
+}
+
+export type UpdateLinkForUserData = UpdateLinkData & {
+  /** Present (string or null) to also move/unfile the link in the same write; omitted leaves the folder untouched. */
+  folderId?: string | null;
+};
+
+/**
+ * Updates a link owned by an explicit `userId` — url/title/description (a
+ * changed url re-scrapes metadata, exactly as `updateLink`) and, when
+ * `data.folderId` is present, its folder — in a SINGLE `prisma.link.update`,
+ * so a combined edit + move either fully lands or doesn't land at all.
+ *
+ * Returns null when the link isn't found or isn't owned by `userId`. Callers
+ * should check folder ownership (`assertFolderOwned`) before calling; a folder
+ * deleted between that check and this write surfaces as
+ * `FolderNotFoundError` (mapped from the P2003 FK violation).
+ */
+export async function updateLinkForUser(
+  userId: string,
+  id: string,
+  data: UpdateLinkForUserData,
+): Promise<UpdateLinkResult | null> {
   const existing = await prisma.link.findFirst({
     where: { id, userId },
   });
@@ -516,12 +618,60 @@ export async function updateLink(
       updatePayload.description = data.description;
   }
 
+  if (data.folderId !== undefined) {
+    updatePayload.folderId = data.folderId;
+  }
+
   if (Object.keys(updatePayload).length === 0) return existing;
 
-  return prisma.link.update({
-    where: { id },
-    data: updatePayload,
+  try {
+    return await prisma.link.update({
+      where: { id },
+      data: updatePayload,
+    });
+  } catch (error) {
+    if (isForeignKeyConstraintError(error)) {
+      throw new FolderNotFoundError();
+    }
+    throw error;
+  }
+}
+
+/**
+ * Moves a link into `folderId` (or clears it with `null`) if the link belongs
+ * to `userId`. Returns null when the link is not found or not owned (routes
+ * map this to 404). Throws `FolderNotFoundError` when `folderId` is a
+ * non-null id not owned by `userId`.
+ */
+export async function moveLinkToFolder(
+  userId: string,
+  linkId: string,
+  folderId: string | null,
+): Promise<Link | null> {
+  const existing = await prisma.link.findFirst({
+    where: { id: linkId, userId },
   });
+  if (!existing) return null;
+
+  if (folderId !== null) {
+    await assertFolderOwned(userId, folderId);
+  }
+
+  try {
+    const updated = await prisma.link.update({
+      where: { id: linkId },
+      data: { folderId },
+    });
+    return mapRowToLink(updated);
+  } catch (error) {
+    // The folder could have been deleted between assertFolderOwned above
+    // and this write; surface that race as FolderNotFoundError (404), not a
+    // raw Prisma FK violation (500).
+    if (isForeignKeyConstraintError(error)) {
+      throw new FolderNotFoundError();
+    }
+    throw error;
+  }
 }
 
 /** Deletes a link if it belongs to the current user. Returns true if deleted, false if not found or not owned. Throws UnauthorizedError if not authenticated. */
@@ -539,6 +689,7 @@ export type ListLinksOptions = {
   limit: number;
   cursor: string | null;
   contentType: string | null;
+  folderId?: string;
 };
 
 export type ListLinksResult = {
@@ -577,11 +728,16 @@ export async function listLinksForUser(
   userId: string,
   opts: ListLinksOptions,
 ): Promise<ListLinksResult> {
-  const { limit, cursor, contentType } = opts;
+  const { limit, cursor, contentType, folderId } = opts;
+
+  if (folderId !== undefined) {
+    await assertFolderOwned(userId, folderId);
+  }
 
   type WhereInput = {
     userId: string;
     contentType?: ContentType;
+    folderId?: string;
     createdAt?: { lt: Date };
     OR?: ({ createdAt: { lt: Date } } | { createdAt: Date; id: { lt: string } })[];
   };
@@ -590,6 +746,10 @@ export async function listLinksForUser(
 
   if (contentType) {
     where.contentType = contentType as ContentType;
+  }
+
+  if (folderId !== undefined) {
+    where.folderId = folderId;
   }
 
   const position = parseLinksCursor(cursor);

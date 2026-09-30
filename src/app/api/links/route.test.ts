@@ -36,6 +36,9 @@ vi.mock("@/lib/prisma", () => ({
       update: vi.fn(),
       count: vi.fn(),
     },
+    folder: {
+      findFirst: vi.fn(),
+    },
   },
 }));
 
@@ -137,6 +140,7 @@ describe("POST /api/links", () => {
     vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.link.count).mockResolvedValue(0);
     vi.mocked(prisma.link.update).mockReset();
+    vi.mocked(prisma.folder.findFirst).mockReset();
     vi.mocked(ogs).mockReset();
     vi.mocked(broadcastLinksChanged).mockClear();
     fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -249,6 +253,26 @@ describe("POST /api/links", () => {
         }),
       );
     });
+
+    it("returns 400 when folderId is not a string", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      const res = await POST(
+        postRequest({ url: "https://example.com", folderId: 123 }),
+      );
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "Invalid folder" });
+      expect(prisma.link.create).not.toHaveBeenCalled();
+    });
+
+    it("returns 404 when folderId is a foreign/unknown folder", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
+      const res = await POST(
+        postRequest({ url: "https://example.com", folderId: "someone-elses" }),
+      );
+      expect(res.status).toBe(404);
+      expect(await res.json()).toEqual({ error: "Folder not found" });
+    });
   });
 
   describe("successful link creation", () => {
@@ -278,7 +302,63 @@ describe("POST /api/links", () => {
         domain: "example.com",
         contentType: "WEB",
         createdAt: CREATED_AT.toISOString(),
+        folderId: null,
+        moved: false,
       });
+    });
+
+    it("creates the link in the given folder and reports moved in the response", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.folder.findFirst).mockResolvedValue({
+        id: "folder-1",
+        userId: "user-123",
+        name: "Reading",
+        slug: "reading",
+      } as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        folderId: "folder-1",
+      } as never);
+
+      const res = await POST(
+        postRequest({ url: "https://example.com", folderId: "folder-1" }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ folderId: "folder-1" }),
+        }),
+      );
+      const json = await res.json();
+      expect(json.folderId).toBe("folder-1");
+      expect(json.moved).toBe(false);
+    });
+
+    it("reports moved: true when re-saving an existing link into a different folder", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.folder.findFirst).mockResolvedValue({
+        id: "folder-1",
+        userId: "user-123",
+        name: "Reading",
+        slug: "reading",
+      } as never);
+      vi.mocked(prisma.link.findFirst).mockResolvedValue({
+        ...MOCK_LINK,
+        folderId: null,
+      } as never);
+      vi.mocked(prisma.link.update).mockResolvedValue({
+        ...MOCK_LINK,
+        folderId: "folder-1",
+      } as never);
+
+      const res = await POST(
+        postRequest({ url: "https://example.com", folderId: "folder-1" }),
+      );
+
+      expect(res.status).toBe(201);
+      const json = await res.json();
+      expect(json.moved).toBe(true);
     });
 
     it("writes the authenticated user id to the database record", async () => {
@@ -862,6 +942,7 @@ describe("GET /api/links", () => {
   beforeEach(() => {
     vi.mocked(prisma.link.findMany).mockReset();
     vi.mocked(prisma.link.count).mockReset();
+    vi.mocked(prisma.folder.findFirst).mockReset();
   });
 
   it("returns 401 when not authenticated", async () => {
@@ -947,5 +1028,36 @@ describe("GET /api/links", () => {
     const body = await res.json();
 
     expect(body.timeZone).toBe("America/Sao_Paulo");
+  });
+
+  it("passes folderId through to the link listing when given", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue({
+      id: "folder-1",
+      userId: "user-123",
+      name: "Reading",
+      slug: "reading",
+    } as never);
+    vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.link.count).mockResolvedValue(0 as never);
+
+    const res = await GET(getRequest("?folderId=folder-1"));
+
+    expect(res.status).toBe(200);
+    expect(vi.mocked(prisma.link.findMany)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ folderId: "folder-1" }),
+      }),
+    );
+  });
+
+  it("returns 404 when folderId is a foreign/unknown folder", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
+
+    const res = await GET(getRequest("?folderId=someone-elses"));
+
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Folder not found" });
   });
 });

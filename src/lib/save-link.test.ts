@@ -3,13 +3,15 @@ import { LINKS_ORIGIN_HEADER } from "@/lib/realtime-constants";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { saveLink } from "./save-link";
 
-const { errorMock } = vi.hoisted(() => ({
+const { errorMock, successMock } = vi.hoisted(() => ({
   errorMock: vi.fn(),
+  successMock: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
   toast: {
     error: errorMock,
+    success: successMock,
   },
 }));
 
@@ -17,6 +19,7 @@ describe("saveLink", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     errorMock.mockReset();
+    successMock.mockReset();
   });
 
   it("returns null and shows validation toast for invalid URL", async () => {
@@ -89,5 +92,60 @@ describe("saveLink", () => {
     });
     expect(result).toEqual({ id: "link-1" });
     expect(errorMock).not.toHaveBeenCalled();
+    expect(successMock).not.toHaveBeenCalled();
+  });
+
+  it("sends folderId and toasts 'Saved to {name}' when no move happened", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "link-1", moved: false }), {
+        status: 201,
+      }),
+    );
+
+    const result = await saveLink("https://example.com", {
+      folder: { id: "folder-1", name: "Books" },
+    });
+
+    expect(fetchSpy).toHaveBeenCalledWith("/api/links", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [LINKS_ORIGIN_HEADER]: LINKS_CLIENT_ORIGIN,
+      },
+      body: JSON.stringify({ url: "https://example.com", folderId: "folder-1" }),
+    });
+    expect(result).toEqual({ id: "link-1" });
+    expect(successMock).toHaveBeenCalledWith("Saved to Books");
+  });
+
+  it("toasts 'Moved to {name}' when the save moved an existing link", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "link-1", moved: true }), {
+        status: 201,
+      }),
+    );
+
+    const result = await saveLink("https://example.com", {
+      folder: { id: "folder-1", name: "Books" },
+    });
+
+    expect(result).toEqual({ id: "link-1" });
+    expect(successMock).toHaveBeenCalledWith("Moved to Books");
+  });
+
+  it("does not send folderId or toast success when no folder is given", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "link-1" }), { status: 201 }),
+    );
+
+    await saveLink("https://example.com");
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/links",
+      expect.objectContaining({
+        body: JSON.stringify({ url: "https://example.com" }),
+      }),
+    );
+    expect(successMock).not.toHaveBeenCalled();
   });
 });

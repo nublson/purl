@@ -5,9 +5,9 @@ import { getSessionUser } from "@/lib/session";
 import { getRequestTimeZone } from "@/lib/time-zone";
 import { groupLinksByDate } from "@/utils/links";
 
-export async function HomeShellLoader() {
+export async function FolderShellLoader({ folderId }: { folderId: string }) {
   const [{ links, nextCursor }, user, timeZone] = await Promise.all([
-    getLinksPageForCurrentUser(HOME_LINKS_PAGE_SIZE),
+    getLinksPageForCurrentUser(HOME_LINKS_PAGE_SIZE, null, false, folderId),
     getSessionUser(),
     getRequestTimeZone(),
   ]);
@@ -16,11 +16,12 @@ export async function HomeShellLoader() {
     // navigating between /home and a folder page, or between two folder
     // pages — HomeShell otherwise keeps the previous view's list state.
     <HomeShell
-      key="all"
+      key={folderId}
       userId={user?.id ?? null}
       initialGroups={groupLinksByDate(links, { timeZone })}
       initialNextCursor={nextCursor}
       timeZone={timeZone}
+      folderId={folderId}
     />
   );
 }

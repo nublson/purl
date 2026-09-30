@@ -1,0 +1,241 @@
+import { LINKS_CLIENT_ORIGIN } from "@/lib/links-origin";
+import { LINKS_ORIGIN_HEADER } from "@/lib/realtime-constants";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  fetchFolders,
+  patchFolder,
+  patchLinkFolder,
+  postFolder,
+  removeFolder,
+} from "./folder-client";
+
+describe("fetchFolders", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("GETs /api/folders and resolves with the folder list", async () => {
+    const folders = [{ id: "f1", name: "Reading", slug: "reading", linkCount: 2 }];
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(folders), { status: 200 }),
+    );
+
+    const result = await fetchFolders();
+
+    expect(fetchSpy).toHaveBeenCalledWith("/api/folders");
+    expect(result).toEqual(folders);
+  });
+
+  it("throws with the body's error message on a non-2xx response", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }),
+    );
+
+    await expect(fetchFolders()).rejects.toThrow("Unauthorized");
+  });
+
+  it("throws the fallback message on a network error", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("down"));
+
+    await expect(fetchFolders()).rejects.toThrow();
+  });
+});
+
+describe("postFolder", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("POSTs the name and returns ok with the created folder on 2xx", async () => {
+    const folder = { id: "f1", name: "Books", slug: "books", linkCount: 0 };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(folder), { status: 201 }),
+    );
+
+    const result = await postFolder("Books");
+
+    expect(fetchSpy).toHaveBeenCalledWith("/api/folders", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        [LINKS_ORIGIN_HEADER]: LINKS_CLIENT_ORIGIN,
+      },
+      body: JSON.stringify({ name: "Books" }),
+    });
+    expect(result).toEqual({ ok: true, data: folder });
+  });
+
+  it("returns the body's error on a 409", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: "You already have a folder with that name." }),
+        { status: 409 },
+      ),
+    );
+
+    const result = await postFolder("Books");
+
+    expect(result).toEqual({
+      ok: false,
+      error: "You already have a folder with that name.",
+    });
+  });
+
+  it("returns the fallback error when the request throws", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network down"));
+
+    const result = await postFolder("Books");
+
+    expect(result).toEqual({
+      ok: false,
+      error: "Something went wrong. Try again.",
+    });
+  });
+
+  it("returns the fallback error when the error body has no error field", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("not json", { status: 500 }),
+    );
+
+    const result = await postFolder("Books");
+
+    expect(result).toEqual({
+      ok: false,
+      error: "Something went wrong. Try again.",
+    });
+  });
+});
+
+describe("patchFolder", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("PATCHes /api/folders/[id] with the new name", async () => {
+    const folder = { id: "f1", name: "Renamed", slug: "renamed", linkCount: 2 };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(folder), { status: 200 }),
+    );
+
+    const result = await patchFolder("f1", "Renamed");
+
+    expect(fetchSpy).toHaveBeenCalledWith("/api/folders/f1", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        [LINKS_ORIGIN_HEADER]: LINKS_CLIENT_ORIGIN,
+      },
+      body: JSON.stringify({ name: "Renamed" }),
+    });
+    expect(result).toEqual({ ok: true, data: folder });
+  });
+
+  it("returns 404's body error", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "Folder not found" }), {
+        status: 404,
+      }),
+    );
+
+    const result = await patchFolder("missing", "Renamed");
+
+    expect(result).toEqual({ ok: false, error: "Folder not found" });
+  });
+});
+
+describe("removeFolder", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("DELETEs /api/folders/[id] with withLinks in the query string", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ deletedLinks: 3 }), { status: 200 }),
+    );
+
+    const result = await removeFolder("f1", true);
+
+    expect(fetchSpy).toHaveBeenCalledWith("/api/folders/f1?withLinks=true", {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        [LINKS_ORIGIN_HEADER]: LINKS_CLIENT_ORIGIN,
+      },
+    });
+    expect(result).toEqual({ ok: true, data: { deletedLinks: 3 } });
+  });
+
+  it("sends withLinks=false", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ deletedLinks: 0 }), { status: 200 }),
+    );
+
+    await removeFolder("f1", false);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/folders/f1?withLinks=false",
+      expect.anything(),
+    );
+  });
+
+  it("returns the fallback error on a network throw", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("down"));
+
+    const result = await removeFolder("f1", true);
+
+    expect(result).toEqual({
+      ok: false,
+      error: "Something went wrong. Try again.",
+    });
+  });
+});
+
+describe("patchLinkFolder", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("PATCHes /api/links/[id] with folderId", async () => {
+    const link = { id: "l1", folderId: "f1" };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(link), { status: 200 }),
+    );
+
+    const result = await patchLinkFolder("l1", "f1");
+
+    expect(fetchSpy).toHaveBeenCalledWith("/api/links/l1", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        [LINKS_ORIGIN_HEADER]: LINKS_CLIENT_ORIGIN,
+      },
+      body: JSON.stringify({ folderId: "f1" }),
+    });
+    expect(result).toEqual({ ok: true, data: link });
+  });
+
+  it("sends folderId: null to unfile", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "l1", folderId: null }), {
+        status: 200,
+      }),
+    );
+
+    await patchLinkFolder("l1", null);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/links/l1",
+      expect.objectContaining({ body: JSON.stringify({ folderId: null }) }),
+    );
+  });
+
+  it("returns a 404's body error for a foreign link", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "Not found" }), { status: 404 }),
+    );
+
+    const result = await patchLinkFolder("l1", "f1");
+
+    expect(result).toEqual({ ok: false, error: "Not found" });
+  });
+});

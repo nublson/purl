@@ -2,6 +2,7 @@ import "server-only";
 
 import { auth } from "@/lib/auth";
 import { SaveLimitError } from "@/lib/entitlements";
+import { FolderNotFoundError, listFoldersForUser } from "@/lib/folders";
 import {
   createLinkForUser,
   listLinksForUser,
@@ -48,18 +49,25 @@ export function errorContent(message: string): ToolResult {
 export async function saveLinkTool(
   userId: string,
   url: string,
+  folderId?: string,
 ): Promise<ToolResult> {
   const trimmed = url.trim();
   if (!trimmed || !isValidUrl(trimmed)) {
     return errorContent("Invalid or missing URL.");
   }
   try {
-    const link = await createLinkForUser(userId, trimmed);
+    // A falsy `folderId` (omitted or "") means "no folder".
+    const link = folderId
+      ? await createLinkForUser(userId, trimmed, { folderId })
+      : await createLinkForUser(userId, trimmed);
     broadcastLinksChanged(link.userId);
-    return jsonContent(serializeLink(link));
+    return jsonContent({ ...serializeLink(link), moved: link.moved });
   } catch (e) {
     if (e instanceof SaveLimitError) {
       return errorContent(`Limit reached: ${e.message}`);
+    }
+    if (e instanceof FolderNotFoundError) {
+      return errorContent("Folder not found");
     }
     throw e;
   }
@@ -69,21 +77,36 @@ export type ListSavedItemsArgs = {
   contentType?: string;
   limit?: number;
   cursor?: string;
+  folderId?: string;
 };
 
 export async function listSavedItemsTool(
   userId: string,
   args: ListSavedItemsArgs,
 ): Promise<ToolResult> {
-  const result = await listLinksForUser(userId, {
-    limit: args.limit ?? 50,
-    cursor: args.cursor ?? null,
-    contentType: args.contentType ?? null,
-  });
-  return jsonContent({
-    data: result.links.map(serializeLink),
-    nextCursor: result.nextCursor,
-  });
+  try {
+    const result = await listLinksForUser(userId, {
+      limit: args.limit ?? 50,
+      cursor: args.cursor ?? null,
+      contentType: args.contentType ?? null,
+      // An empty `folderId` means "no folder filter", same as omitting it.
+      folderId: args.folderId || undefined,
+    });
+    return jsonContent({
+      data: result.links.map(serializeLink),
+      nextCursor: result.nextCursor,
+    });
+  } catch (e) {
+    if (e instanceof FolderNotFoundError) {
+      return errorContent("Folder not found");
+    }
+    throw e;
+  }
+}
+
+export async function listFoldersTool(userId: string): Promise<ToolResult> {
+  const folders = await listFoldersForUser(userId);
+  return jsonContent(folders);
 }
 
 export async function getLinkTool(
@@ -102,8 +125,12 @@ export function registerPurlTools(server: McpServer): void {
     "Save a URL (web page, PDF, YouTube video, or audio) to the user's library.",
     {
       url: z.string().describe("The URL to save"),
+      folderId: z
+        .string()
+        .optional()
+        .describe("Folder id from list_folders to save into"),
     },
-    async ({ url }, extra) => saveLinkTool(getUserId(extra), url),
+    async ({ url, folderId }, extra) => saveLinkTool(getUserId(extra), url, folderId),
   );
 
   server.tool(
@@ -124,6 +151,10 @@ export function registerPurlTools(server: McpServer): void {
         .describe(
           "Pagination cursor taken from a previous response's nextCursor",
         ),
+      folderId: z
+        .string()
+        .optional()
+        .describe("Folder id from list_folders to filter by"),
     },
     async (args, extra) => listSavedItemsTool(getUserId(extra), args),
   );
@@ -135,6 +166,13 @@ export function registerPurlTools(server: McpServer): void {
       id: z.string().describe("The link id"),
     },
     async ({ id }, extra) => getLinkTool(getUserId(extra), id),
+  );
+
+  server.tool(
+    "list_folders",
+    "List the user's folders (collections of saved links) with id, name and link count",
+    {},
+    async (_args, extra) => listFoldersTool(getUserId(extra)),
   );
 }
 

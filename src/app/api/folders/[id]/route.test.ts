@@ -1,0 +1,214 @@
+import { NextRequest } from "next/server";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mockGetBrowserSessionUserId = vi.fn();
+vi.mock("@/lib/require-browser-session", () => ({
+  getBrowserSessionUserId: mockGetBrowserSessionUserId,
+}));
+
+const mockRenameFolder = vi.fn();
+const mockDeleteFolder = vi.fn();
+vi.mock("@/lib/folders", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/folders")>(
+    "@/lib/folders",
+  );
+  return {
+    ...actual,
+    renameFolder: mockRenameFolder,
+    deleteFolder: mockDeleteFolder,
+  };
+});
+
+const mockBroadcastLinksChanged = vi.fn();
+vi.mock("@/lib/realtime-broadcast", () => ({
+  broadcastLinksChanged: mockBroadcastLinksChanged,
+}));
+
+const { PATCH, DELETE } = await import("./route");
+const { FolderNameError, FolderNotFoundError, FolderLimitError } =
+  await import("@/lib/folders");
+
+function ctx(id = "f1") {
+  return { params: Promise.resolve({ id }) };
+}
+
+function patchRequest(body: unknown) {
+  return new NextRequest("http://localhost/api/folders/f1", {
+    method: "PATCH",
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+}
+
+function deleteRequest(query = "") {
+  return new NextRequest(`http://localhost/api/folders/f1${query}`, {
+    method: "DELETE",
+  });
+}
+
+describe("PATCH /api/folders/[id]", () => {
+  beforeEach(() => {
+    mockGetBrowserSessionUserId.mockReset();
+    mockRenameFolder.mockReset();
+    mockDeleteFolder.mockReset();
+    mockBroadcastLinksChanged.mockReset();
+  });
+
+  it("returns 401 when there is no browser session", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue(null);
+    const res = await PATCH(patchRequest({ name: "Reading" }), ctx());
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Unauthorized" });
+    expect(mockRenameFolder).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 Invalid JSON body for a non-JSON body", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    const res = await PATCH(patchRequest("not json"), ctx());
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid JSON body" });
+  });
+
+  it("returns 400 NAME_EMPTY for a non-string name", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockRenameFolder.mockRejectedValue(
+      new FolderNameError("empty", "Give your folder a name."),
+    );
+    const res = await PATCH(patchRequest({ name: null }), ctx());
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Give your folder a name.",
+      code: "NAME_EMPTY",
+    });
+    expect(mockRenameFolder).toHaveBeenCalledWith("user-1", "f1", "");
+  });
+
+  it("returns 400 NAME_TOO_LONG for an over-long name", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockRenameFolder.mockRejectedValue(
+      new FolderNameError("too_long", "Keep it under 60 characters."),
+    );
+    const res = await PATCH(patchRequest({ name: "a".repeat(70) }), ctx());
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Keep it under 60 characters.",
+      code: "NAME_TOO_LONG",
+    });
+  });
+
+  it("returns 409 NAME_TAKEN when the name collides", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockRenameFolder.mockRejectedValue(
+      new FolderNameError("taken", "You already have a folder with that name."),
+    );
+    const res = await PATCH(patchRequest({ name: "Reading" }), ctx());
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      error: "You already have a folder with that name.",
+      code: "NAME_TAKEN",
+    });
+  });
+
+  it("returns 403 LIMIT_REACHED/FOLDER_LIMIT when the lib throws it", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockRenameFolder.mockRejectedValue(
+      new FolderLimitError("You can have up to 100 folders."),
+    );
+    const res = await PATCH(patchRequest({ name: "Reading" }), ctx());
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({
+      error: "You can have up to 100 folders.",
+      code: "LIMIT_REACHED",
+      feature: "FOLDER_LIMIT",
+    });
+  });
+
+  it("returns 404 Folder not found on FolderNotFoundError", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockRenameFolder.mockRejectedValue(new FolderNotFoundError());
+    const res = await PATCH(patchRequest({ name: "Reading" }), ctx());
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Folder not found" });
+  });
+
+  it("returns 200 with the renamed folder and broadcasts the change", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    const updated = { id: "f1", name: "Reading", slug: "reading", linkCount: 2 };
+    mockRenameFolder.mockResolvedValue(updated);
+
+    const res = await PATCH(patchRequest({ name: "Reading" }), ctx());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(updated);
+    expect(mockRenameFolder).toHaveBeenCalledWith("user-1", "f1", "Reading");
+    expect(mockBroadcastLinksChanged).toHaveBeenCalledWith("user-1", null);
+  });
+});
+
+describe("DELETE /api/folders/[id]", () => {
+  beforeEach(() => {
+    mockGetBrowserSessionUserId.mockReset();
+    mockRenameFolder.mockReset();
+    mockDeleteFolder.mockReset();
+    mockBroadcastLinksChanged.mockReset();
+  });
+
+  it("returns 401 when there is no browser session", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue(null);
+    const res = await DELETE(deleteRequest(), ctx());
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Unauthorized" });
+    expect(mockDeleteFolder).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 Folder not found on FolderNotFoundError", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockDeleteFolder.mockRejectedValue(new FolderNotFoundError());
+    const res = await DELETE(deleteRequest(), ctx());
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Folder not found" });
+  });
+
+  it("parses withLinks=true and passes withLinks: true", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockDeleteFolder.mockResolvedValue({ deletedLinks: 3 });
+
+    const res = await DELETE(deleteRequest("?withLinks=true"), ctx());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ deletedLinks: 3 });
+    expect(mockDeleteFolder).toHaveBeenCalledWith("user-1", "f1", {
+      withLinks: true,
+    });
+  });
+
+  it("treats any non-'true' withLinks value as false", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockDeleteFolder.mockResolvedValue({ deletedLinks: 0 });
+
+    const res = await DELETE(deleteRequest("?withLinks=1"), ctx());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ deletedLinks: 0 });
+    expect(mockDeleteFolder).toHaveBeenCalledWith("user-1", "f1", {
+      withLinks: false,
+    });
+  });
+
+  it("defaults withLinks to false when absent", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockDeleteFolder.mockResolvedValue({ deletedLinks: 0 });
+
+    const res = await DELETE(deleteRequest(), ctx());
+    expect(res.status).toBe(200);
+    expect(mockDeleteFolder).toHaveBeenCalledWith("user-1", "f1", {
+      withLinks: false,
+    });
+  });
+
+  it("returns 200 and broadcasts the change on success", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockDeleteFolder.mockResolvedValue({ deletedLinks: 5 });
+
+    const res = await DELETE(deleteRequest("?withLinks=true"), ctx());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ deletedLinks: 5 });
+    expect(mockBroadcastLinksChanged).toHaveBeenCalledWith("user-1", null);
+  });
+});

@@ -31,6 +31,7 @@ model User {
   sessions      Session[]
   accounts      Account[]
   links         Link[]
+  folders       Folder[]
 
   @@unique([email])
   @@map("users")
@@ -48,9 +49,28 @@ model Link {
   createdAt   DateTime    @default(now())
   userId      String
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folderId    String?
+  folder      Folder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
+  @@index([userId, folderId, createdAt])
   @@map("links")
+}
+
+model Folder {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  links     Link[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@unique([userId, slug])
+  @@index([userId, createdAt])
+  @@map("folders")
 }
 
 model Session {

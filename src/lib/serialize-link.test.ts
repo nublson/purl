@@ -90,4 +90,19 @@ describe("serializeLink", () => {
     const roundtripped = JSON.parse(JSON.stringify(result));
     expect(roundtripped.createdAt).toBe(BASE_DATE.toISOString());
   });
+
+  it("returns folderId: null when the field is absent", () => {
+    const result = serializeLink(makeLink());
+    expect(result.folderId).toBeNull();
+  });
+
+  it("preserves a non-null folderId", () => {
+    const result = serializeLink(makeLink({ folderId: "folder-1" }));
+    expect(result.folderId).toBe("folder-1");
+  });
+
+  it("returns folderId: null when the field is explicitly null", () => {
+    const result = serializeLink(makeLink({ folderId: null }));
+    expect(result.folderId).toBeNull();
+  });
 });

@@ -6,3 +6,6 @@ export const HOME_LINKS_PAGE_SIZE = 30;
 
 /** Max results returned by the header search. */
 export const LINK_SEARCH_LIMIT = 20;
+
+/** Per-account cap on folders. */
+export const MAX_FOLDERS = 100;
