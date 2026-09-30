@@ -12,7 +12,11 @@ export async function HomeShellLoader() {
     getRequestTimeZone(),
   ]);
   return (
+    // `key` forces a remount (fresh `groups`/`nextCursor` state) when
+    // navigating between /home and a folder page, or between two folder
+    // pages — HomeShell otherwise keeps the previous view's list state.
     <HomeShell
+      key="all"
       userId={user?.id ?? null}
       initialGroups={groupLinksByDate(links, { timeZone })}
       initialNextCursor={nextCursor}

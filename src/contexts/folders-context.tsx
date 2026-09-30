@@ -50,20 +50,44 @@ const byName = (a: FolderSummary, b: FolderSummary) =>
  * already in flight when a local patch lands is stale by definition (its
  * response predates the mutation), so its result is dropped instead of
  * overwriting the patch; the next version bump or `refresh()` reconciles.
+ *
+ * `initialFolders` seeds the list from the layout's own server-side lookup
+ * (see `(private)/(app)/layout.tsx`) so `useCurrentFolder()` already
+ * resolves correctly on the very first render everywhere the provider
+ * reaches — including a save made before the client-side refetch below
+ * would otherwise have landed. Passing it also starts `isLoading` at
+ * `false` instead of `true`.
  */
-export function FoldersProvider({ children }: { children: ReactNode }) {
+export function FoldersProvider({
+  children,
+  initialFolders,
+}: {
+  children: ReactNode;
+  initialFolders?: FolderSummary[];
+}) {
   const { version } = useLinksSyncState();
-  const [folders, setFolders] = useState<FolderSummary[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [folders, setFolders] = useState<FolderSummary[]>(
+    initialFolders ?? [],
+  );
+  const [isLoading, setIsLoading] = useState(!initialFolders);
   const [refreshToken, setRefreshToken] = useState(0);
   const mutationCountRef = useRef(0);
+  // True once the effect below has run once while seeded. Lets the very
+  // first (mount) run skip its fetch when server-seeded data is already
+  // fresh, while any later run — a version bump or refresh() — still
+  // fetches normally.
+  const skippedSeededMountRef = useRef(false);
 
   useEffect(() => {
+    if (initialFolders !== undefined && !skippedSeededMountRef.current) {
+      skippedSeededMountRef.current = true;
+      return;
+    }
     let cancelled = false;
     const mutationCountAtStart = mutationCountRef.current;
-    // Only the initial mount shows a loading state; a version bump or
-    // refresh() re-fetches silently in the background, the same pattern
-    // HomeShell's own `reload()` follows.
+    // Only the initial (unseeded) mount shows a loading state; a version
+    // bump or refresh() re-fetches silently in the background, the same
+    // pattern HomeShell's own `reload()` follows.
     fetchFolders()
       .then((data) => {
         if (cancelled) return;
@@ -79,6 +103,11 @@ export function FoldersProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
+    // `initialFolders` is intentionally omitted: it only matters for the
+    // one-time skip check above, keyed off `skippedSeededMountRef` rather
+    // than the value itself, so reacting to it here would refetch on a
+    // parent re-render that happens to pass a new (but equivalent) array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version, refreshToken]);
 
   const refresh = useCallback(() => setRefreshToken((t) => t + 1), []);
