@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-30
 **Status:** Approved in brainstorming, pending spec review
-**Branch:** `feat/folders`
+**Branch:** `feat/folders-backend` (backend; UI + wiring on a follow-up branch)
 
 ## Goal
 
