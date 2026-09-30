@@ -1,25 +1,9 @@
-import {
-  createFolder,
-  FolderLimitError,
-  FolderNameError,
-  listFoldersForUser,
-} from "@/lib/folders";
+import { createFolder, listFoldersForUser } from "@/lib/folders";
+import { mapFolderError } from "@/lib/folder-errors";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { LINKS_ORIGIN_HEADER, parseLinksOrigin } from "@/lib/realtime-constants";
 import { getBrowserSessionUserId } from "@/lib/require-browser-session";
 import { NextRequest, NextResponse } from "next/server";
-
-const NAME_ERROR_CODES: Record<FolderNameError["reason"], string> = {
-  empty: "NAME_EMPTY",
-  too_long: "NAME_TOO_LONG",
-  taken: "NAME_TAKEN",
-};
-
-const NAME_ERROR_STATUS: Record<FolderNameError["reason"], number> = {
-  empty: 400,
-  too_long: 400,
-  taken: 409,
-};
 
 export async function GET(_request: NextRequest) {
   const userId = await getBrowserSessionUserId();
@@ -54,18 +38,8 @@ export async function POST(request: NextRequest) {
     );
     return NextResponse.json(folder, { status: 201 });
   } catch (e) {
-    if (e instanceof FolderNameError) {
-      return NextResponse.json(
-        { error: e.message, code: NAME_ERROR_CODES[e.reason] },
-        { status: NAME_ERROR_STATUS[e.reason] },
-      );
-    }
-    if (e instanceof FolderLimitError) {
-      return NextResponse.json(
-        { error: e.message, code: "LIMIT_REACHED", feature: e.feature },
-        { status: 403 },
-      );
-    }
+    const mapped = mapFolderError(e);
+    if (mapped) return mapped;
     throw e;
   }
 }

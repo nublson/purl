@@ -28,6 +28,13 @@ vi.mock("@/lib/entitlements", () => ({
   SaveLimitError: MockSaveLimitError,
 }));
 
+class MockFolderNotFoundError extends Error {
+  constructor() { super("Folder not found."); }
+}
+vi.mock("@/lib/folders", () => ({
+  FolderNotFoundError: MockFolderNotFoundError,
+}));
+
 const MOCK_LINK = {
   id: "link-1",
   url: "https://example.com",
@@ -93,6 +100,35 @@ describe("GET /api/v1/links", () => {
     expect(mockListLinks).toHaveBeenCalledWith(
       expect.objectContaining({ contentType: null })
     );
+  });
+
+  it("passes folderId from query params", async () => {
+    mockListLinks.mockResolvedValue({ links: [], nextCursor: null });
+    const { GET } = await import("./route");
+    await GET(new NextRequest("http://localhost/api/v1/links?folderId=folder-1"));
+    expect(mockListLinks).toHaveBeenCalledWith(
+      expect.objectContaining({ folderId: "folder-1" })
+    );
+  });
+
+  it("omits folderId when not provided", async () => {
+    mockListLinks.mockResolvedValue({ links: [], nextCursor: null });
+    const { GET } = await import("./route");
+    await GET(new NextRequest("http://localhost/api/v1/links"));
+    expect(mockListLinks).toHaveBeenCalledWith(
+      expect.not.objectContaining({ folderId: expect.anything() })
+    );
+  });
+
+  it("returns 404 for an unknown folderId", async () => {
+    mockListLinks.mockRejectedValue(new MockFolderNotFoundError());
+    const { GET } = await import("./route");
+    const res = await GET(
+      new NextRequest("http://localhost/api/v1/links?folderId=missing")
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Folder not found" });
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   });
 });
 
@@ -183,6 +219,36 @@ describe("POST /api/v1/links", () => {
       })
     );
     expect(res.status).toBe(400);
+  });
+
+  it("passes folderId through to createLink", async () => {
+    mockCreateLink.mockResolvedValue(MOCK_LINK);
+    const { POST } = await import("./route");
+    await POST(
+      new NextRequest("http://localhost/api/v1/links", {
+        method: "POST",
+        body: JSON.stringify({ url: "https://example.com", folderId: "folder-1" }),
+        headers: { "content-type": "application/json" },
+      })
+    );
+    expect(mockCreateLink).toHaveBeenCalledWith("https://example.com", {
+      folderId: "folder-1",
+    });
+  });
+
+  it("returns 404 for an unknown folderId", async () => {
+    mockCreateLink.mockRejectedValue(new MockFolderNotFoundError());
+    const { POST } = await import("./route");
+    const res = await POST(
+      new NextRequest("http://localhost/api/v1/links", {
+        method: "POST",
+        body: JSON.stringify({ url: "https://example.com", folderId: "missing" }),
+        headers: { "content-type": "application/json" },
+      })
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Folder not found" });
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   });
 });
 
