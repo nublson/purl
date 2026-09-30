@@ -1,5 +1,6 @@
 "use client";
 
+import { useCurrentFolder } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { requestSaveUrl, saveLink } from "@/lib/save-link";
 import { Chromium, ClipboardPaste, ExternalLink, Plus } from "lucide-react";
@@ -44,6 +45,7 @@ function isApplePlatform() {
  */
 export function HeaderSaveLink() {
   const { notifyLinksChanged } = useLinksSyncActions();
+  const currentFolder = useCurrentFolder();
   const hintId = useId();
 
   async function handlePasteLink() {
@@ -64,9 +66,16 @@ export function HeaderSaveLink() {
     // Prefer the page's paste flow (optimistic row, list refresh).
     if (requestSaveUrl(text)) return;
 
-    const result = await saveLink(text);
+    const result = await saveLink(
+      text,
+      currentFolder
+        ? { folder: { id: currentFolder.id, name: currentFolder.name } }
+        : undefined,
+    );
     if (result && "id" in result) {
-      toast.success("Link saved");
+      // saveLink already toasts "Saved to {name}"/"Moved to {name}" when a
+      // folder is passed; avoid a second "Link saved" toast on top of it.
+      if (!currentFolder) toast.success("Link saved");
       notifyLinksChanged();
     }
   }

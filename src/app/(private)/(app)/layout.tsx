@@ -5,6 +5,7 @@ import { HeaderActionsFallback } from "@/components/skeletons";
 import { User } from "@/components/user";
 import { getEnabledProviders } from "@/lib/auth-providers";
 import { CurrentUserProvider } from "@/contexts/current-user-context";
+import { FoldersProvider } from "@/contexts/folders-context";
 import { LinksSyncProvider } from "@/contexts/links-sync-context";
 import { UsageProvider } from "@/contexts/usage-context";
 import { getSessionUser } from "@/lib/session";
@@ -38,17 +39,19 @@ export default function AppShellLayout({
   // changes made in the list, and vice versa.
   return (
     <LinksSyncProvider>
-      <Header
-        pathname="/home"
-        actions={
-          <Suspense fallback={<HeaderActionsFallback />}>
-            <HeaderActions />
-          </Suspense>
-        }
-      />
-      <main className="flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-4 md:px-0">
-        {children}
-      </main>
+      <FoldersProvider>
+        <Header
+          pathname="/home"
+          actions={
+            <Suspense fallback={<HeaderActionsFallback />}>
+              <HeaderActions />
+            </Suspense>
+          }
+        />
+        <main className="flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-4 md:px-0">
+          {children}
+        </main>
+      </FoldersProvider>
     </LinksSyncProvider>
   );
 }

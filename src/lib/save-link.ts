@@ -9,7 +9,13 @@ export type SaveLinkResult =
   | { error: string; limit?: boolean }
   | null;
 
-export async function saveLink(rawUrl: string): Promise<SaveLinkResult> {
+/** Folder to file a save into: `useCurrentFolder()` on a folder page, or omitted on /home. */
+export type SaveLinkFolder = { id: string; name: string };
+
+export async function saveLink(
+  rawUrl: string,
+  opts?: { folder?: SaveLinkFolder },
+): Promise<SaveLinkResult> {
   const url = rawUrl.trim();
 
   if (!isValidUrl(url)) {
@@ -17,17 +23,23 @@ export async function saveLink(rawUrl: string): Promise<SaveLinkResult> {
     return null;
   }
 
+  const folder = opts?.folder;
+
   try {
+    const body: { url: string; folderId?: string } = { url };
+    if (folder) body.folderId = folder.id;
+
     const res = await fetch("/api/links", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...linksOriginHeaders },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify(body),
     });
 
     const data = (await res.json().catch(() => ({}))) as {
       id?: string;
       error?: string;
       code?: string;
+      moved?: boolean;
     };
     if (!res.ok) {
       const msg = data?.error ?? "Unable to save the link. Try again.";
@@ -41,6 +53,11 @@ export async function saveLink(rawUrl: string): Promise<SaveLinkResult> {
       toast.error("Unable to save the link. Try again.");
       return { error: "Invalid response" };
     }
+
+    if (folder) {
+      toast.success(data.moved ? `Moved to ${folder.name}` : `Saved to ${folder.name}`);
+    }
+
     return { id };
   } catch {
     toast.error("Unable to save the link. Check your connection and try again.");
