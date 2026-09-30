@@ -1,4 +1,5 @@
 import { SaveLimitError } from "@/lib/entitlements";
+import { FolderNotFoundError } from "@/lib/folders";
 import {
   createLink,
   getLinksPageForCurrentUser,
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
     ? Math.min(Math.max(Math.trunc(rawLimit), 1), MAX_SAVED_LINKS)
     : HOME_LINKS_PAGE_SIZE;
   const cursor = params.get("cursor");
+  const folderId = params.get("folderId") ?? undefined;
 
   const timeZone = resolveRequestTimeZone({
     cookie: request.cookies.get(TIME_ZONE_COOKIE)?.value,
@@ -55,7 +57,7 @@ export async function GET(request: NextRequest) {
   });
 
   try {
-    const page = await getLinksPageForCurrentUser(limit, cursor, true);
+    const page = await getLinksPageForCurrentUser(limit, cursor, true, folderId);
     return NextResponse.json({
       groups: groupLinksByDate(page.links, { timeZone }),
       nextCursor: page.nextCursor,
@@ -66,12 +68,15 @@ export async function GET(request: NextRequest) {
     if (e instanceof UnauthorizedError) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    if (e instanceof FolderNotFoundError) {
+      return NextResponse.json({ error: "Folder not found" }, { status: 404 });
+    }
     throw e;
   }
 }
 
 export async function POST(request: NextRequest) {
-  let body: { url?: string };
+  let body: { url?: string; folderId?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -89,15 +94,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const hasFolderId = body?.folderId !== undefined;
+  if (hasFolderId && typeof body.folderId !== "string") {
+    return withCors(
+      request,
+      NextResponse.json({ error: "Invalid folder" }, { status: 400 }),
+    );
+  }
+  const folderId = hasFolderId ? (body.folderId as string) : undefined;
+
   try {
-    const link = await createLink(url);
+    const link = await createLink(
+      url,
+      folderId !== undefined ? { folderId } : undefined,
+    );
     broadcastLinksChanged(
       link.userId,
       parseLinksOrigin(request.headers.get(LINKS_ORIGIN_HEADER)),
     );
     return withCors(
       request,
-      NextResponse.json(serializeLink(link), { status: 201 }),
+      NextResponse.json(
+        { ...serializeLink(link), moved: link.moved },
+        { status: 201 },
+      ),
     );
   } catch (e) {
     if (e instanceof UnauthorizedError) {
@@ -113,6 +133,12 @@ export async function POST(request: NextRequest) {
           { error: e.message, code: "LIMIT_REACHED", feature: e.feature },
           { status: 403 },
         ),
+      );
+    }
+    if (e instanceof FolderNotFoundError) {
+      return withCors(
+        request,
+        NextResponse.json({ error: "Folder not found" }, { status: 404 }),
       );
     }
     throw e;
