@@ -278,6 +278,7 @@ describe("POST /api/links", () => {
         domain: "example.com",
         contentType: "WEB",
         createdAt: CREATED_AT.toISOString(),
+        folderId: null,
       });
     });
 

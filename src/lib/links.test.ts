@@ -34,8 +34,16 @@ vi.mock("@/lib/realtime-broadcast", () => ({
   broadcastLinksChanged: vi.fn(),
 }));
 
+vi.mock("@/lib/folders", () => ({
+  assertFolderOwned: vi.fn(),
+  FolderNotFoundError: class FolderNotFoundError extends Error {
+    readonly name = "FolderNotFoundError";
+  },
+}));
+
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
+const { assertFolderOwned, FolderNotFoundError } = await import("@/lib/folders");
 const { getLinksPageForCurrentUser, UnauthorizedError, listLinks } = await import("./links");
 
 const MOCK_SESSION = { user: { id: "user-123", username: "user-123" }, session: {} };
@@ -155,6 +163,7 @@ describe("listLinks", () => {
   beforeEach(() => {
     vi.mocked(auth.api.getSession).mockReset();
     vi.mocked(prisma.link.findMany).mockReset();
+    vi.mocked(assertFolderOwned).mockReset().mockResolvedValue(undefined);
   });
 
   it("throws UnauthorizedError when not authenticated", async () => {
@@ -242,5 +251,43 @@ describe("listLinks", () => {
         where: { userId: "user-123" },
       })
     );
+  });
+
+  it("puts folderId in the where alongside the keyset OR cursor clause", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.findMany).mockResolvedValue([] as never);
+    const createdAt = new Date("2025-01-01T12:00:00.000Z");
+    await listLinks({
+      limit: 50,
+      cursor: `${createdAt.toISOString()}_link-7`,
+      contentType: null,
+      folderId: "folder-1",
+    });
+    expect(vi.mocked(assertFolderOwned)).toHaveBeenCalledWith(
+      "user-123",
+      "folder-1",
+    );
+    expect(vi.mocked(prisma.link.findMany)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          userId: "user-123",
+          folderId: "folder-1",
+          OR: [
+            { createdAt: { lt: createdAt } },
+            { createdAt, id: { lt: "link-7" } },
+          ],
+        },
+      }),
+    );
+  });
+
+  it("throws FolderNotFoundError for a foreign folderId and does not query links", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(assertFolderOwned).mockRejectedValue(new FolderNotFoundError());
+
+    await expect(
+      listLinks({ limit: 50, cursor: null, contentType: null, folderId: "foreign" }),
+    ).rejects.toThrow(FolderNotFoundError);
+    expect(vi.mocked(prisma.link.findMany)).not.toHaveBeenCalled();
   });
 });

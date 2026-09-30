@@ -120,6 +120,7 @@ describe("links/[id] API route", () => {
         domain: "example.com",
         contentType: "WEB",
         createdAt: createdAt.toISOString(),
+        folderId: null,
       });
     });
   });

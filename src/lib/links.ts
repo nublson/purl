@@ -1,5 +1,6 @@
 import type { ContentType } from "@/generated/prisma/enums";
 import { assertCanSaveLink } from "@/lib/entitlements";
+import { assertFolderOwned } from "@/lib/folders";
 import {
   OG_HTML_READ_MAX_BYTES,
   readHtmlForOpenGraph,
@@ -353,10 +354,13 @@ export const getLinksPageForCurrentUser = cache(
     limit: number,
     cursor: string | null = null,
     withTotal = false,
+    folderId?: string,
   ): Promise<LinksPage> => {
     const userId = await getCurrentUserId();
+    // `total` always reflects the user's overall saved-link count (the Usage
+    // meter), regardless of `folderId` filtering the returned page.
     const [{ links, nextCursor }, total] = await Promise.all([
-      listLinksForUser(userId, { limit, cursor, contentType: null }),
+      listLinksForUser(userId, { limit, cursor, contentType: null, folderId }),
       withTotal ? prisma.link.count({ where: { userId } }) : undefined,
     ]);
     return { links: links.map(mapRowToLink), nextCursor, total };
@@ -418,22 +422,62 @@ export async function refreshLink(
   return refreshed;
 }
 
+export type CreateLinkOptions = {
+  folderId?: string;
+};
+
 /** Creates a link for the current user after scraping metadata. If a link with the same URL already exists, updates its createdAt and returns it. Throws UnauthorizedError if not authenticated. */
-export async function createLink(url: string): Promise<CreateLinkResult> {
+export async function createLink(
+  url: string,
+  opts?: CreateLinkOptions,
+): Promise<CreateLinkResult & { moved: boolean }> {
   const userId = await getCurrentUserId();
-  return createLinkForUser(userId, url);
+  return createLinkForUser(userId, url, opts);
 }
 
-/** Creates a link for an explicit user id. Used where the caller has already resolved the user (e.g. the MCP server via bearer token). */
+/**
+ * Creates a link for an explicit user id. Used where the caller has already
+ * resolved the user (e.g. the MCP server via bearer token).
+ *
+ * `opts.folderId`, when given, must be owned by `userId` (checked via
+ * `assertFolderOwned`, which throws `FolderNotFoundError` otherwise). For a
+ * new URL the link is created directly in that folder. For an existing URL,
+ * the folder is only changed when `opts.folderId` is explicitly provided and
+ * differs from the link's current folder — re-saving with no `folderId`
+ * leaves the link's folder untouched. `moved` reports whether the folder
+ * changed as a result of this call.
+ */
 export async function createLinkForUser(
   userId: string,
   url: string,
-): Promise<CreateLinkResult> {
+  opts?: CreateLinkOptions,
+): Promise<CreateLinkResult & { moved: boolean }> {
+  if (opts?.folderId !== undefined) {
+    await assertFolderOwned(userId, opts.folderId);
+  }
+
   const existing = await prisma.link.findFirst({
     where: { userId, url },
   });
+
   if (existing) {
-    return (await refreshLink(existing.id)) ?? existing;
+    // NOTE: refreshLink resolves the acting user from the session rather
+    // than `userId` — a pre-existing coupling that predates this change (see
+    // task report). The folder move below is explicitly scoped by `userId`
+    // via the `existing` row already looked up above, independent of that.
+    const refreshed = (await refreshLink(existing.id)) ?? existing;
+    const requestedFolderId = opts?.folderId;
+    if (
+      requestedFolderId === undefined ||
+      requestedFolderId === existing.folderId
+    ) {
+      return { ...refreshed, moved: false };
+    }
+    const moved = await prisma.link.update({
+      where: { id: existing.id },
+      data: { folderId: requestedFolderId },
+    });
+    return { ...refreshed, ...moved, moved: true };
   }
 
   await assertCanSaveLink(userId);
@@ -450,9 +494,10 @@ export async function createLinkForUser(
       domain: resolved.domain,
       contentType: resolved.contentType,
       userId,
+      ...(opts?.folderId !== undefined ? { folderId: opts.folderId } : {}),
     },
   });
-  return link;
+  return { ...link, moved: false };
 }
 
 /** Fetches a single link if it belongs to the current user; otherwise null. Throws UnauthorizedError if not authenticated. */
@@ -524,6 +569,33 @@ export async function updateLink(
   });
 }
 
+/**
+ * Moves a link into `folderId` (or clears it with `null`) if the link belongs
+ * to `userId`. Returns null when the link is not found or not owned (routes
+ * map this to 404). Throws `FolderNotFoundError` when `folderId` is a
+ * non-null id not owned by `userId`.
+ */
+export async function moveLinkToFolder(
+  userId: string,
+  linkId: string,
+  folderId: string | null,
+): Promise<Link | null> {
+  const existing = await prisma.link.findFirst({
+    where: { id: linkId, userId },
+  });
+  if (!existing) return null;
+
+  if (folderId !== null) {
+    await assertFolderOwned(userId, folderId);
+  }
+
+  const updated = await prisma.link.update({
+    where: { id: linkId },
+    data: { folderId },
+  });
+  return mapRowToLink(updated);
+}
+
 /** Deletes a link if it belongs to the current user. Returns true if deleted, false if not found or not owned. Throws UnauthorizedError if not authenticated. */
 export async function deleteLink(id: string): Promise<boolean> {
   const userId = await getCurrentUserId();
@@ -539,6 +611,7 @@ export type ListLinksOptions = {
   limit: number;
   cursor: string | null;
   contentType: string | null;
+  folderId?: string;
 };
 
 export type ListLinksResult = {
@@ -577,11 +650,16 @@ export async function listLinksForUser(
   userId: string,
   opts: ListLinksOptions,
 ): Promise<ListLinksResult> {
-  const { limit, cursor, contentType } = opts;
+  const { limit, cursor, contentType, folderId } = opts;
+
+  if (folderId) {
+    await assertFolderOwned(userId, folderId);
+  }
 
   type WhereInput = {
     userId: string;
     contentType?: ContentType;
+    folderId?: string;
     createdAt?: { lt: Date };
     OR?: ({ createdAt: { lt: Date } } | { createdAt: Date; id: { lt: string } })[];
   };
@@ -590,6 +668,10 @@ export async function listLinksForUser(
 
   if (contentType) {
     where.contentType = contentType as ContentType;
+  }
+
+  if (folderId) {
+    where.folderId = folderId;
   }
 
   const position = parseLinksCursor(cursor);
