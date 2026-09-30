@@ -12,6 +12,7 @@ import {
 import type { FolderSummary } from "@/lib/folders";
 import { MAX_FOLDERS } from "@/lib/limits";
 import { useParams, usePathname, useRouter } from "next/navigation";
+import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 
 export type { ActionResult, FolderSummary };
@@ -53,93 +54,118 @@ export function useFolderActions(): {
   moveLink: (
     linkId: string,
     folderId: string | null,
-    previousFolderName?: string,
+    opts?: { folderName?: string },
   ) => Promise<ActionResult>;
 } {
-  const { folders, refresh } = useFoldersContext();
+  const { folders, upsertFolder, removeFolderLocally } = useFoldersContext();
   const { notifyLinksChanged } = useLinksSyncActions();
   const router = useRouter();
   const pathname = usePathname();
   const currentFolder = useCurrentFolder();
 
-  const createFolder = async (
-    name: string,
-  ): Promise<ActionResult<FolderSummary>> => {
-    const result = await postFolder(name);
-    if (result.ok) {
-      toast.success("Folder created");
-      refresh();
-      notifyLinksChanged();
-      router.push(`/folders/${result.data.slug}`);
-    } else {
-      toast.error(result.error);
-    }
-    return result;
-  };
-
-  const renameFolder = async (
-    id: string,
-    name: string,
-  ): Promise<ActionResult<FolderSummary>> => {
-    const result = await patchFolder(id, name);
-    if (result.ok) {
-      toast.success("Folder renamed");
-      refresh();
-      notifyLinksChanged();
-      const onThisFolder = currentFolder?.id === id;
-      const newPath = `/folders/${result.data.slug}`;
-      if (onThisFolder && pathname !== newPath) {
-        router.replace(newPath);
+  const createFolder = useCallback(
+    async (name: string): Promise<ActionResult<FolderSummary>> => {
+      const result = await postFolder(name);
+      if (result.ok) {
+        // Patch the list locally before navigating: the background refetch
+        // triggered by notifyLinksChanged() hasn't landed yet, and without
+        // this the new folder page's useCurrentFolder() would briefly (and
+        // wrongly) resolve to null on the very next render.
+        upsertFolder(result.data);
+        toast.success("Folder created");
+        notifyLinksChanged();
+        router.push(`/folders/${result.data.slug}`);
+      } else {
+        toast.error(result.error);
       }
-    } else {
-      toast.error(result.error);
-    }
-    return result;
-  };
-
-  const deleteFolder = async (
-    id: string,
-    opts: { withLinks: boolean },
-  ): Promise<ActionResult<{ deletedLinks: number }>> => {
-    const result = await removeFolder(id, opts.withLinks);
-    if (result.ok) {
-      toast.success("Folder deleted");
-      refresh();
-      notifyLinksChanged();
-      if (currentFolder?.id === id) {
-        router.push("/home");
-      }
-    } else {
-      toast.error(result.error);
-    }
-    return result;
-  };
-
-  // Optional `previousFolderName`: the "Removed from {name}" copy needs the
-  // folder the link is leaving, which the server response (just the link's
-  // new folderId) doesn't carry — callers on a folder page already know it
-  // from `useCurrentFolder()`/the row's own folder badge.
-  const moveLink = async (
-    linkId: string,
-    folderId: string | null,
-    previousFolderName?: string,
-  ): Promise<ActionResult> => {
-    const result = await patchLinkFolder(linkId, folderId);
-    if (!result.ok) {
-      toast.error(result.error);
       return result;
-    }
+    },
+    [upsertFolder, notifyLinksChanged, router],
+  );
 
-    if (folderId !== null) {
-      const target = folders.find((folder) => folder.id === folderId);
-      if (target) toast.success(`Moved to ${target.name}`);
-    } else if (previousFolderName) {
-      toast.success(`Removed from ${previousFolderName}`);
-    }
-    refresh();
-    notifyLinksChanged();
-    return { ok: true, data: undefined };
-  };
+  const renameFolder = useCallback(
+    async (id: string, name: string): Promise<ActionResult<FolderSummary>> => {
+      const result = await patchFolder(id, name);
+      if (result.ok) {
+        // Same reasoning as createFolder: patch locally before the
+        // router.replace below, so useCurrentFolder() on the new slug
+        // resolves immediately instead of racing the background refetch.
+        upsertFolder(result.data);
+        toast.success("Folder renamed");
+        notifyLinksChanged();
+        const onThisFolder = currentFolder?.id === id;
+        const newPath = `/folders/${result.data.slug}`;
+        if (onThisFolder && pathname !== newPath) {
+          router.replace(newPath);
+        }
+      } else {
+        toast.error(result.error);
+      }
+      return result;
+    },
+    [upsertFolder, notifyLinksChanged, currentFolder, pathname, router],
+  );
 
-  return { createFolder, renameFolder, deleteFolder, moveLink };
+  const deleteFolder = useCallback(
+    async (
+      id: string,
+      opts: { withLinks: boolean },
+    ): Promise<ActionResult<{ deletedLinks: number }>> => {
+      const result = await removeFolder(id, opts.withLinks);
+      if (result.ok) {
+        // Patch locally before the /home redirect below, for the same
+        // reason as createFolder/renameFolder.
+        removeFolderLocally(id);
+        toast.success("Folder deleted");
+        notifyLinksChanged();
+        if (currentFolder?.id === id) {
+          router.push("/home");
+        }
+      } else {
+        toast.error(result.error);
+      }
+      return result;
+    },
+    [removeFolderLocally, notifyLinksChanged, currentFolder, router],
+  );
+
+  // `opts.folderName` is an optional fallback for the toast copy:
+  // - moving into a folder: the name is looked up in the loaded folders
+  //   list first; `opts.folderName` covers the (unlikely) case where the
+  //   target isn't in that list yet, so "Moved to {name}" still fires.
+  // - unfiling (`folderId: null`): there's no folder to look up (the link
+  //   is leaving one), so the "Removed from {name}" copy needs the caller
+  //   to pass the folder's name — e.g. from `useCurrentFolder()` on the
+  //   folder page the removal happened on. Omitting it just skips the
+  //   toast; the move itself still succeeds.
+  const moveLink = useCallback(
+    async (
+      linkId: string,
+      folderId: string | null,
+      opts?: { folderName?: string },
+    ): Promise<ActionResult> => {
+      const result = await patchLinkFolder(linkId, folderId);
+      if (!result.ok) {
+        toast.error(result.error);
+        return result;
+      }
+
+      if (folderId !== null) {
+        const name =
+          folders.find((folder) => folder.id === folderId)?.name ??
+          opts?.folderName;
+        if (name) toast.success(`Moved to ${name}`);
+      } else if (opts?.folderName) {
+        toast.success(`Removed from ${opts.folderName}`);
+      }
+      notifyLinksChanged();
+      return { ok: true, data: undefined };
+    },
+    [folders, notifyLinksChanged],
+  );
+
+  return useMemo(
+    () => ({ createFolder, renameFolder, deleteFolder, moveLink }),
+    [createFolder, renameFolder, deleteFolder, moveLink],
+  );
 }

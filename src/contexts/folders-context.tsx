@@ -9,6 +9,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -18,36 +19,56 @@ export interface FoldersContextValue {
   isLoading: boolean;
   /** Re-fetches immediately, without waiting for the next links-sync version bump. */
   refresh: () => void;
+  /** Inserts or replaces a folder locally (create/rename), ahead of the background refetch. */
+  upsertFolder: (folder: FolderSummary) => void;
+  /** Removes a folder locally (delete), ahead of the background refetch. */
+  removeFolderLocally: (id: string) => void;
 }
 
 const FoldersContext = createContext<FoldersContextValue>({
   folders: [],
   isLoading: true,
   refresh: () => {},
+  upsertFolder: () => {},
+  removeFolderLocally: () => {},
 });
+
+const collator = new Intl.Collator(undefined, { sensitivity: "base" });
+const byName = (a: FolderSummary, b: FolderSummary) =>
+  collator.compare(a.name, b.name);
 
 /**
  * Single source of truth for the signed-in user's folders. Fetches once on
  * mount and again whenever the links-sync `version` changes (a save, edit,
  * delete, or remote update can change folder link counts). Consumers read
- * through `useFolders`/`useCurrentFolder`; actions call `refresh()` after a
- * mutation so the list updates immediately instead of waiting on the next
- * links-sync bump.
+ * through `useFolders`/`useCurrentFolder`.
+ *
+ * `useFolderActions()` doesn't wait for a refetch after create/rename/delete
+ * before navigating (e.g. to the new folder's page) — it patches the list
+ * locally via `upsertFolder`/`removeFolderLocally` first, so
+ * `useCurrentFolder()` resolves correctly on the very next render. A fetch
+ * already in flight when a local patch lands is stale by definition (its
+ * response predates the mutation), so its result is dropped instead of
+ * overwriting the patch; the next version bump or `refresh()` reconciles.
  */
 export function FoldersProvider({ children }: { children: ReactNode }) {
   const { version } = useLinksSyncState();
   const [folders, setFolders] = useState<FolderSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshToken, setRefreshToken] = useState(0);
+  const mutationCountRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
-    // Only the initial mount shows a loading state; a version bump or an
-    // action's refresh() re-fetches silently in the background, the same
-    // pattern HomeShell's own `reload()` follows.
+    const mutationCountAtStart = mutationCountRef.current;
+    // Only the initial mount shows a loading state; a version bump or
+    // refresh() re-fetches silently in the background, the same pattern
+    // HomeShell's own `reload()` follows.
     fetchFolders()
       .then((data) => {
-        if (!cancelled) setFolders(data);
+        if (cancelled) return;
+        if (mutationCountRef.current !== mutationCountAtStart) return;
+        setFolders(data);
       })
       .catch(() => {
         // Keep the previous list; the next version bump or refresh() retries.
@@ -62,9 +83,25 @@ export function FoldersProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(() => setRefreshToken((t) => t + 1), []);
 
+  const upsertFolder = useCallback((folder: FolderSummary) => {
+    mutationCountRef.current += 1;
+    setFolders((current) => {
+      const idx = current.findIndex((f) => f.id === folder.id);
+      if (idx === -1) return [...current, folder].sort(byName);
+      const next = [...current];
+      next[idx] = folder;
+      return next.sort(byName);
+    });
+  }, []);
+
+  const removeFolderLocally = useCallback((id: string) => {
+    mutationCountRef.current += 1;
+    setFolders((current) => current.filter((f) => f.id !== id));
+  }, []);
+
   const value = useMemo<FoldersContextValue>(
-    () => ({ folders, isLoading, refresh }),
-    [folders, isLoading, refresh],
+    () => ({ folders, isLoading, refresh, upsertFolder, removeFolderLocally }),
+    [folders, isLoading, refresh, upsertFolder, removeFolderLocally],
   );
 
   return (
