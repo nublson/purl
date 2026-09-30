@@ -173,6 +173,7 @@ describe("links/[id] API route", () => {
         contentType: "WEB",
         createdAt,
         userId: "user-123",
+        folderId: null,
       });
 
       const res = await PATCH(
@@ -201,6 +202,7 @@ describe("links/[id] API route", () => {
         contentType: "WEB",
         createdAt: new Date("2025-06-15T10:00:00Z"),
         userId: "user-123",
+        folderId: null,
       });
 
       await PATCH(patchRequest({ description: null }), {
