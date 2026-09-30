@@ -152,6 +152,34 @@ describe("createFolder", () => {
     );
   });
 
+  it("strips a trailing dash off a truncated base before adding a collision suffix", async () => {
+    // Slugifies to 47 a's + "-" + "bb" (50 chars, the truncation cutoff).
+    // Suffixing "-2" (48-char budget) would otherwise truncate right after
+    // the dash, producing a "...a--2" double-dash if the trailing dash isn't
+    // stripped first.
+    const name = `${"a".repeat(47)} ${"b".repeat(10)}`;
+    const base = `${"a".repeat(47)}-bb`;
+    vi.mocked(prisma.folder.count).mockResolvedValue(1);
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.folder.findMany).mockResolvedValue([
+      { slug: base },
+    ] as never);
+    vi.mocked(prisma.folder.create).mockResolvedValue({
+      id: "new-id",
+      name,
+      slug: `${"a".repeat(47)}-2`,
+      _count: { links: 0 },
+    } as never);
+
+    await createFolder("user-1", name);
+
+    expect(prisma.folder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ slug: `${"a".repeat(47)}-2` }),
+      }),
+    );
+  });
+
   it("maps a P2002 race on create to a taken FolderNameError", async () => {
     vi.mocked(prisma.folder.count).mockResolvedValue(0);
     vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
@@ -296,18 +324,32 @@ describe("deleteFolder", () => {
       slug: "books",
       userId: "user-1",
     } as never);
+    // Sentinels (not just default `undefined`) so the $transaction assertion
+    // below actually pins which two operations were batched, in order —
+    // rather than trivially matching because both calls return `undefined`.
+    const deleteManySentinel = Symbol("deleteMany-op");
+    const deleteSentinel = Symbol("delete-op");
+    vi.mocked(prisma.link.deleteMany).mockReturnValue(
+      deleteManySentinel as never,
+    );
+    vi.mocked(prisma.folder.delete).mockReturnValue(deleteSentinel as never);
     vi.mocked(prisma.$transaction).mockResolvedValue([{ count: 5 }, {}]);
 
     const result = await deleteFolder("user-1", "folder-1", {
       withLinks: true,
     });
-    expect(result).toEqual({ deletedLinks: 5 });
+
+    expect(prisma.link.deleteMany).toHaveBeenCalledWith({
+      where: { userId: "user-1", folderId: "folder-1" },
+    });
+    expect(prisma.folder.delete).toHaveBeenCalledWith({
+      where: { id: "folder-1" },
+    });
     expect(prisma.$transaction).toHaveBeenCalledWith([
-      prisma.link.deleteMany({
-        where: { userId: "user-1", folderId: "folder-1" },
-      }),
-      prisma.folder.delete({ where: { id: "folder-1" } }),
+      deleteManySentinel,
+      deleteSentinel,
     ]);
+    expect(result).toEqual({ deletedLinks: 5 });
   });
 
   it("keeps links when not withLinks", async () => {

@@ -109,7 +109,7 @@ function withSuffix(base: string, n: number): string {
   const suffix = `-${n}`;
   const trimmedBase =
     base.length + suffix.length > MAX_SLUG_LENGTH
-      ? base.slice(0, MAX_SLUG_LENGTH - suffix.length)
+      ? base.slice(0, MAX_SLUG_LENGTH - suffix.length).replace(/-+$/, "")
       : base;
   return `${trimmedBase}${suffix}`;
 }
