@@ -185,6 +185,29 @@ describe("proxy", () => {
     expect(res.headers.get("location")).toBeNull();
   });
 
+  describe("/folders/[slug] route", () => {
+    it("redirects to / for a signed-out request", async () => {
+      vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+      const req = createRequest("/folders/books");
+      const res = await proxy(req);
+      expect(res.status).toBe(307);
+      const location = res.headers.get("location");
+      expect(location).not.toBeNull();
+      expect(new URL(location as string).pathname).toBe("/");
+    });
+
+    it("returns next for a signed-in request", async () => {
+      vi.mocked(auth.auth.api.getSession).mockResolvedValue({
+        user: {},
+        session: {},
+      } as never);
+      const req = createRequest("/folders/books");
+      const res = await proxy(req);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+    });
+  });
+
   describe("MCP route", () => {
     it("passes through /api/mcp without redirecting to landing (bearer auth at handler)", async () => {
       vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);

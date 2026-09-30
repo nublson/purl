@@ -43,11 +43,14 @@ export function HomeShell({
   initialGroups,
   initialNextCursor,
   timeZone,
+  folderId,
 }: {
   userId: string | null;
   initialGroups: LinkGroupType[];
   initialNextCursor: string | null;
   timeZone: string;
+  /** Set on a `/folders/[slug]` page to scope every `/api/links` fetch to that folder. Omitted on /home. */
+  folderId?: string;
 }) {
   useRealtimeSync(userId);
   const { version } = useLinksSyncState();
@@ -83,9 +86,9 @@ export function HomeShell({
       HOME_LINKS_PAGE_SIZE,
     );
     try {
-      const page = await fetchLinksPage(
-        new URLSearchParams({ limit: String(limit) }),
-      );
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (folderId) params.set("folderId", folderId);
+      const page = await fetchLinksPage(params);
       if (seq !== reloadSeq.current) return;
       setGroups(page.groups);
       setNextCursor(page.nextCursor);
@@ -94,7 +97,7 @@ export function HomeShell({
     } catch {
       // Keep the current list; the next change or reload will retry.
     }
-  }, [setLinksTotal]);
+  }, [setLinksTotal, folderId]);
 
   // If the browser's time zone differs from the one the server resolved (and
   // from what's already cookied), persist it and reload once so grouping
@@ -126,12 +129,12 @@ export function HomeShell({
     setLoadingMore(true);
     const seq = reloadSeq.current;
     try {
-      const page = await fetchLinksPage(
-        new URLSearchParams({
-          limit: String(HOME_LINKS_PAGE_SIZE),
-          cursor: nextCursor,
-        }),
-      );
+      const params = new URLSearchParams({
+        limit: String(HOME_LINKS_PAGE_SIZE),
+        cursor: nextCursor,
+      });
+      if (folderId) params.set("folderId", folderId);
+      const page = await fetchLinksPage(params);
       // A reload started meanwhile already has fresher data.
       if (seq !== reloadSeq.current) return;
       // The time zone changed under the list (e.g. the cookie correction
@@ -147,7 +150,7 @@ export function HomeShell({
     } finally {
       setLoadingMore(false);
     }
-  }, [nextCursor, loadingMore, groupsTimeZone, reload]);
+  }, [nextCursor, loadingMore, groupsTimeZone, reload, folderId]);
 
   // Reload when a save, edit, delete, or remote update bumps the version
   // (skipping the version this list mounted with).
@@ -184,8 +187,11 @@ export function HomeShell({
     await reload();
     setPendingUrl(null);
     // The new row is only visual; announce the save for screen readers too.
-    toast.success("Link saved");
-  }, [reload]);
+    // On a folder page, `saveLink` (via LinkInput/PasteHandler's own
+    // `useCurrentFolder()`) already toasted "Saved to {name}"/"Moved to
+    // {name}" for this save — skip the generic toast so it isn't doubled.
+    if (!folderId) toast.success("Link saved");
+  }, [reload, folderId]);
 
   const onSaveError = useCallback(() => {
     setPendingUrl(null);
