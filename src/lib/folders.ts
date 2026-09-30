@@ -1,7 +1,10 @@
 import "server-only";
 
 import { MAX_FOLDERS } from "@/lib/limits";
-import prisma from "@/lib/prisma";
+import prisma, { type Prisma } from "@/lib/prisma";
+
+/** Either the root client or an interactive-transaction client; the folder helpers below accept both. */
+type Db = Prisma.TransactionClient;
 
 /** Max length (in characters) of a generated slug. */
 const MAX_SLUG_LENGTH = 50;
@@ -91,8 +94,9 @@ async function assertNameAvailable(
   userId: string,
   name: string,
   excludeId?: string,
+  db: Db = prisma,
 ): Promise<void> {
-  const existing = await prisma.folder.findFirst({
+  const existing = await db.folder.findFirst({
     where: {
       userId,
       name: { equals: name, mode: "insensitive" },
@@ -122,9 +126,10 @@ async function generateUniqueSlug(
   userId: string,
   name: string,
   excludeId?: string,
+  db: Db = prisma,
 ): Promise<string> {
   const base = slugifyFolderName(name);
-  const existing = await prisma.folder.findMany({
+  const existing = await db.folder.findMany({
     where: {
       userId,
       ...(excludeId ? { NOT: { id: excludeId } } : {}),
@@ -190,29 +195,43 @@ export async function getFolderBySlug(
   return row ? toSummary(row as FolderRowWithCount) : null;
 }
 
-/** Creates a folder for `userId`, enforcing the name rules, the folder cap, and slug uniqueness. */
+/**
+ * Creates a folder for `userId`, enforcing the name rules, the folder cap, and slug uniqueness.
+ *
+ * The cap check and the insert run in one interactive transaction that first
+ * takes a per-user advisory lock (released at commit/rollback), so concurrent
+ * creates for the same user are serialized: two requests at `MAX_FOLDERS - 1`
+ * can't both pass the count and overshoot the cap.
+ */
 export async function createFolder(
   userId: string,
   name: string,
 ): Promise<FolderSummary> {
   const trimmed = validateFolderName(name);
 
-  const count = await prisma.folder.count({ where: { userId } });
-  if (count >= MAX_FOLDERS) {
-    throw new FolderLimitError(
-      `You can have up to ${MAX_FOLDERS} folders.`,
-    );
-  }
-
-  await assertNameAvailable(userId, trimmed);
-  const slug = await generateUniqueSlug(userId, trimmed);
-
   try {
-    const created = await prisma.folder.create({
-      data: { userId, name: trimmed, slug },
-      include: { _count: { select: { links: true } } },
+    return await prisma.$transaction(async (tx) => {
+      // Parameterized tagged template: `userId` is bound, never interpolated
+      // into the SQL text. `$executeRaw` (not `$queryRaw`) because the lock
+      // function returns `void`, which Prisma can't deserialize as a column.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
+
+      const count = await tx.folder.count({ where: { userId } });
+      if (count >= MAX_FOLDERS) {
+        throw new FolderLimitError(
+          `You can have up to ${MAX_FOLDERS} folders.`,
+        );
+      }
+
+      await assertNameAvailable(userId, trimmed, undefined, tx);
+      const slug = await generateUniqueSlug(userId, trimmed, undefined, tx);
+
+      const created = await tx.folder.create({
+        data: { userId, name: trimmed, slug },
+        include: { _count: { select: { links: true } } },
+      });
+      return toSummary(created as FolderRowWithCount);
     });
-    return toSummary(created as FolderRowWithCount);
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       throw new FolderNameError(

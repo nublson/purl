@@ -32,7 +32,19 @@ const {
 } = await import("./folders");
 const { MAX_FOLDERS } = await import("./limits");
 
+/**
+ * Stand-in for the interactive-transaction client `createFolder` receives.
+ * It shares the root `prisma.folder` mocks so per-test setups apply to both,
+ * plus its own `$executeRaw` (the per-user advisory lock).
+ */
+const txExecuteRaw = vi.fn();
+const tx = {
+  folder: prisma.folder,
+  $executeRaw: txExecuteRaw,
+};
+
 function resetMocks() {
+  txExecuteRaw.mockReset().mockResolvedValue(1);
   vi.mocked(prisma.folder.findMany).mockReset();
   vi.mocked(prisma.folder.findFirst).mockReset();
   vi.mocked(prisma.folder.count).mockReset();
@@ -40,7 +52,12 @@ function resetMocks() {
   vi.mocked(prisma.folder.update).mockReset();
   vi.mocked(prisma.folder.delete).mockReset();
   vi.mocked(prisma.link.deleteMany).mockReset();
-  vi.mocked(prisma.$transaction).mockReset();
+  vi.mocked(prisma.$transaction)
+    .mockReset()
+    // Interactive form: run the callback against `tx`. (deleteFolder's tests
+    // override this with the array form's resolved value.)
+    .mockImplementation(((arg: unknown) =>
+      typeof arg === "function" ? arg(tx) : Promise.resolve(arg)) as never);
 }
 
 describe("slugifyFolderName", () => {
@@ -195,6 +212,59 @@ describe("createFolder", () => {
     expect((err as InstanceType<typeof FolderNameError>).reason).toBe(
       "taken",
     );
+  });
+
+  it("takes the per-user lock before counting, and creates on the transaction client", async () => {
+    // Distinct tx mocks so the test proves the reads and the insert run on
+    // `tx`, not the root client, and in lock → count → create order.
+    const order: string[] = [];
+    const isolatedTx = {
+      $executeRaw: vi.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+        order.push(`lock:${strings.join("?")}:${values.join(",")}`);
+        return 1;
+      }),
+      folder: {
+        count: vi.fn(async () => {
+          order.push("count");
+          return MAX_FOLDERS - 1;
+        }),
+        findFirst: vi.fn(async () => null),
+        findMany: vi.fn(async () => []),
+        create: vi.fn(async () => {
+          order.push("create");
+          return { id: "new-id", name: "Books", slug: "books", _count: { links: 0 } };
+        }),
+      },
+    };
+    vi.mocked(prisma.$transaction).mockImplementation(((
+      cb: (t: typeof isolatedTx) => unknown,
+    ) => cb(isolatedTx)) as never);
+
+    const result = await createFolder("user-1", "Books");
+
+    expect(result).toEqual({ id: "new-id", name: "Books", slug: "books", linkCount: 0 });
+    expect(order).toEqual([
+      "lock:SELECT pg_advisory_xact_lock(hashtext(?)):user-1",
+      "count",
+      "create",
+    ]);
+    expect(isolatedTx.folder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { userId: "user-1", name: "Books", slug: "books" },
+      }),
+    );
+    expect(prisma.folder.count).not.toHaveBeenCalled();
+    expect(prisma.folder.create).not.toHaveBeenCalled();
+  });
+
+  it("does not create when the locked count is already at the cap", async () => {
+    vi.mocked(prisma.folder.count).mockResolvedValue(MAX_FOLDERS);
+
+    const err = await createFolder("user-1", "Late").catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(FolderLimitError);
+    expect(txExecuteRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.folder.create).not.toHaveBeenCalled();
   });
 });
 
