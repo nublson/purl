@@ -9,7 +9,6 @@ interface LinkGroupProps {
   newLinkId?: string | null;
   prependItems?: ReactNode;
   eagerFirstLinkFavicon?: boolean;
-  mode?: "default" | "search";
 }
 
 export const LinkGroup = ({
@@ -17,7 +16,6 @@ export const LinkGroup = ({
   links,
   prependItems,
   eagerFirstLinkFavicon = false,
-  mode = "default",
 }: LinkGroupProps) => {
   const headingId = `link-group-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
@@ -41,7 +39,6 @@ export const LinkGroup = ({
           >
             <LinkItem
               link={link}
-              mode={mode}
               eagerFavicon={eagerFirstLinkFavicon && index === 0}
             />
           </div>

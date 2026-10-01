@@ -34,7 +34,6 @@ const X = dynamic(
 interface LinkItemProps {
   link: LinkType;
   eagerFavicon?: boolean;
-  mode?: "default" | "search";
 }
 
 export const LinkItem = React.forwardRef<
@@ -46,7 +45,6 @@ export const LinkItem = React.forwardRef<
     className,
     onMouseEnter,
     onMouseLeave,
-    mode = "default",
     eagerFavicon,
     ...rest
   },
@@ -131,8 +129,6 @@ export const LinkItem = React.forwardRef<
     );
   }
 
-  const interactive = mode === "default";
-
   const content = (
     <Item
       ref={ref}
@@ -159,30 +155,26 @@ export const LinkItem = React.forwardRef<
       }}
       {...rest}
     >
-      {/* In search the row is a listbox option that opens the link itself,
-          so it must not contain its own link or menu. */}
-      {interactive && (
-        <a
-          ref={anchorRef}
-          href={link.url}
-          aria-label={`${link.title} (opens in new tab)`}
-          aria-describedby={link.description ? descriptionId : undefined}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="absolute inset-0 z-0 w-full rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring"
-          onFocus={(event) => {
-            // Keyboard users get the same preview mouse users get on hover.
-            if (!event.currentTarget.matches(":focus-visible")) return;
-            clearCloseTimer();
-            openedByPointerRef.current = false;
-            setPreviewOpen(true);
-          }}
-          onBlur={() => {
-            if (!hoveringPreviewRef.current) setPreviewOpen(false);
-          }}
-        />
-      )}
-      {interactive && link.description ? (
+      <a
+        ref={anchorRef}
+        href={link.url}
+        aria-label={`${link.title} (opens in new tab)`}
+        aria-describedby={link.description ? descriptionId : undefined}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute inset-0 z-0 w-full rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring"
+        onFocus={(event) => {
+          // Keyboard users get the same preview mouse users get on hover.
+          if (!event.currentTarget.matches(":focus-visible")) return;
+          clearCloseTimer();
+          openedByPointerRef.current = false;
+          setPreviewOpen(true);
+        }}
+        onBlur={() => {
+          if (!hoveringPreviewRef.current) setPreviewOpen(false);
+        }}
+      />
+      {link.description ? (
         <span id={descriptionId} className="sr-only">
           {link.description}
         </span>
@@ -210,58 +202,53 @@ export const LinkItem = React.forwardRef<
           </Typography>
         </ItemTitle>
       </ItemContent>
-      {interactive && (
-        <ItemActions
-          className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-focus-within/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100"
-          onMouseEnter={() => {
-            hoveringActionsRef.current = true;
-            clearOpenTimer();
-            clearCloseTimer();
+      <ItemActions
+        className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-focus-within/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100"
+        onMouseEnter={() => {
+          hoveringActionsRef.current = true;
+          clearOpenTimer();
+          clearCloseTimer();
+        }}
+        onMouseLeave={() => {
+          hoveringActionsRef.current = false;
+          scheduleOpen();
+        }}
+      >
+        <LinkMenu
+          link={link}
+          onDeleteStart={() => {
+            const rows = Array.from(
+              document.querySelectorAll<HTMLElement>(
+                '[data-cy="link-item"] > a[href]',
+              ),
+            );
+            const index = rows.indexOf(anchorRef.current as HTMLElement);
+            focusAfterDeleteRef.current =
+              index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
+            setDeletePhase("animating");
           }}
-          onMouseLeave={() => {
-            hoveringActionsRef.current = false;
-            scheduleOpen();
+          onDeleteSuccess={() => {
+            setDeletePhase("exiting");
+            // The menu trigger unmounts with the row; move focus to the
+            // neighboring row only if focus was left on the page body.
+            const target = focusAfterDeleteRef.current;
+            requestAnimationFrame(() => {
+              const active = document.activeElement;
+              if (
+                target?.isConnected &&
+                (!active || active === document.body)
+              ) {
+                target.focus();
+              }
+            });
           }}
-        >
-          <LinkMenu
-            link={link}
-            onDeleteStart={() => {
-              const rows = Array.from(
-                document.querySelectorAll<HTMLElement>(
-                  '[data-cy="link-item"] > a[href]',
-                ),
-              );
-              const index = rows.indexOf(anchorRef.current as HTMLElement);
-              focusAfterDeleteRef.current =
-                index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
-              setDeletePhase("animating");
-            }}
-            onDeleteSuccess={() => {
-              setDeletePhase("exiting");
-              // The menu trigger unmounts with the row; move focus to the
-              // neighboring row only if focus was left on the page body.
-              const target = focusAfterDeleteRef.current;
-              requestAnimationFrame(() => {
-                const active = document.activeElement;
-                if (
-                  target?.isConnected &&
-                  (!active || active === document.body)
-                ) {
-                  target.focus();
-                }
-              });
-            }}
-            onDeleteError={() => {
-              setDeletePhase("idle");
-            }}
-          />
-        </ItemActions>
-      )}
+          onDeleteError={() => {
+            setDeletePhase("idle");
+          }}
+        />
+      </ItemActions>
     </Item>
   );
-
-  // The hover preview only opens in the default list; skip it elsewhere.
-  if (mode !== "default") return content;
 
   return (
     <LinkPreview
