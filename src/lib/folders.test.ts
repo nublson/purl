@@ -30,6 +30,9 @@ const {
   deleteFolder,
   normalizeFolderEmoji,
   FolderEmojiError,
+  normalizeFolderDescription,
+  FolderDescriptionError,
+  MAX_FOLDER_DESCRIPTION_LENGTH,
   FolderUpdateEmptyError,
   DEFAULT_FOLDER_EMOJI,
   assertFolderOwned,
@@ -163,6 +166,7 @@ describe("createFolder", () => {
       name: "Books!",
       slug: "books-3",
       emoji: DEFAULT_FOLDER_EMOJI,
+      description: null,
       linkCount: 0,
     });
     expect(prisma.folder.create).toHaveBeenCalledWith(
@@ -252,6 +256,7 @@ describe("createFolder", () => {
       name: "Books",
       slug: "books",
       emoji: DEFAULT_FOLDER_EMOJI,
+      description: null,
       linkCount: 0,
     });
     expect(order).toEqual([
@@ -261,7 +266,13 @@ describe("createFolder", () => {
     ]);
     expect(isolatedTx.folder.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { userId: "user-1", name: "Books", slug: "books", emoji: null },
+        data: {
+          userId: "user-1",
+          name: "Books",
+          slug: "books",
+          emoji: null,
+          description: null,
+        },
       }),
     );
     expect(prisma.folder.count).not.toHaveBeenCalled();
@@ -319,6 +330,7 @@ describe("updateFolder", () => {
       name: "books",
       slug: "books",
       emoji: DEFAULT_FOLDER_EMOJI,
+      description: null,
       linkCount: 3,
     });
     expect(prisma.folder.findFirst).toHaveBeenNthCalledWith(2, {
@@ -418,6 +430,7 @@ describe("updateFolder", () => {
       name: "Books",
       slug: "books",
       emoji: "📚",
+      description: null,
       linkCount: 2,
     });
     expect(prisma.folder.update).toHaveBeenCalledWith(
@@ -518,6 +531,11 @@ describe("normalizeFolderEmoji", () => {
     // Text-default pictograph forced to emoji presentation with U+FE0F.
     ["\u2764\uFE0F", "\u2764\uFE0F"],
     ["\u00A9\uFE0F", "\u00A9\uFE0F"],
+    // Typical emoji-picker output: skin-tone ZWJ sequences, flags with ZWJ.
+    ["👩🏽‍💻", "👩🏽‍💻"],
+    ["🧑🏿‍🤝‍🧑🏻", "🧑🏿‍🤝‍🧑🏻"],
+    ["🏳️‍🌈", "🏳️‍🌈"],
+    ["☺️", "☺️"],
   ])("accepts %j", (input, expected) => {
     expect(normalizeFolderEmoji(input)).toBe(expected);
   });
@@ -586,6 +604,133 @@ describe("createFolder emoji", () => {
     );
     expect(err).toBeInstanceOf(FolderEmojiError);
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe("normalizeFolderDescription", () => {
+  it("trims the description", () => {
+    expect(normalizeFolderDescription("  Precious pearls.  ")).toBe(
+      "Precious pearls.",
+    );
+  });
+
+  it.each([[undefined], [null], [""], ["   "]])(
+    "treats %j as no description (null)",
+    (input) => {
+      expect(normalizeFolderDescription(input)).toBeNull();
+    },
+  );
+
+  it("accepts exactly the max length (after trimming)", () => {
+    const max = "a".repeat(MAX_FOLDER_DESCRIPTION_LENGTH);
+    expect(normalizeFolderDescription(` ${max} `)).toBe(max);
+  });
+
+  it("rejects anything longer", () => {
+    const err = (() => {
+      try {
+        normalizeFolderDescription("a".repeat(MAX_FOLDER_DESCRIPTION_LENGTH + 1));
+      } catch (e) {
+        return e;
+      }
+    })();
+    expect(err).toBeInstanceOf(FolderDescriptionError);
+    expect((err as Error).message).toBe(
+      "Keep the description under 160 characters.",
+    );
+  });
+});
+
+describe("folder description", () => {
+  beforeEach(resetMocks);
+
+  it("stores a trimmed description on create and returns it", async () => {
+    vi.mocked(prisma.folder.count).mockResolvedValue(0);
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.folder.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.folder.create).mockResolvedValue({
+      id: "new-id",
+      name: "Oyster",
+      slug: "oyster",
+      emoji: null,
+      description: "Precious pearls.",
+      _count: { links: 0 },
+    } as never);
+
+    const result = await createFolder(
+      "user-1",
+      "Oyster",
+      undefined,
+      "  Precious pearls. ",
+    );
+
+    expect(result.description).toBe("Precious pearls.");
+    expect(prisma.folder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ description: "Precious pearls." }),
+      }),
+    );
+  });
+
+  it("rejects an over-long description before opening the transaction", async () => {
+    const err = await createFolder(
+      "user-1",
+      "Oyster",
+      undefined,
+      "a".repeat(MAX_FOLDER_DESCRIPTION_LENGTH + 1),
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(FolderDescriptionError);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("updates only the description", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValueOnce({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      userId: "user-1",
+    } as never);
+    vi.mocked(prisma.folder.update).mockResolvedValue({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      emoji: null,
+      description: "To read.",
+      _count: { links: 0 },
+    } as never);
+
+    const result = await updateFolder("user-1", "folder-1", {
+      description: "To read.",
+    });
+
+    expect(result.description).toBe("To read.");
+    expect(prisma.folder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { description: "To read." } }),
+    );
+  });
+
+  it("clears the description with an empty string", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValueOnce({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      userId: "user-1",
+    } as never);
+    vi.mocked(prisma.folder.update).mockResolvedValue({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      emoji: null,
+      description: null,
+      _count: { links: 0 },
+    } as never);
+
+    const result = await updateFolder("user-1", "folder-1", { description: "" });
+
+    expect(result.description).toBeNull();
+    expect(prisma.folder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { description: null } }),
+    );
   });
 });
 
@@ -694,6 +839,7 @@ describe("listFoldersForUser", () => {
       name: "banana",
       slug: "banana",
       emoji: DEFAULT_FOLDER_EMOJI,
+      description: null,
       linkCount: 0,
     });
     // A stored emoji wins over the default.
@@ -724,6 +870,7 @@ describe("getFolderBySlug", () => {
       name: "Books",
       slug: "books",
       emoji: "📚",
+      description: null,
       linkCount: 4,
     });
   });

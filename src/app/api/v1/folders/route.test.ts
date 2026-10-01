@@ -148,7 +148,7 @@ describe("POST /api/v1/folders", () => {
     const res = await POST(postRequest({ name: "Reading" }));
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual(created);
-    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Reading", undefined);
+    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Reading", undefined, undefined);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(mockBroadcast).toHaveBeenCalledWith("user-1");
   });
@@ -171,7 +171,32 @@ describe("POST /api/v1/folders", () => {
     const res = await POST(postRequest({ name: "Trips", emoji: "🇵🇹" }));
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual(created);
-    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Trips", "🇵🇹");
+    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Trips", "🇵🇹", undefined);
+  });
+
+  it("creates a folder with a description", async () => {
+    mockGetSessionUser.mockResolvedValue({ id: "user-1" });
+    mockCreateFolder.mockResolvedValue({
+      id: "f1",
+      name: "Trips",
+      slug: "trips",
+      emoji: "🦪",
+      description: "Places to go.",
+      linkCount: 0,
+    });
+
+    const res = await POST(postRequest({ name: "Trips", description: "Places to go." }));
+    expect(res.status).toBe(201);
+    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Trips", undefined, "Places to go.");
+  });
+
+  it("returns 400 INVALID_DESCRIPTION with CORS for a non-string description", async () => {
+    mockGetSessionUser.mockResolvedValue({ id: "user-1" });
+    const res = await POST(postRequest({ name: "Trips", description: 1 }));
+    expect(res.status).toBe(400);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect((await res.json()).code).toBe("INVALID_DESCRIPTION");
+    expect(mockCreateFolder).not.toHaveBeenCalled();
   });
 
   it("returns 400 INVALID_EMOJI with CORS for a non-string emoji", async () => {

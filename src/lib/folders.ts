@@ -1,6 +1,9 @@
 import "server-only";
 
-import { DEFAULT_FOLDER_EMOJI } from "@/lib/folder-display";
+import {
+  DEFAULT_FOLDER_EMOJI,
+  MAX_FOLDER_DESCRIPTION_LENGTH,
+} from "@/lib/folder-display";
 import { MAX_FOLDERS } from "@/lib/limits";
 import prisma, { type Prisma } from "@/lib/prisma";
 
@@ -10,8 +13,8 @@ type Db = Prisma.TransactionClient;
 /** Max length (in characters) of a generated slug. */
 const MAX_SLUG_LENGTH = 50;
 
-// Lives in the client-safe module so the folder UI can use it; re-exported here.
-export { DEFAULT_FOLDER_EMOJI };
+// Live in the client-safe module so the folder UI can use them; re-exported here.
+export { DEFAULT_FOLDER_EMOJI, MAX_FOLDER_DESCRIPTION_LENGTH };
 
 /**
  * Upper bound (UTF-16 code units) for a stored emoji. The longest real emoji
@@ -35,6 +38,8 @@ export type FolderSummary = {
   slug: string;
   /** The folder's emoji; always set (falls back to `DEFAULT_FOLDER_EMOJI`). */
   emoji: string;
+  /** Optional one-line description; `null` when unset. */
+  description: string | null;
   linkCount: number;
 };
 
@@ -64,6 +69,16 @@ export class FolderEmojiError extends Error {
   }
 }
 
+/** Thrown when a folder description is too long. Routes map this to 400 `INVALID_DESCRIPTION`. */
+export class FolderDescriptionError extends Error {
+  readonly name = "FolderDescriptionError";
+  constructor() {
+    super(
+      `Keep the description under ${MAX_FOLDER_DESCRIPTION_LENGTH} characters.`,
+    );
+  }
+}
+
 /** Thrown when a user is at the folder cap. */
 export class FolderLimitError extends Error {
   readonly name = "FolderLimitError";
@@ -76,6 +91,7 @@ type FolderRowWithCount = {
   name: string;
   slug: string;
   emoji?: string | null;
+  description?: string | null;
   _count: { links: number };
 };
 
@@ -85,6 +101,7 @@ function toSummary(row: FolderRowWithCount): FolderSummary {
     name: row.name,
     slug: row.slug,
     emoji: row.emoji || DEFAULT_FOLDER_EMOJI,
+    description: row.description || null,
     linkCount: row._count.links,
   };
 }
@@ -136,6 +153,22 @@ export function normalizeFolderEmoji(
   const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
   if (Array.from(segmenter.segment(trimmed)).length !== 1) {
     throw new FolderEmojiError();
+  }
+  return trimmed;
+}
+
+/**
+ * Validates an optional folder description. Trims it; empty/undefined/null
+ * means no description (`null`). Longer than
+ * `MAX_FOLDER_DESCRIPTION_LENGTH` characters → `FolderDescriptionError`.
+ */
+export function normalizeFolderDescription(
+  description: string | null | undefined,
+): string | null {
+  const trimmed = (description ?? "").trim();
+  if (trimmed.length === 0) return null;
+  if (trimmed.length > MAX_FOLDER_DESCRIPTION_LENGTH) {
+    throw new FolderDescriptionError();
   }
   return trimmed;
 }
@@ -258,9 +291,11 @@ export async function createFolder(
   userId: string,
   name: string,
   emoji?: string | null,
+  description?: string | null,
 ): Promise<FolderSummary> {
   const trimmed = validateFolderName(name);
   const normalizedEmoji = normalizeFolderEmoji(emoji);
+  const normalizedDescription = normalizeFolderDescription(description);
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -280,7 +315,13 @@ export async function createFolder(
       const slug = await generateUniqueSlug(userId, trimmed, undefined, tx);
 
       const created = await tx.folder.create({
-        data: { userId, name: trimmed, slug, emoji: normalizedEmoji },
+        data: {
+          userId,
+          name: trimmed,
+          slug,
+          emoji: normalizedEmoji,
+          description: normalizedDescription,
+        },
         include: { _count: { select: { links: true } } },
       });
       return toSummary(created as FolderRowWithCount);
@@ -301,6 +342,8 @@ export type FolderUpdate = {
   name?: string;
   /** A single emoji, or `null`/`""` to clear it back to the default. */
   emoji?: string | null;
+  /** Up to 160 characters, or `null`/`""` to clear it. */
+  description?: string | null;
 };
 
 /** Thrown when `updateFolder` is called with no fields to change. Routes map this to 400. */
@@ -314,8 +357,9 @@ export class FolderUpdateEmptyError extends Error {
 /**
  * Updates a folder owned by `userId`. A new `name` goes through the same rules
  * as `createFolder` and regenerates (and de-collides) the slug; `emoji` is
- * validated by `normalizeFolderEmoji` (`null`/`""` clears it). Omitted fields
- * are left unchanged.
+ * validated by `normalizeFolderEmoji` and `description` by
+ * `normalizeFolderDescription` (`null`/`""` clears either). Omitted fields are
+ * left unchanged.
  */
 export async function updateFolder(
   userId: string,
@@ -324,15 +368,24 @@ export async function updateFolder(
 ): Promise<FolderSummary> {
   const hasName = input.name !== undefined;
   const hasEmoji = input.emoji !== undefined;
-  if (!hasName && !hasEmoji) {
+  const hasDescription = input.description !== undefined;
+  if (!hasName && !hasEmoji && !hasDescription) {
     throw new FolderUpdateEmptyError();
   }
 
   await assertFolderOwned(userId, id);
 
-  const data: { name?: string; slug?: string; emoji?: string | null } = {};
+  const data: {
+    name?: string;
+    slug?: string;
+    emoji?: string | null;
+    description?: string | null;
+  } = {};
   if (hasEmoji) {
     data.emoji = normalizeFolderEmoji(input.emoji);
+  }
+  if (hasDescription) {
+    data.description = normalizeFolderDescription(input.description);
   }
   if (hasName) {
     const trimmed = validateFolderName(input.name as string);

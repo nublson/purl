@@ -170,7 +170,7 @@ export function registerPurlTools(server: McpServer): void {
 
   server.tool(
     "list_folders",
-    "List the user's folders (collections of saved links) with id, name, emoji and link count",
+    "List the user's folders (collections of saved links) with id, name, emoji, description and link count",
     {},
     async (_args, extra) => listFoldersTool(getUserId(extra)),
   );

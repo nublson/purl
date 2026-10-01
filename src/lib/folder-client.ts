@@ -4,10 +4,14 @@ import type { FolderSummary } from "@/lib/folders";
 import { linksOriginHeaders } from "@/lib/links-origin";
 import type { Link } from "@/utils/links";
 
-/** Result shape for every folder/link-filing action: success carries `data`, failure a user-facing `error`. */
+/**
+ * Result shape for every folder/link-filing action: success carries `data`,
+ * failure a user-facing `error` plus the API's machine `code` when it sent
+ * one (e.g. `NAME_TAKEN`), so a form can show the error on the right field.
+ */
 export type ActionResult<T = void> =
   | { ok: true; data: T }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: string };
 
 const FALLBACK_ERROR = "Something went wrong. Try again.";
 
@@ -30,6 +34,17 @@ function errorFromBody(body: unknown): string {
   return FALLBACK_ERROR;
 }
 
+function codeFromBody(body: unknown): string | undefined {
+  if (
+    body &&
+    typeof body === "object" &&
+    typeof (body as { code?: unknown }).code === "string"
+  ) {
+    return (body as { code: string }).code;
+  }
+  return undefined;
+}
+
 /** Runs a mutating fetch and maps it to `ActionResult`, never throwing. */
 async function mutate<T>(
   path: string,
@@ -46,7 +61,12 @@ async function mutate<T>(
     });
     const body = await parseBody(res);
     if (!res.ok) {
-      return { ok: false, error: errorFromBody(body) };
+      const code = codeFromBody(body);
+      return {
+        ok: false,
+        error: errorFromBody(body),
+        ...(code ? { code } : {}),
+      };
     }
     return { ok: true, data: body as T };
   } catch {
@@ -69,10 +89,18 @@ export async function fetchFolders(): Promise<FolderSummary[]> {
 }
 
 /** Body for `POST /api/folders`. An omitted/empty `emoji` means the default. */
-export type CreateFolderInput = { name: string; emoji?: string };
+export type CreateFolderInput = {
+  name: string;
+  emoji?: string;
+  description?: string;
+};
 
-/** Body for `PATCH /api/folders/[id]`. Omitted fields are unchanged; `emoji: null` clears it. */
-export type UpdateFolderInput = { name?: string; emoji?: string | null };
+/** Body for `PATCH /api/folders/[id]`. Omitted fields are unchanged; `null` clears `emoji`/`description`. */
+export type UpdateFolderInput = {
+  name?: string;
+  emoji?: string | null;
+  description?: string | null;
+};
 
 export function postFolder(
   input: CreateFolderInput,

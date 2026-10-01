@@ -58,15 +58,16 @@ model Link {
 }
 
 model Folder {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String
-  emoji     String?
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  links     Link[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  slug        String
+  emoji       String?
+  description String?
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  links       Link[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@unique([userId, name])
   @@unique([userId, slug])

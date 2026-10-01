@@ -183,6 +183,37 @@ describe("PATCH /api/folders/[id]", () => {
     });
   });
 
+  it("passes the description through to updateFolder (null clears it)", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockUpdateFolder.mockResolvedValue({
+      id: "f1",
+      name: "Books",
+      slug: "books",
+      emoji: "🦪",
+      description: null,
+      linkCount: 0,
+    });
+
+    const res = await PATCH(patchRequest({ description: null }), ctx());
+    expect(res.status).toBe(200);
+    expect(mockUpdateFolder).toHaveBeenCalledWith("user-1", "f1", {
+      name: undefined,
+      emoji: undefined,
+      description: null,
+    });
+  });
+
+  it("returns 400 INVALID_DESCRIPTION for a non-string description without calling the lib", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    const res = await PATCH(patchRequest({ description: ["x"] }), ctx());
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "The description must be text.",
+      code: "INVALID_DESCRIPTION",
+    });
+    expect(mockUpdateFolder).not.toHaveBeenCalled();
+  });
+
   it("returns 400 INVALID_EMOJI for a non-string emoji without calling the lib", async () => {
     mockGetBrowserSessionUserId.mockResolvedValue("user-1");
     const res = await PATCH(patchRequest({ emoji: ["📚"] }), ctx());

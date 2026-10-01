@@ -157,7 +157,7 @@ describe("patchFolder", () => {
     expect(fetchSpy.mock.calls[1][1]?.body).toBe(JSON.stringify({ emoji: null }));
   });
 
-  it("returns the INVALID_EMOJI error message without throwing", async () => {
+  it("returns the INVALID_EMOJI error message and code without throwing", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
         JSON.stringify({ error: "Pick a single emoji.", code: "INVALID_EMOJI" }),
@@ -167,7 +167,11 @@ describe("patchFolder", () => {
 
     const result = await patchFolder("f1", { emoji: "ab" });
 
-    expect(result).toEqual({ ok: false, error: "Pick a single emoji." });
+    expect(result).toEqual({
+      ok: false,
+      error: "Pick a single emoji.",
+      code: "INVALID_EMOJI",
+    });
   });
 
   it("returns 404's body error", async () => {

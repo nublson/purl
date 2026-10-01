@@ -25,7 +25,12 @@ vi.mock("@/lib/realtime-broadcast", () => ({
 }));
 
 const { GET, POST } = await import("./route");
-const { FolderNameError, FolderLimitError, FolderEmojiError } = await import(
+const {
+  FolderNameError,
+  FolderLimitError,
+  FolderEmojiError,
+  FolderDescriptionError,
+} = await import(
   "@/lib/folders",
 );
 
@@ -104,7 +109,7 @@ describe("POST /api/folders", () => {
       error: "Give your folder a name.",
       code: "NAME_EMPTY",
     });
-    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "", undefined);
+    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "", undefined, undefined);
   });
 
   it("returns 400 NAME_EMPTY for an empty name", async () => {
@@ -168,7 +173,7 @@ describe("POST /api/folders", () => {
     const res = await POST(postRequest({ name: "Reading" }));
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual(created);
-    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Reading", undefined);
+    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Reading", undefined, undefined);
     expect(mockBroadcastLinksChanged).toHaveBeenCalledWith("user-1", null);
   });
 
@@ -180,7 +185,50 @@ describe("POST /api/folders", () => {
     const res = await POST(postRequest({ name: "Code", emoji: "👩‍💻" }));
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual(created);
-    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Code", "👩‍💻");
+    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Code", "👩‍💻", undefined);
+  });
+
+  it("passes the description through to createFolder", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockCreateFolder.mockResolvedValue({
+      id: "f1",
+      name: "Oyster",
+      slug: "oyster",
+      emoji: "🦪",
+      description: "Pearls.",
+      linkCount: 0,
+    });
+
+    const res = await POST(postRequest({ name: "Oyster", description: "Pearls." }));
+    expect(res.status).toBe(201);
+    expect(mockCreateFolder).toHaveBeenCalledWith(
+      "user-1",
+      "Oyster",
+      undefined,
+      "Pearls.",
+    );
+  });
+
+  it("returns 400 INVALID_DESCRIPTION for a non-string description without calling the lib", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    const res = await POST(postRequest({ name: "Oyster", description: 42 }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "The description must be text.",
+      code: "INVALID_DESCRIPTION",
+    });
+    expect(mockCreateFolder).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 INVALID_DESCRIPTION when the lib rejects the description", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockCreateFolder.mockRejectedValue(new FolderDescriptionError());
+    const res = await POST(postRequest({ name: "Oyster", description: "a".repeat(161) }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Keep the description under 160 characters.",
+      code: "INVALID_DESCRIPTION",
+    });
   });
 
   it("returns 400 INVALID_EMOJI for a non-string emoji without calling the lib", async () => {

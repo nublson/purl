@@ -1,4 +1,5 @@
 import {
+  FolderDescriptionError,
   FolderEmojiError,
   FolderLimitError,
   FolderNameError,
@@ -21,7 +22,7 @@ const NAME_ERROR_STATUS: Record<FolderNameError["reason"], number> = {
 
 /**
  * Maps the folder library's errors (`FolderNameError`, `FolderEmojiError`,
- * `FolderUpdateEmptyError`, `FolderLimitError`, `FolderNotFoundError`) to the shared API response shape used by both the
+ * `FolderDescriptionError`, `FolderUpdateEmptyError`, `FolderLimitError`, `FolderNotFoundError`) to the shared API response shape used by both the
  * browser-session `/api/folders` routes and the API-key `/api/v1/folders`
  * routes. Returns `null` when `e` isn't one of these, so callers can
  * `throw e` unchanged.
@@ -36,6 +37,12 @@ export function mapFolderError(e: unknown): NextResponse | null {
   if (e instanceof FolderEmojiError) {
     return NextResponse.json(
       { error: e.message, code: "INVALID_EMOJI" },
+      { status: 400 },
+    );
+  }
+  if (e instanceof FolderDescriptionError) {
+    return NextResponse.json(
+      { error: e.message, code: "INVALID_DESCRIPTION" },
       { status: 400 },
     );
   }
@@ -67,6 +74,23 @@ export function parseEmojiField(
   }
   return NextResponse.json(
     { error: new FolderEmojiError().message, code: "INVALID_EMOJI" },
+    { status: 400 },
+  );
+}
+
+/**
+ * Reads the optional `description` field of a folder request body: absent →
+ * `undefined` (leave unchanged / none), `null` or a string → passed on to the
+ * library for validation, anything else → a 400 `INVALID_DESCRIPTION` response.
+ */
+export function parseDescriptionField(
+  value: unknown,
+): string | null | undefined | NextResponse {
+  if (value === undefined || value === null || typeof value === "string") {
+    return value;
+  }
+  return NextResponse.json(
+    { error: "The description must be text.", code: "INVALID_DESCRIPTION" },
     { status: 400 },
   );
 }
