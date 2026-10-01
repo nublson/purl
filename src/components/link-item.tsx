@@ -2,7 +2,11 @@
 
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
-import { deleteLinkWithUndo } from "@/lib/pending-link-deletes";
+import {
+  deleteLinkWithUndo,
+  LINK_DELETE_FADE_MS,
+  usePendingLinkDeletes,
+} from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
@@ -47,18 +51,14 @@ export const LinkItem = React.forwardRef<
   ref,
 ) {
   const { notifyLinksChanged } = useLinksSyncActions();
-  // "animating" = the row fades out; when that ends it's handed to
-  // `deleteLinkWithUndo`, which hides it (via `LinkGroup`) behind an Undo toast.
-  const [deletePhase, setDeletePhase] = React.useState<"idle" | "animating">(
-    "idle",
-  );
+  // Deleting is owned by `deleteLinkWithUndo` (it outlives this row): the
+  // row fades while "fading", then `LinkGroup` hides it behind an Undo toast.
+  const deletePhase = usePendingLinkDeletes().get(link.id);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   // Whether the current preview was opened by hover (vs keyboard focus).
   const openedByPointerRef = React.useRef(false);
   const descriptionId = React.useId();
   const anchorRef = React.useRef<HTMLAnchorElement>(null);
-  // Row to focus after a delete, so focus doesn't fall back to the page.
-  const focusAfterDeleteRef = React.useRef<HTMLElement | null>(null);
   const hoveringActionsRef = React.useRef(false);
   const hoveringPreviewRef = React.useRef(false);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,7 +117,7 @@ export const LinkItem = React.forwardRef<
       data-cy="link-item"
       className={cn(
         "w-full p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
-        deletePhase === "animating" &&
+        deletePhase === "fading" &&
           "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
         className,
       )}
@@ -130,20 +130,6 @@ export const LinkItem = React.forwardRef<
         onMouseLeave?.(event);
         hoveringActionsRef.current = false;
         scheduleClose();
-      }}
-      onAnimationEnd={() => {
-        if (deletePhase !== "animating") return;
-        setDeletePhase("idle");
-        deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
-        // The row (and its menu trigger) unmounts; move focus to the
-        // neighboring row only if focus was left on the page body.
-        const target = focusAfterDeleteRef.current;
-        requestAnimationFrame(() => {
-          const active = document.activeElement;
-          if (target?.isConnected && (!active || active === document.body)) {
-            target.focus();
-          }
-        });
       }}
       {...rest}
     >
@@ -215,9 +201,22 @@ export const LinkItem = React.forwardRef<
               ),
             );
             const index = rows.indexOf(anchorRef.current as HTMLElement);
-            focusAfterDeleteRef.current =
+            const target =
               index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
-            setDeletePhase("animating");
+            deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
+            // The row (and its menu trigger) unmounts once hidden; then move
+            // focus to the neighboring row only if focus fell to the body.
+            setTimeout(() => {
+              requestAnimationFrame(() => {
+                const active = document.activeElement;
+                if (
+                  target?.isConnected &&
+                  (!active || active === document.body)
+                ) {
+                  target.focus();
+                }
+              });
+            }, LINK_DELETE_FADE_MS);
           }}
         />
       </ItemActions>

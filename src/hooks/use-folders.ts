@@ -23,6 +23,12 @@ import { toast } from "sonner";
 export type { ActionResult, CreateFolderInput, FolderSummary, UpdateFolderInput };
 
 /**
+ * Latest move per link id. A move's Undo only applies while it is still the
+ * link's latest move, so an older toast can't revert a newer choice.
+ */
+const latestMoveByLink = new Map<string, symbol>();
+
+/**
  * Folder list backing the folder menus/sidebars; refreshes on every
  * links-sync version bump, or on `refresh()` for a change that reloads its
  * own list without bumping the version (a save on a folder page).
@@ -96,8 +102,10 @@ export function useFolderActions(): {
     opts?: { from?: string | null },
   ) => Promise<ActionResult>;
 } {
-  const { folders, upsertFolder, removeFolderLocally } = useFoldersContext();
-  const { notifyLinksChanged } = useLinksSyncActions();
+  const { folders, upsertFolder, removeFolderLocally, initialTotalLinks } =
+    useFoldersContext();
+  const { notifyLinksChanged, setLinksTotal } = useLinksSyncActions();
+  const { total } = useLinksSyncState();
   const router = useRouter();
   const pathname = usePathname();
   const currentFolder = useCurrentFolder();
@@ -159,6 +167,13 @@ export function useFolderActions(): {
         // Patch locally before the /home redirect below, for the same
         // reason as createFolder/updateFolder.
         removeFolderLocally(id);
+        // Deleted links leave Home's count. Set it here: when this was the
+        // current folder, the folder page's own reload (which normally
+        // reports the total) fails because the folder is gone.
+        const knownTotal = total ?? initialTotalLinks;
+        if (result.data.deletedLinks > 0 && knownTotal !== null) {
+          setLinksTotal(Math.max(0, knownTotal - result.data.deletedLinks));
+        }
         toast.success(
           result.data.deletedLinks > 0
             ? `Folder and ${formatLinkCount(result.data.deletedLinks)} deleted`
@@ -171,7 +186,15 @@ export function useFolderActions(): {
       }
       return result;
     },
-    [removeFolderLocally, notifyLinksChanged, currentFolder, router],
+    [
+      removeFolderLocally,
+      notifyLinksChanged,
+      setLinksTotal,
+      total,
+      initialTotalLinks,
+      currentFolder,
+      router,
+    ],
   );
 
   // `opts.from` is the folder the link is leaving (`null` = none). Passing
@@ -198,12 +221,16 @@ export function useFolderActions(): {
           ? `Removed from ${formatFolderLabel(source)}`
           : null;
       const from = opts?.from;
+      const move = Symbol(linkId);
+      latestMoveByLink.set(linkId, move);
       const undo =
         from === undefined
           ? undefined
           : {
               label: "Undo",
               onClick: async () => {
+                if (latestMoveByLink.get(linkId) !== move) return;
+                latestMoveByLink.delete(linkId);
                 const reverted = await patchLinkFolder(linkId, from);
                 if (!reverted.ok) {
                   toast.error(reverted.error);
@@ -212,7 +239,11 @@ export function useFolderActions(): {
                 notifyLinksChanged();
               },
             };
-      if (message) toast.success(message, { action: undo });
+      // One toast per link: a newer move replaces the older toast (and its
+      // Undo) instead of stacking under it.
+      if (message) {
+        toast.success(message, { id: `link-move-${linkId}`, action: undo });
+      }
       notifyLinksChanged();
       return { ok: true, data: undefined };
     },

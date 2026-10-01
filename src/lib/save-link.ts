@@ -2,6 +2,7 @@
 
 import { linksOriginHeaders } from "@/lib/links-origin";
 import { formatFolderLabel } from "@/lib/folder-display";
+import { cancelPendingLinkDelete } from "@/lib/pending-link-deletes";
 import { isValidUrl } from "@/utils/url";
 import { toast } from "sonner";
 
@@ -54,6 +55,10 @@ export async function saveLink(
       toast.error("Unable to save the link. Try again.");
       return { error: "Invalid response" };
     }
+
+    // Saving a link that's mid-delete (Undo window) returns its same id:
+    // treat the save as an Undo so it isn't hidden and then deleted.
+    cancelPendingLinkDelete(id);
 
     if (folder) {
       const label = formatFolderLabel(folder);

@@ -218,7 +218,7 @@ export function HomeShell({
   const allLinksHidden =
     !nextCursor &&
     groups.every((group) =>
-      group.links.every((link) => pendingDeletes.has(link.id)),
+      group.links.every((link) => pendingDeletes.get(link.id) === "hidden"),
     );
 
   return (

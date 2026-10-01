@@ -24,7 +24,9 @@ export const LinkGroup = ({
   // Links deleted but still undoable are hidden here, and a day whose links
   // are all hidden drops its heading too.
   const pendingDeletes = usePendingLinkDeletes();
-  const visibleLinks = links.filter((link) => !pendingDeletes.has(link.id));
+  const visibleLinks = links.filter(
+    (link) => pendingDeletes.get(link.id) !== "hidden",
+  );
   if (visibleLinks.length === 0 && !prependItems) return null;
 
   return (
