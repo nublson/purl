@@ -4,31 +4,22 @@ vi.mock("@/lib/prisma", () => ({ default: {} }));
 
 const {
   DEFAULT_FOLDER_EMOJI,
-  FOLDER_EMOJI_PRESETS,
+  MAX_FOLDER_DESCRIPTION_LENGTH,
   formatLinkCount,
 } = await import("./folder-display");
 const folders = await import("./folders");
 
-describe("FOLDER_EMOJI_PRESETS", () => {
-  it("has 12 presets, the default oyster first", () => {
-    expect(FOLDER_EMOJI_PRESETS).toHaveLength(12);
-    expect(FOLDER_EMOJI_PRESETS[0].emoji).toBe(DEFAULT_FOLDER_EMOJI);
+describe("shared folder constants", () => {
+  it("are the ones the server enforces", () => {
+    expect(DEFAULT_FOLDER_EMOJI).toBe("🦪");
     expect(folders.DEFAULT_FOLDER_EMOJI).toBe(DEFAULT_FOLDER_EMOJI);
+    expect(folders.normalizeFolderEmoji(DEFAULT_FOLDER_EMOJI)).toBe(
+      DEFAULT_FOLDER_EMOJI,
+    );
+    expect(folders.MAX_FOLDER_DESCRIPTION_LENGTH).toBe(
+      MAX_FOLDER_DESCRIPTION_LENGTH,
+    );
   });
-
-  it("has unique emoji and labels", () => {
-    const emoji = FOLDER_EMOJI_PRESETS.map((preset) => preset.emoji);
-    const labels = FOLDER_EMOJI_PRESETS.map((preset) => preset.label);
-    expect(new Set(emoji).size).toBe(emoji.length);
-    expect(new Set(labels).size).toBe(labels.length);
-  });
-
-  it.each(FOLDER_EMOJI_PRESETS.map((preset) => [preset.label, preset.emoji]))(
-    "%s (%s) passes the server emoji validation unchanged",
-    (_label, emoji) => {
-      expect(folders.normalizeFolderEmoji(emoji)).toBe(emoji);
-    },
-  );
 });
 
 describe("formatLinkCount", () => {

@@ -6,7 +6,8 @@ export function HeaderActionsFallback() {
       aria-hidden="true"
       data-slot="header-actions-fallback"
     >
-      <div className="size-8 shrink-0 rounded-md bg-muted animate-pulse" />
+      {/* Matches the save button, which only renders on hover-capable devices. */}
+      <div className="hidden size-8 shrink-0 rounded-md bg-muted animate-pulse [@media(hover:hover)]:block" />
       <div className="size-8 shrink-0 rounded-full bg-muted animate-pulse" />
     </div>
   );

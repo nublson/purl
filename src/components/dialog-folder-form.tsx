@@ -2,16 +2,25 @@
 
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
+import {
+  EmojiPicker,
+  EmojiPickerContent,
+  EmojiPickerFooter,
+  EmojiPickerSearch,
+} from "@/components/ui/emoji-picker";
 import { Field, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useFolderActions, type FolderSummary } from "@/hooks/use-folders";
 import {
   DEFAULT_FOLDER_EMOJI,
-  FOLDER_EMOJI_PRESETS,
-  type FolderEmojiPreset,
+  MAX_FOLDER_DESCRIPTION_LENGTH,
 } from "@/lib/folder-display";
-import { cn } from "@/lib/utils";
 import * as React from "react";
 import { DialogWrapper } from "./dialog-wrapper";
 
@@ -45,6 +54,15 @@ export function DialogFolderForm({
   );
 }
 
+/** Which field a server error belongs to, from the API's error `code`. */
+type ErrorField = "name" | "description" | "form";
+
+function errorFieldFor(code: string | undefined): ErrorField {
+  if (code?.startsWith("NAME_") || code === "INVALID_EMOJI") return "name";
+  if (code === "INVALID_DESCRIPTION") return "description";
+  return "form";
+}
+
 function FolderForm({
   folder,
   onDone,
@@ -54,27 +72,41 @@ function FolderForm({
 }) {
   const { createFolder, updateFolder } = useFolderActions();
   const [name, setName] = React.useState(folder?.name ?? "");
-  const [emoji, setEmoji] = React.useState(folder?.emoji ?? DEFAULT_FOLDER_EMOJI);
-  const [error, setError] = React.useState<string | null>(null);
+  // `null` = nothing picked yet: the oyster shows as the placeholder and the
+  // server applies it as the default on create.
+  const [emoji, setEmoji] = React.useState<string | null>(
+    folder?.emoji ?? null,
+  );
+  const [description, setDescription] = React.useState(
+    folder?.description ?? "",
+  );
+  const [error, setError] = React.useState<{
+    field: ErrorField;
+    message: string;
+  } | null>(null);
   const [pending, setPending] = React.useState(false);
   const nameId = React.useId();
-  const errorId = React.useId();
-  const emojiLabelId = React.useId();
+  const nameErrorId = React.useId();
+  const descriptionId = React.useId();
+  const descriptionErrorId = React.useId();
+  const formErrorId = React.useId();
 
   const trimmedName = name.trim();
+  const trimmedDescription = description.trim();
   const nameChanged = folder ? trimmedName !== folder.name : true;
-  const emojiChanged = folder ? emoji !== folder.emoji : true;
+  const emojiChanged = folder ? emoji !== folder.emoji : emoji !== null;
+  const descriptionChanged = folder
+    ? trimmedDescription !== (folder.description ?? "")
+    : trimmedDescription.length > 0;
   const canSubmit =
-    !pending && trimmedName.length > 0 && (nameChanged || emojiChanged);
+    !pending &&
+    trimmedName.length > 0 &&
+    (nameChanged || emojiChanged || descriptionChanged);
 
-  // A folder whose emoji was set outside the presets (e.g. via the API)
-  // keeps it as the first option, so editing the name doesn't silently drop it.
-  const options = React.useMemo<readonly FolderEmojiPreset[]>(() => {
-    if (!folder || FOLDER_EMOJI_PRESETS.some((p) => p.emoji === folder.emoji)) {
-      return FOLDER_EMOJI_PRESETS;
-    }
-    return [{ emoji: folder.emoji, label: "Current" }, ...FOLDER_EMOJI_PRESETS];
-  }, [folder]);
+  const nameError = error?.field === "name" ? error.message : null;
+  const descriptionError =
+    error?.field === "description" ? error.message : null;
+  const formError = error?.field === "form" ? error.message : null;
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -87,14 +119,19 @@ function FolderForm({
       ? await updateFolder(folder.id, {
           ...(nameChanged ? { name: trimmedName } : {}),
           ...(emojiChanged ? { emoji } : {}),
+          ...(descriptionChanged ? { description: trimmedDescription } : {}),
         })
-      : await createFolder({ name: trimmedName, emoji });
+      : await createFolder({
+          name: trimmedName,
+          ...(emoji ? { emoji } : {}),
+          ...(trimmedDescription ? { description: trimmedDescription } : {}),
+        });
     setPending(false);
 
     if (result.ok) {
       onDone();
     } else {
-      setError(result.error);
+      setError({ field: errorFieldFor(result.code), message: result.error });
     }
   }
 
@@ -102,43 +139,74 @@ function FolderForm({
     <form className="flex flex-col gap-6 px-6 pt-6" onSubmit={handleSubmit}>
       <FieldGroup>
         <Field>
-          <Label htmlFor={nameId}>Name</Label>
-          <Input
-            id={nameId}
-            name="name"
-            type="text"
-            value={name}
-            onChange={(e) => {
-              setName(e.target.value);
-              if (error) setError(null);
-            }}
-            autoFocus
-            required
-            maxLength={MAX_NAME_LENGTH}
-            autoComplete="off"
-            disabled={pending}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? errorId : undefined}
-          />
+          <Label htmlFor={nameId}>Folder name</Label>
+          <div className="flex gap-2">
+            <FolderEmojiPicker
+              value={emoji}
+              disabled={pending}
+              invalid={nameError !== null}
+              describedBy={nameError ? nameErrorId : undefined}
+              onChange={(next) => {
+                setEmoji(next);
+                if (error) setError(null);
+              }}
+            />
+            <Input
+              id={nameId}
+              name="name"
+              type="text"
+              placeholder="Folder name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (error) setError(null);
+              }}
+              autoFocus
+              required
+              maxLength={MAX_NAME_LENGTH}
+              autoComplete="off"
+              disabled={pending}
+              aria-invalid={nameError ? true : undefined}
+              aria-describedby={nameError ? nameErrorId : undefined}
+            />
+          </div>
+          {nameError ? (
+            <p id={nameErrorId} role="alert" className="text-sm text-destructive">
+              {nameError}
+            </p>
+          ) : null}
         </Field>
         <Field>
-          <Label id={emojiLabelId} asChild>
-            <span>Emoji</span>
-          </Label>
-          <EmojiPicker
-            labelledBy={emojiLabelId}
-            options={options}
-            value={emoji}
-            disabled={pending}
-            onChange={(next) => {
-              setEmoji(next);
+          <Label htmlFor={descriptionId}>Folder description</Label>
+          <Input
+            id={descriptionId}
+            name="description"
+            type="text"
+            placeholder="What's this folder for?"
+            value={description}
+            onChange={(e) => {
+              setDescription(e.target.value);
               if (error) setError(null);
             }}
+            maxLength={MAX_FOLDER_DESCRIPTION_LENGTH}
+            autoComplete="off"
+            disabled={pending}
+            aria-invalid={descriptionError ? true : undefined}
+            aria-describedby={descriptionError ? descriptionErrorId : undefined}
           />
+          {descriptionError ? (
+            <p
+              id={descriptionErrorId}
+              role="alert"
+              className="text-sm text-destructive"
+            >
+              {descriptionError}
+            </p>
+          ) : null}
         </Field>
-        {error ? (
-          <p id={errorId} role="alert" className="text-sm text-destructive">
-            {error}
+        {formError ? (
+          <p id={formErrorId} role="alert" className="text-sm text-destructive">
+            {formError}
           </p>
         ) : null}
       </FieldGroup>
@@ -156,83 +224,62 @@ function FolderForm({
   );
 }
 
-const NAV_KEYS: Record<string, (index: number, length: number) => number> = {
-  ArrowRight: (i, n) => (i + 1) % n,
-  ArrowDown: (i, n) => (i + 1) % n,
-  ArrowLeft: (i, n) => (i - 1 + n) % n,
-  ArrowUp: (i, n) => (i - 1 + n) % n,
-  Home: () => 0,
-  End: (_i, n) => n - 1,
-};
-
 /**
- * Single-select emoji grid with radio semantics: one tab stop (the selected
- * tile), arrow keys move and select, like a native radio group.
+ * Square button showing the folder's emoji (the oyster until one is picked)
+ * that opens the emoji picker in a popover. Picking closes the popover and
+ * returns focus to the button.
  */
-function EmojiPicker({
-  labelledBy,
-  options,
+function FolderEmojiPicker({
   value,
   disabled,
+  invalid,
+  describedBy,
   onChange,
 }: {
-  labelledBy: string;
-  options: readonly FolderEmojiPreset[];
-  value: string;
+  value: string | null;
   disabled: boolean;
+  invalid: boolean;
+  describedBy?: string;
   onChange: (emoji: string) => void;
 }) {
-  const tileRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
-  const selectedIndex = Math.max(
-    0,
-    options.findIndex((option) => option.emoji === value),
-  );
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
-    const move = NAV_KEYS[e.key];
-    if (!move) return;
-    e.preventDefault();
-    const next = move(selectedIndex, options.length);
-    onChange(options[next].emoji);
-    tileRefs.current[next]?.focus();
-  }
+  const [open, setOpen] = React.useState(false);
+  const shown = value ?? DEFAULT_FOLDER_EMOJI;
 
   return (
-    // Concentric: 14px outer radius = 10px tile radius + 4px padding.
-    <div
-      role="radiogroup"
-      aria-labelledby={labelledBy}
-      onKeyDown={handleKeyDown}
-      className="grid w-fit grid-cols-6 gap-1 rounded-[14px] bg-muted p-1"
-    >
-      {options.map((option, index) => {
-        const selected = index === selectedIndex;
-        return (
-          <button
-            key={option.emoji}
-            ref={(node) => {
-              tileRefs.current[index] = node;
-            }}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            aria-label={option.label}
-            tabIndex={selected ? 0 : -1}
-            disabled={disabled}
-            onClick={() => onChange(option.emoji)}
-            className={cn(
-              "flex size-10 items-center justify-center rounded-[10px] text-xl leading-none outline-none select-none",
-              "transition-[scale,background-color,box-shadow] duration-150 ease-out active:scale-[0.96]",
-              "hover:bg-background/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-              "disabled:pointer-events-none disabled:opacity-50",
-              // Static selected cue (surface + ring), not motion alone.
-              "aria-checked:bg-background aria-checked:shadow-sm aria-checked:ring-2 aria-checked:ring-primary",
-            )}
-          >
-            <span aria-hidden="true">{option.emoji}</span>
-          </button>
-        );
-      })}
-    </div>
+    // Modal so the popover's scroll lock sits above the dialog's: without it
+    // the dialog swallows wheel/touch scrolling inside the portaled picker.
+    <Popover open={open} onOpenChange={setOpen} modal>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          disabled={disabled}
+          aria-label={`Folder emoji: ${shown}. Choose another`}
+          aria-invalid={invalid ? true : undefined}
+          aria-describedby={describedBy}
+          className="text-lg leading-none"
+        >
+          <span aria-hidden="true">{shown}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        // Above the dialog (`DialogWrapper` raises it to z-51).
+        className="z-52 w-auto gap-0 rounded-lg p-0"
+      >
+        <EmojiPicker
+          className="h-80"
+          onEmojiSelect={({ emoji }) => {
+            onChange(emoji);
+            setOpen(false);
+          }}
+        >
+          <EmojiPickerSearch />
+          <EmojiPickerContent />
+          <EmojiPickerFooter />
+        </EmojiPicker>
+      </PopoverContent>
+    </Popover>
   );
 }
