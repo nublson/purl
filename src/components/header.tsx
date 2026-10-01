@@ -3,13 +3,11 @@ import { UsageProvider } from "@/contexts/usage-context";
 import { getEnabledProviders } from "@/lib/auth-providers";
 import { getSessionUser } from "@/lib/session";
 import { getUsageSummaryForUser } from "@/lib/usage-summary";
-import { Lock } from "lucide-react";
 import { Suspense } from "react";
 import { FolderSelectDropdown } from "./folder-select-dropdown";
 import { HeaderSaveLink } from "./header-save-link";
 import { Logo } from "./logo";
 import { HeaderActionsFallback } from "./skeletons/header-actions-fallback";
-import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import { User } from "./user";
 
@@ -22,15 +20,6 @@ async function HeaderActions() {
     <CurrentUserProvider user={user} enabledProviders={enabledProviders}>
       <UsageProvider usageSummary={usageSummary}>
         <div className="flex items-center justify-end gap-2">
-          <Button
-            aria-label="Share link"
-            variant="ghost"
-            size="sm"
-            className="hidden cursor-pointer text-muted-foreground [@media(hover:hover)]:inline-flex"
-          >
-            <Lock />
-            Private
-          </Button>
           <HeaderSaveLink />
           <User />
         </div>
