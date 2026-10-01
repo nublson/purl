@@ -33,7 +33,7 @@ type FolderDialog =
  * links to every folder, and opens the New / Edit / Delete folder dialogs.
  */
 export function FolderSelectDropdown() {
-  const { folders, max } = useFolders();
+  const { folders, max, totalLinks } = useFolders();
   const currentFolder = useCurrentFolder();
   const pathname = usePathname();
   const onHome = pathname === "/home";
@@ -113,13 +113,7 @@ export function FolderSelectDropdown() {
           <DropdownMenuItem asChild>
             <Link href="/home" aria-current={onHome ? "page" : undefined}>
               <FolderEmoji emoji={HOME_EMOJI} />
-              <Typography
-                component="span"
-                size="small"
-                className="min-w-0 flex-1 truncate"
-              >
-                Home
-              </Typography>
+              <RowLabel name="Home" count={totalLinks} />
               <CurrentMark active={onHome} />
             </Link>
           </DropdownMenuItem>
@@ -132,20 +126,7 @@ export function FolderSelectDropdown() {
                   aria-current={active ? "page" : undefined}
                 >
                   <FolderEmoji emoji={folder.emoji} />
-                  <Typography
-                    component="span"
-                    size="small"
-                    className="min-w-0 flex-1 truncate"
-                  >
-                    {folder.name}
-                  </Typography>
-                  <Typography
-                    component="span"
-                    size="small"
-                    className="text-xs tabular-nums text-muted-foreground"
-                  >
-                    {folder.linkCount}
-                  </Typography>
+                  <RowLabel name={folder.name} count={folder.linkCount} />
                   <CurrentMark active={active} />
                 </Link>
               </DropdownMenuItem>
@@ -207,12 +188,38 @@ export function FolderSelectDropdown() {
   );
 }
 
+/**
+ * Row name with its link count right beside it (the name truncates first);
+ * the check mark is pushed to the row's end by `CurrentMark`.
+ */
+function RowLabel({ name, count }: { name: string; count: number | null }) {
+  return (
+    <Typography
+      component="span"
+      className="flex min-w-0 items-baseline gap-1.5"
+    >
+      <Typography component="span" size="small" className="min-w-0 truncate">
+        {name}
+      </Typography>
+      {count !== null ? (
+        <Typography
+          component="span"
+          size="mini"
+          className="shrink-0 tabular-nums"
+        >
+          {count}
+        </Typography>
+      ) : null}
+    </Typography>
+  );
+}
+
 /** Fixed-width trailing slot so counts line up whether or not a row is checked. */
 function CurrentMark({ active }: { active: boolean }) {
   return (
     <Typography
       component="span"
-      className="flex size-4 shrink-0 items-center justify-center"
+      className="ml-auto flex size-4 shrink-0 items-center justify-center"
     >
       {active ? <Check aria-hidden="true" /> : null}
     </Typography>

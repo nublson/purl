@@ -3,6 +3,7 @@ import { FoldersProvider } from "@/contexts/folders-context";
 import { LinksSyncProvider } from "@/contexts/links-sync-context";
 import { listFoldersForUser } from "@/lib/folders";
 import { getSessionUser } from "@/lib/session";
+import { getUsageSummaryForUser } from "@/lib/usage-summary";
 
 export default async function AppShellLayout({
   children,
@@ -17,13 +18,21 @@ export default async function AppShellLayout({
   // `useCurrentFolder()` is correct on the very first render instead of
   // racing the provider's own client-side fetch (see folders-context.tsx).
   const user = await getSessionUser();
-  const initialFolders = user ? await listFoldersForUser(user.id) : [];
+  const [initialFolders, usageSummary] = user
+    ? await Promise.all([
+        listFoldersForUser(user.id),
+        getUsageSummaryForUser(user.id),
+      ])
+    : [[], null];
 
   // Wraps header and page: the folder selector's counts and the usage meter
   // follow link changes made in the list, and vice versa.
   return (
     <LinksSyncProvider>
-      <FoldersProvider initialFolders={initialFolders}>
+      <FoldersProvider
+        initialFolders={initialFolders}
+        initialTotalLinks={usageSummary?.saves.used ?? null}
+      >
         <Header />
         <main className="flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-4 md:px-0">
           {children}

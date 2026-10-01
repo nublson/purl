@@ -2,7 +2,7 @@
 
 import { useCurrentFolderContext } from "@/contexts/current-folder-context";
 import { useFoldersContext } from "@/contexts/folders-context";
-import { useLinksSyncActions } from "@/hooks/use-links-sync";
+import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
 import {
   patchFolder,
   patchLinkFolder,
@@ -21,14 +21,26 @@ import { toast } from "sonner";
 
 export type { ActionResult, CreateFolderInput, FolderSummary, UpdateFolderInput };
 
-/** Folder list backing the folder menus/sidebars; refreshes on every links-sync version bump. */
+/**
+ * Folder list backing the folder menus/sidebars; refreshes on every
+ * links-sync version bump. `totalLinks` is Home's count (every saved link):
+ * the live links-sync total once a list reload has reported one, else the
+ * server-rendered count; `null` when neither is known.
+ */
 export function useFolders(): {
   folders: FolderSummary[];
   isLoading: boolean;
   max: number;
+  totalLinks: number | null;
 } {
-  const { folders, isLoading } = useFoldersContext();
-  return { folders, isLoading, max: MAX_FOLDERS };
+  const { folders, isLoading, initialTotalLinks } = useFoldersContext();
+  const { total } = useLinksSyncState();
+  return {
+    folders,
+    isLoading,
+    max: MAX_FOLDERS,
+    totalLinks: total ?? initialTotalLinks,
+  };
 }
 
 /**
