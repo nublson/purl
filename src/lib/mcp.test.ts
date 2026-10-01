@@ -405,7 +405,7 @@ describe("listFoldersTool", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("returns the user's folders as JSON content", async () => {
-    const folders = [{ id: "f1", name: "Reading", slug: "reading", linkCount: 3 }];
+    const folders = [{ id: "f1", name: "Reading", slug: "reading", emoji: "🦪", linkCount: 3 }];
     mockListFoldersForUser.mockResolvedValue(folders);
     const result = await listFoldersTool("user-1");
     expect(mockListFoldersForUser).toHaveBeenCalledWith("user-1");

@@ -30,7 +30,9 @@ vi.mock("@/lib/folders", async () => {
 });
 
 const { GET, POST, OPTIONS } = await import("./route");
-const { FolderNameError, FolderLimitError } = await import("@/lib/folders");
+const { FolderNameError, FolderLimitError, FolderEmojiError } = await import(
+  "@/lib/folders",
+);
 
 function getRequest() {
   return new NextRequest("http://localhost/api/v1/folders", { method: "GET" });
@@ -56,7 +58,7 @@ describe("GET /api/v1/folders", () => {
 
   it("returns 200 with the folder list and CORS header", async () => {
     mockGetSessionUser.mockResolvedValue({ id: "user-1" });
-    const folders = [{ id: "f1", name: "Reading", slug: "reading", linkCount: 3 }];
+    const folders = [{ id: "f1", name: "Reading", slug: "reading", emoji: "🦪", linkCount: 3 }];
     mockListFoldersForUser.mockResolvedValue(folders);
     const res = await GET(getRequest());
     expect(res.status).toBe(200);
@@ -101,12 +103,12 @@ describe("POST /api/v1/folders", () => {
   it("returns 400 NAME_TOO_LONG for an over-long name", async () => {
     mockGetSessionUser.mockResolvedValue({ id: "user-1" });
     mockCreateFolder.mockRejectedValue(
-      new FolderNameError("too_long", "Keep it under 60 characters."),
+      new FolderNameError("too_long", "Keep the name to 60 characters or fewer."),
     );
     const res = await POST(postRequest({ name: "a".repeat(70) }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({
-      error: "Keep it under 60 characters.",
+      error: "Keep the name to 60 characters or fewer.",
       code: "NAME_TOO_LONG",
     });
   });
@@ -114,12 +116,12 @@ describe("POST /api/v1/folders", () => {
   it("returns 409 NAME_TAKEN when the name collides", async () => {
     mockGetSessionUser.mockResolvedValue({ id: "user-1" });
     mockCreateFolder.mockRejectedValue(
-      new FolderNameError("taken", "You already have a folder with that name."),
+      new FolderNameError("taken", "You already have a folder with that name. Choose another."),
     );
     const res = await POST(postRequest({ name: "Reading" }));
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({
-      error: "You already have a folder with that name.",
+      error: "You already have a folder with that name. Choose another.",
       code: "NAME_TAKEN",
     });
   });
@@ -140,13 +142,13 @@ describe("POST /api/v1/folders", () => {
 
   it("returns 201 with the created folder and CORS header", async () => {
     mockGetSessionUser.mockResolvedValue({ id: "user-1" });
-    const created = { id: "f1", name: "Reading", slug: "reading", linkCount: 0 };
+    const created = { id: "f1", name: "Reading", slug: "reading", emoji: "🦪", linkCount: 0 };
     mockCreateFolder.mockResolvedValue(created);
 
     const res = await POST(postRequest({ name: "Reading" }));
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual(created);
-    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Reading");
+    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Reading", undefined, undefined);
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(mockBroadcast).toHaveBeenCalledWith("user-1");
   });
@@ -154,10 +156,71 @@ describe("POST /api/v1/folders", () => {
   it("does not broadcast when creation fails", async () => {
     mockGetSessionUser.mockResolvedValue({ id: "user-1" });
     mockCreateFolder.mockRejectedValue(
-      new FolderNameError("taken", "You already have a folder with that name."),
+      new FolderNameError("taken", "You already have a folder with that name. Choose another."),
     );
     const res = await POST(postRequest({ name: "Reading" }));
     expect(res.status).toBe(409);
+    expect(mockBroadcast).not.toHaveBeenCalled();
+  });
+
+  it("creates a folder with an emoji", async () => {
+    mockGetSessionUser.mockResolvedValue({ id: "user-1" });
+    const created = { id: "f1", name: "Trips", slug: "trips", emoji: "🇵🇹", linkCount: 0 };
+    mockCreateFolder.mockResolvedValue(created);
+
+    const res = await POST(postRequest({ name: "Trips", emoji: "🇵🇹" }));
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual(created);
+    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Trips", "🇵🇹", undefined);
+  });
+
+  it("creates a folder with a description", async () => {
+    mockGetSessionUser.mockResolvedValue({ id: "user-1" });
+    mockCreateFolder.mockResolvedValue({
+      id: "f1",
+      name: "Trips",
+      slug: "trips",
+      emoji: "🦪",
+      description: "Places to go.",
+      linkCount: 0,
+    });
+
+    const res = await POST(postRequest({ name: "Trips", description: "Places to go." }));
+    expect(res.status).toBe(201);
+    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Trips", undefined, "Places to go.");
+  });
+
+  it("returns 400 INVALID_DESCRIPTION with CORS for a non-string description", async () => {
+    mockGetSessionUser.mockResolvedValue({ id: "user-1" });
+    const res = await POST(postRequest({ name: "Trips", description: 1 }));
+    expect(res.status).toBe(400);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect((await res.json()).code).toBe("INVALID_DESCRIPTION");
+    expect(mockCreateFolder).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 INVALID_EMOJI with CORS for a non-string emoji", async () => {
+    mockGetSessionUser.mockResolvedValue({ id: "user-1" });
+    const res = await POST(postRequest({ name: "Trips", emoji: true }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Pick a single emoji.",
+      code: "INVALID_EMOJI",
+    });
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(mockCreateFolder).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 INVALID_EMOJI with CORS when the lib rejects the emoji", async () => {
+    mockGetSessionUser.mockResolvedValue({ id: "user-1" });
+    mockCreateFolder.mockRejectedValue(new FolderEmojiError());
+    const res = await POST(postRequest({ name: "Trips", emoji: "trips" }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Pick a single emoji.",
+      code: "INVALID_EMOJI",
+    });
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(mockBroadcast).not.toHaveBeenCalled();
   });
 });

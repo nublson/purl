@@ -26,8 +26,15 @@ const {
   listFoldersForUser,
   getFolderBySlug,
   createFolder,
-  renameFolder,
+  updateFolder,
   deleteFolder,
+  normalizeFolderEmoji,
+  FolderEmojiError,
+  normalizeFolderDescription,
+  FolderDescriptionError,
+  MAX_FOLDER_DESCRIPTION_LENGTH,
+  FolderUpdateEmptyError,
+  DEFAULT_FOLDER_EMOJI,
   assertFolderOwned,
 } = await import("./folders");
 const { MAX_FOLDERS } = await import("./limits");
@@ -93,7 +100,7 @@ describe("createFolder", () => {
     expect((err as InstanceType<typeof FolderNameError>).reason).toBe(
       "too_long",
     );
-    expect((err as Error).message).toBe("Keep it under 60 characters.");
+    expect((err as Error).message).toBe("Keep the name to 60 characters or fewer.");
   });
 
   it("rejects case-insensitive duplicates", async () => {
@@ -113,7 +120,7 @@ describe("createFolder", () => {
       "taken",
     );
     expect((err as Error).message).toBe(
-      "You already have a folder with that name.",
+      "You already have a folder with that name. Choose another.",
     );
     expect(prisma.folder.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -158,6 +165,8 @@ describe("createFolder", () => {
       id: "new-id",
       name: "Books!",
       slug: "books-3",
+      emoji: DEFAULT_FOLDER_EMOJI,
+      description: null,
       linkCount: 0,
     });
     expect(prisma.folder.create).toHaveBeenCalledWith(
@@ -242,7 +251,14 @@ describe("createFolder", () => {
 
     const result = await createFolder("user-1", "Books");
 
-    expect(result).toEqual({ id: "new-id", name: "Books", slug: "books", linkCount: 0 });
+    expect(result).toEqual({
+      id: "new-id",
+      name: "Books",
+      slug: "books",
+      emoji: DEFAULT_FOLDER_EMOJI,
+      description: null,
+      linkCount: 0,
+    });
     expect(order).toEqual([
       "lock:SELECT pg_advisory_xact_lock(hashtext(?)):user-1",
       "count",
@@ -250,7 +266,13 @@ describe("createFolder", () => {
     ]);
     expect(isolatedTx.folder.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { userId: "user-1", name: "Books", slug: "books" },
+        data: {
+          userId: "user-1",
+          name: "Books",
+          slug: "books",
+          emoji: null,
+          description: null,
+        },
       }),
     );
     expect(prisma.folder.count).not.toHaveBeenCalled();
@@ -268,13 +290,13 @@ describe("createFolder", () => {
   });
 });
 
-describe("renameFolder", () => {
+describe("updateFolder", () => {
   beforeEach(resetMocks);
 
   it("treats another user's folder as not found", async () => {
     vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
 
-    const err = await renameFolder("user-1", "folder-1", "New Name").catch(
+    const err = await updateFolder("user-1", "folder-1", { name: "New Name" }).catch(
       (e: unknown) => e,
     );
     expect(err).toBeInstanceOf(FolderNotFoundError);
@@ -302,11 +324,13 @@ describe("renameFolder", () => {
       _count: { links: 3 },
     } as never);
 
-    const result = await renameFolder("user-1", "folder-1", "books");
+    const result = await updateFolder("user-1", "folder-1", { name: "books" });
     expect(result).toEqual({
       id: "folder-1",
       name: "books",
       slug: "books",
+      emoji: DEFAULT_FOLDER_EMOJI,
+      description: null,
       linkCount: 3,
     });
     expect(prisma.folder.findFirst).toHaveBeenNthCalledWith(2, {
@@ -337,7 +361,7 @@ describe("renameFolder", () => {
       _count: { links: 1 },
     } as never);
 
-    const result = await renameFolder("user-1", "folder-1", "Trips");
+    const result = await updateFolder("user-1", "folder-1", { name: "Trips" });
     expect(result.slug).toBe("trips-2");
     expect(prisma.folder.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -367,12 +391,345 @@ describe("renameFolder", () => {
     vi.mocked(prisma.folder.findMany).mockResolvedValue([]);
     vi.mocked(prisma.folder.update).mockRejectedValue({ code: "P2002" });
 
-    const err = await renameFolder("user-1", "folder-1", "Trips").catch(
+    const err = await updateFolder("user-1", "folder-1", { name: "Trips" }).catch(
       (e: unknown) => e,
     );
     expect(err).toBeInstanceOf(FolderNameError);
     expect((err as InstanceType<typeof FolderNameError>).reason).toBe(
       "taken",
+    );
+  });
+  it("rejects an update with no fields before touching the DB", async () => {
+    const err = await updateFolder("user-1", "folder-1", {}).catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(FolderUpdateEmptyError);
+    expect((err as Error).message).toBe("Nothing to update");
+    expect(prisma.folder.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("updates only the emoji, leaving the name and slug alone", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValueOnce({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      userId: "user-1",
+    } as never);
+    vi.mocked(prisma.folder.update).mockResolvedValue({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      emoji: "📚",
+      _count: { links: 2 },
+    } as never);
+
+    const result = await updateFolder("user-1", "folder-1", { emoji: " 📚 " });
+
+    expect(result).toEqual({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      emoji: "📚",
+      description: null,
+      linkCount: 2,
+    });
+    expect(prisma.folder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "folder-1" }, data: { emoji: "📚" } }),
+    );
+    // No name → no taken check and no slug regeneration.
+    expect(prisma.folder.findFirst).toHaveBeenCalledTimes(1);
+    expect(prisma.folder.findMany).not.toHaveBeenCalled();
+  });
+
+  it("clears the emoji with null or an empty string", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      userId: "user-1",
+    } as never);
+    vi.mocked(prisma.folder.update).mockResolvedValue({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      emoji: null,
+      _count: { links: 0 },
+    } as never);
+
+    const a = await updateFolder("user-1", "folder-1", { emoji: null });
+    const b = await updateFolder("user-1", "folder-1", { emoji: "" });
+
+    expect(a.emoji).toBe(DEFAULT_FOLDER_EMOJI);
+    expect(b.emoji).toBe(DEFAULT_FOLDER_EMOJI);
+    expect(prisma.folder.update).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ data: { emoji: null } }),
+    );
+    expect(prisma.folder.update).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ data: { emoji: null } }),
+    );
+  });
+
+  it("updates name and emoji together", async () => {
+    vi.mocked(prisma.folder.findFirst)
+      .mockResolvedValueOnce({
+        id: "folder-1",
+        name: "Books",
+        slug: "books",
+        userId: "user-1",
+      } as never)
+      .mockResolvedValueOnce(null);
+    vi.mocked(prisma.folder.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.folder.update).mockResolvedValue({
+      id: "folder-1",
+      name: "Trips",
+      slug: "trips",
+      emoji: "✈️",
+      _count: { links: 0 },
+    } as never);
+
+    await updateFolder("user-1", "folder-1", { name: "Trips", emoji: "✈️" });
+
+    expect(prisma.folder.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { name: "Trips", slug: "trips", emoji: "✈️" },
+      }),
+    );
+  });
+
+  it("rejects an invalid emoji without updating", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      userId: "user-1",
+    } as never);
+
+    const err = await updateFolder("user-1", "folder-1", {
+      emoji: "📚📚",
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(FolderEmojiError);
+    expect(prisma.folder.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("normalizeFolderEmoji", () => {
+  it.each([
+    ["🦪", "🦪"],
+    ["  📚  ", "📚"],
+    // ZWJ sequence: one grapheme, several code points.
+    ["👩‍💻", "👩‍💻"],
+    // Flag: a pair of regional indicators.
+    ["🇵🇹", "🇵🇹"],
+    // Skin-tone modifier and variation selector.
+    ["👍🏽", "👍🏽"],
+    ["✈️", "✈️"],
+    // Keycap sequence.
+    ["1️⃣", "1️⃣"],
+    // Text-default pictograph forced to emoji presentation with U+FE0F.
+    ["\u2764\uFE0F", "\u2764\uFE0F"],
+    ["\u00A9\uFE0F", "\u00A9\uFE0F"],
+    // Typical emoji-picker output: skin-tone ZWJ sequences, flags with ZWJ.
+    ["👩🏽‍💻", "👩🏽‍💻"],
+    ["🧑🏿‍🤝‍🧑🏻", "🧑🏿‍🤝‍🧑🏻"],
+    ["🏳️‍🌈", "🏳️‍🌈"],
+    ["☺️", "☺️"],
+  ])("accepts %j", (input, expected) => {
+    expect(normalizeFolderEmoji(input)).toBe(expected);
+  });
+
+  it.each([[undefined], [null], [""], ["   "]])(
+    "treats %j as no emoji (null)",
+    (input) => {
+      expect(normalizeFolderEmoji(input)).toBeNull();
+    },
+  );
+
+  it.each([
+    ["two emoji", "📚📚"],
+    ["two flags", "🇵🇹🇧🇷"],
+    ["plain text", "a"],
+    ["a word", "books"],
+    ["emoji plus text", "📚a"],
+    ["a digit alone", "1"],
+    ["a letter with U+FE0F", "a\uFE0F"],
+    ["© (text presentation)", "\u00A9"],
+    ["® (text presentation)", "\u00AE"],
+    ["™ (text presentation)", "\u2122"],
+    ["❤ without U+FE0F", "\u2764"],
+    ["a grapheme padded with combining marks", `🦪${"\u0301".repeat(40)}`],
+  ])("rejects %s", (_label, input) => {
+    const err = (() => {
+      try {
+        normalizeFolderEmoji(input);
+      } catch (e) {
+        return e;
+      }
+    })();
+    expect(err).toBeInstanceOf(FolderEmojiError);
+    expect((err as Error).message).toBe("Pick a single emoji.");
+  });
+});
+
+describe("createFolder emoji", () => {
+  beforeEach(resetMocks);
+
+  it("stores a valid emoji and returns it", async () => {
+    vi.mocked(prisma.folder.count).mockResolvedValue(0);
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.folder.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.folder.create).mockResolvedValue({
+      id: "new-id",
+      name: "Code",
+      slug: "code",
+      emoji: "👩‍💻",
+      _count: { links: 0 },
+    } as never);
+
+    const result = await createFolder("user-1", "Code", "👩‍💻");
+
+    expect(result.emoji).toBe("👩‍💻");
+    expect(prisma.folder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ emoji: "👩‍💻" }),
+      }),
+    );
+  });
+
+  it("rejects an invalid emoji before opening the transaction", async () => {
+    const err = await createFolder("user-1", "Code", "code").catch(
+      (e: unknown) => e,
+    );
+    expect(err).toBeInstanceOf(FolderEmojiError);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe("normalizeFolderDescription", () => {
+  it("trims the description", () => {
+    expect(normalizeFolderDescription("  Precious pearls.  ")).toBe(
+      "Precious pearls.",
+    );
+  });
+
+  it.each([[undefined], [null], [""], ["   "]])(
+    "treats %j as no description (null)",
+    (input) => {
+      expect(normalizeFolderDescription(input)).toBeNull();
+    },
+  );
+
+  it("accepts exactly the max length (after trimming)", () => {
+    const max = "a".repeat(MAX_FOLDER_DESCRIPTION_LENGTH);
+    expect(normalizeFolderDescription(` ${max} `)).toBe(max);
+  });
+
+  it("rejects anything longer", () => {
+    const err = (() => {
+      try {
+        normalizeFolderDescription("a".repeat(MAX_FOLDER_DESCRIPTION_LENGTH + 1));
+      } catch (e) {
+        return e;
+      }
+    })();
+    expect(err).toBeInstanceOf(FolderDescriptionError);
+    expect((err as Error).message).toBe(
+      "Keep the description to 160 characters or fewer.",
+    );
+  });
+});
+
+describe("folder description", () => {
+  beforeEach(resetMocks);
+
+  it("stores a trimmed description on create and returns it", async () => {
+    vi.mocked(prisma.folder.count).mockResolvedValue(0);
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.folder.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.folder.create).mockResolvedValue({
+      id: "new-id",
+      name: "Oyster",
+      slug: "oyster",
+      emoji: null,
+      description: "Precious pearls.",
+      _count: { links: 0 },
+    } as never);
+
+    const result = await createFolder(
+      "user-1",
+      "Oyster",
+      undefined,
+      "  Precious pearls. ",
+    );
+
+    expect(result.description).toBe("Precious pearls.");
+    expect(prisma.folder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ description: "Precious pearls." }),
+      }),
+    );
+  });
+
+  it("rejects an over-long description before opening the transaction", async () => {
+    const err = await createFolder(
+      "user-1",
+      "Oyster",
+      undefined,
+      "a".repeat(MAX_FOLDER_DESCRIPTION_LENGTH + 1),
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(FolderDescriptionError);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("updates only the description", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValueOnce({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      userId: "user-1",
+    } as never);
+    vi.mocked(prisma.folder.update).mockResolvedValue({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      emoji: null,
+      description: "To read.",
+      _count: { links: 0 },
+    } as never);
+
+    const result = await updateFolder("user-1", "folder-1", {
+      description: "To read.",
+    });
+
+    expect(result.description).toBe("To read.");
+    expect(prisma.folder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { description: "To read." } }),
+    );
+  });
+
+  it("clears the description with an empty string", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValueOnce({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      userId: "user-1",
+    } as never);
+    vi.mocked(prisma.folder.update).mockResolvedValue({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      emoji: null,
+      description: null,
+      _count: { links: 0 },
+    } as never);
+
+    const result = await updateFolder("user-1", "folder-1", { description: "" });
+
+    expect(result.description).toBeNull();
+    expect(prisma.folder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { description: null } }),
     );
   });
 });
@@ -470,8 +827,8 @@ describe("listFoldersForUser", () => {
 
   it("orders by name, case-insensitive", async () => {
     vi.mocked(prisma.folder.findMany).mockResolvedValue([
-      { id: "1", name: "banana", slug: "banana", _count: { links: 0 } },
-      { id: "2", name: "Apple", slug: "apple", _count: { links: 2 } },
+      { id: "1", name: "banana", slug: "banana", emoji: null, _count: { links: 0 } },
+      { id: "2", name: "Apple", slug: "apple", emoji: "🍎", _count: { links: 2 } },
       { id: "3", name: "cherry", slug: "cherry", _count: { links: 1 } },
     ] as never);
 
@@ -481,8 +838,12 @@ describe("listFoldersForUser", () => {
       id: "1",
       name: "banana",
       slug: "banana",
+      emoji: DEFAULT_FOLDER_EMOJI,
+      description: null,
       linkCount: 0,
     });
+    // A stored emoji wins over the default.
+    expect(result[0].emoji).toBe("🍎");
   });
 });
 
@@ -500,6 +861,7 @@ describe("getFolderBySlug", () => {
       id: "1",
       name: "Books",
       slug: "books",
+      emoji: "📚",
       _count: { links: 4 },
     } as never);
     const result = await getFolderBySlug("user-1", "books");
@@ -507,6 +869,8 @@ describe("getFolderBySlug", () => {
       id: "1",
       name: "Books",
       slug: "books",
+      emoji: "📚",
+      description: null,
       linkCount: 4,
     });
   });

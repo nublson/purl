@@ -52,7 +52,7 @@ describe("postFolder", () => {
       new Response(JSON.stringify(folder), { status: 201 }),
     );
 
-    const result = await postFolder("Books");
+    const result = await postFolder({ name: "Books" });
 
     expect(fetchSpy).toHaveBeenCalledWith("/api/folders", {
       method: "POST",
@@ -65,30 +65,44 @@ describe("postFolder", () => {
     expect(result).toEqual({ ok: true, data: folder });
   });
 
+  it("POSTs the emoji alongside the name when given", async () => {
+    const folder = { id: "f1", name: "Books", slug: "books", emoji: "📚", linkCount: 0 };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(folder), { status: 201 }),
+    );
+
+    const result = await postFolder({ name: "Books", emoji: "📚" });
+
+    expect(fetchSpy.mock.calls[0][1]?.body).toBe(
+      JSON.stringify({ name: "Books", emoji: "📚" }),
+    );
+    expect(result).toEqual({ ok: true, data: folder });
+  });
+
   it("returns the body's error on a 409", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
-        JSON.stringify({ error: "You already have a folder with that name." }),
+        JSON.stringify({ error: "You already have a folder with that name. Choose another." }),
         { status: 409 },
       ),
     );
 
-    const result = await postFolder("Books");
+    const result = await postFolder({ name: "Books" });
 
     expect(result).toEqual({
       ok: false,
-      error: "You already have a folder with that name.",
+      error: "You already have a folder with that name. Choose another.",
     });
   });
 
   it("returns the fallback error when the request throws", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network down"));
 
-    const result = await postFolder("Books");
+    const result = await postFolder({ name: "Books" });
 
     expect(result).toEqual({
       ok: false,
-      error: "Something went wrong. Try again.",
+      error: "Unable to create the folder. Check your connection and try again.",
     });
   });
 
@@ -97,11 +111,11 @@ describe("postFolder", () => {
       new Response("not json", { status: 500 }),
     );
 
-    const result = await postFolder("Books");
+    const result = await postFolder({ name: "Books" });
 
     expect(result).toEqual({
       ok: false,
-      error: "Something went wrong. Try again.",
+      error: "Unable to create the folder. Try again.",
     });
   });
 });
@@ -117,7 +131,7 @@ describe("patchFolder", () => {
       new Response(JSON.stringify(folder), { status: 200 }),
     );
 
-    const result = await patchFolder("f1", "Renamed");
+    const result = await patchFolder("f1", { name: "Renamed" });
 
     expect(fetchSpy).toHaveBeenCalledWith("/api/folders/f1", {
       method: "PATCH",
@@ -130,6 +144,36 @@ describe("patchFolder", () => {
     expect(result).toEqual({ ok: true, data: folder });
   });
 
+  it("PATCHes only the emoji when that's all that changed, and sends null to clear it", async () => {
+    const folder = { id: "f1", name: "Books", slug: "books", emoji: "📚", linkCount: 2 };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(folder), { status: 200 }),
+    );
+
+    await patchFolder("f1", { emoji: "📚" });
+    await patchFolder("f1", { emoji: null });
+
+    expect(fetchSpy.mock.calls[0][1]?.body).toBe(JSON.stringify({ emoji: "📚" }));
+    expect(fetchSpy.mock.calls[1][1]?.body).toBe(JSON.stringify({ emoji: null }));
+  });
+
+  it("returns the INVALID_EMOJI error message and code without throwing", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({ error: "Pick a single emoji.", code: "INVALID_EMOJI" }),
+        { status: 400 },
+      ),
+    );
+
+    const result = await patchFolder("f1", { emoji: "ab" });
+
+    expect(result).toEqual({
+      ok: false,
+      error: "Pick a single emoji.",
+      code: "INVALID_EMOJI",
+    });
+  });
+
   it("returns 404's body error", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ error: "Folder not found" }), {
@@ -137,7 +181,7 @@ describe("patchFolder", () => {
       }),
     );
 
-    const result = await patchFolder("missing", "Renamed");
+    const result = await patchFolder("missing", { name: "Renamed" });
 
     expect(result).toEqual({ ok: false, error: "Folder not found" });
   });
@@ -185,7 +229,7 @@ describe("removeFolder", () => {
 
     expect(result).toEqual({
       ok: false,
-      error: "Something went wrong. Try again.",
+      error: "Unable to delete the folder. Check your connection and try again.",
     });
   });
 });

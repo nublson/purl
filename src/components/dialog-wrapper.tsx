@@ -45,7 +45,8 @@ export function DialogWrapper({
       <DialogContent
         className={cn(
           "gap-4 px-0 z-51",
-          content && "flex min-h-0 flex-col overflow-hidden",
+          // pb-5 + the scroll area's pb-1 keep the 24px bottom inset.
+          content && "flex min-h-0 flex-col overflow-hidden pb-5",
           className,
         )}
       >
@@ -54,7 +55,9 @@ export function DialogWrapper({
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         {content ? (
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain">
+          // pb-1 so the footer buttons' focus ring (ring-3) isn't clipped by
+          // the scroll container's edge.
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain pb-1">
             {content}
           </div>
         ) : null}

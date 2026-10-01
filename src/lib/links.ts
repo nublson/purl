@@ -369,31 +369,6 @@ export const getLinksPageForCurrentUser = cache(
   },
 );
 
-/** Case-insensitive search over the current user's links (title, URL, domain, description), newest first. An empty query returns the most recent links. */
-export async function searchLinksForCurrentUser(
-  query: string,
-  limit: number,
-): Promise<Link[]> {
-  const userId = await getCurrentUserId();
-  const q = query.trim();
-  const rows = await prisma.link.findMany({
-    where: q
-      ? {
-          userId,
-          OR: [
-            { title: { contains: q, mode: "insensitive" } },
-            { url: { contains: q, mode: "insensitive" } },
-            { domain: { contains: q, mode: "insensitive" } },
-            { description: { contains: q, mode: "insensitive" } },
-          ],
-        }
-      : { userId },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
-  return rows.map(mapRowToLink);
-}
-
 export type CreateLinkResult = Awaited<ReturnType<typeof prisma.link.create>>;
 export type RefreshLinkResult = Awaited<ReturnType<typeof prisma.link.update>>;
 

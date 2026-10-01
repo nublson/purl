@@ -95,7 +95,7 @@ describe("saveLink", () => {
     expect(successMock).not.toHaveBeenCalled();
   });
 
-  it("sends folderId and toasts 'Saved to {name}' when no move happened", async () => {
+  it("sends folderId and toasts 'Saved to {emoji} {name}' when no move happened", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ id: "link-1", moved: false }), {
         status: 201,
@@ -103,7 +103,7 @@ describe("saveLink", () => {
     );
 
     const result = await saveLink("https://example.com", {
-      folder: { id: "folder-1", name: "Books" },
+      folder: { id: "folder-1", name: "Books", emoji: "📚" },
     });
 
     expect(fetchSpy).toHaveBeenCalledWith("/api/links", {
@@ -115,10 +115,10 @@ describe("saveLink", () => {
       body: JSON.stringify({ url: "https://example.com", folderId: "folder-1" }),
     });
     expect(result).toEqual({ id: "link-1" });
-    expect(successMock).toHaveBeenCalledWith("Saved to Books");
+    expect(successMock).toHaveBeenCalledWith("Saved to 📚 Books");
   });
 
-  it("toasts 'Moved to {name}' when the save moved an existing link", async () => {
+  it("toasts 'Moved to {emoji} {name}' when the save moved an existing link", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ id: "link-1", moved: true }), {
         status: 201,
@@ -126,11 +126,11 @@ describe("saveLink", () => {
     );
 
     const result = await saveLink("https://example.com", {
-      folder: { id: "folder-1", name: "Books" },
+      folder: { id: "folder-1", name: "Books", emoji: "📚" },
     });
 
     expect(result).toEqual({ id: "link-1" });
-    expect(successMock).toHaveBeenCalledWith("Moved to Books");
+    expect(successMock).toHaveBeenCalledWith("Moved to 📚 Books");
   });
 
   it("does not send folderId or toast success when no folder is given", async () => {

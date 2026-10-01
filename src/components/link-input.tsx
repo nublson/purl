@@ -36,7 +36,13 @@ export function LinkInput({
       const result = await saveLink(
         value.url,
         currentFolder
-          ? { folder: { id: currentFolder.id, name: currentFolder.name } }
+          ? {
+              folder: {
+                id: currentFolder.id,
+                name: currentFolder.name,
+                emoji: currentFolder.emoji,
+              },
+            }
           : undefined,
       );
       if (!result || !("id" in result)) {

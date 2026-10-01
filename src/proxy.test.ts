@@ -346,7 +346,6 @@ describe("proxy matcher", () => {
     "/",
     "/home",
     "/api/links",
-    "/api/links/search",
     "/api/auth/get-session",
     "/.well-known/oauth-authorization-server",
     "/oauth/consent",

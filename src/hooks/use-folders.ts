@@ -2,31 +2,57 @@
 
 import { useCurrentFolderContext } from "@/contexts/current-folder-context";
 import { useFoldersContext } from "@/contexts/folders-context";
-import { useLinksSyncActions } from "@/hooks/use-links-sync";
+import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
 import {
   patchFolder,
   patchLinkFolder,
   postFolder,
   removeFolder,
   type ActionResult,
+  type CreateFolderInput,
+  type UpdateFolderInput,
 } from "@/lib/folder-client";
 import type { FolderSummary } from "@/lib/folders";
 import { resolveCurrentFolder } from "@/lib/current-folder";
+import { formatFolderLabel, formatLinkCount } from "@/lib/folder-display";
 import { MAX_FOLDERS } from "@/lib/limits";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 
-export type { ActionResult, FolderSummary };
+export type { ActionResult, CreateFolderInput, FolderSummary, UpdateFolderInput };
 
-/** Folder list backing the folder menus/sidebars; refreshes on every links-sync version bump. */
+/**
+ * Latest move per link id. A move's Undo only applies while it is still the
+ * link's latest move, so an older toast can't revert a newer choice.
+ */
+const latestMoveByLink = new Map<string, symbol>();
+
+/**
+ * Folder list backing the folder menus/sidebars; refreshes on every
+ * links-sync version bump, or on `refresh()` for a change that reloads its
+ * own list without bumping the version (a save on a folder page).
+ * `totalLinks` is Home's count (every saved link): the live links-sync total
+ * once a list reload has reported one, else the server-rendered count;
+ * `null` when neither is known.
+ */
 export function useFolders(): {
   folders: FolderSummary[];
   isLoading: boolean;
   max: number;
+  totalLinks: number | null;
+  refresh: () => void;
 } {
-  const { folders, isLoading } = useFoldersContext();
-  return { folders, isLoading, max: MAX_FOLDERS };
+  const { folders, isLoading, initialTotalLinks, refresh } =
+    useFoldersContext();
+  const { total } = useLinksSyncState();
+  return {
+    folders,
+    isLoading,
+    max: MAX_FOLDERS,
+    totalLinks: total ?? initialTotalLinks,
+    refresh,
+  };
 }
 
 /**
@@ -50,11 +76,21 @@ export function useCurrentFolder(): FolderSummary | null {
   return resolveCurrentFolder({ pageFolder, folders, pathname, slug });
 }
 
+/**
+ * Folder mutations. Each returns `{ ok: true, data } | { ok: false, error }`
+ * and never throws. On success they toast, refresh the folder list and
+ * navigate (create → the new folder; update → its new slug if you're on it;
+ * delete → /home if you're on it). On failure `createFolder`, `updateFolder`
+ * and `deleteFolder` stay silent: their callers (the folder dialogs) show
+ * `error` inline. `moveLink` has no dialog, so it toasts its own failures.
+ */
 export function useFolderActions(): {
-  createFolder: (name: string) => Promise<ActionResult<FolderSummary>>;
-  renameFolder: (
+  createFolder: (
+    input: CreateFolderInput,
+  ) => Promise<ActionResult<FolderSummary>>;
+  updateFolder: (
     id: string,
-    name: string,
+    input: UpdateFolderInput,
   ) => Promise<ActionResult<FolderSummary>>;
   deleteFolder: (
     id: string,
@@ -63,18 +99,20 @@ export function useFolderActions(): {
   moveLink: (
     linkId: string,
     folderId: string | null,
-    opts?: { folderName?: string },
+    opts?: { from?: string | null },
   ) => Promise<ActionResult>;
 } {
-  const { folders, upsertFolder, removeFolderLocally } = useFoldersContext();
-  const { notifyLinksChanged } = useLinksSyncActions();
+  const { folders, upsertFolder, removeFolderLocally, initialTotalLinks } =
+    useFoldersContext();
+  const { notifyLinksChanged, setLinksTotal } = useLinksSyncActions();
+  const { total } = useLinksSyncState();
   const router = useRouter();
   const pathname = usePathname();
   const currentFolder = useCurrentFolder();
 
   const createFolder = useCallback(
-    async (name: string): Promise<ActionResult<FolderSummary>> => {
-      const result = await postFolder(name);
+    async (input: CreateFolderInput): Promise<ActionResult<FolderSummary>> => {
+      const result = await postFolder(input);
       if (result.ok) {
         // Patch the list locally before navigating: the background refetch
         // triggered by notifyLinksChanged() hasn't landed yet, and without
@@ -84,35 +122,39 @@ export function useFolderActions(): {
         toast.success("Folder created");
         notifyLinksChanged();
         router.push(`/folders/${result.data.slug}`);
-      } else {
-        toast.error(result.error);
       }
       return result;
     },
     [upsertFolder, notifyLinksChanged, router],
   );
 
-  const renameFolder = useCallback(
-    async (id: string, name: string): Promise<ActionResult<FolderSummary>> => {
-      const result = await patchFolder(id, name);
+  const updateFolder = useCallback(
+    async (
+      id: string,
+      input: UpdateFolderInput,
+    ): Promise<ActionResult<FolderSummary>> => {
+      // Captured before the request: the local list is patched below.
+      const previousName = folders.find((folder) => folder.id === id)?.name;
+      const result = await patchFolder(id, input);
       if (result.ok) {
+        const renamed =
+          input.name !== undefined &&
+          (previousName === undefined || previousName !== result.data.name);
         // Same reasoning as createFolder: patch locally before the
         // router.replace below, so useCurrentFolder() on the new slug
         // resolves immediately instead of racing the background refetch.
         upsertFolder(result.data);
-        toast.success("Folder renamed");
+        toast.success(renamed ? "Folder renamed" : "Folder updated");
         notifyLinksChanged();
         const onThisFolder = currentFolder?.id === id;
         const newPath = `/folders/${result.data.slug}`;
         if (onThisFolder && pathname !== newPath) {
           router.replace(newPath);
         }
-      } else {
-        toast.error(result.error);
       }
       return result;
     },
-    [upsertFolder, notifyLinksChanged, currentFolder, pathname, router],
+    [folders, upsertFolder, notifyLinksChanged, currentFolder, pathname, router],
   );
 
   const deleteFolder = useCallback(
@@ -123,35 +165,47 @@ export function useFolderActions(): {
       const result = await removeFolder(id, opts.withLinks);
       if (result.ok) {
         // Patch locally before the /home redirect below, for the same
-        // reason as createFolder/renameFolder.
+        // reason as createFolder/updateFolder.
         removeFolderLocally(id);
-        toast.success("Folder deleted");
+        // Deleted links leave Home's count. Set it here: when this was the
+        // current folder, the folder page's own reload (which normally
+        // reports the total) fails because the folder is gone.
+        const knownTotal = total ?? initialTotalLinks;
+        if (result.data.deletedLinks > 0 && knownTotal !== null) {
+          setLinksTotal(Math.max(0, knownTotal - result.data.deletedLinks));
+        }
+        toast.success(
+          result.data.deletedLinks > 0
+            ? `Folder and ${formatLinkCount(result.data.deletedLinks)} deleted`
+            : "Folder deleted",
+        );
         notifyLinksChanged();
         if (currentFolder?.id === id) {
           router.push("/home");
         }
-      } else {
-        toast.error(result.error);
       }
       return result;
     },
-    [removeFolderLocally, notifyLinksChanged, currentFolder, router],
+    [
+      removeFolderLocally,
+      notifyLinksChanged,
+      setLinksTotal,
+      total,
+      initialTotalLinks,
+      currentFolder,
+      router,
+    ],
   );
 
-  // `opts.folderName` is an optional fallback for the toast copy:
-  // - moving into a folder: the name is looked up in the loaded folders
-  //   list first; `opts.folderName` covers the (unlikely) case where the
-  //   target isn't in that list yet, so "Moved to {name}" still fires.
-  // - unfiling (`folderId: null`): there's no folder to look up (the link
-  //   is leaving one), so the "Removed from {name}" copy needs the caller
-  //   to pass the folder's name — e.g. from `useCurrentFolder()` on the
-  //   folder page the removal happened on. Omitting it just skips the
-  //   toast; the move itself still succeeds.
+  // `opts.from` is the folder the link is leaving (`null` = none). Passing
+  // it names that folder in "Removed from …" and adds an Undo action that
+  // moves the link back; omit it and the toast has no Undo. Folder labels
+  // come from the loaded folder list ("🦪 Reading").
   const moveLink = useCallback(
     async (
       linkId: string,
       folderId: string | null,
-      opts?: { folderName?: string },
+      opts?: { from?: string | null },
     ): Promise<ActionResult> => {
       const result = await patchLinkFolder(linkId, folderId);
       if (!result.ok) {
@@ -159,13 +213,36 @@ export function useFolderActions(): {
         return result;
       }
 
-      if (folderId !== null) {
-        const name =
-          folders.find((folder) => folder.id === folderId)?.name ??
-          opts?.folderName;
-        if (name) toast.success(`Moved to ${name}`);
-      } else if (opts?.folderName) {
-        toast.success(`Removed from ${opts.folderName}`);
+      const target = folders.find((folder) => folder.id === folderId);
+      const source = folders.find((folder) => folder.id === opts?.from);
+      const message = target
+        ? `Moved to ${formatFolderLabel(target)}`
+        : source
+          ? `Removed from ${formatFolderLabel(source)}`
+          : null;
+      const from = opts?.from;
+      const move = Symbol(linkId);
+      latestMoveByLink.set(linkId, move);
+      const undo =
+        from === undefined
+          ? undefined
+          : {
+              label: "Undo",
+              onClick: async () => {
+                if (latestMoveByLink.get(linkId) !== move) return;
+                latestMoveByLink.delete(linkId);
+                const reverted = await patchLinkFolder(linkId, from);
+                if (!reverted.ok) {
+                  toast.error(reverted.error);
+                  return;
+                }
+                notifyLinksChanged();
+              },
+            };
+      // One toast per link: a newer move replaces the older toast (and its
+      // Undo) instead of stacking under it.
+      if (message) {
+        toast.success(message, { id: `link-move-${linkId}`, action: undo });
       }
       notifyLinksChanged();
       return { ok: true, data: undefined };
@@ -174,7 +251,7 @@ export function useFolderActions(): {
   );
 
   return useMemo(
-    () => ({ createFolder, renameFolder, deleteFolder, moveLink }),
-    [createFolder, renameFolder, deleteFolder, moveLink],
+    () => ({ createFolder, updateFolder, deleteFolder, moveLink }),
+    [createFolder, updateFolder, deleteFolder, moveLink],
   );
 }

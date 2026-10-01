@@ -1,4 +1,4 @@
-import { mapFolderError } from "@/lib/folder-errors";
+import { mapFolderError, parseDescriptionField, parseEmojiField } from "@/lib/folder-errors";
 import { createFolder, listFoldersForUser } from "@/lib/folders";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { getSessionUser } from "@/lib/session";
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return addCors(NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
   }
 
-  let body: { name?: unknown };
+  let body: { name?: unknown; emoji?: unknown; description?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -33,9 +33,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const name = typeof body?.name === "string" ? body.name : "";
+  const emoji = parseEmojiField(body?.emoji);
+  if (emoji instanceof NextResponse) return addCors(emoji);
+  const description = parseDescriptionField(body?.description);
+  if (description instanceof NextResponse) return addCors(description);
 
   try {
-    const folder = await createFolder(user.id, name);
+    const folder = await createFolder(user.id, name, emoji, description);
     broadcastLinksChanged(user.id);
     return addCors(NextResponse.json(folder, { status: 201 }));
   } catch (e) {

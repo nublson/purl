@@ -48,7 +48,7 @@ export default function FeedbackForm({ onSuccess }: FeedbackFormProps) {
           return;
         }
 
-        toast.success("Thanks for your feedback.");
+        toast.success("Thanks for your feedback");
         form.reset();
         onSuccess();
       } catch {

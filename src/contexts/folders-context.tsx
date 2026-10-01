@@ -17,6 +17,11 @@ import {
 export interface FoldersContextValue {
   folders: FolderSummary[];
   isLoading: boolean;
+  /**
+   * The user's saved-link total from the server render (Home's count);
+   * `useFolders` prefers the live links-sync total once a list reload reports one.
+   */
+  initialTotalLinks: number | null;
   /** Re-fetches immediately, without waiting for the next links-sync version bump. */
   refresh: () => void;
   /** Inserts or replaces a folder locally (create/rename), ahead of the background refetch. */
@@ -28,6 +33,7 @@ export interface FoldersContextValue {
 const FoldersContext = createContext<FoldersContextValue>({
   folders: [],
   isLoading: true,
+  initialTotalLinks: null,
   refresh: () => {},
   upsertFolder: () => {},
   removeFolderLocally: () => {},
@@ -61,9 +67,11 @@ const byName = (a: FolderSummary, b: FolderSummary) =>
 export function FoldersProvider({
   children,
   initialFolders,
+  initialTotalLinks = null,
 }: {
   children: ReactNode;
   initialFolders?: FolderSummary[];
+  initialTotalLinks?: number | null;
 }) {
   const { version } = useLinksSyncState();
   const [folders, setFolders] = useState<FolderSummary[]>(
@@ -129,8 +137,22 @@ export function FoldersProvider({
   }, []);
 
   const value = useMemo<FoldersContextValue>(
-    () => ({ folders, isLoading, refresh, upsertFolder, removeFolderLocally }),
-    [folders, isLoading, refresh, upsertFolder, removeFolderLocally],
+    () => ({
+      folders,
+      isLoading,
+      initialTotalLinks,
+      refresh,
+      upsertFolder,
+      removeFolderLocally,
+    }),
+    [
+      folders,
+      isLoading,
+      initialTotalLinks,
+      refresh,
+      upsertFolder,
+      removeFolderLocally,
+    ],
   );
 
   return (

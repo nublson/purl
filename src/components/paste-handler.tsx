@@ -22,7 +22,13 @@ export function PasteHandler({
       const result = await saveLink(
         text,
         currentFolder
-          ? { folder: { id: currentFolder.id, name: currentFolder.name } }
+          ? {
+              folder: {
+                id: currentFolder.id,
+                name: currentFolder.name,
+                emoji: currentFolder.emoji,
+              },
+            }
           : undefined,
       );
       if (!result || !("id" in result)) {

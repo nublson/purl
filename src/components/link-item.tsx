@@ -2,6 +2,11 @@
 
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
+import {
+  deleteLinkWithUndo,
+  LINK_DELETE_FADE_MS,
+  usePendingLinkDeletes,
+} from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
@@ -9,7 +14,6 @@ import dynamic from "next/dynamic";
 import * as React from "react";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
-import { LinkItemSkeleton } from "./skeletons";
 import { Typography } from "./typography";
 import {
   Item,
@@ -19,22 +23,17 @@ import {
   ItemTitle,
 } from "./ui/item";
 
-// Loaded on demand: the menu (dropdown, edit dialog, form library) and the
-// Motion-based delete icon stay out of the initial bundle. The placeholder
-// matches the menu trigger's size to avoid layout shift.
+// Loaded on demand: the menu (dropdown, edit dialog, form library) stays out
+// of the initial bundle. The placeholder matches the menu trigger's size to
+// avoid layout shift.
 const LinkMenu = dynamic(
   () => import("./link-menu").then((m) => m.LinkMenu),
   { loading: () => <div className="size-8" aria-hidden /> },
-);
-const X = dynamic(
-  () => import("./animate-ui/icons/x").then((m) => m.X),
-  { ssr: false },
 );
 
 interface LinkItemProps {
   link: LinkType;
   eagerFavicon?: boolean;
-  mode?: "default" | "search";
 }
 
 export const LinkItem = React.forwardRef<
@@ -46,23 +45,20 @@ export const LinkItem = React.forwardRef<
     className,
     onMouseEnter,
     onMouseLeave,
-    mode = "default",
     eagerFavicon,
     ...rest
   },
   ref,
 ) {
   const { notifyLinksChanged } = useLinksSyncActions();
-  const [deletePhase, setDeletePhase] = React.useState<
-    "idle" | "animating" | "loading" | "exiting"
-  >("idle");
+  // Deleting is owned by `deleteLinkWithUndo` (it outlives this row): the
+  // row fades while "fading", then `LinkGroup` hides it behind an Undo toast.
+  const deletePhase = usePendingLinkDeletes().get(link.id);
   const [previewOpen, setPreviewOpen] = React.useState(false);
   // Whether the current preview was opened by hover (vs keyboard focus).
   const openedByPointerRef = React.useRef(false);
   const descriptionId = React.useId();
   const anchorRef = React.useRef<HTMLAnchorElement>(null);
-  // Row to focus after a delete, so focus doesn't fall back to the page.
-  const focusAfterDeleteRef = React.useRef<HTMLElement | null>(null);
   const hoveringActionsRef = React.useRef(false);
   const hoveringPreviewRef = React.useRef(false);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -115,31 +111,13 @@ export const LinkItem = React.forwardRef<
     });
   }, [previewOpen]);
 
-  if (deletePhase === "loading" || deletePhase === "exiting") {
-    return (
-      <LinkItemSkeleton
-        icon={<X className="size-5" animate={true} loop={true} />}
-        url={link.url}
-        asListItem={false}
-        animateIn={deletePhase === "loading"}
-        animateOut={deletePhase === "exiting"}
-        onAnimationEnd={() => {
-          if (deletePhase !== "exiting") return;
-          notifyLinksChanged();
-        }}
-      />
-    );
-  }
-
-  const interactive = mode === "default";
-
   const content = (
     <Item
       ref={ref}
       data-cy="link-item"
       className={cn(
         "w-full p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
-        deletePhase === "animating" &&
+        deletePhase === "fading" &&
           "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
         className,
       )}
@@ -153,36 +131,28 @@ export const LinkItem = React.forwardRef<
         hoveringActionsRef.current = false;
         scheduleClose();
       }}
-      onAnimationEnd={() => {
-        if (deletePhase !== "animating") return;
-        setDeletePhase("loading");
-      }}
       {...rest}
     >
-      {/* In search the row is a listbox option that opens the link itself,
-          so it must not contain its own link or menu. */}
-      {interactive && (
-        <a
-          ref={anchorRef}
-          href={link.url}
-          aria-label={`${link.title} (opens in new tab)`}
-          aria-describedby={link.description ? descriptionId : undefined}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="absolute inset-0 z-0 w-full rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring"
-          onFocus={(event) => {
-            // Keyboard users get the same preview mouse users get on hover.
-            if (!event.currentTarget.matches(":focus-visible")) return;
-            clearCloseTimer();
-            openedByPointerRef.current = false;
-            setPreviewOpen(true);
-          }}
-          onBlur={() => {
-            if (!hoveringPreviewRef.current) setPreviewOpen(false);
-          }}
-        />
-      )}
-      {interactive && link.description ? (
+      <a
+        ref={anchorRef}
+        href={link.url}
+        aria-label={`${link.title} (opens in new tab)`}
+        aria-describedby={link.description ? descriptionId : undefined}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="absolute inset-0 z-0 w-full rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring"
+        onFocus={(event) => {
+          // Keyboard users get the same preview mouse users get on hover.
+          if (!event.currentTarget.matches(":focus-visible")) return;
+          clearCloseTimer();
+          openedByPointerRef.current = false;
+          setPreviewOpen(true);
+        }}
+        onBlur={() => {
+          if (!hoveringPreviewRef.current) setPreviewOpen(false);
+        }}
+      />
+      {link.description ? (
         <span id={descriptionId} className="sr-only">
           {link.description}
         </span>
@@ -210,37 +180,33 @@ export const LinkItem = React.forwardRef<
           </Typography>
         </ItemTitle>
       </ItemContent>
-      {interactive && (
-        <ItemActions
-          className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-focus-within/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100"
-          onMouseEnter={() => {
-            hoveringActionsRef.current = true;
-            clearOpenTimer();
-            clearCloseTimer();
-          }}
-          onMouseLeave={() => {
-            hoveringActionsRef.current = false;
-            scheduleOpen();
-          }}
-        >
-          <LinkMenu
-            link={link}
-            onDeleteStart={() => {
-              const rows = Array.from(
-                document.querySelectorAll<HTMLElement>(
-                  '[data-cy="link-item"] > a[href]',
-                ),
-              );
-              const index = rows.indexOf(anchorRef.current as HTMLElement);
-              focusAfterDeleteRef.current =
-                index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
-              setDeletePhase("animating");
-            }}
-            onDeleteSuccess={() => {
-              setDeletePhase("exiting");
-              // The menu trigger unmounts with the row; move focus to the
-              // neighboring row only if focus was left on the page body.
-              const target = focusAfterDeleteRef.current;
+      <ItemActions
+        className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-focus-within/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100"
+        onMouseEnter={() => {
+          hoveringActionsRef.current = true;
+          clearOpenTimer();
+          clearCloseTimer();
+        }}
+        onMouseLeave={() => {
+          hoveringActionsRef.current = false;
+          scheduleOpen();
+        }}
+      >
+        <LinkMenu
+          link={link}
+          onDelete={() => {
+            const rows = Array.from(
+              document.querySelectorAll<HTMLElement>(
+                '[data-cy="link-item"] > a[href]',
+              ),
+            );
+            const index = rows.indexOf(anchorRef.current as HTMLElement);
+            const target =
+              index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
+            deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
+            // The row (and its menu trigger) unmounts once hidden; then move
+            // focus to the neighboring row only if focus fell to the body.
+            setTimeout(() => {
               requestAnimationFrame(() => {
                 const active = document.activeElement;
                 if (
@@ -250,18 +216,12 @@ export const LinkItem = React.forwardRef<
                   target.focus();
                 }
               });
-            }}
-            onDeleteError={() => {
-              setDeletePhase("idle");
-            }}
-          />
-        </ItemActions>
-      )}
+            }, LINK_DELETE_FADE_MS);
+          }}
+        />
+      </ItemActions>
     </Item>
   );
-
-  // The hover preview only opens in the default list; skip it elsewhere.
-  if (mode !== "default") return content;
 
   return (
     <LinkPreview

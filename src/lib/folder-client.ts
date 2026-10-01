@@ -4,12 +4,15 @@ import type { FolderSummary } from "@/lib/folders";
 import { linksOriginHeaders } from "@/lib/links-origin";
 import type { Link } from "@/utils/links";
 
-/** Result shape for every folder/link-filing action: success carries `data`, failure a user-facing `error`. */
+/**
+ * Result shape for every folder/link-filing action: success carries `data`,
+ * failure a user-facing `error` plus the API's machine `code` when it sent
+ * one (e.g. `NAME_TAKEN`), so a form can show the error on the right field.
+ */
 export type ActionResult<T = void> =
   | { ok: true; data: T }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: string };
 
-const FALLBACK_ERROR = "Something went wrong. Try again.";
 
 async function parseBody(res: Response): Promise<unknown> {
   try {
@@ -19,7 +22,7 @@ async function parseBody(res: Response): Promise<unknown> {
   }
 }
 
-function errorFromBody(body: unknown): string {
+function errorFromBody(body: unknown, fallback: string): string {
   if (
     body &&
     typeof body === "object" &&
@@ -27,13 +30,29 @@ function errorFromBody(body: unknown): string {
   ) {
     return (body as { error: string }).error;
   }
-  return FALLBACK_ERROR;
+  return fallback;
 }
 
-/** Runs a mutating fetch and maps it to `ActionResult`, never throwing. */
+function codeFromBody(body: unknown): string | undefined {
+  if (
+    body &&
+    typeof body === "object" &&
+    typeof (body as { code?: unknown }).code === "string"
+  ) {
+    return (body as { code: string }).code;
+  }
+  return undefined;
+}
+
+/**
+ * Runs a mutating fetch and maps it to `ActionResult`, never throwing.
+ * `failure` names the action for the fallback errors ("Unable to {failure}.")
+ * used when the API sends no message or the request never reaches it.
+ */
 async function mutate<T>(
   path: string,
   init: RequestInit,
+  failure: string,
 ): Promise<ActionResult<T>> {
   try {
     const res = await fetch(path, {
@@ -46,11 +65,19 @@ async function mutate<T>(
     });
     const body = await parseBody(res);
     if (!res.ok) {
-      return { ok: false, error: errorFromBody(body) };
+      const code = codeFromBody(body);
+      return {
+        ok: false,
+        error: errorFromBody(body, `Unable to ${failure}. Try again.`),
+        ...(code ? { code } : {}),
+      };
     }
     return { ok: true, data: body as T };
   } catch {
-    return { ok: false, error: FALLBACK_ERROR };
+    return {
+      ok: false,
+      error: `Unable to ${failure}. Check your connection and try again.`,
+    };
   }
 }
 
@@ -63,26 +90,44 @@ async function mutate<T>(
 export async function fetchFolders(): Promise<FolderSummary[]> {
   const res = await fetch("/api/folders");
   if (!res.ok) {
-    throw new Error(errorFromBody(await parseBody(res)));
+    throw new Error(
+      errorFromBody(await parseBody(res), "Unable to load folders. Try again."),
+    );
   }
   return (await res.json()) as FolderSummary[];
 }
 
-export function postFolder(name: string): Promise<ActionResult<FolderSummary>> {
+/** Body for `POST /api/folders`. An omitted/empty `emoji` means the default. */
+export type CreateFolderInput = {
+  name: string;
+  emoji?: string;
+  description?: string;
+};
+
+/** Body for `PATCH /api/folders/[id]`. Omitted fields are unchanged; `null` clears `emoji`/`description`. */
+export type UpdateFolderInput = {
+  name?: string;
+  emoji?: string | null;
+  description?: string | null;
+};
+
+export function postFolder(
+  input: CreateFolderInput,
+): Promise<ActionResult<FolderSummary>> {
   return mutate<FolderSummary>("/api/folders", {
     method: "POST",
-    body: JSON.stringify({ name }),
-  });
+    body: JSON.stringify(input),
+  }, "create the folder");
 }
 
 export function patchFolder(
   id: string,
-  name: string,
+  input: UpdateFolderInput,
 ): Promise<ActionResult<FolderSummary>> {
   return mutate<FolderSummary>(`/api/folders/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ name }),
-  });
+    body: JSON.stringify(input),
+  }, "save the folder");
 }
 
 export function removeFolder(
@@ -92,6 +137,7 @@ export function removeFolder(
   return mutate<{ deletedLinks: number }>(
     `/api/folders/${id}?withLinks=${withLinks}`,
     { method: "DELETE" },
+    "delete the folder",
   );
 }
 
@@ -102,5 +148,5 @@ export function patchLinkFolder(
   return mutate<Link>(`/api/links/${linkId}`, {
     method: "PATCH",
     body: JSON.stringify({ folderId }),
-  });
+  }, "move the link");
 }

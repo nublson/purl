@@ -66,6 +66,8 @@ Saving is fully **synchronous**; there is no background processing:
 
 - A link belongs to at most one folder: `Folder` model, `Link.folderId` (`onDelete: SetNull`, so deleting a folder unfiles its links unless deleted `withLinks`). Cap: `MAX_FOLDERS = 100` (`src/lib/limits.ts`).
 - Routes: `/folders/[slug]` page; `/api/folders` + `/api/folders/[id]` (app) and `/api/v1/folders` (API key); `folderId` on the links endpoints (filter on GET, file on POST — a duplicate URL is moved and the response reports `moved`; `folderId: null` on app `PATCH /api/links/[id]` unfiles); MCP `list_folders`, plus `folderId` on `save_link` / `list_saved_items`.
+- Each folder has an optional `emoji` (exactly one emoji grapheme, validated by `normalizeFolderEmoji`; invalid → 400 `INVALID_EMOJI`). `FolderSummary.emoji` is always set: the stored value or `DEFAULT_FOLDER_EMOJI` (🦪). Each folder also has an optional `description` (trimmed, ≤160 chars, `MAX_FOLDER_DESCRIPTION_LENGTH`; too long → 400 `INVALID_DESCRIPTION`), `null` in `FolderSummary` when unset. Create takes `{ name, emoji?, description? }`; `updateFolder` / `PATCH /api/folders/[id]` take `{ name?, emoji?, description? }` (`null` clears `emoji`/`description`).
+- The folder dialog's emoji picker is Frimousse (`src/components/ui/emoji-picker.tsx`); its emoji data loads from the jsDelivr CDN at runtime.
 - Client folder state comes only from `FoldersProvider` (`src/contexts/folders-context.tsx`) via `src/hooks/use-folders.ts` (`useFolders`, `useCurrentFolder`, `useFolderActions`). The current folder is resolved by the folder page (server-side, handed down through `CurrentFolderProvider`), so saves there file by folder id.
 
 ### Authentication & routing
