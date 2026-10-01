@@ -98,7 +98,7 @@ export function FolderSelectDropdown() {
             <Typography
               component="span"
               size="small"
-              className="min-w-0 truncate"
+              className="min-w-0 truncate text-foreground"
             >
               {label}
             </Typography>
@@ -198,7 +198,11 @@ function RowLabel({ name, count }: { name: string; count: number | null }) {
       component="span"
       className="flex min-w-0 items-baseline gap-1.5"
     >
-      <Typography component="span" size="small" className="min-w-0 truncate">
+      <Typography
+        component="span"
+        size="small"
+        className="min-w-0 truncate text-foreground"
+      >
         {name}
       </Typography>
       {count !== null ? (
