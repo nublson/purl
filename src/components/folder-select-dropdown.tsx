@@ -161,7 +161,7 @@ export function FolderSelectDropdown() {
             }}
           >
             <Plus />
-            New folder…
+            New folder
           </DropdownMenuItem>
           {atCap ? (
             <Typography
@@ -170,7 +170,7 @@ export function FolderSelectDropdown() {
               id={capHintId}
               className="px-2 pb-1.5 text-muted-foreground"
             >
-              You can have up to {max} folders.
+              You’ve reached {max} folders. Delete one to add another.
             </Typography>
           ) : null}
           {currentFolder ? (
@@ -184,7 +184,7 @@ export function FolderSelectDropdown() {
                 }}
               >
                 <Pencil />
-                Edit folder…
+                Edit folder
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
@@ -196,7 +196,7 @@ export function FolderSelectDropdown() {
                 }}
               >
                 <Trash />
-                Delete folder…
+                Delete folder
               </DropdownMenuItem>
             </>
           ) : null}

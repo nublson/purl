@@ -14,6 +14,7 @@ import {
 } from "@/lib/folder-client";
 import type { FolderSummary } from "@/lib/folders";
 import { resolveCurrentFolder } from "@/lib/current-folder";
+import { formatLinkCount } from "@/lib/folder-display";
 import { MAX_FOLDERS } from "@/lib/limits";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
@@ -153,7 +154,11 @@ export function useFolderActions(): {
         // Patch locally before the /home redirect below, for the same
         // reason as createFolder/updateFolder.
         removeFolderLocally(id);
-        toast.success("Folder deleted");
+        toast.success(
+          result.data.deletedLinks > 0
+            ? `Folder and ${formatLinkCount(result.data.deletedLinks)} deleted`
+            : "Folder deleted",
+        );
         notifyLinksChanged();
         if (currentFolder?.id === id) {
           router.push("/home");

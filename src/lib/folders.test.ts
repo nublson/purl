@@ -100,7 +100,7 @@ describe("createFolder", () => {
     expect((err as InstanceType<typeof FolderNameError>).reason).toBe(
       "too_long",
     );
-    expect((err as Error).message).toBe("Keep it under 60 characters.");
+    expect((err as Error).message).toBe("Keep the name to 60 characters or fewer.");
   });
 
   it("rejects case-insensitive duplicates", async () => {
@@ -120,7 +120,7 @@ describe("createFolder", () => {
       "taken",
     );
     expect((err as Error).message).toBe(
-      "You already have a folder with that name.",
+      "You already have a folder with that name. Choose another.",
     );
     expect(prisma.folder.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -636,7 +636,7 @@ describe("normalizeFolderDescription", () => {
     })();
     expect(err).toBeInstanceOf(FolderDescriptionError);
     expect((err as Error).message).toBe(
-      "Keep the description under 160 characters.",
+      "Keep the description to 160 characters or fewer.",
     );
   });
 });

@@ -25,7 +25,7 @@ import * as React from "react";
 import { DialogWrapper } from "./dialog-wrapper";
 import { Typography } from "./typography";
 
-/** Mirrors the server's folder-name cap in `src/lib/folders.ts` ("Keep it under 60 characters."). */
+/** Mirrors the server's folder-name cap in `src/lib/folders.ts` ("Keep the name to 60 characters or fewer."). */
 const MAX_NAME_LENGTH = 60;
 
 type DialogFolderFormProps = {
@@ -156,7 +156,7 @@ function FolderForm({
               id={nameId}
               name="name"
               type="text"
-              placeholder="Folder name"
+              placeholder="Reading list"
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
@@ -189,7 +189,7 @@ function FolderForm({
             id={descriptionId}
             name="description"
             type="text"
-            placeholder="What's this folder for?"
+            placeholder="Long reads for the weekend"
             value={description}
             onChange={(e) => {
               setDescription(e.target.value);
@@ -232,7 +232,13 @@ function FolderForm({
           </Button>
         </DialogClose>
         <Button type="submit" disabled={!canSubmit}>
-          {folder ? (pending ? "Saving…" : "Save") : pending ? "Creating…" : "Create"}
+          {folder
+            ? pending
+              ? "Saving…"
+              : "Save changes"
+            : pending
+              ? "Creating…"
+              : "Create folder"}
         </Button>
       </DialogFooter>
     </form>

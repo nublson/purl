@@ -23,8 +23,9 @@ type Pending = "keep" | "with-links" | null;
 
 /**
  * Controlled delete confirmation for a folder. A folder with links offers
- * "Keep links" (they move to Home) or "Delete links too"; an empty one just
- * "Delete". Stays open with an inline error if the request fails.
+ * "Delete folder only" (its links stay saved, unfiled) or "Delete folder and
+ * links"; an empty one just "Delete folder". Stays open with an inline
+ * error if the request fails.
  */
 export function DialogDeleteFolder({
   folder: snapshot,
@@ -77,8 +78,8 @@ export function DialogDeleteFolder({
           </AlertDialogTitle>
           <AlertDialogDescription>
             {hasLinks
-              ? `It has ${formatLinkCount(folder.linkCount)}. Keep them and they move to Home, or delete them with the folder.`
-              : "It has no links."}
+              ? `Its ${formatLinkCount(folder.linkCount)} stay saved unless you delete them too. Deleted links can't be recovered.`
+              : "This folder is empty."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error ? (
@@ -101,14 +102,14 @@ export function DialogDeleteFolder({
                 disabled={pending !== null}
                 onClick={() => handleDelete(true)}
               >
-                {pending === "with-links" ? "Deleting…" : "Delete links too"}
+                {pending === "with-links" ? "Deleting…" : "Delete folder and links"}
               </Button>
               <Button
                 type="button"
                 disabled={pending !== null}
                 onClick={() => handleDelete(false)}
               >
-                {pending === "keep" ? "Deleting…" : "Keep links"}
+                {pending === "keep" ? "Deleting…" : "Delete folder only"}
               </Button>
             </>
           ) : (
@@ -118,7 +119,7 @@ export function DialogDeleteFolder({
               disabled={pending !== null}
               onClick={() => handleDelete(false)}
             >
-              {pending === "keep" ? "Deleting…" : "Delete"}
+              {pending === "keep" ? "Deleting…" : "Delete folder"}
             </Button>
           )}
         </AlertDialogFooter>

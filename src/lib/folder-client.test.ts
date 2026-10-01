@@ -82,7 +82,7 @@ describe("postFolder", () => {
   it("returns the body's error on a 409", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(
-        JSON.stringify({ error: "You already have a folder with that name." }),
+        JSON.stringify({ error: "You already have a folder with that name. Choose another." }),
         { status: 409 },
       ),
     );
@@ -91,7 +91,7 @@ describe("postFolder", () => {
 
     expect(result).toEqual({
       ok: false,
-      error: "You already have a folder with that name.",
+      error: "You already have a folder with that name. Choose another.",
     });
   });
 
@@ -102,7 +102,7 @@ describe("postFolder", () => {
 
     expect(result).toEqual({
       ok: false,
-      error: "Something went wrong. Try again.",
+      error: "Unable to create the folder. Check your connection and try again.",
     });
   });
 
@@ -115,7 +115,7 @@ describe("postFolder", () => {
 
     expect(result).toEqual({
       ok: false,
-      error: "Something went wrong. Try again.",
+      error: "Unable to create the folder. Try again.",
     });
   });
 });
@@ -229,7 +229,7 @@ describe("removeFolder", () => {
 
     expect(result).toEqual({
       ok: false,
-      error: "Something went wrong. Try again.",
+      error: "Unable to delete the folder. Check your connection and try again.",
     });
   });
 });

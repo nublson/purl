@@ -128,12 +128,12 @@ describe("POST /api/folders", () => {
   it("returns 400 NAME_TOO_LONG for an over-long name", async () => {
     mockGetBrowserSessionUserId.mockResolvedValue("user-1");
     mockCreateFolder.mockRejectedValue(
-      new FolderNameError("too_long", "Keep it under 60 characters."),
+      new FolderNameError("too_long", "Keep the name to 60 characters or fewer."),
     );
     const res = await POST(postRequest({ name: "a".repeat(70) }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({
-      error: "Keep it under 60 characters.",
+      error: "Keep the name to 60 characters or fewer.",
       code: "NAME_TOO_LONG",
     });
   });
@@ -141,12 +141,12 @@ describe("POST /api/folders", () => {
   it("returns 409 NAME_TAKEN when the name collides", async () => {
     mockGetBrowserSessionUserId.mockResolvedValue("user-1");
     mockCreateFolder.mockRejectedValue(
-      new FolderNameError("taken", "You already have a folder with that name."),
+      new FolderNameError("taken", "You already have a folder with that name. Choose another."),
     );
     const res = await POST(postRequest({ name: "Reading" }));
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({
-      error: "You already have a folder with that name.",
+      error: "You already have a folder with that name. Choose another.",
       code: "NAME_TAKEN",
     });
   });
@@ -226,7 +226,7 @@ describe("POST /api/folders", () => {
     const res = await POST(postRequest({ name: "Oyster", description: "a".repeat(161) }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({
-      error: "Keep the description under 160 characters.",
+      error: "Keep the description to 160 characters or fewer.",
       code: "INVALID_DESCRIPTION",
     });
   });

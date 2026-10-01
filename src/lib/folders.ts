@@ -74,7 +74,7 @@ export class FolderDescriptionError extends Error {
   readonly name = "FolderDescriptionError";
   constructor() {
     super(
-      `Keep the description under ${MAX_FOLDER_DESCRIPTION_LENGTH} characters.`,
+      `Keep the description to ${MAX_FOLDER_DESCRIPTION_LENGTH} characters or fewer.`,
     );
   }
 }
@@ -132,7 +132,7 @@ function validateFolderName(name: string): string {
     throw new FolderNameError("empty", "Give your folder a name.");
   }
   if (trimmed.length > 60) {
-    throw new FolderNameError("too_long", "Keep it under 60 characters.");
+    throw new FolderNameError("too_long", "Keep the name to 60 characters or fewer.");
   }
   return trimmed;
 }
@@ -190,7 +190,7 @@ async function assertNameAvailable(
   if (existing) {
     throw new FolderNameError(
       "taken",
-      "You already have a folder with that name.",
+      "You already have a folder with that name. Choose another.",
     );
   }
 }
@@ -330,7 +330,7 @@ export async function createFolder(
     if (isUniqueConstraintError(error)) {
       throw new FolderNameError(
         "taken",
-        "You already have a folder with that name.",
+        "You already have a folder with that name. Choose another.",
       );
     }
     throw error;
@@ -405,7 +405,7 @@ export async function updateFolder(
     if (isUniqueConstraintError(error)) {
       throw new FolderNameError(
         "taken",
-        "You already have a folder with that name.",
+        "You already have a folder with that name. Choose another.",
       );
     }
     throw error;
