@@ -5,6 +5,7 @@ vi.mock("@/lib/prisma", () => ({ default: {} }));
 const {
   DEFAULT_FOLDER_EMOJI,
   MAX_FOLDER_DESCRIPTION_LENGTH,
+  formatFolderLabel,
   formatLinkCount,
 } = await import("./folder-display");
 const folders = await import("./folders");
@@ -18,6 +19,14 @@ describe("shared folder constants", () => {
     );
     expect(folders.MAX_FOLDER_DESCRIPTION_LENGTH).toBe(
       MAX_FOLDER_DESCRIPTION_LENGTH,
+    );
+  });
+});
+
+describe("formatFolderLabel", () => {
+  it("puts the emoji before the name", () => {
+    expect(formatFolderLabel({ emoji: "🧑‍🎨", name: "Design Engineering" })).toBe(
+      "🧑‍🎨 Design Engineering",
     );
   });
 });

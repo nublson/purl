@@ -87,7 +87,7 @@ function DeleteAccountButton({ closeDialog }: { closeDialog: () => void }) {
         return;
       }
 
-      toast.success("Your account has been deleted.");
+      toast.success("Account deleted");
       setAlertOpen(false);
       setConfirmation("");
       closeDialog();

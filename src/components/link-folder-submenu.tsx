@@ -43,7 +43,7 @@ export function LinkFolderSubmenu({ link }: { link: LinkType }) {
                 key={folder.id}
                 disabled={active}
                 onSelect={() => {
-                  void moveLink(link.id, folder.id);
+                  void moveLink(link.id, folder.id, { from: link.folderId });
                 }}
               >
                 <FolderEmoji emoji={folder.emoji} />
@@ -64,7 +64,7 @@ export function LinkFolderSubmenu({ link }: { link: LinkType }) {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onSelect={() => {
-                void moveLink(link.id, null, { folderName: currentFolder.name });
+                void moveLink(link.id, null, { from: link.folderId });
               }}
             >
               <FolderMinus />

@@ -14,7 +14,7 @@ import {
 } from "@/lib/folder-client";
 import type { FolderSummary } from "@/lib/folders";
 import { resolveCurrentFolder } from "@/lib/current-folder";
-import { formatLinkCount } from "@/lib/folder-display";
+import { formatFolderLabel, formatLinkCount } from "@/lib/folder-display";
 import { MAX_FOLDERS } from "@/lib/limits";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
@@ -88,7 +88,7 @@ export function useFolderActions(): {
   moveLink: (
     linkId: string,
     folderId: string | null,
-    opts?: { folderName?: string },
+    opts?: { from?: string | null },
   ) => Promise<ActionResult>;
 } {
   const { folders, upsertFolder, removeFolderLocally } = useFoldersContext();
@@ -169,20 +169,15 @@ export function useFolderActions(): {
     [removeFolderLocally, notifyLinksChanged, currentFolder, router],
   );
 
-  // `opts.folderName` is an optional fallback for the toast copy:
-  // - moving into a folder: the name is looked up in the loaded folders
-  //   list first; `opts.folderName` covers the (unlikely) case where the
-  //   target isn't in that list yet, so "Moved to {name}" still fires.
-  // - unfiling (`folderId: null`): there's no folder to look up (the link
-  //   is leaving one), so the "Removed from {name}" copy needs the caller
-  //   to pass the folder's name — e.g. from `useCurrentFolder()` on the
-  //   folder page the removal happened on. Omitting it just skips the
-  //   toast; the move itself still succeeds.
+  // `opts.from` is the folder the link is leaving (`null` = none). Passing
+  // it names that folder in "Removed from …" and adds an Undo action that
+  // moves the link back; omit it and the toast has no Undo. Folder labels
+  // come from the loaded folder list ("🦪 Reading").
   const moveLink = useCallback(
     async (
       linkId: string,
       folderId: string | null,
-      opts?: { folderName?: string },
+      opts?: { from?: string | null },
     ): Promise<ActionResult> => {
       const result = await patchLinkFolder(linkId, folderId);
       if (!result.ok) {
@@ -190,14 +185,29 @@ export function useFolderActions(): {
         return result;
       }
 
-      if (folderId !== null) {
-        const name =
-          folders.find((folder) => folder.id === folderId)?.name ??
-          opts?.folderName;
-        if (name) toast.success(`Moved to ${name}`);
-      } else if (opts?.folderName) {
-        toast.success(`Removed from ${opts.folderName}`);
-      }
+      const target = folders.find((folder) => folder.id === folderId);
+      const source = folders.find((folder) => folder.id === opts?.from);
+      const message = target
+        ? `Moved to ${formatFolderLabel(target)}`
+        : source
+          ? `Removed from ${formatFolderLabel(source)}`
+          : null;
+      const from = opts?.from;
+      const undo =
+        from === undefined
+          ? undefined
+          : {
+              label: "Undo",
+              onClick: async () => {
+                const reverted = await patchLinkFolder(linkId, from);
+                if (!reverted.ok) {
+                  toast.error(reverted.error);
+                  return;
+                }
+                notifyLinksChanged();
+              },
+            };
+      if (message) toast.success(message, { action: undo });
       notifyLinksChanged();
       return { ok: true, data: undefined };
     },

@@ -1,6 +1,7 @@
 "use client";
 
 import { linksOriginHeaders } from "@/lib/links-origin";
+import { formatFolderLabel } from "@/lib/folder-display";
 import { isValidUrl } from "@/utils/url";
 import { toast } from "sonner";
 
@@ -10,7 +11,7 @@ export type SaveLinkResult =
   | null;
 
 /** Folder to file a save into: `useCurrentFolder()` on a folder page, or omitted on /home. */
-export type SaveLinkFolder = { id: string; name: string };
+export type SaveLinkFolder = { id: string; name: string; emoji: string };
 
 export async function saveLink(
   rawUrl: string,
@@ -55,7 +56,8 @@ export async function saveLink(
     }
 
     if (folder) {
-      toast.success(data.moved ? `Moved to ${folder.name}` : `Saved to ${folder.name}`);
+      const label = formatFolderLabel(folder);
+      toast.success(data.moved ? `Moved to ${label}` : `Saved to ${label}`);
     }
 
     return { id };

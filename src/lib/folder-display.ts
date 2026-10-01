@@ -9,6 +9,11 @@ export const DEFAULT_FOLDER_EMOJI = "🦪";
 /** Max length (in characters) of a folder description; enforced by `src/lib/folders.ts`. */
 export const MAX_FOLDER_DESCRIPTION_LENGTH = 160;
 
+/** How a folder is named in copy such as toasts: its emoji, then its name ("🦪 Reading"). */
+export function formatFolderLabel(folder: { emoji: string; name: string }): string {
+  return `${folder.emoji} ${folder.name}`;
+}
+
 /** "1 link", "0 links", "3 links". */
 export function formatLinkCount(count: number): string {
   return `${count} ${count === 1 ? "link" : "links"}`;
