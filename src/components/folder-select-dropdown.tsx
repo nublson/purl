@@ -13,6 +13,7 @@ import { DialogDeleteFolder } from "./dialog-delete-folder";
 import { DialogFolderForm } from "./dialog-folder-form";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { FolderEmoji } from "./folder-emoji";
+import { Typography } from "./typography";
 import { Button } from "./ui/button";
 import {
   DropdownMenuGroup,
@@ -94,7 +95,13 @@ export function FolderSelectDropdown() {
             className="max-w-52 min-w-0 shrink pl-2"
           >
             <FolderEmoji emoji={currentFolder?.emoji ?? HOME_EMOJI} />
-            <span className="min-w-0 truncate">{label}</span>
+            <Typography
+              component="span"
+              size="small"
+              className="min-w-0 truncate"
+            >
+              {label}
+            </Typography>
             <ChevronDown
               data-icon="inline-end"
               className="text-muted-foreground"
@@ -106,7 +113,13 @@ export function FolderSelectDropdown() {
           <DropdownMenuItem asChild>
             <Link href="/home" aria-current={onHome ? "page" : undefined}>
               <FolderEmoji emoji={HOME_EMOJI} />
-              <span className="min-w-0 flex-1 truncate">Home</span>
+              <Typography
+                component="span"
+                size="small"
+                className="min-w-0 flex-1 truncate"
+              >
+                Home
+              </Typography>
               <CurrentMark active={onHome} />
             </Link>
           </DropdownMenuItem>
@@ -119,10 +132,20 @@ export function FolderSelectDropdown() {
                   aria-current={active ? "page" : undefined}
                 >
                   <FolderEmoji emoji={folder.emoji} />
-                  <span className="min-w-0 flex-1 truncate">{folder.name}</span>
-                  <span className="text-xs tabular-nums text-muted-foreground">
+                  <Typography
+                    component="span"
+                    size="small"
+                    className="min-w-0 flex-1 truncate"
+                  >
+                    {folder.name}
+                  </Typography>
+                  <Typography
+                    component="span"
+                    size="small"
+                    className="text-xs tabular-nums text-muted-foreground"
+                  >
                     {folder.linkCount}
-                  </span>
+                  </Typography>
                   <CurrentMark active={active} />
                 </Link>
               </DropdownMenuItem>
@@ -142,18 +165,23 @@ export function FolderSelectDropdown() {
             New folder…
           </DropdownMenuItem>
           {atCap ? (
-            <p
+            <Typography
+              component="p"
+              size="mini"
               id={capHintId}
-              className="px-2 pb-1.5 text-xs text-muted-foreground"
+              className="px-2 pb-1.5 text-muted-foreground"
             >
               You can have up to {max} folders.
-            </p>
+            </Typography>
           ) : null}
           {currentFolder ? (
             <>
               <DropdownMenuItem
                 onSelect={() => {
-                  pendingDialog.current = { kind: "edit", folder: currentFolder };
+                  pendingDialog.current = {
+                    kind: "edit",
+                    folder: currentFolder,
+                  };
                 }}
               >
                 <Pencil />
@@ -182,8 +210,11 @@ export function FolderSelectDropdown() {
 /** Fixed-width trailing slot so counts line up whether or not a row is checked. */
 function CurrentMark({ active }: { active: boolean }) {
   return (
-    <span className="flex size-4 shrink-0 items-center justify-center">
+    <Typography
+      component="span"
+      className="flex size-4 shrink-0 items-center justify-center"
+    >
       {active ? <Check aria-hidden="true" /> : null}
-    </span>
+    </Typography>
   );
 }
