@@ -92,7 +92,7 @@ export function FolderSelectDropdown() {
             aria-label={`Folder: ${label}`}
             // Emoji side gets 2px less padding than the text default
             // (optical alignment); the chevron uses Button's inline-end inset.
-            className="max-w-52 min-w-0 shrink pl-2"
+            className="max-w-52 min-w-0 shrink ps-2"
           >
             <FolderEmoji emoji={currentFolder?.emoji ?? HOME_EMOJI} />
             <Typography
@@ -117,6 +117,13 @@ export function FolderSelectDropdown() {
               <CurrentMark active={onHome} />
             </Link>
           </DropdownMenuItem>
+        </DropdownMenuGroup>
+        {/*
+          Only the folders scroll, so Home and the New/Edit/Delete actions stay
+          in view at any folder count. 240px = 7.5 rows: the half-visible row
+          at the bottom is the cue that the list scrolls.
+        */}
+        <DropdownMenuGroup className="max-h-60 overflow-y-auto overscroll-y-contain">
           {folders.map((folder) => {
             const active = currentFolder?.id === folder.id;
             return (
@@ -223,7 +230,7 @@ function CurrentMark({ active }: { active: boolean }) {
   return (
     <Typography
       component="span"
-      className="ml-auto flex size-4 shrink-0 items-center justify-center"
+      className="ms-auto flex size-4 shrink-0 items-center justify-center"
     >
       {active ? <Check aria-hidden="true" /> : null}
     </Typography>

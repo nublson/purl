@@ -42,11 +42,11 @@ function EmojiPickerSearch({
       <div className="relative">
         <SearchIcon
           aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
+          className="pointer-events-none absolute top-1/2 start-2.5 size-4 -translate-y-1/2 text-muted-foreground"
         />
         <EmojiPickerPrimitive.Search
           className={cn(
-            "h-8 w-full min-w-0 rounded-sm border border-input bg-transparent pr-2.5 pl-8 text-base outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30",
+            "h-8 w-full min-w-0 rounded-sm border border-input bg-transparent ps-8 pe-2.5 text-base outline-none transition-[color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/30",
             className,
           )}
           placeholder="Search…"
@@ -170,7 +170,7 @@ function EmojiPickerFooter({
             <Typography
               component="span"
               size="mini"
-              className="ml-2 flex h-8 items-center truncate"
+              className="ms-2 flex h-8 items-center truncate"
             >
               Select an emoji…
             </Typography>

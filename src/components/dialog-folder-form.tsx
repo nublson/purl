@@ -286,6 +286,8 @@ function FolderEmojiPicker({
       </PopoverTrigger>
       <PopoverContent
         align="start"
+        // Keeps the picker inside the 16px page margin on narrow screens.
+        collisionPadding={16}
         // Above the dialog (`DialogWrapper` raises it to z-51).
         className="z-52 w-auto gap-0 rounded-lg p-0"
       >
