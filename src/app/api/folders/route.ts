@@ -1,5 +1,5 @@
 import { createFolder, listFoldersForUser } from "@/lib/folders";
-import { mapFolderError } from "@/lib/folder-errors";
+import { mapFolderError, parseEmojiField } from "@/lib/folder-errors";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { LINKS_ORIGIN_HEADER, parseLinksOrigin } from "@/lib/realtime-constants";
 import { getBrowserSessionUserId } from "@/lib/require-browser-session";
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { name?: unknown };
+  let body: { name?: unknown; emoji?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -29,9 +29,11 @@ export async function POST(request: NextRequest) {
   }
 
   const name = typeof body?.name === "string" ? body.name : "";
+  const emoji = parseEmojiField(body?.emoji);
+  if (emoji instanceof NextResponse) return emoji;
 
   try {
-    const folder = await createFolder(userId, name);
+    const folder = await createFolder(userId, name, emoji);
     broadcastLinksChanged(
       userId,
       parseLinksOrigin(request.headers.get(LINKS_ORIGIN_HEADER)),

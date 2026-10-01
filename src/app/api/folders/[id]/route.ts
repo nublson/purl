@@ -1,5 +1,5 @@
-import { mapFolderError } from "@/lib/folder-errors";
-import { deleteFolder, renameFolder } from "@/lib/folders";
+import { mapFolderError, parseEmojiField } from "@/lib/folder-errors";
+import { deleteFolder, updateFolder } from "@/lib/folders";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { LINKS_ORIGIN_HEADER, parseLinksOrigin } from "@/lib/realtime-constants";
 import { getBrowserSessionUserId } from "@/lib/require-browser-session";
@@ -14,18 +14,27 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { name?: unknown };
+  let body: { name?: unknown; emoji?: unknown };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const name = typeof body?.name === "string" ? body.name : "";
+  // A present-but-non-string name is treated as blank, so it fails the name
+  // rules ("Give your folder a name.") rather than being silently ignored.
+  const name =
+    body?.name === undefined
+      ? undefined
+      : typeof body.name === "string"
+        ? body.name
+        : "";
+  const emoji = parseEmojiField(body?.emoji);
+  if (emoji instanceof NextResponse) return emoji;
 
   try {
     const { id } = await context.params;
-    const folder = await renameFolder(userId, id, name);
+    const folder = await updateFolder(userId, id, { name, emoji });
     broadcastLinksChanged(
       userId,
       parseLinksOrigin(request.headers.get(LINKS_ORIGIN_HEADER)),

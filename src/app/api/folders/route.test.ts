@@ -25,7 +25,9 @@ vi.mock("@/lib/realtime-broadcast", () => ({
 }));
 
 const { GET, POST } = await import("./route");
-const { FolderNameError, FolderLimitError } = await import("@/lib/folders");
+const { FolderNameError, FolderLimitError, FolderEmojiError } = await import(
+  "@/lib/folders",
+);
 
 function getRequest() {
   return new NextRequest("http://localhost/api/folders", { method: "GET" });
@@ -57,7 +59,7 @@ describe("GET /api/folders", () => {
   it("returns 200 with the folder list on success", async () => {
     mockGetBrowserSessionUserId.mockResolvedValue("user-1");
     const folders = [
-      { id: "f1", name: "Reading", slug: "reading", linkCount: 3 },
+      { id: "f1", name: "Reading", slug: "reading", emoji: "🦪", linkCount: 3 },
     ];
     mockListFoldersForUser.mockResolvedValue(folders);
     const res = await GET(getRequest());
@@ -102,7 +104,7 @@ describe("POST /api/folders", () => {
       error: "Give your folder a name.",
       code: "NAME_EMPTY",
     });
-    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "");
+    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "", undefined);
   });
 
   it("returns 400 NAME_EMPTY for an empty name", async () => {
@@ -160,13 +162,47 @@ describe("POST /api/folders", () => {
 
   it("returns 201 with the created folder and broadcasts the change", async () => {
     mockGetBrowserSessionUserId.mockResolvedValue("user-1");
-    const created = { id: "f1", name: "Reading", slug: "reading", linkCount: 0 };
+    const created = { id: "f1", name: "Reading", slug: "reading", emoji: "🦪", linkCount: 0 };
     mockCreateFolder.mockResolvedValue(created);
 
     const res = await POST(postRequest({ name: "Reading" }));
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual(created);
-    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Reading");
+    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Reading", undefined);
     expect(mockBroadcastLinksChanged).toHaveBeenCalledWith("user-1", null);
+  });
+
+  it("passes the emoji through to createFolder", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    const created = { id: "f1", name: "Code", slug: "code", emoji: "👩‍💻", linkCount: 0 };
+    mockCreateFolder.mockResolvedValue(created);
+
+    const res = await POST(postRequest({ name: "Code", emoji: "👩‍💻" }));
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual(created);
+    expect(mockCreateFolder).toHaveBeenCalledWith("user-1", "Code", "👩‍💻");
+  });
+
+  it("returns 400 INVALID_EMOJI for a non-string emoji without calling the lib", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    const res = await POST(postRequest({ name: "Code", emoji: 42 }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Pick a single emoji.",
+      code: "INVALID_EMOJI",
+    });
+    expect(mockCreateFolder).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 INVALID_EMOJI when the lib rejects the emoji", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockCreateFolder.mockRejectedValue(new FolderEmojiError());
+    const res = await POST(postRequest({ name: "Code", emoji: "ab" }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Pick a single emoji.",
+      code: "INVALID_EMOJI",
+    });
+    expect(mockBroadcastLinksChanged).not.toHaveBeenCalled();
   });
 });

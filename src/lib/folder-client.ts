@@ -68,20 +68,28 @@ export async function fetchFolders(): Promise<FolderSummary[]> {
   return (await res.json()) as FolderSummary[];
 }
 
-export function postFolder(name: string): Promise<ActionResult<FolderSummary>> {
+/** Body for `POST /api/folders`. An omitted/empty `emoji` means the default. */
+export type CreateFolderInput = { name: string; emoji?: string };
+
+/** Body for `PATCH /api/folders/[id]`. Omitted fields are unchanged; `emoji: null` clears it. */
+export type UpdateFolderInput = { name?: string; emoji?: string | null };
+
+export function postFolder(
+  input: CreateFolderInput,
+): Promise<ActionResult<FolderSummary>> {
   return mutate<FolderSummary>("/api/folders", {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(input),
   });
 }
 
 export function patchFolder(
   id: string,
-  name: string,
+  input: UpdateFolderInput,
 ): Promise<ActionResult<FolderSummary>> {
   return mutate<FolderSummary>(`/api/folders/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify(input),
   });
 }
 

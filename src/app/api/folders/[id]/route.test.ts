@@ -6,7 +6,7 @@ vi.mock("@/lib/require-browser-session", () => ({
   getBrowserSessionUserId: mockGetBrowserSessionUserId,
 }));
 
-const mockRenameFolder = vi.fn();
+const mockUpdateFolder = vi.fn();
 const mockDeleteFolder = vi.fn();
 vi.mock("@/lib/folders", async () => {
   const actual = await vi.importActual<typeof import("@/lib/folders")>(
@@ -14,7 +14,7 @@ vi.mock("@/lib/folders", async () => {
   );
   return {
     ...actual,
-    renameFolder: mockRenameFolder,
+    updateFolder: mockUpdateFolder,
     deleteFolder: mockDeleteFolder,
   };
 });
@@ -25,8 +25,12 @@ vi.mock("@/lib/realtime-broadcast", () => ({
 }));
 
 const { PATCH, DELETE } = await import("./route");
-const { FolderNameError, FolderNotFoundError, FolderLimitError } =
-  await import("@/lib/folders");
+const {
+  FolderNameError,
+  FolderNotFoundError,
+  FolderLimitError,
+  FolderEmojiError,
+} = await import("@/lib/folders");
 
 function ctx(id = "f1") {
   return { params: Promise.resolve({ id }) };
@@ -48,7 +52,7 @@ function deleteRequest(query = "") {
 describe("PATCH /api/folders/[id]", () => {
   beforeEach(() => {
     mockGetBrowserSessionUserId.mockReset();
-    mockRenameFolder.mockReset();
+    mockUpdateFolder.mockReset();
     mockDeleteFolder.mockReset();
     mockBroadcastLinksChanged.mockReset();
   });
@@ -58,7 +62,7 @@ describe("PATCH /api/folders/[id]", () => {
     const res = await PATCH(patchRequest({ name: "Reading" }), ctx());
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "Unauthorized" });
-    expect(mockRenameFolder).not.toHaveBeenCalled();
+    expect(mockUpdateFolder).not.toHaveBeenCalled();
   });
 
   it("returns 400 Invalid JSON body for a non-JSON body", async () => {
@@ -70,7 +74,7 @@ describe("PATCH /api/folders/[id]", () => {
 
   it("returns 400 NAME_EMPTY for a non-string name", async () => {
     mockGetBrowserSessionUserId.mockResolvedValue("user-1");
-    mockRenameFolder.mockRejectedValue(
+    mockUpdateFolder.mockRejectedValue(
       new FolderNameError("empty", "Give your folder a name."),
     );
     const res = await PATCH(patchRequest({ name: null }), ctx());
@@ -79,12 +83,15 @@ describe("PATCH /api/folders/[id]", () => {
       error: "Give your folder a name.",
       code: "NAME_EMPTY",
     });
-    expect(mockRenameFolder).toHaveBeenCalledWith("user-1", "f1", "");
+    expect(mockUpdateFolder).toHaveBeenCalledWith("user-1", "f1", {
+      name: "",
+      emoji: undefined,
+    });
   });
 
   it("returns 400 NAME_TOO_LONG for an over-long name", async () => {
     mockGetBrowserSessionUserId.mockResolvedValue("user-1");
-    mockRenameFolder.mockRejectedValue(
+    mockUpdateFolder.mockRejectedValue(
       new FolderNameError("too_long", "Keep it under 60 characters."),
     );
     const res = await PATCH(patchRequest({ name: "a".repeat(70) }), ctx());
@@ -97,7 +104,7 @@ describe("PATCH /api/folders/[id]", () => {
 
   it("returns 409 NAME_TAKEN when the name collides", async () => {
     mockGetBrowserSessionUserId.mockResolvedValue("user-1");
-    mockRenameFolder.mockRejectedValue(
+    mockUpdateFolder.mockRejectedValue(
       new FolderNameError("taken", "You already have a folder with that name."),
     );
     const res = await PATCH(patchRequest({ name: "Reading" }), ctx());
@@ -110,7 +117,7 @@ describe("PATCH /api/folders/[id]", () => {
 
   it("returns 403 LIMIT_REACHED/FOLDER_LIMIT when the lib throws it", async () => {
     mockGetBrowserSessionUserId.mockResolvedValue("user-1");
-    mockRenameFolder.mockRejectedValue(
+    mockUpdateFolder.mockRejectedValue(
       new FolderLimitError("You can have up to 100 folders."),
     );
     const res = await PATCH(patchRequest({ name: "Reading" }), ctx());
@@ -124,7 +131,7 @@ describe("PATCH /api/folders/[id]", () => {
 
   it("returns 404 Folder not found on FolderNotFoundError", async () => {
     mockGetBrowserSessionUserId.mockResolvedValue("user-1");
-    mockRenameFolder.mockRejectedValue(new FolderNotFoundError());
+    mockUpdateFolder.mockRejectedValue(new FolderNotFoundError());
     const res = await PATCH(patchRequest({ name: "Reading" }), ctx());
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "Folder not found" });
@@ -132,21 +139,92 @@ describe("PATCH /api/folders/[id]", () => {
 
   it("returns 200 with the renamed folder and broadcasts the change", async () => {
     mockGetBrowserSessionUserId.mockResolvedValue("user-1");
-    const updated = { id: "f1", name: "Reading", slug: "reading", linkCount: 2 };
-    mockRenameFolder.mockResolvedValue(updated);
+    const updated = { id: "f1", name: "Reading", slug: "reading", emoji: "🦪", linkCount: 2 };
+    mockUpdateFolder.mockResolvedValue(updated);
 
     const res = await PATCH(patchRequest({ name: "Reading" }), ctx());
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(updated);
-    expect(mockRenameFolder).toHaveBeenCalledWith("user-1", "f1", "Reading");
+    expect(mockUpdateFolder).toHaveBeenCalledWith("user-1", "f1", {
+      name: "Reading",
+      emoji: undefined,
+    });
     expect(mockBroadcastLinksChanged).toHaveBeenCalledWith("user-1", null);
+  });
+  it("passes an emoji-only update through without a name", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    const updated = { id: "f1", name: "Reading", slug: "reading", emoji: "📚", linkCount: 2 };
+    mockUpdateFolder.mockResolvedValue(updated);
+
+    const res = await PATCH(patchRequest({ emoji: "📚" }), ctx());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(updated);
+    expect(mockUpdateFolder).toHaveBeenCalledWith("user-1", "f1", {
+      name: undefined,
+      emoji: "📚",
+    });
+  });
+
+  it("passes emoji: null through to clear the emoji", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockUpdateFolder.mockResolvedValue({
+      id: "f1",
+      name: "Reading",
+      slug: "reading",
+      emoji: "🦪",
+      linkCount: 2,
+    });
+
+    const res = await PATCH(patchRequest({ emoji: null }), ctx());
+    expect(res.status).toBe(200);
+    expect(mockUpdateFolder).toHaveBeenCalledWith("user-1", "f1", {
+      name: undefined,
+      emoji: null,
+    });
+  });
+
+  it("returns 400 INVALID_EMOJI for a non-string emoji without calling the lib", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    const res = await PATCH(patchRequest({ emoji: ["📚"] }), ctx());
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Pick a single emoji.",
+      code: "INVALID_EMOJI",
+    });
+    expect(mockUpdateFolder).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 INVALID_EMOJI when the lib rejects the emoji", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockUpdateFolder.mockRejectedValue(new FolderEmojiError());
+    const res = await PATCH(patchRequest({ emoji: "📚📚" }), ctx());
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Pick a single emoji.",
+      code: "INVALID_EMOJI",
+    });
+    expect(mockBroadcastLinksChanged).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 Nothing to update for a body with neither field", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    // Real lib error class, thrown by the (mocked) lib for an empty update.
+    const { FolderUpdateEmptyError } = await import("@/lib/folders");
+    mockUpdateFolder.mockRejectedValue(new FolderUpdateEmptyError());
+    const res = await PATCH(patchRequest({}), ctx());
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Nothing to update" });
+    expect(mockUpdateFolder).toHaveBeenCalledWith("user-1", "f1", {
+      name: undefined,
+      emoji: undefined,
+    });
   });
 });
 
 describe("DELETE /api/folders/[id]", () => {
   beforeEach(() => {
     mockGetBrowserSessionUserId.mockReset();
-    mockRenameFolder.mockReset();
+    mockUpdateFolder.mockReset();
     mockDeleteFolder.mockReset();
     mockBroadcastLinksChanged.mockReset();
   });

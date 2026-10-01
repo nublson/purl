@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { resolveCurrentFolder } from "./current-folder";
 
-const reading = { id: "f1", name: "Reading", slug: "reading", linkCount: 2 };
-const renamed = { id: "f1", name: "Later", slug: "later", linkCount: 3 };
-const other = { id: "f2", name: "Work", slug: "work", linkCount: 0 };
+const reading = { id: "f1", name: "Reading", slug: "reading", emoji: "🦪", linkCount: 2 };
+const renamed = { id: "f1", name: "Later", slug: "later", emoji: "📚", linkCount: 3 };
+const other = { id: "f2", name: "Work", slug: "work", emoji: "🦪", linkCount: 0 };
 
 describe("resolveCurrentFolder", () => {
   it("prefers the fresh list entry matching the page folder's id", () => {

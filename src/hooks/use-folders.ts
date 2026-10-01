@@ -9,6 +9,8 @@ import {
   postFolder,
   removeFolder,
   type ActionResult,
+  type CreateFolderInput,
+  type UpdateFolderInput,
 } from "@/lib/folder-client";
 import type { FolderSummary } from "@/lib/folders";
 import { resolveCurrentFolder } from "@/lib/current-folder";
@@ -17,7 +19,7 @@ import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 
-export type { ActionResult, FolderSummary };
+export type { ActionResult, CreateFolderInput, FolderSummary, UpdateFolderInput };
 
 /** Folder list backing the folder menus/sidebars; refreshes on every links-sync version bump. */
 export function useFolders(): {
@@ -51,10 +53,12 @@ export function useCurrentFolder(): FolderSummary | null {
 }
 
 export function useFolderActions(): {
-  createFolder: (name: string) => Promise<ActionResult<FolderSummary>>;
-  renameFolder: (
+  createFolder: (
+    input: CreateFolderInput,
+  ) => Promise<ActionResult<FolderSummary>>;
+  updateFolder: (
     id: string,
-    name: string,
+    input: UpdateFolderInput,
   ) => Promise<ActionResult<FolderSummary>>;
   deleteFolder: (
     id: string,
@@ -73,8 +77,8 @@ export function useFolderActions(): {
   const currentFolder = useCurrentFolder();
 
   const createFolder = useCallback(
-    async (name: string): Promise<ActionResult<FolderSummary>> => {
-      const result = await postFolder(name);
+    async (input: CreateFolderInput): Promise<ActionResult<FolderSummary>> => {
+      const result = await postFolder(input);
       if (result.ok) {
         // Patch the list locally before navigating: the background refetch
         // triggered by notifyLinksChanged() hasn't landed yet, and without
@@ -92,15 +96,23 @@ export function useFolderActions(): {
     [upsertFolder, notifyLinksChanged, router],
   );
 
-  const renameFolder = useCallback(
-    async (id: string, name: string): Promise<ActionResult<FolderSummary>> => {
-      const result = await patchFolder(id, name);
+  const updateFolder = useCallback(
+    async (
+      id: string,
+      input: UpdateFolderInput,
+    ): Promise<ActionResult<FolderSummary>> => {
+      // Captured before the request: the local list is patched below.
+      const previousName = folders.find((folder) => folder.id === id)?.name;
+      const result = await patchFolder(id, input);
       if (result.ok) {
+        const renamed =
+          input.name !== undefined &&
+          (previousName === undefined || previousName !== result.data.name);
         // Same reasoning as createFolder: patch locally before the
         // router.replace below, so useCurrentFolder() on the new slug
         // resolves immediately instead of racing the background refetch.
         upsertFolder(result.data);
-        toast.success("Folder renamed");
+        toast.success(renamed ? "Folder renamed" : "Folder updated");
         notifyLinksChanged();
         const onThisFolder = currentFolder?.id === id;
         const newPath = `/folders/${result.data.slug}`;
@@ -112,7 +124,7 @@ export function useFolderActions(): {
       }
       return result;
     },
-    [upsertFolder, notifyLinksChanged, currentFolder, pathname, router],
+    [folders, upsertFolder, notifyLinksChanged, currentFolder, pathname, router],
   );
 
   const deleteFolder = useCallback(
@@ -123,7 +135,7 @@ export function useFolderActions(): {
       const result = await removeFolder(id, opts.withLinks);
       if (result.ok) {
         // Patch locally before the /home redirect below, for the same
-        // reason as createFolder/renameFolder.
+        // reason as createFolder/updateFolder.
         removeFolderLocally(id);
         toast.success("Folder deleted");
         notifyLinksChanged();
@@ -174,7 +186,7 @@ export function useFolderActions(): {
   );
 
   return useMemo(
-    () => ({ createFolder, renameFolder, deleteFolder, moveLink }),
-    [createFolder, renameFolder, deleteFolder, moveLink],
+    () => ({ createFolder, updateFolder, deleteFolder, moveLink }),
+    [createFolder, updateFolder, deleteFolder, moveLink],
   );
 }
