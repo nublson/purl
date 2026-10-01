@@ -515,6 +515,9 @@ describe("normalizeFolderEmoji", () => {
     ["✈️", "✈️"],
     // Keycap sequence.
     ["1️⃣", "1️⃣"],
+    // Text-default pictograph forced to emoji presentation with U+FE0F.
+    ["\u2764\uFE0F", "\u2764\uFE0F"],
+    ["\u00A9\uFE0F", "\u00A9\uFE0F"],
   ])("accepts %j", (input, expected) => {
     expect(normalizeFolderEmoji(input)).toBe(expected);
   });
@@ -533,6 +536,11 @@ describe("normalizeFolderEmoji", () => {
     ["a word", "books"],
     ["emoji plus text", "📚a"],
     ["a digit alone", "1"],
+    ["a letter with U+FE0F", "a\uFE0F"],
+    ["© (text presentation)", "\u00A9"],
+    ["® (text presentation)", "\u00AE"],
+    ["™ (text presentation)", "\u2122"],
+    ["❤ without U+FE0F", "\u2764"],
     ["a grapheme padded with combining marks", `🦪${"\u0301".repeat(40)}`],
   ])("rejects %s", (_label, input) => {
     const err = (() => {

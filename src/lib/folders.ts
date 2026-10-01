@@ -19,8 +19,13 @@ export const DEFAULT_FOLDER_EMOJI = "🦪";
  */
 const MAX_EMOJI_LENGTH = 32;
 
-/** Matches a code point that makes a grapheme an emoji: pictographs, flag halves, or a keycap. */
-const EMOJI_PATTERN = /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20E3/u;
+/**
+ * Matches a grapheme that renders as an emoji (not a text symbol like © or ™):
+ * a code point with default emoji presentation, a pictograph forced to emoji
+ * presentation with U+FE0F, a keycap sequence, or a regional-indicator flag.
+ */
+const EMOJI_PATTERN =
+  /\p{Emoji_Presentation}|\p{Extended_Pictographic}\uFE0F|[0-9#*]\uFE0F?\u20E3|\p{Regional_Indicator}{2}/u;
 
 /** Row shape returned for folder listings/mutations, with the derived link count flattened. */
 export type FolderSummary = {
