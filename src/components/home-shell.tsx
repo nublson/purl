@@ -5,6 +5,7 @@ import { LinkInput } from "@/components/link-input";
 import { PasteHandler } from "@/components/paste-handler";
 import { LinkItemSkeleton } from "@/components/skeletons";
 import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
+import { useFolders } from "@/hooks/use-folders";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
 import { coolPreviews } from "@/lib/link-preview-warmth";
@@ -56,6 +57,7 @@ export function HomeShell({
   useRealtimeSync(userId);
   const { version } = useLinksSyncState();
   const { setLinksTotal } = useLinksSyncActions();
+  const { refresh: refreshFolders } = useFolders();
   const [groups, setGroups] = useState(initialGroups);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
@@ -193,7 +195,11 @@ export function HomeShell({
     // always resolves to this `folderId`) already toasted "Saved to
     // {name}"/"Moved to {name}" — skip the generic toast so it isn't doubled.
     if (!folderId) toast.success("Link saved");
-  }, [reload, folderId]);
+    // A save here files the link into this folder (a re-saved URL moves in
+    // from elsewhere), so folder counts change. `reload()` above only
+    // refreshes this list, not the folder list behind the header's counts.
+    else refreshFolders();
+  }, [reload, folderId, refreshFolders]);
 
   const onSaveError = useCallback(() => {
     setPendingUrl(null);

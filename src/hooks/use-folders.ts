@@ -24,23 +24,28 @@ export type { ActionResult, CreateFolderInput, FolderSummary, UpdateFolderInput 
 
 /**
  * Folder list backing the folder menus/sidebars; refreshes on every
- * links-sync version bump. `totalLinks` is Home's count (every saved link):
- * the live links-sync total once a list reload has reported one, else the
- * server-rendered count; `null` when neither is known.
+ * links-sync version bump, or on `refresh()` for a change that reloads its
+ * own list without bumping the version (a save on a folder page).
+ * `totalLinks` is Home's count (every saved link): the live links-sync total
+ * once a list reload has reported one, else the server-rendered count;
+ * `null` when neither is known.
  */
 export function useFolders(): {
   folders: FolderSummary[];
   isLoading: boolean;
   max: number;
   totalLinks: number | null;
+  refresh: () => void;
 } {
-  const { folders, isLoading, initialTotalLinks } = useFoldersContext();
+  const { folders, isLoading, initialTotalLinks, refresh } =
+    useFoldersContext();
   const { total } = useLinksSyncState();
   return {
     folders,
     isLoading,
     max: MAX_FOLDERS,
     totalLinks: total ?? initialTotalLinks,
+    refresh,
   };
 }
 
