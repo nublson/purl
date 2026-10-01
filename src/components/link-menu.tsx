@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { EditDialog } from "./dialog-edit-link";
 import { DropdownWrapper } from "./dropdown-wrapper";
+import { LinkFolderSubmenu } from "./link-folder-submenu";
 import { Button } from "./ui/button";
 import {
   DropdownMenuGroup,
@@ -104,6 +105,7 @@ export function LinkMenu({
           <Link /> Copy link
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        <LinkFolderSubmenu link={link} />
         <EditDialog link={link}>
           <DropdownMenuItem
             onSelect={(event) => {
