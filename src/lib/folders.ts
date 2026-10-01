@@ -1,5 +1,6 @@
 import "server-only";
 
+import { DEFAULT_FOLDER_EMOJI } from "@/lib/folder-display";
 import { MAX_FOLDERS } from "@/lib/limits";
 import prisma, { type Prisma } from "@/lib/prisma";
 
@@ -9,8 +10,8 @@ type Db = Prisma.TransactionClient;
 /** Max length (in characters) of a generated slug. */
 const MAX_SLUG_LENGTH = 50;
 
-/** Emoji shown for a folder that has none stored (the oyster — home of a pearl). */
-export const DEFAULT_FOLDER_EMOJI = "🦪";
+// Lives in the client-safe module so the folder UI can use it; re-exported here.
+export { DEFAULT_FOLDER_EMOJI };
 
 /**
  * Upper bound (UTF-16 code units) for a stored emoji. The longest real emoji
