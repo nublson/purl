@@ -27,8 +27,8 @@ vi.mock("@/lib/auth", () => ({
   },
 }));
 
-vi.mock("@/lib/prisma", () => ({
-  default: {
+vi.mock("@/lib/prisma", () => {
+  const client = {
     link: {
       create: vi.fn(),
       findFirst: vi.fn(),
@@ -39,8 +39,15 @@ vi.mock("@/lib/prisma", () => ({
     folder: {
       findFirst: vi.fn(),
     },
-  },
-}));
+    $executeRaw: vi.fn(),
+    $transaction: vi.fn(),
+  };
+  // insertWithinSaveLimit runs its callback against the same mocked client.
+  client.$transaction.mockImplementation(
+    async (cb: (tx: typeof client) => unknown) => cb(client),
+  );
+  return { default: client };
+});
 
 vi.mock("open-graph-scraper", () => ({
   default: vi.fn(),

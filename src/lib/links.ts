@@ -1,5 +1,5 @@
 import type { ContentType } from "@/generated/prisma/enums";
-import { assertCanSaveLink } from "@/lib/entitlements";
+import { assertCanSaveLink, insertWithinSaveLimit } from "@/lib/entitlements";
 import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
 import {
   OG_HTML_READ_MAX_BYTES,
@@ -509,7 +509,9 @@ export async function createLinkForUser(
 
   let link: CreateLinkResult;
   try {
-    link = await prisma.link.create({
+    // The early check above fails fast before scraping; this re-checks the
+    // cap and inserts atomically so concurrent saves can't exceed it.
+    link = await insertWithinSaveLimit(userId, (tx) => tx.link.create({
       data: {
         url: resolved.url,
         title: resolved.title,
@@ -521,7 +523,7 @@ export async function createLinkForUser(
         userId,
         ...(opts?.folderId !== undefined ? { folderId: opts.folderId } : {}),
       },
-    });
+    }));
   } catch (error) {
     // Same race as the refresh branch above: the folder was deleted after
     // assertFolderOwned. Surface it as FolderNotFoundError (404), not a 500.
