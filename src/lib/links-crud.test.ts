@@ -50,6 +50,8 @@ const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
 const ogs = (await import("open-graph-scraper")).default;
 const { assertFolderOwned, FolderNotFoundError } = await import("@/lib/folders");
+const { SaveLimitError } = await import("@/lib/entitlements");
+const { MAX_SAVED_LINKS } = await import("@/lib/limits");
 const {
   createLink,
   createLinkForUser,
@@ -690,6 +692,33 @@ describe("createLink", () => {
     expect(vi.mocked(prisma.link.findFirst)).toHaveBeenCalledWith({
       where: { userId: "user-123", url: "https://example.com" },
     });
+  });
+
+  it("throws SaveLimitError on the fast pre-check when already at the cap", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.count).mockResolvedValue(MAX_SAVED_LINKS);
+
+    const err = await createLink("https://example.com").catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(SaveLimitError);
+    expect(prisma.link.create).not.toHaveBeenCalled();
+    expect(ogs).not.toHaveBeenCalled();
+  });
+
+  it("throws SaveLimitError without inserting when the cap fills during metadata work", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+    let countCalls = 0;
+    vi.mocked(prisma.link.count).mockImplementation(async () => {
+      countCalls += 1;
+      return countCalls === 1 ? MAX_SAVED_LINKS - 1 : MAX_SAVED_LINKS;
+    });
+
+    const err = await createLink("https://example.com").catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(SaveLimitError);
+    expect(prisma.link.create).not.toHaveBeenCalled();
+    expect(countCalls).toBeGreaterThanOrEqual(2);
   });
 
 });
