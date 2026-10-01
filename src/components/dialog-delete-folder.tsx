@@ -10,7 +10,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { useFolderActions, type FolderSummary } from "@/hooks/use-folders";
+import {
+  useFolderActions,
+  useFolders,
+  type FolderSummary,
+} from "@/hooks/use-folders";
 import { formatLinkCount } from "@/lib/folder-display";
 import * as React from "react";
 
@@ -22,15 +26,25 @@ type Pending = "keep" | "with-links" | null;
  * "Delete". Stays open with an inline error if the request fails.
  */
 export function DialogDeleteFolder({
-  folder,
+  folder: snapshot,
   open,
   onOpenChange,
 }: {
+  /** The folder as it was when the dialog was opened; the live list wins. */
   folder: FolderSummary;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const { deleteFolder } = useFolderActions();
+  const { folders } = useFolders();
+  // Read the live entry (link count, name, emoji) so the copy and the
+  // keep/delete-links choice track links added or moved while it's open.
+  // Once the folder leaves the list (e.g. the delete succeeded and the dialog
+  // is animating out), keep showing it as it last was, else the snapshot.
+  const live = folders.find((candidate) => candidate.id === snapshot.id);
+  const [lastLive, setLastLive] = React.useState<FolderSummary | null>(null);
+  if (live && live !== lastLive) setLastLive(live);
+  const folder = live ?? lastLive ?? snapshot;
   const [pending, setPending] = React.useState<Pending>(null);
   const [error, setError] = React.useState<string | null>(null);
   const hasLinks = folder.linkCount > 0;

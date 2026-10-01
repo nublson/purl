@@ -52,6 +52,14 @@ export function useCurrentFolder(): FolderSummary | null {
   return resolveCurrentFolder({ pageFolder, folders, pathname, slug });
 }
 
+/**
+ * Folder mutations. Each returns `{ ok: true, data } | { ok: false, error }`
+ * and never throws. On success they toast, refresh the folder list and
+ * navigate (create → the new folder; update → its new slug if you're on it;
+ * delete → /home if you're on it). On failure `createFolder`, `updateFolder`
+ * and `deleteFolder` stay silent: their callers (the folder dialogs) show
+ * `error` inline. `moveLink` has no dialog, so it toasts its own failures.
+ */
 export function useFolderActions(): {
   createFolder: (
     input: CreateFolderInput,
@@ -88,8 +96,6 @@ export function useFolderActions(): {
         toast.success("Folder created");
         notifyLinksChanged();
         router.push(`/folders/${result.data.slug}`);
-      } else {
-        toast.error(result.error);
       }
       return result;
     },
@@ -119,8 +125,6 @@ export function useFolderActions(): {
         if (onThisFolder && pathname !== newPath) {
           router.replace(newPath);
         }
-      } else {
-        toast.error(result.error);
       }
       return result;
     },
@@ -142,8 +146,6 @@ export function useFolderActions(): {
         if (currentFolder?.id === id) {
           router.push("/home");
         }
-      } else {
-        toast.error(result.error);
       }
       return result;
     },
