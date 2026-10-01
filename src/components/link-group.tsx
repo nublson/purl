@@ -1,3 +1,6 @@
+"use client";
+
+import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { Link } from "@/utils/links";
 import type { ReactNode } from "react";
 import { LinkItem } from "./link-item";
@@ -18,6 +21,11 @@ export const LinkGroup = ({
   eagerFirstLinkFavicon = false,
 }: LinkGroupProps) => {
   const headingId = `link-group-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  // Links deleted but still undoable are hidden here, and a day whose links
+  // are all hidden drops its heading too.
+  const pendingDeletes = usePendingLinkDeletes();
+  const visibleLinks = links.filter((link) => !pendingDeletes.has(link.id));
+  if (visibleLinks.length === 0 && !prependItems) return null;
 
   return (
     <section
@@ -29,7 +37,7 @@ export const LinkGroup = ({
       </h2>
       <ItemGroup aria-labelledby={headingId} className="w-full gap-0">
         {prependItems}
-        {links.map((link, index) => (
+        {visibleLinks.map((link, index) => (
           // content-visibility skips layout/paint for off-screen rows; the
           // intrinsic size (one row) keeps the scrollbar stable.
           <div

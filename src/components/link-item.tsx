@@ -2,6 +2,7 @@
 
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
+import { deleteLinkWithUndo } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
@@ -9,7 +10,6 @@ import dynamic from "next/dynamic";
 import * as React from "react";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
-import { LinkItemSkeleton } from "./skeletons";
 import { Typography } from "./typography";
 import {
   Item,
@@ -19,16 +19,12 @@ import {
   ItemTitle,
 } from "./ui/item";
 
-// Loaded on demand: the menu (dropdown, edit dialog, form library) and the
-// Motion-based delete icon stay out of the initial bundle. The placeholder
-// matches the menu trigger's size to avoid layout shift.
+// Loaded on demand: the menu (dropdown, edit dialog, form library) stays out
+// of the initial bundle. The placeholder matches the menu trigger's size to
+// avoid layout shift.
 const LinkMenu = dynamic(
   () => import("./link-menu").then((m) => m.LinkMenu),
   { loading: () => <div className="size-8" aria-hidden /> },
-);
-const X = dynamic(
-  () => import("./animate-ui/icons/x").then((m) => m.X),
-  { ssr: false },
 );
 
 interface LinkItemProps {
@@ -51,9 +47,11 @@ export const LinkItem = React.forwardRef<
   ref,
 ) {
   const { notifyLinksChanged } = useLinksSyncActions();
-  const [deletePhase, setDeletePhase] = React.useState<
-    "idle" | "animating" | "loading" | "exiting"
-  >("idle");
+  // "animating" = the row fades out; when that ends it's handed to
+  // `deleteLinkWithUndo`, which hides it (via `LinkGroup`) behind an Undo toast.
+  const [deletePhase, setDeletePhase] = React.useState<"idle" | "animating">(
+    "idle",
+  );
   const [previewOpen, setPreviewOpen] = React.useState(false);
   // Whether the current preview was opened by hover (vs keyboard focus).
   const openedByPointerRef = React.useRef(false);
@@ -113,22 +111,6 @@ export const LinkItem = React.forwardRef<
     });
   }, [previewOpen]);
 
-  if (deletePhase === "loading" || deletePhase === "exiting") {
-    return (
-      <LinkItemSkeleton
-        icon={<X className="size-5" animate={true} loop={true} />}
-        url={link.url}
-        asListItem={false}
-        animateIn={deletePhase === "loading"}
-        animateOut={deletePhase === "exiting"}
-        onAnimationEnd={() => {
-          if (deletePhase !== "exiting") return;
-          notifyLinksChanged();
-        }}
-      />
-    );
-  }
-
   const content = (
     <Item
       ref={ref}
@@ -151,7 +133,17 @@ export const LinkItem = React.forwardRef<
       }}
       onAnimationEnd={() => {
         if (deletePhase !== "animating") return;
-        setDeletePhase("loading");
+        setDeletePhase("idle");
+        deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
+        // The row (and its menu trigger) unmounts; move focus to the
+        // neighboring row only if focus was left on the page body.
+        const target = focusAfterDeleteRef.current;
+        requestAnimationFrame(() => {
+          const active = document.activeElement;
+          if (target?.isConnected && (!active || active === document.body)) {
+            target.focus();
+          }
+        });
       }}
       {...rest}
     >
@@ -216,7 +208,7 @@ export const LinkItem = React.forwardRef<
       >
         <LinkMenu
           link={link}
-          onDeleteStart={() => {
+          onDelete={() => {
             const rows = Array.from(
               document.querySelectorAll<HTMLElement>(
                 '[data-cy="link-item"] > a[href]',
@@ -226,24 +218,6 @@ export const LinkItem = React.forwardRef<
             focusAfterDeleteRef.current =
               index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
             setDeletePhase("animating");
-          }}
-          onDeleteSuccess={() => {
-            setDeletePhase("exiting");
-            // The menu trigger unmounts with the row; move focus to the
-            // neighboring row only if focus was left on the page body.
-            const target = focusAfterDeleteRef.current;
-            requestAnimationFrame(() => {
-              const active = document.activeElement;
-              if (
-                target?.isConnected &&
-                (!active || active === document.body)
-              ) {
-                target.focus();
-              }
-            });
-          }}
-          onDeleteError={() => {
-            setDeletePhase("idle");
           }}
         />
       </ItemActions>

@@ -8,6 +8,7 @@ import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
 import { coolPreviews } from "@/lib/link-preview-warmth";
+import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import {
   countGroupedLinks,
   mergeLinkGroups,
@@ -205,6 +206,14 @@ export function HomeShell({
   const showSkeleton = pendingUrl !== null;
   const skeletonUrl = pendingUrl ?? "";
   const showSyntheticToday = showSkeleton && !todayGroup;
+  // Every loaded link deleted (awaiting Undo) and nothing left to load reads
+  // as empty, so the empty state shows instead of a blank list.
+  const pendingDeletes = usePendingLinkDeletes();
+  const allLinksHidden =
+    !nextCursor &&
+    groups.every((group) =>
+      group.links.every((link) => pendingDeletes.has(link.id)),
+    );
 
   return (
     <>
@@ -218,7 +227,7 @@ export function HomeShell({
         onSaveSuccess={onSaveSuccess}
         onSaveError={onSaveError}
       />
-      {!groups.length && !showSyntheticToday ? (
+      {(!groups.length || allLinksHidden) && !showSyntheticToday ? (
         <LinkGroupEmpty />
       ) : (
         // Leaving the list resets the preview hover delay (see

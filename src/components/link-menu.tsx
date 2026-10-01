@@ -1,8 +1,6 @@
 "use client";
 
 import { copyToClipboard } from "@/lib/clipboard";
-import { useLinksSyncActions } from "@/hooks/use-links-sync";
-import { linksOriginHeaders } from "@/lib/links-origin";
 import type { Link as LinkType } from "@/utils/links";
 import {
   Ellipsis,
@@ -24,19 +22,11 @@ import {
 
 interface LinkMenuProps {
   link: LinkType;
-  onDeleteStart?: () => void;
-  onDeleteSuccess?: () => void;
-  onDeleteError?: () => void;
+  /** Delete was chosen; the row animates out, then deletes with Undo (see `LinkItem`). */
+  onDelete: () => void;
 }
 
-export function LinkMenu({
-  link,
-  onDeleteStart,
-  onDeleteSuccess,
-  onDeleteError,
-}: LinkMenuProps) {
-  const { notifyLinksChanged } = useLinksSyncActions();
-
+export function LinkMenu({ link, onDelete }: LinkMenuProps) {
   async function handleOpenInNewTab() {
     window.open(link.url, "_blank");
   }
@@ -47,30 +37,6 @@ export function LinkMenu({
       toast.success("Link copied");
     } catch {
       toast.error("Unable to copy the link. Try again.");
-    }
-  }
-
-  async function handleDelete() {
-    onDeleteStart?.();
-    try {
-      const res = await fetch(`/api/links/${link.id}`, {
-        method: "DELETE",
-        headers: linksOriginHeaders,
-      });
-      if (res.ok) {
-        toast.success("Link deleted");
-        if (onDeleteSuccess) {
-          onDeleteSuccess();
-          return;
-        }
-        notifyLinksChanged();
-      } else {
-        onDeleteError?.();
-        toast.error("Unable to delete the link. Try again.");
-      }
-    } catch {
-      onDeleteError?.();
-      toast.error("Unable to delete the link. Check your connection and try again.");
     }
   }
 
@@ -116,7 +82,7 @@ export function LinkMenu({
             <Pencil /> Edit
           </DropdownMenuItem>
         </EditDialog>
-        <DropdownMenuItem data-cy="delete-link-menu-item" variant="destructive" onClick={handleDelete}>
+        <DropdownMenuItem data-cy="delete-link-menu-item" variant="destructive" onClick={onDelete}>
           <Trash /> Delete
         </DropdownMenuItem>
       </DropdownMenuGroup>
