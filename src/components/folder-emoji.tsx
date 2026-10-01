@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { Typography } from "./typography";
 
 /**
  * A folder's emoji in a fixed square box, so rows with emoji line up with
@@ -14,7 +15,8 @@ export function FolderEmoji({
   className?: string;
 }) {
   return (
-    <span
+    <Typography
+      component="span"
       aria-hidden="true"
       className={cn(
         "flex size-4 shrink-0 items-center justify-center text-base leading-none",
@@ -22,6 +24,6 @@ export function FolderEmoji({
       )}
     >
       {emoji}
-    </span>
+    </Typography>
   );
 }

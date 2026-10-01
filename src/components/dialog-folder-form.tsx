@@ -23,6 +23,7 @@ import {
 } from "@/lib/folder-display";
 import * as React from "react";
 import { DialogWrapper } from "./dialog-wrapper";
+import { Typography } from "./typography";
 
 /** Mirrors the server's folder-name cap in `src/lib/folders.ts` ("Keep it under 60 characters."). */
 const MAX_NAME_LENGTH = 60;
@@ -171,9 +172,15 @@ function FolderForm({
             />
           </div>
           {nameError ? (
-            <p id={nameErrorId} role="alert" className="text-sm text-destructive">
+            <Typography
+              component="p"
+              size="small"
+              id={nameErrorId}
+              role="alert"
+              className="text-destructive"
+            >
               {nameError}
-            </p>
+            </Typography>
           ) : null}
         </Field>
         <Field>
@@ -195,19 +202,27 @@ function FolderForm({
             aria-describedby={descriptionError ? descriptionErrorId : undefined}
           />
           {descriptionError ? (
-            <p
+            <Typography
+              component="p"
+              size="small"
               id={descriptionErrorId}
               role="alert"
-              className="text-sm text-destructive"
+              className="text-destructive"
             >
               {descriptionError}
-            </p>
+            </Typography>
           ) : null}
         </Field>
         {formError ? (
-          <p id={formErrorId} role="alert" className="text-sm text-destructive">
+          <Typography
+            component="p"
+            size="small"
+            id={formErrorId}
+            role="alert"
+            className="text-destructive"
+          >
             {formError}
-          </p>
+          </Typography>
         ) : null}
       </FieldGroup>
       <DialogFooter>
@@ -260,7 +275,13 @@ function FolderEmojiPicker({
           aria-describedby={describedBy}
           className="text-lg leading-none"
         >
-          <span aria-hidden="true">{shown}</span>
+          <Typography
+            component="span"
+            aria-hidden="true"
+            className="text-lg leading-none"
+          >
+            {shown}
+          </Typography>
         </Button>
       </PopoverTrigger>
       <PopoverContent

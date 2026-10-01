@@ -17,6 +17,7 @@ import {
 } from "@/hooks/use-folders";
 import { formatLinkCount } from "@/lib/folder-display";
 import * as React from "react";
+import { Typography } from "./typography";
 
 type Pending = "keep" | "with-links" | null;
 
@@ -81,9 +82,14 @@ export function DialogDeleteFolder({
           </AlertDialogDescription>
         </AlertDialogHeader>
         {error ? (
-          <p role="alert" className="text-sm text-destructive">
+          <Typography
+            component="p"
+            size="small"
+            role="alert"
+            className="text-destructive"
+          >
             {error}
-          </p>
+          </Typography>
         ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending !== null}>Cancel</AlertDialogCancel>

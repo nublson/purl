@@ -9,6 +9,7 @@ import {
 import { LoaderIcon, SearchIcon } from "lucide-react";
 import type * as React from "react";
 
+import { Typography } from "@/components/typography";
 import { cn } from "@/lib/utils";
 
 // Frimousse's shadcn registry component (frimousse.liveblocks.io/r/emoji-picker),
@@ -157,14 +158,22 @@ function EmojiPickerFooter({
               <div className="flex size-8 flex-none items-center justify-center text-lg leading-none">
                 {emoji.emoji}
               </div>
-              <span className="truncate text-xs text-secondary-foreground">
+              <Typography
+                component="span"
+                size="mini"
+                className="truncate text-secondary-foreground"
+              >
                 {emoji.label}
-              </span>
+              </Typography>
             </>
           ) : (
-            <span className="ml-2 flex h-8 items-center truncate text-xs text-muted-foreground">
+            <Typography
+              component="span"
+              size="mini"
+              className="ml-2 flex h-8 items-center truncate"
+            >
               Select an emoji…
-            </span>
+            </Typography>
           )
         }
       </EmojiPickerPrimitive.ActiveEmoji>
