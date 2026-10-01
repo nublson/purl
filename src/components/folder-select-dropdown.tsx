@@ -23,6 +23,15 @@ import {
 
 const HOME_EMOJI = "🏠";
 
+/**
+ * Lines the menu's emoji and names up under the trigger's. The trigger's
+ * emoji sits 9px in (1px border + 8px `ps-2`); a menu row's sits 12px in
+ * (4px menu `p-1` + 8px item `px-2`). Shifting the menu 3px toward the
+ * leading edge puts both emoji columns on one edge, and the trigger's
+ * `gap-2` matches the rows' 8px gap, so the names share an edge too.
+ */
+const MENU_ALIGN_OFFSET = -3;
+
 type FolderDialog =
   | { kind: "create" }
   | { kind: "edit"; folder: FolderSummary }
@@ -78,6 +87,7 @@ export function FolderSelectDropdown() {
       <DropdownWrapper
         className="w-60"
         align="start"
+        alignOffset={MENU_ALIGN_OFFSET}
         onCloseAutoFocus={() => {
           const next = pendingDialog.current;
           if (!next) return;
@@ -92,7 +102,8 @@ export function FolderSelectDropdown() {
             aria-label={`Folder: ${label}`}
             // Emoji side gets 2px less padding than the text default
             // (optical alignment); the chevron uses Button's inline-end inset.
-            className="max-w-52 min-w-0 shrink ps-2"
+            // `gap-2` matches the menu rows (see MENU_ALIGN_OFFSET).
+            className="max-w-52 min-w-0 shrink gap-2 ps-2"
           >
             <FolderEmoji emoji={currentFolder?.emoji ?? HOME_EMOJI} />
             <Typography
