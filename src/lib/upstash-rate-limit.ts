@@ -40,6 +40,10 @@ function makeLimiter(
 const authLimiter = () => makeLimiter("auth", 30, "1 m");
 const linksPostLimiter = () => makeLimiter("links_post", 30, "1 m");
 const feedbackPostLimiter = () => makeLimiter("feedback_post", 10, "1 m");
+// The availability check runs (debounced) as the user types a new username;
+// a change is rare, so it gets a much tighter budget.
+const usernameCheckLimiter = () => makeLimiter("username_check", 60, "1 m");
+const usernameChangeLimiter = () => makeLimiter("username_change", 10, "1 h");
 
 const v1Limiter = () => makeLimiter("v1", 120, "1 m");
 const v1PostLimiter = () => makeLimiter("v1_post", 60, "1 m");
@@ -51,6 +55,8 @@ let cachedV1: Ratelimit | null | undefined;
 let cachedV1Post: Ratelimit | null | undefined;
 let cachedFeedbackPost: Ratelimit | null | undefined;
 let cachedMcp: Ratelimit | null | undefined;
+let cachedUsernameCheck: Ratelimit | null | undefined;
+let cachedUsernameChange: Ratelimit | null | undefined;
 
 export function getAuthRateLimiter(): Ratelimit | null {
   if (cachedAuth === undefined) cachedAuth = authLimiter();
@@ -77,6 +83,20 @@ export function getFeedbackPostRateLimiter(): Ratelimit | null {
     cachedFeedbackPost = feedbackPostLimiter();
   }
   return cachedFeedbackPost;
+}
+
+export function getUsernameCheckRateLimiter(): Ratelimit | null {
+  if (cachedUsernameCheck === undefined) {
+    cachedUsernameCheck = usernameCheckLimiter();
+  }
+  return cachedUsernameCheck;
+}
+
+export function getUsernameChangeRateLimiter(): Ratelimit | null {
+  if (cachedUsernameChange === undefined) {
+    cachedUsernameChange = usernameChangeLimiter();
+  }
+  return cachedUsernameChange;
 }
 
 export function getMcpRateLimiter(): Ratelimit | null {

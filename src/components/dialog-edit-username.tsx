@@ -141,6 +141,8 @@ function EditUsernameForm({ onSuccess }: { onSuccess: () => void }) {
       if (!res.ok) {
         if (res.status === 409 || body?.code === "TAKEN") {
           setStatus({ kind: "taken" });
+        } else if (res.status === 429) {
+          toast.error("Too many username changes. Try again in a while.");
         } else {
           toast.error(body?.error ?? "Unable to update your username. Try again.");
         }
