@@ -21,6 +21,8 @@ pnpm lint                     # ESLint
 pnpm typecheck                # tsc --noEmit
 pnpm test                     # vitest run (single pass)
 pnpm test:watch               # vitest watch mode
+pnpm test:e2e                 # Playwright end-to-end tests (Chromium + WebKit)
+pnpm test:e2e:ui              # Playwright UI mode
 ```
 
 Run a single test file: `pnpm vitest run src/lib/entitlements.test.ts`
@@ -100,6 +102,15 @@ Vitest, node environment. Test files: `src/**/*.test.ts`.
 - Mocks `node:dns/promises` to return a public IP (passes SSRF guards)
 
 Test patterns: mock `globalThis.fetch`, mock Prisma client calls, mock Supabase clients. Tests focus on business logic — avoid shallow UI-only wrappers.
+
+### End-to-end (Playwright)
+
+`e2e/*.spec.ts`, run with `pnpm test:e2e` in Chromium and WebKit (not in CI). It reuses a running `pnpm dev` on :3000 or starts one, and loads `.env` + `.env.local` like the app.
+
+- **Local database only.** `playwright.config.ts` refuses to run unless `DATABASE_URL` points at localhost: the tests create and delete users, folders and links.
+- **Sign-in:** OAuth can't be automated, so `e2e/fixtures.ts` gives each worker its own `@purl.test` user (reserved domain, deleted afterwards) and signs the browser in with session cookies minted by a test-only Better Auth instance with the `testUtils` plugin (`e2e/support/auth.ts`, same DB, secret and base URL as the app). Nothing test-only ships in `src/lib/auth.ts`. Opt out per test with `test.use({ signedIn: false })`.
+- **Seeding** goes through plain `pg` (`e2e/support/db.ts`), not the generated Prisma client, which Playwright's CommonJS loader can't load. Use the `seed` fixture (`seed.link`, `seed.folder`); every test starts with no links or folders.
+- **Hydration:** pages are server-rendered, so a control can be clicked before React hydrates it. Call `waitForHydration(page, selector)` before interacting with client-only controls (menus, dialogs).
 
 ## Key gotchas
 
