@@ -120,6 +120,7 @@ Test patterns: mock `globalThis.fetch`, mock Prisma client calls, mock Supabase 
 - **ESLint rule:** no namespace imports from `lucide-react` or `@radix-ui/*` — use named imports only.
 - **Sign-in is Google/GitHub only** (Apple is enabled when its env vars exist); for local dev, create OAuth apps with localhost callbacks `http://localhost:3000/api/auth/callback/{google,github}`.
 - **Usage UI**: the link count vs. the cap is in **Settings → Usage**, not `/home`. See `src/app/(private)/(app)/layout.tsx`, `src/lib/usage-summary.ts`, `src/components/dialog-settings.tsx`.
+- **Pull-to-refresh** (`src/components/pull-to-refresh.tsx`, rules in `src/lib/pull-to-refresh.ts`): touch-only, on the layout's `<main>` (the app's scroll container; the page itself never scrolls, and `html, body { overscroll-behavior-y: none }` keeps the browser's own pull-to-refresh from reloading the page). It and returning to the app after `RETURN_REFRESH_AFTER_MS` call `HomeShell`'s `refresh` (list + folder counts) in place, no page reload. Its e2e test drives real touches through CDP, so it runs in Chromium only.
 - **Serwist (PWA)**: service worker is disabled in `pnpm dev`. Use `pnpm build && pnpm start` to test install/offline behavior.
 - **`SUPABASE_SERVICE_ROLE_KEY`** is server-only. The browser uses only the anon key for Realtime.
 - **All user-supplied URLs must go through `safeFetch`** — never raw `fetch` — to prevent SSRF.

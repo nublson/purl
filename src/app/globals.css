@@ -132,6 +132,13 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+  /* The app scrolls inside <main>, not the page. Without this, dragging down
+     at the top would fire the browser's own pull-to-refresh (a full page
+     reload) instead of the app's (see PullToRefresh). */
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
   html {
     @apply font-sans;
   }
