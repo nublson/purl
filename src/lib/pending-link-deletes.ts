@@ -112,7 +112,7 @@ export function deleteLinkWithUndo(
     if (pending.get(linkId) === "fading") setPhase(linkId, "hidden");
   }, LINK_DELETE_FADE_MS);
 
-  const send = async (keepalive: boolean) => {
+  const send = async () => {
     if (settled) return;
     settled = true;
     waiting.delete(linkId);
@@ -121,7 +121,10 @@ export function deleteLinkWithUndo(
       const res = await fetch(`/api/links/${linkId}`, {
         method: "DELETE",
         headers: linksOriginHeaders,
-        keepalive,
+        // Always keepalive: the toast can close right before a reload or
+        // navigation, and a normal fetch that hasn't gone out yet would be
+        // cancelled with the page.
+        keepalive: true,
       });
       if (!res.ok) {
         setPhase(linkId, null);
@@ -146,14 +149,14 @@ export function deleteLinkWithUndo(
     toast.dismiss(toastId);
   };
 
-  waiting.set(linkId, { send: () => void send(true), cancel });
+  waiting.set(linkId, { send: () => void send(), cancel });
   bindFlushOnPageHide();
 
   toast.success("Link deleted", {
     id: toastId,
     duration: LINK_DELETE_UNDO_MS,
     action: { label: "Undo", onClick: cancel },
-    onAutoClose: () => void send(false),
-    onDismiss: () => void send(false),
+    onAutoClose: () => void send(),
+    onDismiss: () => void send(),
   });
 }
