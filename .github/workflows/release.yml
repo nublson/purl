@@ -2,6 +2,14 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      allow_destructive_migrations:
+        description: >-
+          Apply pending migrations that drop or delete data (DROP, DELETE,
+          TRUNCATE, column type changes). Back up the production database
+          first.
+        type: boolean
+        default: false
 
 jobs:
   merge-develop:
@@ -84,11 +92,34 @@ jobs:
       - name: Apply database migrations (production)
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          ALLOW_DESTRUCTIVE: ${{ inputs.allow_destructive_migrations }}
         run: |
           if [ -z "$DATABASE_URL" ]; then
             echo "::error::PRODUCTION_DATABASE_URL secret is not set (Supabase session pooler URL, port 5432)."
             exit 1
           fi
+
+          # Destructive pending migrations need an explicit opt-in (and a
+          # backup) instead of running unattended. `migrate status` exits
+          # non-zero while migrations are pending, so its output is parsed.
+          STATUS=$(pnpm exec prisma migrate status 2>&1 || true)
+          echo "$STATUS"
+          PENDING=$(printf '%s\n' "$STATUS" \
+            | sed -n '/not yet been applied:/,/^$/p' \
+            | grep -E '^[0-9]{14}_' || true)
+          DESTRUCTIVE=""
+          for NAME in $PENDING; do
+            # Skip Prisma's `-- DropIndex`-style comment headers.
+            if grep -v '^[[:space:]]*--' "prisma/migrations/${NAME}/migration.sql" \
+              | grep -qiE '\bDROP\b|\bDELETE[[:space:]]+FROM\b|\bTRUNCATE\b|\bALTER[[:space:]]+COLUMN\b.*\bTYPE\b'; then
+              DESTRUCTIVE="${DESTRUCTIVE} ${NAME}"
+            fi
+          done
+          if [ -n "$DESTRUCTIVE" ] && [ "$ALLOW_DESTRUCTIVE" != "true" ]; then
+            echo "::error::Pending migrations drop or delete data:${DESTRUCTIVE}. Back up the production database, then re-run Release with allow_destructive_migrations enabled."
+            exit 1
+          fi
+
           pnpm exec prisma migrate deploy
 
       - name: Publish deploy gate status for Vercel
