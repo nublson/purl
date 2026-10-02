@@ -44,7 +44,9 @@ Add `CHROME_EXTENSION_ID=<your-extension-id>` to `.env.example` and Vercel env v
 
 ## Low
 
-### `next.config.ts` — `X-Frame-Options` header missing
+### ~~`next.config.ts` — `X-Frame-Options` header missing~~ (fixed)
+
+**Status: fixed 2026-10-02.** `X-Frame-Options: DENY` is in `BASE_SECURITY_HEADERS`, so it's sent in dev and production next to the CSP's `frame-ancestors 'none'` (verified on a production build for `/`, `/home` and `/api/links`). The original finding, kept for reference:
 
 The production CSP has `frame-ancestors 'none'` which covers modern browsers, but `X-Frame-Options: DENY` is the fallback for older browsers and should be in `BASE_SECURITY_HEADERS` so it applies in both dev and prod.
 
@@ -59,7 +61,9 @@ const BASE_SECURITY_HEADERS = [
 
 ---
 
-### `next.config.ts` — Source maps may be exposed in production
+### ~~`next.config.ts` — Source maps may be exposed in production~~ (resolved)
+
+**Status: resolved 2026-10-02.** Sentry has since been removed (no `withSentryConfig`, no dependency), and Next.js doesn't emit browser source maps in production builds. `productionBrowserSourceMaps: false` is now set explicitly in `next.config.ts` to document that, and a production build was checked to emit no `.map` files in `.next/static` or `public/`. The original finding, kept for reference:
 
 `widenClientFileUpload: true` uploads expanded source maps to Sentry. Without `hideSourceMaps: true` in the Sentry config, those maps can be accessible in the browser bundle, leaking server-side code structure.
 
@@ -91,9 +95,9 @@ const BASE_SECURITY_HEADERS = [
 
 ## Fix Priority
 
-1. **Add `X-Frame-Options` (Low)** — belt-and-suspenders for older browsers
-2. **Add `hideSourceMaps: true` (Low)** — limits code exposure if Sentry upload config changes
+All findings are fixed, resolved or withdrawn (2026-10-02):
 
-~~Pin Chrome extension ID~~ — fixed 2026-10-02: extension origins now need an explicit `ALLOWED_ORIGINS` entry (see above).
-
-~~Fix IP extraction in rate limiter~~ — withdrawn 2026-10-02: Vercel overwrites `x-forwarded-for`, so it isn't spoofable on this deployment (see above).
+- ~~Fix IP extraction in rate limiter~~ — withdrawn: Vercel overwrites `x-forwarded-for`, so it isn't spoofable on this deployment.
+- ~~Pin Chrome extension ID~~ — fixed: extension origins need an explicit `ALLOWED_ORIGINS` entry.
+- ~~Add `X-Frame-Options`~~ — fixed: `X-Frame-Options: DENY` on every response.
+- ~~Add `hideSourceMaps: true`~~ — resolved: Sentry is gone and no browser source maps are emitted.

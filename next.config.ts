@@ -37,6 +37,9 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 const BASE_SECURITY_HEADERS: { key: string; value: string }[] = [
   { key: "X-Content-Type-Options", value: "nosniff" },
+  // Legacy fallback for the CSP's `frame-ancestors 'none'` (older browsers),
+  // and the only framing protection in dev, where the CSP isn't sent.
+  { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   {
     key: "Permissions-Policy",
@@ -45,6 +48,9 @@ const BASE_SECURITY_HEADERS: { key: string; value: string }[] = [
 ];
 
 const nextConfig: NextConfig = {
+  // Next's default, set explicitly: production builds don't emit browser
+  // source maps, so the client code structure isn't published.
+  productionBrowserSourceMaps: false,
   async redirects() {
     // The in-app AI chat was removed; keep old bookmarks and PWA shortcuts working.
     return [
