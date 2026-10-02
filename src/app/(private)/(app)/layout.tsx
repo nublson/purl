@@ -34,8 +34,7 @@ export default async function AppShellLayout({
         initialTotalLinks={usageSummary?.saves.used ?? null}
       >
         <Header />
-        {/* overscroll-y-contain: no rubber-band or scroll chaining under a pull-to-refresh. */}
-        <main className="flex flex-1 flex-col items-center justify-start overflow-y-auto overscroll-y-contain px-4 pt-4 md:px-0">
+        <main className="flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-4 md:px-0">
           {children}
         </main>
       </FoldersProvider>
