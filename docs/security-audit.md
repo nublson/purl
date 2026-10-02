@@ -20,7 +20,7 @@ Related: username changes are now rate-limited per user after authentication (`s
 
 ### ~~`src/app/api/links/route.ts` — Any Chrome extension can make credentialed requests~~ (fixed)
 
-**Status: fixed 2026-10-02.** `POST /api/links` no longer allows every `chrome-extension://` origin. Credentialed CORS is limited to origins listed in `ALLOWED_ORIGINS`. Purl's own extension needs no CORS headers: it calls the API from its service worker with `host_permissions` for `https://purl.nublson.com/*`, which Chrome exempts from the same-origin policy ([Cross-origin network requests](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests)). To allow a specific extension anyway, add its `chrome-extension://<id>` origin to `ALLOWED_ORIGINS`. An extension that has its own host permission for the app isn't limited by CORS, so no server-side CORS setting can block it.
+**Status: fixed 2026-10-02.** `POST /api/links` no longer allows every `chrome-extension://` origin. Credentialed CORS is limited to origins listed in `ALLOWED_ORIGINS`. Purl's own extension needs no CORS headers: it calls the API from its service worker with `host_permissions` for `https://purl.live/*`, which Chrome exempts from the same-origin policy ([Cross-origin network requests](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests)). To allow a specific extension anyway, add its `chrome-extension://<id>` origin to `ALLOWED_ORIGINS`. An extension that has its own host permission for the app isn't limited by CORS, so no server-side CORS setting can block it.
 
 The original finding, kept for reference:
 

@@ -9,7 +9,7 @@ name: Publish to MCP Registry
 # in release.yml tags whatever version is committed there, and that tag push is what
 # triggers this workflow — so the tag always mirrors server.json, never the reverse.
 #
-# The remote server URL (https://purl.nublson.com/api/mcp) MUST be live before publishing, so tag
+# The remote server URL (https://purl.live/api/mcp) MUST be live before publishing, so tag
 # a release only AFTER the production deploy is out.
 
 on:

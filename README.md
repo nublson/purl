@@ -6,7 +6,7 @@
 
 **Save anything. Keep it in one place.**
 
-**Live preview:** [https://purl.nublson.com](https://purl.nublson.com)
+**Live preview:** [https://purl.live](https://purl.live)
 
 Purl is a read-it-later app — a home for your "pearls". You paste URLs: web pages, PDFs, YouTube videos, and audio. Purl resolves each item's metadata (title, favicon, description, thumbnail) and keeps everything in one place, available from the app, a REST API, and an MCP server.
 
