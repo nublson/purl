@@ -163,21 +163,30 @@ export function PullToRefresh({
       else moveTo(0, true);
     };
 
+    // Interrupted by the system (not a release): never refreshes.
+    const onTouchCancel = () => {
+      const wasPulling = pulling;
+      reset();
+      if (wasPulling) moveTo(0, true);
+    };
+
     scroller.addEventListener("touchstart", onTouchStart, { passive: true });
     // Not passive: a pull has to stop the native scroll.
     scroller.addEventListener("touchmove", onTouchMove, { passive: false });
     scroller.addEventListener("touchend", onTouchEnd);
-    scroller.addEventListener("touchcancel", onTouchEnd);
+    scroller.addEventListener("touchcancel", onTouchCancel);
     return () => {
       scroller.removeEventListener("touchstart", onTouchStart);
       scroller.removeEventListener("touchmove", onTouchMove);
       scroller.removeEventListener("touchend", onTouchEnd);
-      scroller.removeEventListener("touchcancel", onTouchEnd);
+      scroller.removeEventListener("touchcancel", onTouchCancel);
     };
   }, [moveTo, refresh]);
 
   return (
-    <div className="relative">
+    // `data-pull-to-refresh` turns the browser's own pull-to-refresh off
+    // while this is on the page (globals.css).
+    <div data-pull-to-refresh className="relative">
       {/* Sits just above the list and rides down with it. */}
       <div
         ref={indicatorRef}

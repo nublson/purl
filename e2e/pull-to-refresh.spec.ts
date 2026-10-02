@@ -34,6 +34,10 @@ test.describe("Pull to refresh", () => {
     await page.goto("/home");
     await waitForHydration(page, '[data-cy="link-item"]');
     await expect(linkItems(page)).toHaveCount(1);
+    // The browser's own pull-to-refresh is off while ours is on the page.
+    expect(
+      await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY),
+    ).toBe("none");
     // The first visit may reload once to store the browser's time zone.
     await page.waitForLoadState("networkidle");
 

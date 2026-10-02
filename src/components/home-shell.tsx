@@ -81,32 +81,39 @@ export function HomeShell({
     groupsRef.current = groups;
   }, [groups]);
   const reloadSeq = useRef(0);
+  const latestReload = useRef<Promise<boolean>>(Promise.resolve(true));
 
   /**
    * Re-fetches exactly as many links as are loaded, so pages stay consistent
    * after inserts/deletes. Resolves `false` when the fetch failed (the list
-   * is kept); a reload overtaken by a newer one counts as done.
+   * is kept); a reload overtaken by a newer one resolves with that one's
+   * outcome, since only the newest reload's data is shown.
    */
-  const reload = useCallback(async (): Promise<boolean> => {
+  const reload = useCallback((): Promise<boolean> => {
     const seq = ++reloadSeq.current;
     const limit = Math.max(
       countGroupedLinks(groupsRef.current),
       HOME_LINKS_PAGE_SIZE,
     );
-    try {
-      const params = new URLSearchParams({ limit: String(limit) });
-      if (folderId) params.set("folderId", folderId);
-      const page = await fetchLinksPage(params);
-      if (seq !== reloadSeq.current) return true;
-      setGroups(page.groups);
-      setNextCursor(page.nextCursor);
-      if (page.timeZone) setGroupsTimeZone(page.timeZone);
-      if (typeof page.total === "number") setLinksTotal(page.total);
-      return true;
-    } catch {
-      // Keep the current list; the next change or reload will retry.
-      return false;
-    }
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (folderId) params.set("folderId", folderId);
+    const run = fetchLinksPage(params).then(
+      (page) => {
+        if (seq !== reloadSeq.current) return latestReload.current;
+        setGroups(page.groups);
+        setNextCursor(page.nextCursor);
+        if (page.timeZone) setGroupsTimeZone(page.timeZone);
+        if (typeof page.total === "number") setLinksTotal(page.total);
+        return true;
+      },
+      () => {
+        // Keep the current list; the next change or reload will retry.
+        if (seq !== reloadSeq.current) return latestReload.current;
+        return false;
+      },
+    );
+    latestReload.current = run;
+    return run;
   }, [setLinksTotal, folderId]);
 
   /**
@@ -114,8 +121,8 @@ export function HomeShell({
    * total and the usage meter) plus the folder counts.
    */
   const refresh = useCallback(async () => {
-    refreshFolders();
-    return reload();
+    const [links, folders] = await Promise.all([reload(), refreshFolders()]);
+    return links && folders;
   }, [reload, refreshFolders]);
 
   // Coming back after a while (e.g. an installed app resumed on iOS, whose
@@ -233,7 +240,7 @@ export function HomeShell({
     // A save here files the link into this folder (a re-saved URL moves in
     // from elsewhere), so folder counts change. `reload()` above only
     // refreshes this list, not the folder list behind the header's counts.
-    else refreshFolders();
+    else void refreshFolders();
   }, [reload, folderId, refreshFolders]);
 
   const onSaveError = useCallback(() => {

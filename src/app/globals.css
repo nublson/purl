@@ -132,11 +132,12 @@ body {
   body {
     @apply bg-background text-foreground;
   }
-  /* The app scrolls inside <main>, not the page. Without this, dragging down
-     at the top would fire the browser's own pull-to-refresh (a full page
-     reload) instead of the app's (see PullToRefresh). */
-  html,
-  body {
+  /* Pages with the app's pull-to-refresh scroll inside <main>, not the page.
+     There, dragging down at the top would otherwise fire the browser's own
+     pull-to-refresh (a full page reload) too. Other pages (landing, offline
+     fallback) keep the native one. */
+  html:has([data-pull-to-refresh]),
+  body:has([data-pull-to-refresh]) {
     overscroll-behavior-y: none;
   }
   html {
