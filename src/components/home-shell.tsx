@@ -1,7 +1,6 @@
 "use client";
 
 import { LinkGroup } from "@/components/link-group";
-import { LinkInput } from "@/components/link-input";
 import { PasteHandler } from "@/components/paste-handler";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { LinkItemSkeleton } from "@/components/skeletons";
@@ -226,7 +225,7 @@ export function HomeShell({
     await reload();
     setPendingUrl(null);
     // The new row is only visual; announce the save for screen readers too.
-    // On a folder page, `saveLink` (via LinkInput/PasteHandler's own
+    // On a folder page, `saveLink` (via PasteHandler's own
     // `useCurrentFolder()`, which inside the page's CurrentFolderProvider
     // always resolves to this `folderId`) already toasted "Saved to
     // {name}"/"Moved to {name}" — skip the generic toast so it isn't doubled.
@@ -259,11 +258,6 @@ export function HomeShell({
 
   return (
     <PullToRefresh onRefresh={refresh} className="gap-8">
-      <LinkInput
-        onSaveStart={onPasteStart}
-        onSaveSuccess={onSaveSuccess}
-        onSaveError={onSaveError}
-      />
       <PasteHandler
         onPasteStart={onPasteStart}
         onSaveSuccess={onSaveSuccess}
