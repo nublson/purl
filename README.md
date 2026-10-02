@@ -25,7 +25,7 @@ The product goal: one place to stash material you care about.
 - **Hardened outbound fetch** — Server-side `safeFetch` with optional proxy/DNS controls (see `AGENTS.md`). An egress proxy can be configured via [`SAFE_OUTBOUND_HTTP_PROXY`](docs/production-outbound-proxy.md).
 - **Realtime list sync** — Supabase Realtime so saves and updates propagate across tabs/devices quickly.
 - **Link actions** — Open original, copy URL, edit metadata, delete.
-- **REST API & MCP** — `/api/v1` and an MCP server (`save_link`, `list_saved_items`, `get_link`) with API-key or OAuth auth.
+- **REST API & MCP** — `/api/v1` (links and folders) and an MCP server (`save_link`, `list_saved_items`, `get_link`, `move_link`, `list_folders`, `create_folder`, `update_folder`, `delete_folder`) with API-key or OAuth auth.
 - **Operational extras** — Optional Upstash-backed API rate limiting, Vitest coverage for critical paths.
 - **PWA (installable app)** — [Web App Manifest](public/manifest.json) plus a [Serwist](https://serwist.pages.dev/) service worker ([`src/app/sw.ts`](src/app/sw.ts)) that builds to **`public/sw.js`** (generated on `pnpm build`, gitignored). Enables **Install** in Chrome/Edge and similar where the platform supports it, with runtime caching via Serwist's Next.js defaults and a static offline shell at [`/~offline`](src/app/~offline/page.tsx). **Serwist is disabled in `pnpm dev`** to avoid service-worker cache surprises during development — use **`pnpm build && pnpm start`** (or your production URL) to exercise installability and the SW.
 

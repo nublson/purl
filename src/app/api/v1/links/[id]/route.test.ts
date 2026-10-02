@@ -19,6 +19,17 @@ vi.mock("@/lib/auth", () => ({
 const mockReadLink = vi.fn();
 const mockUpdateLink = vi.fn();
 const mockDeleteLink = vi.fn();
+const mockMoveLinkToFolder = vi.fn();
+const mockUpdateLinkForUser = vi.fn();
+const mockAssertFolderOwned = vi.fn();
+
+class MockFolderNotFoundError extends Error {
+  constructor() { super("Folder not found."); }
+}
+vi.mock("@/lib/folders", () => ({
+  assertFolderOwned: mockAssertFolderOwned,
+  FolderNotFoundError: MockFolderNotFoundError,
+}));
 
 class MockUnauthorizedError extends Error {
   constructor() { super("Unauthorized"); }
@@ -28,6 +39,8 @@ vi.mock("@/lib/links", () => ({
   readLink: mockReadLink,
   updateLink: mockUpdateLink,
   deleteLink: mockDeleteLink,
+  moveLinkToFolder: mockMoveLinkToFolder,
+  updateLinkForUser: mockUpdateLinkForUser,
   UnauthorizedError: MockUnauthorizedError,
 }));
 
@@ -168,6 +181,73 @@ describe("PATCH /api/v1/links/:id", () => {
       { params }
     );
     expect(res.status).toBe(400);
+  });
+});
+
+describe("PATCH /api/v1/links/:id folderId", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function patch(body: unknown) {
+    return new NextRequest("http://localhost/api/v1/links/link-1", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("moves the link into an owned folder", async () => {
+    mockMoveLinkToFolder.mockResolvedValue({ ...MOCK_LINK, folderId: "f1" });
+    const { PATCH } = await import("./route");
+    const res = await PATCH(patch({ folderId: "f1" }), { params });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(mockAssertFolderOwned).toHaveBeenCalledWith("user-1", "f1");
+    expect(mockMoveLinkToFolder).toHaveBeenCalledWith("user-1", "link-1", "f1");
+    expect(mockUpdateLink).not.toHaveBeenCalled();
+  });
+
+  it("takes the link out of its folder with folderId: null", async () => {
+    mockMoveLinkToFolder.mockResolvedValue({ ...MOCK_LINK, folderId: null });
+    const { PATCH } = await import("./route");
+    const res = await PATCH(patch({ folderId: null }), { params });
+    expect(res.status).toBe(200);
+    expect(mockAssertFolderOwned).not.toHaveBeenCalled();
+    expect(mockMoveLinkToFolder).toHaveBeenCalledWith("user-1", "link-1", null);
+  });
+
+  it("combines field edits and a move in one write", async () => {
+    mockUpdateLinkForUser.mockResolvedValue({ ...MOCK_LINK, title: "New", folderId: "f1" });
+    const { PATCH } = await import("./route");
+    const res = await PATCH(patch({ title: "New", folderId: "f1" }), { params });
+    expect(res.status).toBe(200);
+    expect(mockUpdateLinkForUser).toHaveBeenCalledWith("user-1", "link-1", {
+      title: "New",
+      folderId: "f1",
+    });
+    expect(mockMoveLinkToFolder).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for a folder the user doesn't own", async () => {
+    mockAssertFolderOwned.mockRejectedValue(new MockFolderNotFoundError());
+    const { PATCH } = await import("./route");
+    const res = await PATCH(patch({ folderId: "foreign" }), { params });
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "Folder not found" });
+    expect(mockMoveLinkToFolder).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 when the link isn't the user's", async () => {
+    mockAssertFolderOwned.mockResolvedValue(undefined);
+    mockMoveLinkToFolder.mockResolvedValue(null);
+    const { PATCH } = await import("./route");
+    const res = await PATCH(patch({ folderId: "f1" }), { params });
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 400 for a non-string folderId", async () => {
+    const { PATCH } = await import("./route");
+    const res = await PATCH(patch({ folderId: 42 }), { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid folder" });
   });
 });
 

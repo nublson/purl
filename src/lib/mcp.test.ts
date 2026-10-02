@@ -11,19 +11,37 @@ vi.mock("@/lib/auth", () => ({
 const mockCreateLinkForUser = vi.fn();
 const mockListLinksForUser = vi.fn();
 const mockReadLinkForUser = vi.fn();
+const mockMoveLinkToFolder = vi.fn();
 vi.mock("@/lib/links", () => ({
   createLinkForUser: mockCreateLinkForUser,
   listLinksForUser: mockListLinksForUser,
   readLinkForUser: mockReadLinkForUser,
+  moveLinkToFolder: mockMoveLinkToFolder,
 }));
 
 const mockListFoldersForUser = vi.fn();
+const mockCreateFolder = vi.fn();
+const mockUpdateFolder = vi.fn();
+const mockDeleteFolder = vi.fn();
 class MockFolderNotFoundError extends Error {
   constructor() { super("Folder not found."); }
 }
+class MockFolderNameError extends Error {}
+class MockFolderEmojiError extends Error {}
+class MockFolderDescriptionError extends Error {}
+class MockFolderUpdateEmptyError extends Error {}
+class MockFolderLimitError extends Error {}
 vi.mock("@/lib/folders", () => ({
   listFoldersForUser: mockListFoldersForUser,
+  createFolder: mockCreateFolder,
+  updateFolder: mockUpdateFolder,
+  deleteFolder: mockDeleteFolder,
   FolderNotFoundError: MockFolderNotFoundError,
+  FolderNameError: MockFolderNameError,
+  FolderEmojiError: MockFolderEmojiError,
+  FolderDescriptionError: MockFolderDescriptionError,
+  FolderUpdateEmptyError: MockFolderUpdateEmptyError,
+  FolderLimitError: MockFolderLimitError,
 }));
 
 const mockBroadcast = vi.fn();
@@ -51,6 +69,10 @@ const {
   listSavedItemsTool,
   getLinkTool,
   listFoldersTool,
+  createFolderTool,
+  updateFolderTool,
+  deleteFolderTool,
+  moveLinkTool,
 } = await import("./mcp");
 
 function parse(result: { content: { text: string }[] }) {
@@ -63,7 +85,7 @@ const reqWithBearer = (token?: string) =>
   });
 
 describe("registerPurlTools", () => {
-  it("registers the four MCP tools on the server", () => {
+  it("registers the MCP tools on the server", () => {
     const registered: string[] = [];
     const mockServer = {
       tool: vi.fn((name: string) => {
@@ -76,6 +98,10 @@ describe("registerPurlTools", () => {
       "list_saved_items",
       "get_link",
       "list_folders",
+      "create_folder",
+      "update_folder",
+      "delete_folder",
+      "move_link",
     ]);
   });
 
@@ -84,22 +110,19 @@ describe("registerPurlTools", () => {
       (args: unknown, extra: unknown) => Promise<unknown>
     > = [];
     const mockServer = {
-      tool: vi.fn(
-        (
-          _name: string,
-          _desc: string,
-          _schema: unknown,
-          handler: (args: unknown, extra: unknown) => Promise<unknown>,
-        ) => {
-          handlers.push(handler);
-        },
-      ),
+      // The handler is always the last argument (after an optional
+      // annotations object).
+      tool: vi.fn((...args: unknown[]) => {
+        handlers.push(
+          args.at(-1) as (args: unknown, extra: unknown) => Promise<unknown>,
+        );
+      }),
     };
     registerPurlTools(mockServer as never);
 
-    await expect(handlers[0]({ url: "https://example.com" }, {})).rejects.toThrow(
-      "Unauthorized",
-    );
+    for (const handler of handlers) {
+      await expect(handler({}, {})).rejects.toThrow("Unauthorized");
+    }
   });
 });
 
@@ -410,6 +433,152 @@ describe("listFoldersTool", () => {
     const result = await listFoldersTool("user-1");
     expect(mockListFoldersForUser).toHaveBeenCalledWith("user-1");
     expect(parse(result)).toEqual(folders);
+  });
+});
+
+describe("createFolderTool", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("creates the folder, broadcasts, and returns it", async () => {
+    const folder = { id: "f1", name: "Reading", emoji: "📚" };
+    mockCreateFolder.mockResolvedValue(folder);
+    const result = await createFolderTool("user-1", {
+      name: "Reading",
+      emoji: "📚",
+      description: "Long reads",
+    });
+    expect(mockCreateFolder).toHaveBeenCalledWith(
+      "user-1",
+      "Reading",
+      "📚",
+      "Long reads",
+    );
+    expect(mockBroadcast).toHaveBeenCalledWith("user-1");
+    expect(parse(result)).toEqual(folder);
+  });
+
+  it("reports validation errors as tool errors", async () => {
+    mockCreateFolder.mockRejectedValue(
+      new MockFolderNameError("You already have a folder with that name. Choose another."),
+    );
+    const result = await createFolderTool("user-1", { name: "Reading" });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe(
+      "You already have a folder with that name. Choose another.",
+    );
+    expect(mockBroadcast).not.toHaveBeenCalled();
+  });
+
+  it("reports the folder cap as a limit error", async () => {
+    mockCreateFolder.mockRejectedValue(
+      new MockFolderLimitError("You can have up to 100 folders."),
+    );
+    const result = await createFolderTool("user-1", { name: "One more" });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe(
+      "Limit reached: You can have up to 100 folders.",
+    );
+  });
+
+  it("rethrows unexpected errors", async () => {
+    mockCreateFolder.mockRejectedValue(new Error("db down"));
+    await expect(createFolderTool("user-1", { name: "x" })).rejects.toThrow(
+      "db down",
+    );
+  });
+});
+
+describe("updateFolderTool", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("passes only the given fields through", async () => {
+    mockUpdateFolder.mockResolvedValue({ id: "f1", name: "Later" });
+    const result = await updateFolderTool("user-1", {
+      folderId: "f1",
+      name: "Later",
+      description: null,
+    });
+    expect(mockUpdateFolder).toHaveBeenCalledWith("user-1", "f1", {
+      name: "Later",
+      description: null,
+    });
+    expect(mockBroadcast).toHaveBeenCalledWith("user-1");
+    expect(parse(result)).toEqual({ id: "f1", name: "Later" });
+  });
+
+  it("reports an empty update and an unknown folder as tool errors", async () => {
+    mockUpdateFolder.mockRejectedValueOnce(
+      new MockFolderUpdateEmptyError("Nothing to update"),
+    );
+    const empty = await updateFolderTool("user-1", { folderId: "f1" });
+    expect(empty.content[0].text).toBe("Nothing to update");
+
+    mockUpdateFolder.mockRejectedValueOnce(new MockFolderNotFoundError());
+    const missing = await updateFolderTool("user-1", {
+      folderId: "nope",
+      name: "x",
+    });
+    expect(missing.isError).toBe(true);
+    expect(missing.content[0].text).toBe("Folder not found");
+  });
+});
+
+describe("deleteFolderTool", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("keeps the folder's links by default", async () => {
+    mockDeleteFolder.mockResolvedValue({ deletedLinks: 0 });
+    const result = await deleteFolderTool("user-1", "f1");
+    expect(mockDeleteFolder).toHaveBeenCalledWith("user-1", "f1", {
+      withLinks: false,
+    });
+    expect(mockBroadcast).toHaveBeenCalledWith("user-1");
+    expect(parse(result)).toEqual({ deletedLinks: 0 });
+  });
+
+  it("deletes the links too when asked", async () => {
+    mockDeleteFolder.mockResolvedValue({ deletedLinks: 4 });
+    const result = await deleteFolderTool("user-1", "f1", true);
+    expect(mockDeleteFolder).toHaveBeenCalledWith("user-1", "f1", {
+      withLinks: true,
+    });
+    expect(parse(result)).toEqual({ deletedLinks: 4 });
+  });
+
+  it("reports an unknown folder as a tool error", async () => {
+    mockDeleteFolder.mockRejectedValue(new MockFolderNotFoundError());
+    const result = await deleteFolderTool("user-1", "nope");
+    expect(result.content[0].text).toBe("Folder not found");
+    expect(mockBroadcast).not.toHaveBeenCalled();
+  });
+});
+
+describe("moveLinkTool", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("moves the link into the folder", async () => {
+    mockMoveLinkToFolder.mockResolvedValue({ id: "l1", folderId: "f1" });
+    const result = await moveLinkTool("user-1", "l1", "f1");
+    expect(mockMoveLinkToFolder).toHaveBeenCalledWith("user-1", "l1", "f1");
+    expect(mockBroadcast).toHaveBeenCalledWith("user-1");
+    expect(parse(result)).toEqual({ id: "l1", folderId: "f1" });
+  });
+
+  it.each([[null], [""]])("takes the link out of its folder for %j", async (folderId) => {
+    mockMoveLinkToFolder.mockResolvedValue({ id: "l1", folderId: null });
+    await moveLinkTool("user-1", "l1", folderId);
+    expect(mockMoveLinkToFolder).toHaveBeenCalledWith("user-1", "l1", null);
+  });
+
+  it("reports a missing link and an unknown folder as tool errors", async () => {
+    mockMoveLinkToFolder.mockResolvedValueOnce(null);
+    const missingLink = await moveLinkTool("user-1", "nope", "f1");
+    expect(missingLink.content[0].text).toBe("Not found.");
+
+    mockMoveLinkToFolder.mockRejectedValueOnce(new MockFolderNotFoundError());
+    const missingFolder = await moveLinkTool("user-1", "l1", "nope");
+    expect(missingFolder.content[0].text).toBe("Folder not found");
+    expect(mockBroadcast).not.toHaveBeenCalled();
   });
 });
 
