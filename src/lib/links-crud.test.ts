@@ -708,17 +708,16 @@ describe("createLink", () => {
   it("throws SaveLimitError without inserting when the cap fills during metadata work", async () => {
     vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
     vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
-    let countCalls = 0;
-    vi.mocked(prisma.link.count).mockImplementation(async () => {
-      countCalls += 1;
-      return countCalls === 1 ? MAX_SAVED_LINKS - 1 : MAX_SAVED_LINKS;
-    });
+    vi.mocked(prisma.link.count)
+      .mockClear()
+      .mockResolvedValueOnce(MAX_SAVED_LINKS - 1) // fast pre-check passes
+      .mockResolvedValueOnce(MAX_SAVED_LINKS); // re-check inside the transaction fails
 
     const err = await createLink("https://example.com").catch((e: unknown) => e);
 
     expect(err).toBeInstanceOf(SaveLimitError);
     expect(prisma.link.create).not.toHaveBeenCalled();
-    expect(countCalls).toBeGreaterThanOrEqual(2);
+    expect(prisma.link.count).toHaveBeenCalledTimes(2);
   });
 
 });
