@@ -834,14 +834,11 @@ describe("POST /api/links", () => {
 
 describe("CORS /api/links", () => {
   describe("OPTIONS preflight", () => {
-    it("returns 204 with credentialed CORS headers for chrome-extension origins", async () => {
-      const origin = "chrome-extension://abcdefghijklmnop";
-      const res = await OPTIONS(optionsRequest(origin));
+    it("omits CORS headers for an arbitrary chrome-extension origin", async () => {
+      const res = await OPTIONS(optionsRequest("chrome-extension://abcdefghijklmnop"));
       expect(res.status).toBe(204);
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe(origin);
-      expect(res.headers.get("Access-Control-Allow-Credentials")).toBe("true");
-      expect(res.headers.get("Access-Control-Allow-Methods")).toBe("POST, OPTIONS");
-      expect(res.headers.get("Access-Control-Allow-Headers")).toBe("Content-Type");
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+      expect(res.headers.get("Access-Control-Allow-Credentials")).toBeNull();
     });
 
     it("omits CORS headers when Origin is not allowed", async () => {
@@ -859,13 +856,13 @@ describe("CORS /api/links", () => {
   });
 
   describe("POST responses", () => {
-    it("includes CORS headers on error responses for chrome-extension origins", async () => {
-      const origin = "chrome-extension://extension-id-here";
+    it("omits CORS headers on POST for an arbitrary chrome-extension origin", async () => {
       vi.mocked(auth.api.getSession).mockResolvedValue(null);
-      const res = await POST(postRequest({ url: "https://example.com" }, origin));
+      const res = await POST(
+        postRequest({ url: "https://example.com" }, "chrome-extension://some-other-extension"),
+      );
       expect(res.status).toBe(401);
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe(origin);
-      expect(res.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
     });
 
     it("omits CORS headers on POST when Origin is not allowed", async () => {
@@ -904,6 +901,28 @@ describe("CORS /api/links", () => {
       );
       expect(res.headers.get("Access-Control-Allow-Origin")).toBe(origin);
       expect(res.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+    });
+
+    it("allows a specific extension only when its origin is listed", async () => {
+      process.env.ALLOWED_ORIGINS = "chrome-extension://allowed-extension-id";
+      vi.resetModules();
+      const { OPTIONS: optionsHandler } = await import("./route");
+      const preflight = (origin: string) =>
+        optionsHandler(
+          new NextRequest("http://localhost/api/links", {
+            method: "OPTIONS",
+            headers: { origin },
+          }),
+        );
+
+      const allowed = await preflight("chrome-extension://allowed-extension-id");
+      expect(allowed.headers.get("Access-Control-Allow-Origin")).toBe(
+        "chrome-extension://allowed-extension-id",
+      );
+      expect(allowed.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+
+      const other = await preflight("chrome-extension://another-extension-id");
+      expect(other.headers.get("Access-Control-Allow-Origin")).toBeNull();
     });
   });
 });

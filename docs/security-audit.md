@@ -18,7 +18,11 @@ Related: username changes are now rate-limited per user after authentication (`s
 
 ---
 
-### `src/app/api/links/route.ts:17` — Any Chrome extension can make credentialed requests
+### ~~`src/app/api/links/route.ts` — Any Chrome extension can make credentialed requests~~ (fixed)
+
+**Status: fixed 2026-10-02.** `POST /api/links` no longer allows every `chrome-extension://` origin. Credentialed CORS is limited to origins listed in `ALLOWED_ORIGINS`. Purl's own extension needs no CORS headers: it calls the API from its service worker with `host_permissions` for `https://purl.nublson.com/*`, which Chrome exempts from the same-origin policy ([Cross-origin network requests](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests)). To allow a specific extension anyway, add its `chrome-extension://<id>` origin to `ALLOWED_ORIGINS`. An extension that has its own host permission for the app isn't limited by CORS, so no server-side CORS setting can block it.
+
+The original finding, kept for reference:
 
 `origin.startsWith("chrome-extension://")` allows *any* installed extension to post links as the authenticated user. A malicious extension (or one with an XSS vuln) can silently save arbitrary URLs on behalf of any signed-in user. The extension ID should be the only one allowed.
 
@@ -87,8 +91,9 @@ const BASE_SECURITY_HEADERS = [
 
 ## Fix Priority
 
-1. **Pin Chrome extension ID (Medium)** — low likelihood but easy to lock down
-2. **Add `X-Frame-Options` (Low)** — belt-and-suspenders for older browsers
-3. **Add `hideSourceMaps: true` (Low)** — limits code exposure if Sentry upload config changes
+1. **Add `X-Frame-Options` (Low)** — belt-and-suspenders for older browsers
+2. **Add `hideSourceMaps: true` (Low)** — limits code exposure if Sentry upload config changes
+
+~~Pin Chrome extension ID~~ — fixed 2026-10-02: extension origins now need an explicit `ALLOWED_ORIGINS` entry (see above).
 
 ~~Fix IP extraction in rate limiter~~ — withdrawn 2026-10-02: Vercel overwrites `x-forwarded-for`, so it isn't spoofable on this deployment (see above).

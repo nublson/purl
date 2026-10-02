@@ -22,9 +22,19 @@ const ALLOWED_ORIGINS = new Set(
     .filter(Boolean),
 );
 
+/**
+ * Credentialed CORS only for origins listed in `ALLOWED_ORIGINS`. Extensions
+ * are not allowed wholesale: Purl's extension calls this from its service
+ * worker with `host_permissions` for the app, which Chrome exempts from the
+ * same-origin policy, so it needs no CORS headers — and a blanket
+ * `chrome-extension://` allowance would let any installed extension post
+ * links as the signed-in user. To allow a specific extension anyway (e.g. an
+ * unpacked dev build without host permissions), add its
+ * `chrome-extension://<id>` origin to `ALLOWED_ORIGINS`.
+ */
 function withCors(request: NextRequest, response: NextResponse): NextResponse {
   const origin = request.headers.get("origin") ?? "";
-  if (origin.startsWith("chrome-extension://") || ALLOWED_ORIGINS.has(origin)) {
+  if (ALLOWED_ORIGINS.has(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin);
     response.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
     response.headers.set("Access-Control-Allow-Headers", "Content-Type");
