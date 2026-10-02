@@ -1,4 +1,5 @@
 import { test as base, expect, type Page } from "@playwright/test";
+import { randomUUID } from "node:crypto";
 import { sessionCookies } from "./support/auth";
 import {
   createTestUser,
@@ -11,8 +12,9 @@ import {
 
 type WorkerFixtures = {
   /**
-   * One `@purl.test` user per worker and project, so tests running in
-   * parallel (or in both browsers) never share data. Deleted at the end.
+   * One `@purl.test` user per worker, project and run, so tests running in
+   * parallel, in both browsers, or in two runs against the same database
+   * never share data. Deleted at the end.
    */
   testUser: TestUser;
 };
@@ -33,9 +35,17 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   testUser: [
     async ({}, provide, workerInfo) => {
       const tag = `${workerInfo.project.name}-w${workerInfo.parallelIndex}`;
-      const user = await createTestUser(`e2e-${tag}@purl.test`, `E2E ${tag}`);
-      await provide(user);
-      await deleteTestUser(user.id);
+      const run = randomUUID().slice(0, 8);
+      const user = await createTestUser(
+        `e2e-${tag}-${run}@purl.test`,
+        `E2E ${tag}`,
+      );
+      try {
+        await assertAppSharesTestConfig(user.id, workerInfo.project.use.baseURL!);
+        await provide(user);
+      } finally {
+        await deleteTestUser(user.id);
+      }
     },
     { scope: "worker" },
   ],
@@ -61,6 +71,34 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
 });
 
 export { expect };
+
+/**
+ * Fails fast when the app under test (possibly a reused `pnpm dev`) doesn't
+ * share this run's database and auth secret: it must accept a cookie minted
+ * here as this user, which needs both the same secret (signature) and the
+ * same database (session row).
+ */
+async function assertAppSharesTestConfig(
+  userId: string,
+  baseURL: string,
+): Promise<void> {
+  const cookies = await sessionCookies(userId, baseURL);
+  const response = await fetch(new URL("/api/auth/get-session", baseURL), {
+    headers: {
+      cookie: cookies.map(({ name, value }) => `${name}=${value}`).join("; "),
+    },
+  });
+  const session = (await response.json().catch(() => null)) as {
+    user?: { id?: string };
+  } | null;
+  if (session?.user?.id !== userId) {
+    throw new Error(
+      `The app at ${baseURL} doesn't accept test sessions: it isn't using this ` +
+        "run's DATABASE_URL and BETTER_AUTH_SECRET (from .env/.env.local). " +
+        "Restart `pnpm dev` with them, or stop it and let Playwright start one.",
+    );
+  }
+}
 
 /**
  * Waits until React has hydrated the element `selector` matches. Pages are

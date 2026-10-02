@@ -21,6 +21,7 @@ pnpm lint                     # ESLint
 pnpm typecheck                # tsc --noEmit
 pnpm test                     # vitest run (single pass)
 pnpm test:watch               # vitest watch mode
+pnpm exec playwright install chromium webkit   # one-time: browsers for the e2e tests
 pnpm test:e2e                 # Playwright end-to-end tests (Chromium + WebKit)
 pnpm test:e2e:ui              # Playwright UI mode
 ```
@@ -105,7 +106,7 @@ Test patterns: mock `globalThis.fetch`, mock Prisma client calls, mock Supabase 
 
 ### End-to-end (Playwright)
 
-`e2e/*.spec.ts`, run with `pnpm test:e2e` in Chromium and WebKit (not in CI). It reuses a running `pnpm dev` on :3000 or starts one, and loads `.env` + `.env.local` like the app.
+`e2e/*.spec.ts`, run with `pnpm test:e2e` in Chromium and WebKit (not in CI); install the browsers once with `pnpm exec playwright install chromium webkit`. It reuses a running `pnpm dev` on :3000 or starts one, and loads `.env` + `.env.local` like the app. Each worker first checks the app accepts its test session, so a reused server running with a different database or auth secret fails fast with a clear error. The save test fetches `https://example.com`, so it needs network access.
 
 - **Local database only.** `playwright.config.ts` refuses to run unless `DATABASE_URL` points at localhost: the tests create and delete users, folders and links.
 - **Sign-in:** OAuth can't be automated, so `e2e/fixtures.ts` gives each worker its own `@purl.test` user (reserved domain, deleted afterwards) and signs the browser in with session cookies minted by a test-only Better Auth instance with the `testUtils` plugin (`e2e/support/auth.ts`, same DB, secret and base URL as the app). Nothing test-only ships in `src/lib/auth.ts`. Opt out per test with `test.use({ signedIn: false })`.
