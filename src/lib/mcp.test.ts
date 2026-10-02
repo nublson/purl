@@ -12,7 +12,9 @@ const mockCreateLinkForUser = vi.fn();
 const mockListLinksForUser = vi.fn();
 const mockReadLinkForUser = vi.fn();
 const mockMoveLinkToFolder = vi.fn();
+const mockMoveLinksToFolder = vi.fn();
 vi.mock("@/lib/links", () => ({
+  moveLinksToFolder: mockMoveLinksToFolder,
   createLinkForUser: mockCreateLinkForUser,
   listLinksForUser: mockListLinksForUser,
   readLinkForUser: mockReadLinkForUser,
@@ -73,6 +75,7 @@ const {
   updateFolderTool,
   deleteFolderTool,
   moveLinkTool,
+  moveLinksTool,
 } = await import("./mcp");
 
 function parse(result: { content: { text: string }[] }) {
@@ -102,6 +105,7 @@ describe("registerPurlTools", () => {
       "update_folder",
       "delete_folder",
       "move_link",
+      "move_links",
     ]);
   });
 
@@ -579,6 +583,41 @@ describe("moveLinkTool", () => {
     const missingFolder = await moveLinkTool("user-1", "l1", "nope");
     expect(missingFolder.content[0].text).toBe("Folder not found");
     expect(mockBroadcast).not.toHaveBeenCalled();
+  });
+});
+
+describe("moveLinksTool", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("moves the links, broadcasts, and returns what moved", async () => {
+    const result = {
+      moved: [{ id: "l1", previousFolderId: null }],
+      notFound: ["l2"],
+    };
+    mockMoveLinksToFolder.mockResolvedValue(result);
+    const out = await moveLinksTool("user-1", ["l1", "l2", "l1"], "f1");
+    // Duplicates are dropped before the lib call.
+    expect(mockMoveLinksToFolder).toHaveBeenCalledWith("user-1", ["l1", "l2"], "f1");
+    expect(mockBroadcast).toHaveBeenCalledWith("user-1");
+    expect(parse(out)).toEqual(result);
+  });
+
+  it.each([[null], [""]])("takes the links out of their folders for %j", async (folderId) => {
+    mockMoveLinksToFolder.mockResolvedValue({ moved: [], notFound: ["l1"] });
+    await moveLinksTool("user-1", ["l1"], folderId);
+    expect(mockMoveLinksToFolder).toHaveBeenCalledWith("user-1", ["l1"], null);
+    // Nothing moved: no broadcast.
+    expect(mockBroadcast).not.toHaveBeenCalled();
+  });
+
+  it("rejects an empty list and reports an unknown folder as tool errors", async () => {
+    const empty = await moveLinksTool("user-1", [], "f1");
+    expect(empty.isError).toBe(true);
+    expect(mockMoveLinksToFolder).not.toHaveBeenCalled();
+
+    mockMoveLinksToFolder.mockRejectedValueOnce(new MockFolderNotFoundError());
+    const missingFolder = await moveLinksTool("user-1", ["l1"], "nope");
+    expect(missingFolder.content[0].text).toBe("Folder not found");
   });
 });
 

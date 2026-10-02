@@ -17,6 +17,7 @@ vi.mock("sonner", () => ({
 const {
   cancelPendingLinkDelete,
   deleteLinkWithUndo,
+  deleteLinksWithUndo,
   getLinkDeletePhase,
   isLinkDeletePending,
   LINK_DELETE_FADE_MS,
@@ -148,5 +149,106 @@ describe("deleteLinkWithUndo", () => {
       ),
     );
     expect(isLinkDeletePending("link-e")).toBe(false);
+  });
+});
+
+describe("deleteLinksWithUndo", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    successMock.mockReset();
+    errorMock.mockReset();
+    dismissMock.mockReset();
+  });
+
+  it("hides every link behind one '3 links deleted' toast", () => {
+    vi.useFakeTimers();
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    deleteLinksWithUndo(["bulk-a1", "bulk-a2", "bulk-a3"], { onDeleted: vi.fn() });
+
+    expect(successMock).toHaveBeenCalledTimes(1);
+    expect(successMock).toHaveBeenCalledWith("3 links deleted", expect.anything());
+    expect(getLinkDeletePhase("bulk-a2")).toBe("fading");
+    vi.advanceTimersByTime(LINK_DELETE_FADE_MS);
+    expect(getLinkDeletePhase("bulk-a1")).toBe("hidden");
+    expect(getLinkDeletePhase("bulk-a3")).toBe("hidden");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("Undo brings them all back", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    deleteLinksWithUndo(["bulk-b1", "bulk-b2"], { onDeleted: vi.fn() });
+    const options = lastToastOptions();
+
+    options.action?.onClick();
+    options.onDismiss?.();
+
+    expect(isLinkDeletePending("bulk-b1")).toBe(false);
+    expect(isLinkDeletePending("bulk-b2")).toBe(false);
+    expect(dismissMock).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("sends one bulk request when the toast closes", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(Response.json({ deleted: 2 }));
+    const onDeleted = vi.fn();
+    deleteLinksWithUndo(["bulk-c1", "bulk-c2"], { onDeleted });
+    const options = lastToastOptions();
+
+    options.onAutoClose?.();
+    options.onDismiss?.();
+    await vi.waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe("/api/links/bulk");
+    expect(init).toMatchObject({ method: "DELETE", keepalive: true });
+    expect(JSON.parse(init?.body as string)).toEqual({ ids: ["bulk-c1", "bulk-c2"] });
+  });
+
+  it("a re-saved link leaves the batch; the others are still deleted", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    deleteLinksWithUndo(["bulk-d1", "bulk-d2"], { onDeleted: vi.fn() });
+    const options = lastToastOptions();
+
+    cancelPendingLinkDelete("bulk-d1");
+    expect(isLinkDeletePending("bulk-d1")).toBe(false);
+    expect(dismissMock).not.toHaveBeenCalled();
+
+    options.onAutoClose?.();
+    await vi.waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    // Only bulk-d2 is left, so it goes out as a single-link delete.
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/links/bulk-d2",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
+  it("re-saving the last link in the batch closes the toast", () => {
+    deleteLinksWithUndo(["bulk-e1", "bulk-e2"], { onDeleted: vi.fn() });
+    cancelPendingLinkDelete("bulk-e1");
+    cancelPendingLinkDelete("bulk-e2");
+    expect(dismissMock).toHaveBeenCalledTimes(1);
+    expect(isLinkDeletePending("bulk-e2")).toBe(false);
+  });
+
+  it("skips links already being deleted, and brings all back on failure", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(null, { status: 500 }));
+    deleteLinkWithUndo("bulk-f1", { onDeleted: vi.fn() });
+    deleteLinksWithUndo(["bulk-f1", "bulk-f2", "bulk-f3"], { onDeleted: vi.fn() });
+    expect(successMock).toHaveBeenLastCalledWith("2 links deleted", expect.anything());
+
+    lastToastOptions().onAutoClose?.();
+    await vi.waitFor(() =>
+      expect(errorMock).toHaveBeenCalledWith("Unable to delete the links. Try again."),
+    );
+    expect(isLinkDeletePending("bulk-f2")).toBe(false);
+    expect(isLinkDeletePending("bulk-f3")).toBe(false);
+    // The single delete is its own batch, still waiting.
+    expect(isLinkDeletePending("bulk-f1")).toBe(true);
   });
 });

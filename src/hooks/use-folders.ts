@@ -3,9 +3,11 @@
 import { useCurrentFolderContext } from "@/contexts/current-folder-context";
 import { useFoldersContext } from "@/contexts/folders-context";
 import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
+import { groupByPreviousFolder } from "@/lib/bulk-links";
 import {
   patchFolder,
   patchLinkFolder,
+  patchLinksFolder,
   postFolder,
   removeFolder,
   type ActionResult,
@@ -14,7 +16,11 @@ import {
 } from "@/lib/folder-client";
 import type { FolderSummary } from "@/lib/folders";
 import { resolveCurrentFolder } from "@/lib/current-folder";
-import { formatFolderLabel, formatLinkCount } from "@/lib/folder-display";
+import {
+  formatBulkMoveMessage,
+  formatFolderLabel,
+  formatLinkCount,
+} from "@/lib/folder-display";
 import { MAX_FOLDERS } from "@/lib/limits";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
@@ -27,6 +33,9 @@ export type { ActionResult, CreateFolderInput, FolderSummary, UpdateFolderInput 
  * link's latest move, so an older toast can't revert a newer choice.
  */
 const latestMoveByLink = new Map<string, symbol>();
+
+/** Numbers bulk-move toasts, so each batch keeps its own toast and Undo. */
+let bulkMoveCount = 0;
 
 /**
  * Folder list backing the folder menus/sidebars; refreshes on every
@@ -82,7 +91,8 @@ export function useCurrentFolder(): FolderSummary | null {
  * navigate (create → the new folder; update → its new slug if you're on it;
  * delete → /home if you're on it). On failure `createFolder`, `updateFolder`
  * and `deleteFolder` stay silent: their callers (the folder dialogs) show
- * `error` inline. `moveLink` has no dialog, so it toasts its own failures.
+ * `error` inline. `moveLink` and `moveLinks` have no dialog, so they toast
+ * their own failures.
  */
 export function useFolderActions(): {
   createFolder: (
@@ -101,6 +111,10 @@ export function useFolderActions(): {
     folderId: string | null,
     opts?: { from?: string | null },
   ) => Promise<ActionResult>;
+  moveLinks: (
+    linkIds: string[],
+    folderId: string | null,
+  ) => Promise<ActionResult<{ moved: number }>>;
 } {
   const { folders, upsertFolder, removeFolderLocally, initialTotalLinks } =
     useFoldersContext();
@@ -250,8 +264,71 @@ export function useFolderActions(): {
     [folders, notifyLinksChanged],
   );
 
+  // Bulk move (the selection bar). One toast for the whole batch, with an
+  // Undo that puts each link back in the folder it came from (the server
+  // reports those), skipping links moved again since.
+  const moveLinks = useCallback(
+    async (
+      linkIds: string[],
+      folderId: string | null,
+    ): Promise<ActionResult<{ moved: number }>> => {
+      const result = await patchLinksFolder(linkIds, folderId);
+      if (!result.ok) {
+        toast.error(result.error);
+        return result;
+      }
+      const { moved } = result.data;
+      if (moved.length === 0) {
+        const error = "Those links no longer exist.";
+        toast.error(error);
+        notifyLinksChanged();
+        return { ok: false, error };
+      }
+
+      const move = Symbol("bulk-move");
+      for (const { id } of moved) latestMoveByLink.set(id, move);
+      const sourceIds = new Set(moved.map((link) => link.previousFolderId));
+      const [onlySource] = sourceIds;
+      const source =
+        sourceIds.size === 1
+          ? (folders.find((folder) => folder.id === onlySource) ?? null)
+          : null;
+      const target = folders.find((folder) => folder.id === folderId) ?? null;
+
+      toast.success(
+        formatBulkMoveMessage({ count: moved.length, target, source }),
+        {
+          // Its own toast: a later batch of other links must not replace
+          // this one and take its Undo away.
+          id: `links-move-${++bulkMoveCount}`,
+          action: {
+            label: "Undo",
+            onClick: async () => {
+              const stillLatest = moved.filter(
+                ({ id }) => latestMoveByLink.get(id) === move,
+              );
+              for (const { id } of stillLatest) latestMoveByLink.delete(id);
+              const results = await Promise.all(
+                Array.from(groupByPreviousFolder(stillLatest)).map(
+                  ([previousFolderId, ids]) =>
+                    patchLinksFolder(ids, previousFolderId),
+                ),
+              );
+              const failed = results.find((reverted) => !reverted.ok);
+              if (failed && !failed.ok) toast.error(failed.error);
+              notifyLinksChanged();
+            },
+          },
+        },
+      );
+      notifyLinksChanged();
+      return { ok: true, data: { moved: moved.length } };
+    },
+    [folders, notifyLinksChanged],
+  );
+
   return useMemo(
-    () => ({ createFolder, updateFolder, deleteFolder, moveLink }),
-    [createFolder, updateFolder, deleteFolder, moveLink],
+    () => ({ createFolder, updateFolder, deleteFolder, moveLink, moveLinks }),
+    [createFolder, updateFolder, deleteFolder, moveLink, moveLinks],
   );
 }

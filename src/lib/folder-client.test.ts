@@ -5,6 +5,7 @@ import {
   fetchFolders,
   patchFolder,
   patchLinkFolder,
+  patchLinksFolder,
   postFolder,
   removeFolder,
 } from "./folder-client";
@@ -281,5 +282,37 @@ describe("patchLinkFolder", () => {
     const result = await patchLinkFolder("l1", "f1");
 
     expect(result).toEqual({ ok: false, error: "Not found" });
+  });
+});
+
+describe("patchLinksFolder", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("PATCHes /api/links/bulk with the ids and folderId", async () => {
+    const body = { moved: [{ id: "l1", previousFolderId: null }], notFound: [] };
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(Response.json(body));
+
+    const result = await patchLinksFolder(["l1"], null);
+
+    expect(result).toEqual({ ok: true, data: body });
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe("/api/links/bulk");
+    expect(init?.method).toBe("PATCH");
+    expect(JSON.parse(init?.body as string)).toEqual({ ids: ["l1"], folderId: null });
+    expect(new Headers(init?.headers).get(LINKS_ORIGIN_HEADER)).toBe(LINKS_CLIENT_ORIGIN);
+  });
+
+  it("returns the API's error on failure", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ error: "Folder not found" }, { status: 404 }),
+    );
+    expect(await patchLinksFolder(["l1"], "nope")).toEqual({
+      ok: false,
+      error: "Folder not found",
+    });
   });
 });

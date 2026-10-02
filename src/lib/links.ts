@@ -1,4 +1,5 @@
 import type { ContentType } from "@/generated/prisma/enums";
+import type { MoveLinksResult } from "@/lib/bulk-links";
 import { assertCanSaveLink, insertWithinSaveLimit } from "@/lib/entitlements";
 import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
 import {
@@ -649,6 +650,75 @@ export async function moveLinkToFolder(
     }
     throw error;
   }
+}
+
+/**
+ * Moves every link in `linkIds` owned by `userId` into `folderId` (or out of
+ * its folder with `null`) in one write. Ids that aren't the user's are
+ * skipped and reported in `notFound`. Throws `FolderNotFoundError` when
+ * `folderId` is a non-null id not owned by `userId`; nothing is written then.
+ */
+export async function moveLinksToFolder(
+  userId: string,
+  linkIds: string[],
+  folderId: string | null,
+): Promise<MoveLinksResult> {
+  if (folderId !== null) {
+    await assertFolderOwned(userId, folderId);
+  }
+
+  let owned: { id: string; folderId: string | null }[];
+  try {
+    owned = await prisma.$transaction(async (tx) => {
+      // FOR UPDATE: the folders read here are the ones this write replaces.
+      // A concurrent move or delete of the same links waits for (or is
+      // seen by) this transaction, so `previousFolderId` (what Undo
+      // restores) can't be stale and a deleted link isn't reported moved.
+      const rows = await tx.$queryRaw<{ id: string; folderId: string | null }[]>`
+        SELECT "id", "folderId" FROM "links"
+        WHERE "id" = ANY(${linkIds}) AND "userId" = ${userId}
+        FOR UPDATE`;
+      if (rows.length > 0) {
+        await tx.link.updateMany({
+          // `userId` again: never touch another user's row, whatever `rows` says.
+          where: { id: { in: rows.map((row) => row.id) }, userId },
+          data: { folderId },
+        });
+      }
+      return rows;
+    });
+  } catch (error) {
+    // Same race as moveLinkToFolder: the folder was deleted after the check.
+    if (isForeignKeyConstraintError(error)) {
+      throw new FolderNotFoundError();
+    }
+    throw error;
+  }
+
+  // Report in request order (the rows come back in table order).
+  const previousById = new Map(owned.map((row) => [row.id, row.folderId]));
+  const moved = linkIds.flatMap((id) =>
+    previousById.has(id)
+      ? [{ id, previousFolderId: previousById.get(id) ?? null }]
+      : [],
+  );
+  return {
+    moved,
+    notFound: linkIds.filter((id) => !previousById.has(id)),
+  };
+}
+/**
+ * Deletes every link in `linkIds` owned by `userId` in one write; ids that
+ * aren't the user's are ignored. Returns how many links were deleted.
+ */
+export async function deleteLinksForUser(
+  userId: string,
+  linkIds: string[],
+): Promise<number> {
+  const { count } = await prisma.link.deleteMany({
+    where: { id: { in: linkIds }, userId },
+  });
+  return count;
 }
 
 /** Deletes a link if it belongs to the current user. Returns true if deleted, false if not found or not owned. Throws UnauthorizedError if not authenticated. */

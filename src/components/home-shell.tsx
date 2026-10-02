@@ -9,6 +9,7 @@ import { useFolders } from "@/hooks/use-folders";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
 import { coolPreviews } from "@/lib/link-preview-warmth";
+import { linkSelection, setSelectableLinks } from "@/lib/link-selection";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import {
   countGroupedLinks,
@@ -220,6 +221,22 @@ export function HomeShell({
     groups.every((group) =>
       group.links.every((link) => pendingDeletes.get(link.id) === "hidden"),
     );
+
+  // The selectable links are the ones on screen, in display order; a link
+  // that leaves the list (moved out of this folder, deleted) leaves the
+  // selection too.
+  useEffect(() => {
+    setSelectableLinks(
+      groups.flatMap((group) =>
+        group.links
+          .filter((link) => pendingDeletes.get(link.id) !== "hidden")
+          .map((link) => link.id),
+      ),
+    );
+  }, [groups, pendingDeletes]);
+
+  // A selection belongs to one list: switching folders or leaving drops it.
+  useEffect(() => () => linkSelection.clear(), [folderId]);
 
   return (
     <>

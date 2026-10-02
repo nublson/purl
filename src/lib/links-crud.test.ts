@@ -22,10 +22,13 @@ vi.mock("@/lib/prisma", () => {
       findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
       count: vi.fn(),
     },
     $executeRaw: vi.fn(),
+    $queryRaw: vi.fn(),
     $transaction: vi.fn(),
   };
   // insertWithinSaveLimit runs its callback against the same mocked client.
@@ -60,6 +63,8 @@ const {
   updateLinkForUser,
   deleteLink,
   moveLinkToFolder,
+  moveLinksToFolder,
+  deleteLinksForUser,
   scrapeLinkMetadata,
   UnauthorizedError,
 } = await import("./links");
@@ -998,6 +1003,95 @@ describe("moveLinkToFolder", () => {
 
 
 // ─── readLink ─────────────────────────────────────────────────────────────────
+
+describe("moveLinksToFolder", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(assertFolderOwned).mockResolvedValue(undefined);
+    vi.mocked(prisma.link.updateMany).mockResolvedValue({ count: 0 } as never);
+  });
+
+  /** The SQL text of the row-locking read (tagged template strings). */
+  function lockQuerySql(): string {
+    const [strings] = vi.mocked(prisma.$queryRaw).mock.calls[0] as unknown as [
+      TemplateStringsArray,
+    ];
+    return strings.join("?");
+  }
+
+  it("locks the user's links, moves them in one write, and reports where each came from", async () => {
+    // Rows come back in table order; the result follows the request order.
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([
+      { id: "l2", folderId: "f0" },
+      { id: "l1", folderId: null },
+    ] as never);
+
+    const result = await moveLinksToFolder("user-123", ["l1", "l2", "foreign"], "f1");
+
+    expect(assertFolderOwned).toHaveBeenCalledWith("user-123", "f1");
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(lockQuerySql()).toContain("FOR UPDATE");
+    expect(prisma.link.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["l2", "l1"] }, userId: "user-123" },
+      data: { folderId: "f1" },
+    });
+    expect(result).toEqual({
+      moved: [
+        { id: "l1", previousFolderId: null },
+        { id: "l2", previousFolderId: "f0" },
+      ],
+      notFound: ["foreign"],
+    });
+  });
+
+  it("takes links out of their folders with null, without a folder check", async () => {
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ id: "l1", folderId: "f0" }] as never);
+
+    await moveLinksToFolder("user-123", ["l1"], null);
+
+    expect(assertFolderOwned).not.toHaveBeenCalled();
+    expect(prisma.link.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { folderId: null } }),
+    );
+  });
+
+  it("writes nothing when none of the links are the user's (or they were just deleted)", async () => {
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([] as never);
+    const result = await moveLinksToFolder("user-123", ["x"], "f1");
+    expect(prisma.link.updateMany).not.toHaveBeenCalled();
+    expect(result).toEqual({ moved: [], notFound: ["x"] });
+  });
+
+  it("throws FolderNotFoundError for a foreign folder before touching links", async () => {
+    vi.mocked(assertFolderOwned).mockRejectedValue(new FolderNotFoundError());
+    await expect(moveLinksToFolder("user-123", ["l1"], "foreign")).rejects.toBeInstanceOf(
+      FolderNotFoundError,
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("maps a folder deleted mid-move (FK violation) to FolderNotFoundError", async () => {
+    vi.mocked(prisma.$queryRaw).mockResolvedValue([{ id: "l1", folderId: null }] as never);
+    vi.mocked(prisma.link.updateMany).mockRejectedValue(
+      Object.assign(new Error("fk"), { code: "P2003" }),
+    );
+    await expect(moveLinksToFolder("user-123", ["l1"], "f1")).rejects.toBeInstanceOf(
+      FolderNotFoundError,
+    );
+  });
+});
+
+describe("deleteLinksForUser", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("deletes only the user's links and returns the count", async () => {
+    vi.mocked(prisma.link.deleteMany).mockResolvedValue({ count: 2 } as never);
+    expect(await deleteLinksForUser("user-123", ["l1", "l2", "foreign"])).toBe(2);
+    expect(prisma.link.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ["l1", "l2", "foreign"] }, userId: "user-123" },
+    });
+  });
+});
 
 describe("readLink", () => {
   beforeEach(() => {

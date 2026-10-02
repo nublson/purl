@@ -18,3 +18,24 @@ export function formatFolderLabel(folder: { emoji: string; name: string }): stri
 export function formatLinkCount(count: number): string {
   return `${count} ${count === 1 ? "link" : "links"}`;
 }
+
+/**
+ * Toast copy for a bulk move of `count` links: "Moved 3 links to 🦪 Reading"
+ * into `target`; with no target (taken out of their folders), "Removed 3
+ * links from 🦪 Reading" when they all left `source`, else "Removed 3 links
+ * from their folders".
+ */
+export function formatBulkMoveMessage({
+  count,
+  target,
+  source,
+}: {
+  count: number;
+  target: { emoji: string; name: string } | null;
+  source: { emoji: string; name: string } | null;
+}): string {
+  const links = formatLinkCount(count);
+  if (target) return `Moved ${links} to ${formatFolderLabel(target)}`;
+  if (source) return `Removed ${links} from ${formatFolderLabel(source)}`;
+  return `Removed ${links} from their folders`;
+}
