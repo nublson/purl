@@ -1,8 +1,8 @@
 "use client";
 
 import { LinkGroup } from "@/components/link-group";
-import { LinkInput } from "@/components/link-input";
 import { PasteHandler } from "@/components/paste-handler";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import { LinkItemSkeleton } from "@/components/skeletons";
 import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
 import { useFolders } from "@/hooks/use-folders";
@@ -11,6 +11,7 @@ import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
 import { coolPreviews } from "@/lib/link-preview-warmth";
 import { linkSelection, setSelectableLinks } from "@/lib/link-selection";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
+import { RETURN_REFRESH_AFTER_MS } from "@/lib/pull-to-refresh";
 import {
   countGroupedLinks,
   mergeLinkGroups,
@@ -81,27 +82,68 @@ export function HomeShell({
     groupsRef.current = groups;
   }, [groups]);
   const reloadSeq = useRef(0);
+  const latestReload = useRef<Promise<boolean>>(Promise.resolve(true));
 
-  /** Re-fetches exactly as many links as are loaded, so pages stay consistent after inserts/deletes. */
-  const reload = useCallback(async () => {
+  /**
+   * Re-fetches exactly as many links as are loaded, so pages stay consistent
+   * after inserts/deletes. Resolves `false` when the fetch failed (the list
+   * is kept); a reload overtaken by a newer one resolves with that one's
+   * outcome, since only the newest reload's data is shown.
+   */
+  const reload = useCallback((): Promise<boolean> => {
     const seq = ++reloadSeq.current;
     const limit = Math.max(
       countGroupedLinks(groupsRef.current),
       HOME_LINKS_PAGE_SIZE,
     );
-    try {
-      const params = new URLSearchParams({ limit: String(limit) });
-      if (folderId) params.set("folderId", folderId);
-      const page = await fetchLinksPage(params);
-      if (seq !== reloadSeq.current) return;
-      setGroups(page.groups);
-      setNextCursor(page.nextCursor);
-      if (page.timeZone) setGroupsTimeZone(page.timeZone);
-      if (typeof page.total === "number") setLinksTotal(page.total);
-    } catch {
-      // Keep the current list; the next change or reload will retry.
-    }
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (folderId) params.set("folderId", folderId);
+    const run = fetchLinksPage(params).then(
+      (page) => {
+        if (seq !== reloadSeq.current) return latestReload.current;
+        setGroups(page.groups);
+        setNextCursor(page.nextCursor);
+        if (page.timeZone) setGroupsTimeZone(page.timeZone);
+        if (typeof page.total === "number") setLinksTotal(page.total);
+        return true;
+      },
+      () => {
+        // Keep the current list; the next change or reload will retry.
+        if (seq !== reloadSeq.current) return latestReload.current;
+        return false;
+      },
+    );
+    latestReload.current = run;
+    return run;
   }, [setLinksTotal, folderId]);
+
+  /**
+   * Pull-to-refresh and coming back to the app: the list (and with it Home's
+   * total and the usage meter) plus the folder counts.
+   */
+  const refresh = useCallback(async () => {
+    const [links, folders] = await Promise.all([reload(), refreshFolders()]);
+    return links && folders;
+  }, [reload, refreshFolders]);
+
+  // Coming back after a while (e.g. an installed app resumed on iOS, whose
+  // Realtime connection may have dropped while suspended) refreshes quietly.
+  useEffect(() => {
+    let hiddenAt: number | null = null;
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+        return;
+      }
+      if (hiddenAt !== null && Date.now() - hiddenAt >= RETURN_REFRESH_AFTER_MS) {
+        void refresh();
+      }
+      hiddenAt = null;
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [refresh]);
 
   // If the browser's time zone differs from the one the server resolved (and
   // from what's already cookied), persist it and reload once so grouping
@@ -191,7 +233,7 @@ export function HomeShell({
     await reload();
     setPendingUrl(null);
     // The new row is only visual; announce the save for screen readers too.
-    // On a folder page, `saveLink` (via LinkInput/PasteHandler's own
+    // On a folder page, `saveLink` (via PasteHandler's own
     // `useCurrentFolder()`, which inside the page's CurrentFolderProvider
     // always resolves to this `folderId`) already toasted "Saved to
     // {name}"/"Moved to {name}" — skip the generic toast so it isn't doubled.
@@ -199,7 +241,7 @@ export function HomeShell({
     // A save here files the link into this folder (a re-saved URL moves in
     // from elsewhere), so folder counts change. `reload()` above only
     // refreshes this list, not the folder list behind the header's counts.
-    else refreshFolders();
+    else void refreshFolders();
   }, [reload, folderId, refreshFolders]);
 
   const onSaveError = useCallback(() => {
@@ -239,12 +281,7 @@ export function HomeShell({
   useEffect(() => () => linkSelection.clear(), [folderId]);
 
   return (
-    <>
-      <LinkInput
-        onSaveStart={onPasteStart}
-        onSaveSuccess={onSaveSuccess}
-        onSaveError={onSaveError}
-      />
+    <PullToRefresh onRefresh={refresh} className="gap-8">
       <PasteHandler
         onPasteStart={onPasteStart}
         onSaveSuccess={onSaveSuccess}
@@ -307,6 +344,6 @@ export function HomeShell({
           </div>
         </div>
       )}
-    </>
+    </PullToRefresh>
   );
 }

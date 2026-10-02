@@ -22,8 +22,11 @@ export interface FoldersContextValue {
    * `useFolders` prefers the live links-sync total once a list reload reports one.
    */
   initialTotalLinks: number | null;
-  /** Re-fetches immediately, without waiting for the next links-sync version bump. */
-  refresh: () => void;
+  /**
+   * Re-fetches immediately, without waiting for the next links-sync version
+   * bump. Resolves `false` when the fetch failed (the old list is kept).
+   */
+  refresh: () => Promise<boolean>;
   /** Inserts or replaces a folder locally (create/rename), ahead of the background refetch. */
   upsertFolder: (folder: FolderSummary) => void;
   /** Removes a folder locally (delete), ahead of the background refetch. */
@@ -34,7 +37,7 @@ const FoldersContext = createContext<FoldersContextValue>({
   folders: [],
   isLoading: true,
   initialTotalLinks: null,
-  refresh: () => {},
+  refresh: async () => true,
   upsertFolder: () => {},
   removeFolderLocally: () => {},
 });
@@ -80,6 +83,8 @@ export function FoldersProvider({
   const [isLoading, setIsLoading] = useState(!initialFolders);
   const [refreshToken, setRefreshToken] = useState(0);
   const mutationCountRef = useRef(0);
+  // `refresh()` callers waiting on the next fetch's outcome.
+  const refreshWaitersRef = useRef<((ok: boolean) => void)[]>([]);
   // True once the effect below has run once while seeded. Lets the very
   // first (mount) run skip its fetch when server-seeded data is already
   // fresh, while any later run — a version bump or refresh() — still
@@ -93,23 +98,33 @@ export function FoldersProvider({
     }
     let cancelled = false;
     const mutationCountAtStart = mutationCountRef.current;
+    // The same array for the provider's lifetime (only spliced and pushed).
+    const pendingWaiters = refreshWaitersRef.current;
+    const waiters = pendingWaiters.splice(0);
+    const settle = (ok: boolean) => {
+      for (const resolve of waiters) resolve(ok);
+    };
     // Only the initial (unseeded) mount shows a loading state; a version
     // bump or refresh() re-fetches silently in the background, the same
     // pattern HomeShell's own `reload()` follows.
     fetchFolders()
       .then((data) => {
         if (cancelled) return;
+        settle(true);
         if (mutationCountRef.current !== mutationCountAtStart) return;
         setFolders(data);
       })
       .catch(() => {
         // Keep the previous list; the next version bump or refresh() retries.
+        if (!cancelled) settle(false);
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
       });
     return () => {
       cancelled = true;
+      // Superseded: the next run's fetch answers these callers.
+      pendingWaiters.push(...waiters);
     };
     // `initialFolders` is intentionally omitted: it only matters for the
     // one-time skip check above, keyed off `skippedSeededMountRef` rather
@@ -118,7 +133,14 @@ export function FoldersProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version, refreshToken]);
 
-  const refresh = useCallback(() => setRefreshToken((t) => t + 1), []);
+  const refresh = useCallback(
+    () =>
+      new Promise<boolean>((resolve) => {
+        refreshWaitersRef.current.push(resolve);
+        setRefreshToken((t) => t + 1);
+      }),
+    [],
+  );
 
   const upsertFolder = useCallback((folder: FolderSummary) => {
     mutationCountRef.current += 1;
