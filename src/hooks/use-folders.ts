@@ -34,6 +34,9 @@ export type { ActionResult, CreateFolderInput, FolderSummary, UpdateFolderInput 
  */
 const latestMoveByLink = new Map<string, symbol>();
 
+/** Numbers bulk-move toasts, so each batch keeps its own toast and Undo. */
+let bulkMoveCount = 0;
+
 /**
  * Folder list backing the folder menus/sidebars; refreshes on every
  * links-sync version bump, or on `refresh()` for a change that reloads its
@@ -295,7 +298,9 @@ export function useFolderActions(): {
       toast.success(
         formatBulkMoveMessage({ count: moved.length, target, source }),
         {
-          id: "links-move",
+          // Its own toast: a later batch of other links must not replace
+          // this one and take its Undo away.
+          id: `links-move-${++bulkMoveCount}`,
           action: {
             label: "Undo",
             onClick: async () => {
