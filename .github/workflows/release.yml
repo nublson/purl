@@ -73,6 +73,24 @@ jobs:
           RESEND_API_KEY: "ci-placeholder"
           BASE_URL: "http://localhost:3000"
 
+      # Apply pending migrations to production before Vercel is allowed to
+      # deploy (the gate status below). The new code expects the new schema,
+      # so migrations go first; if they fail, the gate fails and the deploy is
+      # blocked instead of shipping code against a stale database.
+      # PRODUCTION_DATABASE_URL must be the Supabase session pooler URL
+      # (port 5432): migrate deploy needs session-level locks, which the
+      # transaction pooler (6543) doesn't support, and the direct host is
+      # IPv6-only.
+      - name: Apply database migrations (production)
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::PRODUCTION_DATABASE_URL secret is not set (Supabase session pooler URL, port 5432)."
+            exit 1
+          fi
+          pnpm exec prisma migrate deploy
+
       - name: Publish deploy gate status for Vercel
         if: always()
         env:
