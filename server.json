@@ -7,7 +7,7 @@
     "url": "https://github.com/nublson/purl",
     "source": "github"
   },
-  "version": "0.1.6",
+  "version": "0.1.7",
   "remotes": [
     {
       "type": "streamable-http",
