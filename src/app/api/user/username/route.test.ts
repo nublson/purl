@@ -17,7 +17,19 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
+const mockLimit = vi.fn();
+const mockGetUsernameChangeRateLimiter = vi.fn();
+vi.mock("@/lib/upstash-rate-limit", () => ({
+  getUsernameChangeRateLimiter: mockGetUsernameChangeRateLimiter,
+}));
+
 const { PATCH } = await import("./route");
+
+/** `findUnique` mock for a user named "old-name" whose new name is free. */
+function freeName(where: { id?: string; username?: string }) {
+  if (where.id) return Promise.resolve({ username: "old-name" });
+  return Promise.resolve(null);
+}
 
 function patchRequest(body: unknown) {
   return new NextRequest("http://localhost/api/user/username", {
@@ -31,6 +43,9 @@ describe("PATCH /api/user/username", () => {
     mockGetBrowserSessionUserId.mockReset();
     mockFindUnique.mockReset();
     mockUpdate.mockReset();
+    mockLimit.mockReset();
+    // No Upstash in tests by default (as in local dev): no limiter.
+    mockGetUsernameChangeRateLimiter.mockReset().mockReturnValue(null);
   });
 
   it("returns 401 when there is no browser session", async () => {
@@ -134,5 +149,62 @@ describe("PATCH /api/user/username", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ username: "nublson" });
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  describe("rate limiting", () => {
+    beforeEach(() => {
+      mockGetUsernameChangeRateLimiter.mockReturnValue({ limit: mockLimit });
+    });
+
+    it("returns 429 RATE_LIMITED with Retry-After once the user's change limit is spent, without writing", async () => {
+      mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+      mockFindUnique.mockImplementation(({ where }) => freeName(where));
+      mockLimit.mockResolvedValue({ success: false, reset: Date.now() + 120_000 });
+
+      const res = await PATCH(patchRequest({ username: "fresh-name" }));
+
+      expect(res.status).toBe(429);
+      expect(await res.json()).toEqual({
+        error: "Too many username changes. Try again in a while.",
+        code: "RATE_LIMITED",
+      });
+      expect(Number(res.headers.get("Retry-After"))).toBeGreaterThan(100);
+      expect(mockLimit).toHaveBeenCalledWith("user-1");
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("counts a real change against the user's (not the IP's) quota", async () => {
+      mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+      mockFindUnique.mockImplementation(({ where }) => freeName(where));
+      mockLimit.mockResolvedValue({ success: true, reset: Date.now() + 60_000 });
+      mockUpdate.mockResolvedValue({ id: "user-1", username: "fresh-name" });
+
+      const res = await PATCH(patchRequest({ username: "fresh-name" }));
+
+      expect(res.status).toBe(200);
+      expect(mockLimit).toHaveBeenCalledWith("user-1");
+    });
+
+    it("doesn't charge signed-out requests, rejected names, taken names or no-op saves", async () => {
+      mockGetBrowserSessionUserId.mockResolvedValue(null);
+      expect((await PATCH(patchRequest({ username: "fresh-name" }))).status).toBe(401);
+
+      mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+      expect((await PATCH(patchRequest({ username: "NO SPACES" }))).status).toBe(400);
+
+      mockFindUnique.mockImplementation(({ where }) =>
+        where.id
+          ? Promise.resolve({ username: "old-name" })
+          : Promise.resolve({ id: "user-2" }),
+      );
+      expect((await PATCH(patchRequest({ username: "taken-name" }))).status).toBe(409);
+
+      mockFindUnique.mockImplementation(({ where }) =>
+        where.id ? Promise.resolve({ username: "same-name" }) : Promise.resolve(null),
+      );
+      expect((await PATCH(patchRequest({ username: "same-name" }))).status).toBe(200);
+
+      expect(mockLimit).not.toHaveBeenCalled();
+    });
   });
 });

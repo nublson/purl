@@ -18,7 +18,6 @@ vi.mock("@/lib/upstash-rate-limit", () => ({
   getFeedbackPostRateLimiter: vi.fn(),
   getLinksPostRateLimiter: vi.fn(),
   getUsernameCheckRateLimiter: vi.fn(),
-  getUsernameChangeRateLimiter: vi.fn(),
   getV1RateLimiter: vi.fn().mockReturnValue({ limit: limitMock }),
   getV1PostRateLimiter: vi.fn(),
   getMcpRateLimiter: vi.fn(),
@@ -29,7 +28,6 @@ const {
   getFeedbackPostRateLimiter,
   getLinksPostRateLimiter,
   getUsernameCheckRateLimiter,
-  getUsernameChangeRateLimiter,
   getV1RateLimiter,
   getV1PostRateLimiter,
   getMcpRateLimiter,
@@ -63,7 +61,6 @@ describe("rateLimitApiRequest", () => {
     vi.mocked(getLinksPostRateLimiter).mockReset();
     vi.mocked(getFeedbackPostRateLimiter).mockReset();
     vi.mocked(getUsernameCheckRateLimiter).mockReset();
-    vi.mocked(getUsernameChangeRateLimiter).mockReset();
   });
 
   describe("unmatched routes", () => {
@@ -234,24 +231,12 @@ describe("rateLimitApiRequest", () => {
       expect(Number(result!.headers.get("Retry-After"))).toBeGreaterThanOrEqual(1);
     });
 
-    it("returns 429 when the username change limit is exceeded", async () => {
-      vi.mocked(getUsernameChangeRateLimiter).mockReturnValue(
-        mockLimiter() as never,
-      );
-      limitMock.mockResolvedValue({ success: false, reset: Date.now() + 600_000 });
-
+    it("leaves username changes to the route (limited per user there)", async () => {
       const result = await rateLimitApiRequest(
         makeRequest("/api/user/username", "PATCH"),
       );
-      expect(result!.status).toBe(429);
-    });
-
-    it("does not limit other methods on the username routes", async () => {
-      const result = await rateLimitApiRequest(
-        makeRequest("/api/user/username", "GET"),
-      );
       expect(result).toBeNull();
-      expect(getUsernameChangeRateLimiter).not.toHaveBeenCalled();
+      expect(limitMock).not.toHaveBeenCalled();
     });
   });
 
