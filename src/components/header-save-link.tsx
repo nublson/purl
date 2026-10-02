@@ -3,8 +3,8 @@
 import { useCurrentFolder } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { requestSaveUrl, saveLink } from "@/lib/save-link";
-import { usePathname } from "next/navigation";
 import { Chromium, ClipboardPaste, ExternalLink, Plus } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { useId } from "react";
 import { toast } from "sonner";
 import { DropdownWrapper } from "./dropdown-wrapper";
@@ -15,6 +15,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
+import { Kbd } from "./ui/kbd";
 
 // Chrome Web Store listing for the extension; the section is hidden until set.
 const CHROME_EXTENSION_URL = safeHttpsUrl(
@@ -82,12 +83,12 @@ export function HeaderSaveLink() {
       text,
       currentFolder
         ? {
-              folder: {
-                id: currentFolder.id,
-                name: currentFolder.name,
-                emoji: currentFolder.emoji,
-              },
-            }
+            folder: {
+              id: currentFolder.id,
+              name: currentFolder.name,
+              emoji: currentFolder.emoji,
+            },
+          }
         : undefined,
     );
     if (result && "id" in result) {
@@ -118,11 +119,8 @@ export function HeaderSaveLink() {
           Paste to save
         </span>
         <span id={hintId} className="text-xs font-normal text-muted-foreground">
-          Press{" "}
-          <kbd className="rounded border px-1 font-sans text-[11px]">
-            {isApplePlatform() ? "⌘V" : "Ctrl+V"}
-          </kbd>{" "}
-          anywhere on this page to save a link.
+          Press <Kbd>{isApplePlatform() ? "⌘V" : "Ctrl+V"}</Kbd> anywhere on
+          this page to save a link.
         </span>
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
