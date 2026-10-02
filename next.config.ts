@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import bundleAnalyzer from "@next/bundle-analyzer";
 import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
-import { buildContentSecurityPolicy } from "./src/lib/csp-header";
+import { buildSecurityHeaders } from "./src/lib/security-headers";
 
 function getSerwistRevision(): string {
   const fromEnv =
@@ -35,16 +35,10 @@ const withBundleAnalyzer = bundleAnalyzer({
   openAnalyzer: false,
 });
 
-const BASE_SECURITY_HEADERS: { key: string; value: string }[] = [
-  { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  {
-    key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), interest-cohort=()",
-  },
-];
-
 const nextConfig: NextConfig = {
+  // Next's default, set explicitly: production builds don't emit browser
+  // source maps, so the client code structure isn't published.
+  productionBrowserSourceMaps: false,
   async redirects() {
     // The in-app AI chat was removed; keep old bookmarks and PWA shortcuts working.
     return [
@@ -59,21 +53,9 @@ const nextConfig: NextConfig = {
     ];
   },
   async headers() {
-    if (process.env.NODE_ENV !== "production") {
-      return [{ source: "/:path*", headers: [...BASE_SECURITY_HEADERS] }];
-    }
-    return [
-      {
-        source: "/:path*",
-        headers: [
-          ...BASE_SECURITY_HEADERS,
-          {
-            key: "Content-Security-Policy",
-            value: buildContentSecurityPolicy(),
-          },
-        ],
-      },
-    ];
+    // X-Frame-Options and friends everywhere; the CSP in production only.
+    // See src/lib/security-headers.ts.
+    return [{ source: "/:path*", headers: buildSecurityHeaders() }];
   },
 };
 
