@@ -110,9 +110,10 @@ describe("deleteLinkWithUndo", () => {
     await vi.waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+    // keepalive so a reload or navigation right after can't cancel it.
     expect(fetchSpy).toHaveBeenCalledWith(
       "/api/links/link-c",
-      expect.objectContaining({ method: "DELETE" }),
+      expect.objectContaining({ method: "DELETE", keepalive: true }),
     );
     // Stays hidden until the list reload drops the row.
     expect(isLinkDeletePending("link-c")).toBe(true);
