@@ -1,6 +1,7 @@
 import "server-only";
 
 import { auth } from "@/lib/auth";
+import { parseLinkIds } from "@/lib/bulk-links";
 import { SaveLimitError } from "@/lib/entitlements";
 import {
   createFolder,
@@ -18,8 +19,10 @@ import {
   createLinkForUser,
   listLinksForUser,
   moveLinkToFolder,
+  moveLinksToFolder,
   readLinkForUser,
 } from "@/lib/links";
+import { MAX_BULK_LINK_IDS } from "@/lib/limits";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { serializeLink } from "@/lib/serialize-link";
 import { isValidUrl } from "@/utils/url";
@@ -228,6 +231,26 @@ export async function moveLinkTool(
   }
 }
 
+export async function moveLinksTool(
+  userId: string,
+  linkIds: string[],
+  folderId: string | null,
+): Promise<ToolResult> {
+  const ids = parseLinkIds(linkIds);
+  if (!ids.ok) return errorContent(ids.error);
+  try {
+    // `null` or "" takes the links out of their folders.
+    const result = await moveLinksToFolder(userId, ids.ids, folderId || null);
+    if (result.moved.length > 0) broadcastLinksChanged(userId);
+    return jsonContent(result);
+  } catch (e) {
+    if (e instanceof FolderNotFoundError) {
+      return errorContent("Folder not found");
+    }
+    throw e;
+  }
+}
+
 export async function getLinkTool(
   userId: string,
   id: string,
@@ -361,6 +384,21 @@ export function registerPurlTools(server: McpServer): void {
     { destructiveHint: false, idempotentHint: true },
     async ({ linkId, folderId }, extra) =>
       moveLinkTool(getUserId(extra), linkId, folderId),
+  );
+
+  server.tool(
+    "move_links",
+    `Move several saved links into a folder at once, or take them out of their folders (up to ${MAX_BULK_LINK_IDS} per call). Returns the moved links with their previous folder, and any ids that weren't found.`,
+    {
+      linkIds: z.array(z.string()).describe("The link ids"),
+      folderId: z
+        .string()
+        .nullable()
+        .describe("Folder id from list_folders; null or an empty string removes the links from their folders"),
+    },
+    { destructiveHint: false, idempotentHint: true },
+    async ({ linkIds, folderId }, extra) =>
+      moveLinksTool(getUserId(extra), linkIds, folderId),
   );
 }
 

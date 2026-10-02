@@ -1,5 +1,6 @@
 "use client";
 
+import type { MoveLinksResult } from "@/lib/bulk-links";
 import type { FolderSummary } from "@/lib/folders";
 import { linksOriginHeaders } from "@/lib/links-origin";
 import type { Link } from "@/utils/links";
@@ -149,4 +150,15 @@ export function patchLinkFolder(
     method: "PATCH",
     body: JSON.stringify({ folderId }),
   }, "move the link");
+}
+
+/** Moves many links at once (`folderId: null` takes them out of their folders). */
+export function patchLinksFolder(
+  linkIds: string[],
+  folderId: string | null,
+): Promise<ActionResult<MoveLinksResult>> {
+  return mutate<MoveLinksResult>("/api/links/bulk", {
+    method: "PATCH",
+    body: JSON.stringify({ ids: linkIds, folderId }),
+  }, "move the links");
 }

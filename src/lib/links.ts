@@ -1,4 +1,5 @@
 import type { ContentType } from "@/generated/prisma/enums";
+import type { MoveLinksResult } from "@/lib/bulk-links";
 import { assertCanSaveLink, insertWithinSaveLimit } from "@/lib/entitlements";
 import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
 import {
@@ -649,6 +650,66 @@ export async function moveLinkToFolder(
     }
     throw error;
   }
+}
+
+/**
+ * Moves every link in `linkIds` owned by `userId` into `folderId` (or out of
+ * its folder with `null`) in one write. Ids that aren't the user's are
+ * skipped and reported in `notFound`. Throws `FolderNotFoundError` when
+ * `folderId` is a non-null id not owned by `userId`; nothing is written then.
+ */
+export async function moveLinksToFolder(
+  userId: string,
+  linkIds: string[],
+  folderId: string | null,
+): Promise<MoveLinksResult> {
+  if (folderId !== null) {
+    await assertFolderOwned(userId, folderId);
+  }
+
+  const owned = await prisma.link.findMany({
+    where: { id: { in: linkIds }, userId },
+    select: { id: true, folderId: true },
+  });
+  const ownedIds = new Set(owned.map((link) => link.id));
+  const notFound = linkIds.filter((id) => !ownedIds.has(id));
+  if (owned.length === 0) return { moved: [], notFound };
+
+  try {
+    await prisma.link.updateMany({
+      // `userId` again: never touch another user's row, whatever `owned` says.
+      where: { id: { in: [...ownedIds] }, userId },
+      data: { folderId },
+    });
+  } catch (error) {
+    // Same race as moveLinkToFolder: the folder was deleted after the check.
+    if (isForeignKeyConstraintError(error)) {
+      throw new FolderNotFoundError();
+    }
+    throw error;
+  }
+
+  return {
+    moved: owned.map((link) => ({
+      id: link.id,
+      previousFolderId: link.folderId ?? null,
+    })),
+    notFound,
+  };
+}
+
+/**
+ * Deletes every link in `linkIds` owned by `userId` in one write; ids that
+ * aren't the user's are ignored. Returns how many links were deleted.
+ */
+export async function deleteLinksForUser(
+  userId: string,
+  linkIds: string[],
+): Promise<number> {
+  const { count } = await prisma.link.deleteMany({
+    where: { id: { in: linkIds }, userId },
+  });
+  return count;
 }
 
 /** Deletes a link if it belongs to the current user. Returns true if deleted, false if not found or not owned. Throws UnauthorizedError if not authenticated. */

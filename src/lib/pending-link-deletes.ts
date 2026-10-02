@@ -32,11 +32,19 @@ const listeners = new Set<() => void>();
 const waiting = new Map<string, { send: () => void; cancel: () => void }>();
 const EMPTY: ReadonlyMap<string, PendingLinkDeletePhase> = new Map();
 
-function setPhase(id: string, phase: PendingLinkDeletePhase | null) {
-  if (phase === null && !pending.has(id)) return;
+/** Sets (or, with `null`, clears) the phase of every id in one update. */
+function setPhase(
+  ids: string | Iterable<string>,
+  phase: PendingLinkDeletePhase | null,
+) {
+  const list = typeof ids === "string" ? [ids] : Array.from(ids);
+  if (list.length === 0) return;
+  if (phase === null && !list.some((id) => pending.has(id))) return;
   const next = new Map(pending);
-  if (phase === null) next.delete(id);
-  else next.set(id, phase);
+  for (const id of list) {
+    if (phase === null) next.delete(id);
+    else next.set(id, phase);
+  }
   pending = next;
   for (const listener of listeners) listener();
 }
@@ -101,62 +109,117 @@ export function cancelPendingLinkDelete(linkId: string): void {
  */
 export function deleteLinkWithUndo(
   linkId: string,
+  opts: { onDeleted: () => void },
+): void {
+  deleteLinksWithUndo([linkId], opts);
+}
+
+let batchCount = 0;
+
+/**
+ * `deleteLinkWithUndo` for many links (the selection bar): one "3 links
+ * deleted" toast whose Undo brings them all back, and one request when it
+ * closes. Links already being deleted are skipped. Saving one of them again
+ * inside the Undo window (`cancelPendingLinkDelete`) takes just that link
+ * out of the batch.
+ */
+export function deleteLinksWithUndo(
+  linkIds: string[],
   { onDeleted }: { onDeleted: () => void },
 ): void {
-  if (waiting.has(linkId)) return;
+  const ids = Array.from(new Set(linkIds)).filter((id) => !waiting.has(id));
+  if (ids.length === 0) return;
+  // Links still in this batch: not undone, not re-saved.
+  const remaining = new Set(ids);
   let settled = false;
-  const toastId = `link-delete-${linkId}`;
+  const toastId =
+    ids.length === 1 ? `link-delete-${ids[0]}` : `links-delete-${++batchCount}`;
 
-  setPhase(linkId, "fading");
+  setPhase(ids, "fading");
   const hideTimer = setTimeout(() => {
-    if (pending.get(linkId) === "fading") setPhase(linkId, "hidden");
+    setPhase(
+      Array.from(remaining).filter((id) => pending.get(id) === "fading"),
+      "hidden",
+    );
   }, LINK_DELETE_FADE_MS);
 
   const send = async () => {
     if (settled) return;
     settled = true;
-    waiting.delete(linkId);
-    setPhase(linkId, "hidden");
+    const toDelete = Array.from(remaining);
+    for (const id of toDelete) waiting.delete(id);
+    setPhase(toDelete, "hidden");
+    const restore = (message: string) => {
+      setPhase(toDelete, null);
+      toast.error(message);
+    };
+    const what = toDelete.length === 1 ? "the link" : "the links";
     try {
-      const res = await fetch(`/api/links/${linkId}`, {
-        method: "DELETE",
-        headers: linksOriginHeaders,
-        // Always keepalive: the toast can close right before a reload or
-        // navigation, and a normal fetch that hasn't gone out yet would be
-        // cancelled with the page.
-        keepalive: true,
-      });
+      // Always keepalive: the toast can close right before a reload or
+      // navigation, and a normal fetch that hasn't gone out yet would be
+      // cancelled with the page.
+      const res =
+        toDelete.length === 1
+          ? await fetch(`/api/links/${toDelete[0]}`, {
+              method: "DELETE",
+              headers: linksOriginHeaders,
+              keepalive: true,
+            })
+          : await fetch("/api/links/bulk", {
+              method: "DELETE",
+              headers: {
+                "Content-Type": "application/json",
+                ...linksOriginHeaders,
+              },
+              body: JSON.stringify({ ids: toDelete }),
+              keepalive: true,
+            });
       if (!res.ok) {
-        setPhase(linkId, null);
-        toast.error("Unable to delete the link. Try again.");
+        restore(`Unable to delete ${what}. Try again.`);
         return;
       }
       onDeleted();
     } catch {
-      setPhase(linkId, null);
-      toast.error(
-        "Unable to delete the link. Check your connection and try again.",
-      );
+      restore(`Unable to delete ${what}. Check your connection and try again.`);
     }
   };
 
-  const cancel = () => {
+  // Undo: every link in the batch comes back.
+  const cancelAll = () => {
     if (settled) return;
     settled = true;
     clearTimeout(hideTimer);
-    waiting.delete(linkId);
-    setPhase(linkId, null);
+    for (const id of remaining) waiting.delete(id);
+    setPhase(remaining, null);
+    remaining.clear();
     toast.dismiss(toastId);
   };
 
-  waiting.set(linkId, { send: () => void send(), cancel });
+  // A re-save: only that link comes back; the rest stay deleted.
+  const cancelOne = (id: string) => {
+    if (settled || !remaining.has(id)) return;
+    if (remaining.size === 1) {
+      cancelAll();
+      return;
+    }
+    remaining.delete(id);
+    waiting.delete(id);
+    setPhase(id, null);
+  };
+
+  for (const id of ids) {
+    waiting.set(id, { send: () => void send(), cancel: () => cancelOne(id) });
+  }
   bindFlushOnPageHide();
 
-  toast.success("Link deleted", {
-    id: toastId,
-    duration: LINK_DELETE_UNDO_MS,
-    action: { label: "Undo", onClick: cancel },
-    onAutoClose: () => void send(),
-    onDismiss: () => void send(),
-  });
+  toast.success(
+    ids.length === 1 ? "Link deleted" : `${ids.length} links deleted`,
+    {
+      id: toastId,
+      duration: LINK_DELETE_UNDO_MS,
+      action: { label: "Undo", onClick: cancelAll },
+      onAutoClose: () => void send(),
+      onDismiss: () => void send(),
+    },
+  );
 }

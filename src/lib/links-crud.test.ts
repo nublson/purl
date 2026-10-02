@@ -22,7 +22,9 @@ vi.mock("@/lib/prisma", () => {
       findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn(),
       count: vi.fn(),
     },
     $executeRaw: vi.fn(),
@@ -58,6 +60,8 @@ const {
   updateLinkForUser,
   deleteLink,
   moveLinkToFolder,
+  moveLinksToFolder,
+  deleteLinksForUser,
   scrapeLinkMetadata,
   UnauthorizedError,
 } = await import("./links");
@@ -970,6 +974,93 @@ describe("moveLinkToFolder", () => {
 
 
 // ─── readLink ─────────────────────────────────────────────────────────────────
+
+describe("moveLinksToFolder", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(assertFolderOwned).mockResolvedValue(undefined);
+  });
+
+  it("moves the user's links in one write and reports where each came from", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([
+      { id: "l1", folderId: null },
+      { id: "l2", folderId: "f0" },
+    ] as never);
+    vi.mocked(prisma.link.updateMany).mockResolvedValue({ count: 2 } as never);
+
+    const result = await moveLinksToFolder("user-123", ["l1", "l2", "foreign"], "f1");
+
+    expect(assertFolderOwned).toHaveBeenCalledWith("user-123", "f1");
+    expect(prisma.link.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ["l1", "l2", "foreign"] }, userId: "user-123" },
+      select: { id: true, folderId: true },
+    });
+    expect(prisma.link.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["l1", "l2"] }, userId: "user-123" },
+      data: { folderId: "f1" },
+    });
+    expect(result).toEqual({
+      moved: [
+        { id: "l1", previousFolderId: null },
+        { id: "l2", previousFolderId: "f0" },
+      ],
+      notFound: ["foreign"],
+    });
+  });
+
+  it("takes links out of their folders with null, without a folder check", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([
+      { id: "l1", folderId: "f0" },
+    ] as never);
+    vi.mocked(prisma.link.updateMany).mockResolvedValue({ count: 1 } as never);
+
+    await moveLinksToFolder("user-123", ["l1"], null);
+
+    expect(assertFolderOwned).not.toHaveBeenCalled();
+    expect(prisma.link.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { folderId: null } }),
+    );
+  });
+
+  it("writes nothing when none of the links are the user's", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([]);
+    const result = await moveLinksToFolder("user-123", ["x"], "f1");
+    expect(prisma.link.updateMany).not.toHaveBeenCalled();
+    expect(result).toEqual({ moved: [], notFound: ["x"] });
+  });
+
+  it("throws FolderNotFoundError for a foreign folder before reading links", async () => {
+    vi.mocked(assertFolderOwned).mockRejectedValue(new FolderNotFoundError());
+    await expect(moveLinksToFolder("user-123", ["l1"], "foreign")).rejects.toBeInstanceOf(
+      FolderNotFoundError,
+    );
+    expect(prisma.link.findMany).not.toHaveBeenCalled();
+  });
+
+  it("maps a folder deleted mid-move (FK violation) to FolderNotFoundError", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([
+      { id: "l1", folderId: null },
+    ] as never);
+    vi.mocked(prisma.link.updateMany).mockRejectedValue(
+      Object.assign(new Error("fk"), { code: "P2003" }),
+    );
+    await expect(moveLinksToFolder("user-123", ["l1"], "f1")).rejects.toBeInstanceOf(
+      FolderNotFoundError,
+    );
+  });
+});
+
+describe("deleteLinksForUser", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("deletes only the user's links and returns the count", async () => {
+    vi.mocked(prisma.link.deleteMany).mockResolvedValue({ count: 2 } as never);
+    expect(await deleteLinksForUser("user-123", ["l1", "l2", "foreign"])).toBe(2);
+    expect(prisma.link.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ["l1", "l2", "foreign"] }, userId: "user-123" },
+    });
+  });
+});
 
 describe("readLink", () => {
   beforeEach(() => {
