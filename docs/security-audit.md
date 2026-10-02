@@ -6,23 +6,23 @@ Audited on 2026-05-28 against the `feature/byok` branch.
 
 ## Medium
 
-### `src/lib/proxy-rate-limit.ts:11` — IP spoofing bypasses rate limits
+### ~~`src/lib/proxy-rate-limit.ts` — IP spoofing bypasses rate limits~~ (withdrawn)
 
-The `clientIp` function takes the *first* entry from `x-forwarded-for`. On Vercel (and most reverse proxies), the client controls everything before the last IP in that header — Vercel appends the real client IP at the end. An attacker can send `x-forwarded-for: 1.2.3.4` to make every request appear to come from a fresh IP, completely bypassing auth, chat, and upload rate limits.
+**Status: not applicable on Vercel. Re-checked 2026-10-02.**
 
-```typescript
-// Before — client-controlled
-const first = forwarded.split(",")[0]?.trim();
+The original finding said `clientIp` reads the client-controlled first entry of `x-forwarded-for`, so a client could send `x-forwarded-for: 1.2.3.4` to get a fresh rate-limit bucket on every request. That's true behind proxies that append to the header, but not on Vercel. Vercel overwrites `x-forwarded-for` and does not forward client-supplied IPs ([Vercel request headers](https://vercel.com/docs/headers/request-headers)). On a direct Vercel deployment, the first (and only) entry is the connecting client's public IP, so it is a sound rate-limit key and no change is needed.
 
-// After — use the last entry, set by Vercel/the trusted proxy
-const ips = forwarded.split(",").map(s => s.trim()).filter(Boolean);
-const last = ips[ips.length - 1];
-if (last) return last;
-```
+**Revisit if** another proxy or CDN that appends to `x-forwarded-for` (Cloudflare, an Enterprise trusted proxy, a self-hosted load balancer) is ever put in front of the app. In that case, key on the entry that proxy appends, or on its own client-IP header, instead of the first entry.
+
+Related: username changes are now rate-limited per user after authentication (`src/app/api/user/username/route.ts`), not per IP.
 
 ---
 
-### `src/app/api/links/route.ts:17` — Any Chrome extension can make credentialed requests
+### ~~`src/app/api/links/route.ts` — Any Chrome extension can make credentialed requests~~ (fixed)
+
+**Status: fixed 2026-10-02.** `POST /api/links` no longer allows every `chrome-extension://` origin. Credentialed CORS is limited to origins listed in `ALLOWED_ORIGINS`. Purl's own extension needs no CORS headers: it calls the API from its service worker with `host_permissions` for `https://purl.live/*`, which Chrome exempts from the same-origin policy ([Cross-origin network requests](https://developer.chrome.com/docs/extensions/develop/concepts/network-requests)). To allow a specific extension anyway, add its `chrome-extension://<id>` origin to `ALLOWED_ORIGINS`. An extension that has its own host permission for the app isn't limited by CORS, so no server-side CORS setting can block it.
+
+The original finding, kept for reference:
 
 `origin.startsWith("chrome-extension://")` allows *any* installed extension to post links as the authenticated user. A malicious extension (or one with an XSS vuln) can silently save arbitrary URLs on behalf of any signed-in user. The extension ID should be the only one allowed.
 
@@ -91,7 +91,9 @@ const BASE_SECURITY_HEADERS = [
 
 ## Fix Priority
 
-1. **Fix IP extraction in rate limiter (Medium)** — actively exploitable, trivial to fix
-2. **Pin Chrome extension ID (Medium)** — low likelihood but easy to lock down
-3. **Add `X-Frame-Options` (Low)** — belt-and-suspenders for older browsers
-4. **Add `hideSourceMaps: true` (Low)** — limits code exposure if Sentry upload config changes
+1. **Add `X-Frame-Options` (Low)** — belt-and-suspenders for older browsers
+2. **Add `hideSourceMaps: true` (Low)** — limits code exposure if Sentry upload config changes
+
+~~Pin Chrome extension ID~~ — fixed 2026-10-02: extension origins now need an explicit `ALLOWED_ORIGINS` entry (see above).
+
+~~Fix IP extraction in rate limiter~~ — withdrawn 2026-10-02: Vercel overwrites `x-forwarded-for`, so it isn't spoofable on this deployment (see above).

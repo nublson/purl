@@ -7,11 +7,11 @@
     "url": "https://github.com/nublson/purl",
     "source": "github"
   },
-  "version": "0.1.7",
+  "version": "0.1.8",
   "remotes": [
     {
       "type": "streamable-http",
-      "url": "https://purl.nublson.com/api/mcp",
+      "url": "https://purl.live/api/mcp",
       "headers": [
         {
           "name": "Authorization",

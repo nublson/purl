@@ -30,7 +30,7 @@ function manifestPlugin(isDev: boolean): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
-  const purlUrl = env.VITE_PURL_URL ?? "https://purl.nublson.com";
+  const purlUrl = env.VITE_PURL_URL ?? "https://purl.live";
   const isDev = mode === "development";
 
   return {
