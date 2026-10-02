@@ -116,3 +116,5 @@ Test patterns: mock `globalThis.fetch`, mock Prisma client calls, mock Supabase 
 ## CI
 
 PRs target `develop` (default) then `main` for releases. Pipeline: setup → Prisma → lint + typecheck (parallel) → tests + build (parallel). Releases are manual (`workflow_dispatch`) and merge `develop` into `main`.
+
+The release workflow runs `prisma migrate deploy` against production (secret `PRODUCTION_DATABASE_URL`, the Supabase **session pooler** URL on port 5432) after the build and before it publishes the `release/build-validation` status that gates the Vercel deploy. A failed migration fails the gate, so the new code never ships against an old schema. Keep migrations backward-compatible (additive), since the previous deploy keeps serving until the new one is live. Pending migrations that drop or delete data (`DROP`, `DELETE FROM`, `TRUNCATE`, column type changes) block the release unless it's started with `allow_destructive_migrations` (back up production first).

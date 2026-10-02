@@ -2,6 +2,14 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      allow_destructive_migrations:
+        description: >-
+          Apply pending migrations that drop or delete data (DROP, DELETE,
+          TRUNCATE, column type changes). Back up the production database
+          first.
+        type: boolean
+        default: false
 
 jobs:
   merge-develop:
@@ -72,6 +80,47 @@ jobs:
           BETTER_AUTH_URL: "http://localhost:3000"
           RESEND_API_KEY: "ci-placeholder"
           BASE_URL: "http://localhost:3000"
+
+      # Apply pending migrations to production before Vercel is allowed to
+      # deploy (the gate status below). The new code expects the new schema,
+      # so migrations go first; if they fail, the gate fails and the deploy is
+      # blocked instead of shipping code against a stale database.
+      # PRODUCTION_DATABASE_URL must be the Supabase session pooler URL
+      # (port 5432): migrate deploy needs session-level locks, which the
+      # transaction pooler (6543) doesn't support, and the direct host is
+      # IPv6-only.
+      - name: Apply database migrations (production)
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          ALLOW_DESTRUCTIVE: ${{ inputs.allow_destructive_migrations }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::PRODUCTION_DATABASE_URL secret is not set (Supabase session pooler URL, port 5432)."
+            exit 1
+          fi
+
+          # Destructive pending migrations need an explicit opt-in (and a
+          # backup) instead of running unattended. `migrate status` exits
+          # non-zero while migrations are pending, so its output is parsed.
+          STATUS=$(pnpm exec prisma migrate status 2>&1 || true)
+          echo "$STATUS"
+          PENDING=$(printf '%s\n' "$STATUS" \
+            | sed -n '/not yet been applied:/,/^$/p' \
+            | grep -E '^[0-9]{14}_' || true)
+          DESTRUCTIVE=""
+          for NAME in $PENDING; do
+            # Skip Prisma's `-- DropIndex`-style comment headers.
+            if grep -v '^[[:space:]]*--' "prisma/migrations/${NAME}/migration.sql" \
+              | grep -qiE '\bDROP\b|\bDELETE[[:space:]]+FROM\b|\bTRUNCATE\b|\bALTER[[:space:]]+COLUMN\b.*\bTYPE\b'; then
+              DESTRUCTIVE="${DESTRUCTIVE} ${NAME}"
+            fi
+          done
+          if [ -n "$DESTRUCTIVE" ] && [ "$ALLOW_DESTRUCTIVE" != "true" ]; then
+            echo "::error::Pending migrations drop or delete data:${DESTRUCTIVE}. Back up the production database, then re-run Release with allow_destructive_migrations enabled."
+            exit 1
+          fi
+
+          pnpm exec prisma migrate deploy
 
       - name: Publish deploy gate status for Vercel
         if: always()
