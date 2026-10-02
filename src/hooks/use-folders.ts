@@ -50,7 +50,7 @@ export function useFolders(): {
   isLoading: boolean;
   max: number;
   totalLinks: number | null;
-  refresh: () => Promise<boolean>;
+  refresh: () => void;
 } {
   const { folders, isLoading, initialTotalLinks, refresh } =
     useFoldersContext();
