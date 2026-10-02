@@ -2,10 +2,22 @@ import "server-only";
 
 import { auth } from "@/lib/auth";
 import { SaveLimitError } from "@/lib/entitlements";
-import { FolderNotFoundError, listFoldersForUser } from "@/lib/folders";
+import {
+  createFolder,
+  deleteFolder,
+  FolderDescriptionError,
+  FolderEmojiError,
+  FolderLimitError,
+  FolderNameError,
+  FolderNotFoundError,
+  FolderUpdateEmptyError,
+  listFoldersForUser,
+  updateFolder,
+} from "@/lib/folders";
 import {
   createLinkForUser,
   listLinksForUser,
+  moveLinkToFolder,
   readLinkForUser,
 } from "@/lib/links";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
@@ -109,6 +121,113 @@ export async function listFoldersTool(userId: string): Promise<ToolResult> {
   return jsonContent(folders);
 }
 
+/**
+ * Folder errors a tool should report to the model (validation, cap, not
+ * found) rather than throw; `null` for anything unexpected.
+ */
+function folderErrorContent(e: unknown): ToolResult | null {
+  if (e instanceof FolderLimitError) {
+    return errorContent(`Limit reached: ${e.message}`);
+  }
+  if (e instanceof FolderNotFoundError) {
+    return errorContent("Folder not found");
+  }
+  if (
+    e instanceof FolderNameError ||
+    e instanceof FolderEmojiError ||
+    e instanceof FolderDescriptionError ||
+    e instanceof FolderUpdateEmptyError
+  ) {
+    return errorContent(e.message);
+  }
+  return null;
+}
+
+export type CreateFolderArgs = {
+  name: string;
+  emoji?: string;
+  description?: string;
+};
+
+export async function createFolderTool(
+  userId: string,
+  args: CreateFolderArgs,
+): Promise<ToolResult> {
+  try {
+    const folder = await createFolder(
+      userId,
+      args.name,
+      args.emoji,
+      args.description,
+    );
+    broadcastLinksChanged(userId);
+    return jsonContent(folder);
+  } catch (e) {
+    const content = folderErrorContent(e);
+    if (content) return content;
+    throw e;
+  }
+}
+
+export type UpdateFolderArgs = {
+  folderId: string;
+  name?: string;
+  emoji?: string | null;
+  description?: string | null;
+};
+
+export async function updateFolderTool(
+  userId: string,
+  { folderId, ...input }: UpdateFolderArgs,
+): Promise<ToolResult> {
+  try {
+    const folder = await updateFolder(userId, folderId, input);
+    broadcastLinksChanged(userId);
+    return jsonContent(folder);
+  } catch (e) {
+    const content = folderErrorContent(e);
+    if (content) return content;
+    throw e;
+  }
+}
+
+export async function deleteFolderTool(
+  userId: string,
+  folderId: string,
+  deleteLinks = false,
+): Promise<ToolResult> {
+  try {
+    const result = await deleteFolder(userId, folderId, {
+      withLinks: deleteLinks,
+    });
+    broadcastLinksChanged(userId);
+    return jsonContent(result);
+  } catch (e) {
+    const content = folderErrorContent(e);
+    if (content) return content;
+    throw e;
+  }
+}
+
+export async function moveLinkTool(
+  userId: string,
+  linkId: string,
+  folderId: string | null,
+): Promise<ToolResult> {
+  try {
+    // `null` or "" takes the link out of its folder.
+    const link = await moveLinkToFolder(userId, linkId, folderId || null);
+    if (!link) return errorContent("Not found.");
+    broadcastLinksChanged(userId);
+    return jsonContent(serializeLink(link));
+  } catch (e) {
+    if (e instanceof FolderNotFoundError) {
+      return errorContent("Folder not found");
+    }
+    throw e;
+  }
+}
+
 export async function getLinkTool(
   userId: string,
   id: string,
@@ -173,6 +292,75 @@ export function registerPurlTools(server: McpServer): void {
     "List the user's folders (collections of saved links) with id, name, emoji, description and link count",
     {},
     async (_args, extra) => listFoldersTool(getUserId(extra)),
+  );
+
+  server.tool(
+    "create_folder",
+    "Create a folder to group saved links. Names are unique per user (case-insensitive).",
+    {
+      name: z.string().describe("Folder name (up to 60 characters)"),
+      emoji: z
+        .string()
+        .optional()
+        .describe("A single emoji for the folder (defaults to 🦪)"),
+      description: z
+        .string()
+        .optional()
+        .describe("Optional description (up to 160 characters)"),
+    },
+    { destructiveHint: false, idempotentHint: false },
+    async (args, extra) => createFolderTool(getUserId(extra), args),
+  );
+
+  server.tool(
+    "update_folder",
+    "Rename a folder or change its emoji or description. Omitted fields are left unchanged.",
+    {
+      folderId: z.string().describe("Folder id from list_folders"),
+      name: z.string().optional().describe("New name (up to 60 characters)"),
+      emoji: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("A single emoji; null or an empty string resets it to the default"),
+      description: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Up to 160 characters; null or an empty string clears it"),
+    },
+    { destructiveHint: false, idempotentHint: true },
+    async (args, extra) => updateFolderTool(getUserId(extra), args),
+  );
+
+  server.tool(
+    "delete_folder",
+    "Delete a folder. Its links are kept (moved out of the folder) unless deleteLinks is true, which permanently deletes them too.",
+    {
+      folderId: z.string().describe("Folder id from list_folders"),
+      deleteLinks: z
+        .boolean()
+        .optional()
+        .describe("Also permanently delete the folder's links (default false)"),
+    },
+    { destructiveHint: true, idempotentHint: false },
+    async ({ folderId, deleteLinks }, extra) =>
+      deleteFolderTool(getUserId(extra), folderId, deleteLinks),
+  );
+
+  server.tool(
+    "move_link",
+    "Move a saved link into a folder, or take it out of its folder.",
+    {
+      linkId: z.string().describe("The link id"),
+      folderId: z
+        .string()
+        .nullable()
+        .describe("Folder id from list_folders; null or an empty string removes the link from its folder"),
+    },
+    { destructiveHint: false, idempotentHint: true },
+    async ({ linkId, folderId }, extra) =>
+      moveLinkTool(getUserId(extra), linkId, folderId),
   );
 }
 

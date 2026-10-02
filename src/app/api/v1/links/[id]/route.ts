@@ -1,5 +1,14 @@
 import { auth } from "@/lib/auth";
-import { deleteLink, readLink, updateLink, UnauthorizedError } from "@/lib/links";
+import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
+import {
+  deleteLink,
+  moveLinkToFolder,
+  readLink,
+  UnauthorizedError,
+  updateLink,
+  updateLinkForUser,
+  type UpdateLinkData,
+} from "@/lib/links";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { serializeLink } from "@/lib/serialize-link";
 import { isValidUrl } from "@/utils/url";
@@ -30,11 +39,15 @@ export async function GET(
   }
 }
 
+/**
+ * Updates a link: `{ url?, title?, description?, folderId? }`. `folderId`
+ * files the link into that folder; `null` takes it out of its folder.
+ */
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
-  let body: { url?: string; title?: string; description?: string | null };
+  let body: UpdateLinkData & { folderId?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -44,12 +57,19 @@ export async function PATCH(
   const hasUrl = typeof body?.url === "string";
   const hasTitle = typeof body?.title === "string";
   const hasDescription = body?.description !== undefined;
-  if (!hasUrl && !hasTitle && !hasDescription) {
+  const hasFolderId =
+    body !== null && typeof body === "object" && "folderId" in body;
+
+  if (hasFolderId && body.folderId !== null && typeof body.folderId !== "string") {
+    return addCors(NextResponse.json({ error: "Invalid folder" }, { status: 400 }));
+  }
+
+  if (!hasUrl && !hasTitle && !hasDescription && !hasFolderId) {
     return addCors(
       NextResponse.json(
-        { error: "At least one of url, title, or description is required" },
-        { status: 400 }
-      )
+        { error: "At least one of url, title, description, or folderId is required" },
+        { status: 400 },
+      ),
     );
   }
 
@@ -58,21 +78,52 @@ export async function PATCH(
     return addCors(NextResponse.json({ error: "Invalid URL" }, { status: 400 }));
   }
 
+  const data: UpdateLinkData = {};
+  if (url !== undefined) data.url = url;
+  if (hasTitle) data.title = body.title as string;
+  if (hasDescription) data.description = body.description;
+  const hasOtherFields = hasUrl || hasTitle || hasDescription;
+
   try {
     const { id } = await context.params;
-    const updated = await updateLink(id, {
-      ...(url !== undefined ? { url } : {}),
-      ...(hasTitle ? { title: body.title } : {}),
-      ...(hasDescription ? { description: body.description } : {}),
-    });
+
+    if (!hasFolderId) {
+      // Fields only: `updateLink` resolves the session itself.
+      const updated = await updateLink(id, data);
+      if (!updated) {
+        return addCors(NextResponse.json({ error: "Not found" }, { status: 404 }));
+      }
+      broadcastLinksChanged(updated.userId);
+      return addCors(NextResponse.json(serializeLink(updated)));
+    }
+
+    // Same flow as the app's PATCH /api/links/[id]: check folder ownership
+    // before writing, then one write for a move (plus any field edits).
+    const session = await auth.api.getSession({ headers: await headers() });
+    const userId = session?.user?.id;
+    if (!userId) {
+      return addCors(NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
+    }
+    const folderId = (body.folderId as string | null) ?? null;
+    if (folderId !== null) {
+      // Throws FolderNotFoundError, handled below.
+      await assertFolderOwned(userId, folderId);
+    }
+
+    const updated = hasOtherFields
+      ? await updateLinkForUser(userId, id, { ...data, folderId })
+      : await moveLinkToFolder(userId, id, folderId);
     if (!updated) {
       return addCors(NextResponse.json({ error: "Not found" }, { status: 404 }));
     }
-    broadcastLinksChanged(updated.userId);
+    broadcastLinksChanged(userId);
     return addCors(NextResponse.json(serializeLink(updated)));
   } catch (e) {
     if (e instanceof UnauthorizedError) {
       return addCors(NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
+    }
+    if (e instanceof FolderNotFoundError) {
+      return addCors(NextResponse.json({ error: "Folder not found" }, { status: 404 }));
     }
     throw e;
   }
