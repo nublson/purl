@@ -6,19 +6,15 @@ Audited on 2026-05-28 against the `feature/byok` branch.
 
 ## Medium
 
-### `src/lib/proxy-rate-limit.ts:11` — IP spoofing bypasses rate limits
+### ~~`src/lib/proxy-rate-limit.ts` — IP spoofing bypasses rate limits~~ (withdrawn)
 
-The `clientIp` function takes the *first* entry from `x-forwarded-for`. On Vercel (and most reverse proxies), the client controls everything before the last IP in that header — Vercel appends the real client IP at the end. An attacker can send `x-forwarded-for: 1.2.3.4` to make every request appear to come from a fresh IP, completely bypassing auth, chat, and upload rate limits.
+**Status: not applicable on Vercel. Re-checked 2026-10-02.**
 
-```typescript
-// Before — client-controlled
-const first = forwarded.split(",")[0]?.trim();
+The original finding said `clientIp` reads the client-controlled first entry of `x-forwarded-for`, so a client could send `x-forwarded-for: 1.2.3.4` to get a fresh rate-limit bucket on every request. That's true behind proxies that append to the header, but not on Vercel. Vercel overwrites `x-forwarded-for` and does not forward client-supplied IPs ([Vercel request headers](https://vercel.com/docs/headers/request-headers)). On a direct Vercel deployment, the first (and only) entry is the connecting client's public IP, so it is a sound rate-limit key and no change is needed.
 
-// After — use the last entry, set by Vercel/the trusted proxy
-const ips = forwarded.split(",").map(s => s.trim()).filter(Boolean);
-const last = ips[ips.length - 1];
-if (last) return last;
-```
+**Revisit if** another proxy or CDN that appends to `x-forwarded-for` (Cloudflare, an Enterprise trusted proxy, a self-hosted load balancer) is ever put in front of the app. In that case, key on the entry that proxy appends, or on its own client-IP header, instead of the first entry.
+
+Related: username changes are now rate-limited per user after authentication (`src/app/api/user/username/route.ts`), not per IP.
 
 ---
 
@@ -91,7 +87,8 @@ const BASE_SECURITY_HEADERS = [
 
 ## Fix Priority
 
-1. **Fix IP extraction in rate limiter (Medium)** — actively exploitable, trivial to fix
-2. **Pin Chrome extension ID (Medium)** — low likelihood but easy to lock down
-3. **Add `X-Frame-Options` (Low)** — belt-and-suspenders for older browsers
-4. **Add `hideSourceMaps: true` (Low)** — limits code exposure if Sentry upload config changes
+1. **Pin Chrome extension ID (Medium)** — low likelihood but easy to lock down
+2. **Add `X-Frame-Options` (Low)** — belt-and-suspenders for older browsers
+3. **Add `hideSourceMaps: true` (Low)** — limits code exposure if Sentry upload config changes
+
+~~Fix IP extraction in rate limiter~~ — withdrawn 2026-10-02: Vercel overwrites `x-forwarded-for`, so it isn't spoofable on this deployment (see above).
