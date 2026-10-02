@@ -19,6 +19,7 @@ const TAKEN_MESSAGE = "That username is taken";
 const AVAILABILITY_DEBOUNCE_MS = 300;
 
 const AVAILABILITY_CHECK_ERROR_MESSAGE = "Couldn't check availability. Try again.";
+const RATE_LIMITED_MESSAGE = "Too many username changes. Try again in a while.";
 
 type FieldStatus =
   | { kind: "unchanged" }
@@ -26,7 +27,10 @@ type FieldStatus =
   | { kind: "checking" }
   | { kind: "taken" }
   | { kind: "available" }
-  | { kind: "check-error" };
+  | { kind: "check-error" }
+  // The server refused the change (429). Save stays disabled until the
+  // value changes and is checked again.
+  | { kind: "rate-limited" };
 
 interface DialogEditUsernameProps {
   children: React.ReactNode;
@@ -118,7 +122,9 @@ function EditUsernameForm({ onSuccess }: { onSuccess: () => void }) {
             ? "Username is available"
             : status.kind === "check-error"
               ? AVAILABILITY_CHECK_ERROR_MESSAGE
-              : null;
+              : status.kind === "rate-limited"
+                ? RATE_LIMITED_MESSAGE
+                : null;
 
   const canSave = status.kind === "available" && !saving;
 
@@ -141,6 +147,8 @@ function EditUsernameForm({ onSuccess }: { onSuccess: () => void }) {
       if (!res.ok) {
         if (res.status === 409 || body?.code === "TAKEN") {
           setStatus({ kind: "taken" });
+        } else if (res.status === 429) {
+          setStatus({ kind: "rate-limited" });
         } else {
           toast.error(body?.error ?? "Unable to update your username. Try again.");
         }

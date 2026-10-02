@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { getBrowserSessionUserId } from "@/lib/require-browser-session";
+import { getUsernameChangeRateLimiter } from "@/lib/upstash-rate-limit";
 import { isUsernameTaken, setUsername } from "@/lib/username-store";
 import { validateUsername } from "@/lib/usernames";
 import { NextRequest, NextResponse } from "next/server";
@@ -55,6 +56,21 @@ export async function PATCH(request: NextRequest) {
       { error: TAKEN_MESSAGE, code: "TAKEN" },
       { status: 409 },
     );
+  }
+
+  // Rate-limit actual changes per user (not per IP, and only after the
+  // session check): signed-out requests, rejected names and no-op saves don't
+  // use up anyone's quota.
+  const limiter = getUsernameChangeRateLimiter();
+  if (limiter) {
+    const { success, reset } = await limiter.limit(userId);
+    if (!success) {
+      const retryAfter = Math.max(1, Math.ceil((reset - Date.now()) / 1000));
+      return NextResponse.json(
+        { error: "Too many username changes. Try again in a while.", code: "RATE_LIMITED" },
+        { status: 429, headers: { "Retry-After": String(retryAfter) } },
+      );
+    }
   }
 
   const result = await setUsername(userId, username);
