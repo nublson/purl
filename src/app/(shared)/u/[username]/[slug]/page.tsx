@@ -2,12 +2,14 @@ import { FolderEmoji } from "@/components/folder-emoji";
 import { Logo } from "@/components/logo";
 import { SharedFolderList } from "@/components/shared-folder-list";
 import { Typography } from "@/components/typography";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   getPublicFolderPage,
   publicFolderPath,
 } from "@/lib/public-folders";
 import { getRequestTimeZone } from "@/lib/time-zone";
+import { LayoutGrid, List } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 
@@ -62,34 +64,51 @@ export default async function SharedFolderPage({
       {/* The app header's frame (header.tsx), with the folder as a label
           where the switcher would be. */}
       <header className="fixed inset-x-0 top-0 z-50 transform-none">
-        <div className="flex w-full items-center gap-2 bg-linear-to-b from-background to-transparent p-4">
-          <div className="shrink-0">
-            <Logo size={32} pathname="/" />
-          </div>
-          <Separator
-            orientation="vertical"
-            className="data-vertical:h-5 data-vertical:self-center"
-          />
-          {/* The switcher button's box (ghost, sm, ps-2), so the emoji and
-              name sit where they do in the app. */}
-          <div className="flex h-8 min-w-0 items-center gap-2 ps-2">
-            <FolderEmoji emoji={folder.emoji} />
-            <Typography
-              component="h1"
-              size="small"
-              className="max-w-52 shrink-0 truncate text-foreground"
-            >
-              {folder.name}
-            </Typography>
-            {folder.description ? (
+        <div className="flex w-full items-center justify-between gap-2 bg-linear-to-b from-background to-transparent p-4">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="shrink-0">
+              <Logo size={32} pathname="/" />
+            </div>
+            <Separator
+              orientation="vertical"
+              className="data-vertical:h-5 data-vertical:self-center"
+            />
+            {/* The switcher button's box (ghost, sm, ps-2), so the emoji and
+                name sit where they do in the app. */}
+            <div className="flex h-8 min-w-0 items-center gap-2 ps-2">
+              <FolderEmoji emoji={folder.emoji} />
               <Typography
-                component="p"
+                component="h1"
                 size="small"
-                className="hidden min-w-0 truncate sm:block"
+                className="min-w-0 truncate text-foreground"
               >
-                {folder.description}
+                {folder.name}
               </Typography>
-            ) : null}
+            </div>
+          </div>
+          {/* List / grid view. Not wired yet: list is the only view. */}
+          <div
+            role="group"
+            aria-label="View"
+            className="flex shrink-0 items-center gap-1"
+          >
+            <Button
+              variant="secondary"
+              size="icon-sm"
+              aria-label="List view"
+              aria-pressed="true"
+            >
+              <List />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Grid view"
+              aria-pressed="false"
+              className="text-muted-foreground"
+            >
+              <LayoutGrid />
+            </Button>
           </div>
         </div>
       </header>
