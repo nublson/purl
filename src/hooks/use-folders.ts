@@ -115,7 +115,7 @@ export function useFolderActions(): {
   moveLinks: (
     linkIds: string[],
     folderId: string | null,
-    opts?: { target?: FolderSummary },
+    opts?: { target?: FolderSummary; quietError?: boolean },
   ) => Promise<ActionResult<{ moved: number }>>;
 } {
   const { folders, upsertFolder, removeFolderLocally, initialTotalLinks } =
@@ -282,11 +282,12 @@ export function useFolderActions(): {
       folderId: string | null,
       // The target folder when the caller has it and the list may not yet
       // (a folder created a moment ago), so the toast can name it.
-      opts?: { target?: FolderSummary },
+      // `quietError`: the caller reports a failure itself.
+      opts?: { target?: FolderSummary; quietError?: boolean },
     ): Promise<ActionResult<{ moved: number }>> => {
       const result = await patchLinksFolder(linkIds, folderId);
       if (!result.ok) {
-        toast.error(result.error);
+        if (!opts?.quietError) toast.error(result.error);
         return result;
       }
       const { moved } = result.data;

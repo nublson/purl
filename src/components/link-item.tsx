@@ -271,6 +271,11 @@ export const LinkItem = React.forwardRef<
           )}
           onClick={(event) => {
             event.preventDefault();
+            // A long-press started here already toggled the row.
+            if (longPressedRef.current) {
+              longPressedRef.current = false;
+              return;
+            }
             linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
           }}
         />

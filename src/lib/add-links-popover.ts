@@ -31,6 +31,8 @@ function subscribe(listener: () => void) {
 export const addLinksPopover = {
   open: (anchor: AddLinksAnchor) => set(anchor),
   close: () => set(null),
+  /** The anchor it's open on, or null. */
+  current: (): AddLinksAnchor | null => openAnchor,
 };
 
 export function useAddLinksPopoverAnchor(): AddLinksAnchor | null {

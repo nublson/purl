@@ -8,9 +8,14 @@ export function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Whether a dialog or menu is open: Radix locks page scrolling while one
- * is, and those handle their own keys.
+ * Whether a dialog, menu or popover is open; those handle their own keys.
+ * Modal ones lock page scrolling; popovers (e.g. Add links) are non-modal,
+ * so they're found by their open content instead. Tooltips don't count.
  */
 export function isOverlayOpen(): boolean {
-  return document.body.hasAttribute("data-scroll-locked");
+  return (
+    document.body.hasAttribute("data-scroll-locked") ||
+    document.querySelector('[data-slot="popover-content"][data-state="open"]') !==
+      null
+  );
 }

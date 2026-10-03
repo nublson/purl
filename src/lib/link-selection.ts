@@ -144,6 +144,16 @@ export const linkSelection = {
   selectAll() {
     setState({ selected: new Set(order), anchor: state.anchor });
   },
+  /** Unselects `ids` (e.g. the links an action just moved), keeping the rest. */
+  remove(ids: readonly string[]) {
+    const gone = new Set(ids);
+    const kept = Array.from(state.selected).filter((id) => !gone.has(id));
+    if (kept.length === state.selected.size) return;
+    setState({
+      selected: kept.length ? new Set(kept) : EMPTY_SET,
+      anchor: state.anchor !== null && gone.has(state.anchor) ? null : state.anchor,
+    });
+  },
   /** Leaves selection mode. */
   clear() {
     setState(EMPTY_SELECTION);

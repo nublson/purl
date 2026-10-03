@@ -7,7 +7,7 @@ import {
   type FolderSummary,
 } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
-import { formatLinkCount } from "@/lib/folder-display";
+import { formatFolderLabel, formatLinkCount } from "@/lib/folder-display";
 import {
   linkSelection,
   useSelectableLinkCount,
@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import * as React from "react";
+import { toast } from "sonner";
 import { DialogFolderForm } from "./dialog-folder-form";
 import { FolderEmoji } from "./folder-emoji";
 import { Typography } from "./typography";
@@ -93,8 +94,19 @@ export function LinkSelectionBar({
       target?: FolderSummary,
     ) => {
       if (ids.length === 0) return;
-      const result = await moveLinks(ids, folderId, { target });
-      if (result.ok) linkSelection.clear();
+      const result = await moveLinks(ids, folderId, {
+        target,
+        quietError: target !== undefined,
+      });
+      // Only the moved links leave the selection: ones picked while the
+      // request was in flight stay selected.
+      if (result.ok) linkSelection.remove(ids);
+      else if (target) {
+        // "New folder…": the folder exists now even though the move failed.
+        toast.error(
+          `Created ${formatFolderLabel(target)}, but the links weren’t moved into it. Use Move to try again.`,
+        );
+      }
     },
     [moveLinks],
   );
