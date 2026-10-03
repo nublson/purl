@@ -344,22 +344,10 @@ export function HomeShell({
 
   return (
     <>
-      <LinkSelectionBar folderOf={folderOf} />
       <PasteHandler
         onPasteStart={onPasteStart}
         onSaveSuccess={onSaveSuccess}
         onSaveError={onSaveError}
-      />
-      <LinkOmnibox
-        value={query}
-        onChange={setQuery}
-        onSave={saveFromField}
-        saveUrl={saveUrl}
-        placeholder={
-          folderId
-            ? `Search ${currentFolder?.name ?? "this folder"} or paste a link`
-            : "Search or paste a link"
-        }
       />
       {saveUrl ? (
         <OmniboxSaveRow
@@ -440,6 +428,20 @@ export function HomeShell({
           }
         />
       ) : null}
+      {/* Pinned to the bottom, so they come last in the page too: keyboard
+          order follows the screen (list, selection bar, search field). */}
+      <LinkSelectionBar folderOf={folderOf} />
+      <LinkOmnibox
+        value={query}
+        onChange={setQuery}
+        onSave={saveFromField}
+        saveUrl={saveUrl}
+        placeholder={
+          folderId
+            ? `Search ${currentFolder?.name ?? "this folder"} or paste a link`
+            : "Search or paste a link"
+        }
+      />
     </>
   );
 }

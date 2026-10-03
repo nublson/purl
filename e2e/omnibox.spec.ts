@@ -109,6 +109,32 @@ test.describe("Search field", () => {
   });
 });
 
+test.describe("Search field, keyboard order", () => {
+  test("Tab follows the screen: header, links, then the search field", async ({ page, seed, browserName }) => {
+    // WebKit skips buttons on Tab (Safari's default), so the order can't be read there.
+    test.skip(browserName === "webkit", "Tab skips buttons in WebKit");
+    await seed.link({ url: "https://a.example", title: "Alpha" });
+    await open(page, "/home");
+
+    const order: string[] = [];
+    for (let i = 0; i < 8; i++) {
+      await page.keyboard.press("Tab");
+      order.push(
+        await page.evaluate(() => {
+          const el = document.activeElement;
+          return el?.getAttribute("aria-label") ?? el?.tagName.toLowerCase() ?? "";
+        }),
+      );
+    }
+    const at = (name: string) => order.indexOf(name);
+    expect(at("Account menu")).toBeGreaterThanOrEqual(0);
+    expect(at("Alpha (opens in new tab)")).toBeGreaterThan(at("Account menu"));
+    expect(at("Search your links or paste a link to save")).toBeGreaterThan(
+      at("Open link menu"),
+    );
+  });
+});
+
 test.describe("Search field on a phone", () => {
   test.use({ viewport: { width: 375, height: 812 } });
 
