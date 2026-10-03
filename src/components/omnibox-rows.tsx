@@ -119,11 +119,13 @@ export function OmniboxSaveRow({
         ) : null}
       </Typography>
       <TooltipWrapper content="Save (↵)">
+        {/* Primary: the one thing this not-yet-saved row is for (and what
+            Enter does). Already saved, saving again only refreshes it. */}
         <Button
-          variant="ghost"
+          variant={alreadySaved ? "outline" : "default"}
           size="icon-sm"
           aria-label={`Save ${link?.title ?? shown}${alreadySaved ? " (already saved)" : ""}`}
-          className="cursor-pointer text-muted-foreground hover:text-foreground"
+          className="cursor-pointer"
           onClick={onSave}
         >
           <Plus />
