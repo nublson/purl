@@ -37,11 +37,11 @@ const LINK_ROW = {
   favicon: "https://a.example/favicon.ico",
   contentType: "WEB",
   createdAt: new Date("2026-10-01T00:00:00Z"),
+  description: "About A",
+  thumbnail: "https://a.example/og.png",
   // Private fields the page must not expose:
   userId: "u1",
   folderId: "f1",
-  description: "private notes",
-  thumbnail: null,
 };
 
 describe("getPublicFolderPage", () => {
@@ -74,6 +74,8 @@ describe("getPublicFolderPage", () => {
           id: "l1",
           url: "https://a.example",
           title: "A",
+          description: "About A",
+          thumbnail: "https://a.example/og.png",
           domain: "a.example",
           favicon: "https://a.example/favicon.ico",
           contentType: "WEB",

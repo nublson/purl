@@ -6,7 +6,7 @@ import { expect, test } from "./fixtures";
 test.describe("Shared folders, visited signed out", () => {
   test.use({ signedIn: false });
 
-  test("a public folder shows its owner, folder and links, and isn't indexed", async ({
+  test("a public folder shows the folder and its links, and isn't indexed", async ({
     page,
     seed,
     testUser,
@@ -23,7 +23,6 @@ test.describe("Shared folders, visited signed out", () => {
     const response = await page.goto(`/@${testUser.username}/design`);
     expect(response?.status()).toBe(200);
     await expect(page.getByRole("heading", { level: 1 })).toContainText("Design");
-    await expect(page.getByText(`@${testUser.username}`)).toBeVisible();
     await expect(page.getByRole("link", { name: /Alpha article/ })).toHaveAttribute(
       "href",
       "https://a.example",
@@ -66,7 +65,17 @@ test.describe("Shared folders, visited signed out", () => {
     expect(body.links.map((link) => link.title)).toEqual(["Alpha"]);
     // Only public fields.
     expect(Object.keys(body.links[0]).sort()).toEqual(
-      ["contentType", "createdAt", "domain", "favicon", "id", "title", "url"].sort(),
+      [
+        "contentType",
+        "createdAt",
+        "description",
+        "domain",
+        "favicon",
+        "id",
+        "thumbnail",
+        "title",
+        "url",
+      ].sort(),
     );
   });
 });

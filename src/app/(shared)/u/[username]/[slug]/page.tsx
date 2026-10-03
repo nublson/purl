@@ -1,23 +1,23 @@
+import { FolderEmoji } from "@/components/folder-emoji";
+import { Logo } from "@/components/logo";
+import { SharedFolderList } from "@/components/shared-folder-list";
 import { Typography } from "@/components/typography";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import {
   getPublicFolderPage,
   publicFolderPath,
 } from "@/lib/public-folders";
 import { getRequestTimeZone } from "@/lib/time-zone";
-import { formatDomain } from "@/utils/formatter";
-import { groupLinksByDate } from "@/utils/links";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
 
 type Params = { username: string; slug: string };
 
 /**
  * A shared folder: /@username/slug (see the rewrite in next.config.ts).
- * Read-only, never indexed. A placeholder layout until the design lands:
- * header (owner), the folder, its links grouped by day, and a "Made with
- * Purl" footer. Old usernames and slugs redirect to the current URL.
+ * Read-only, never indexed. Looks exactly like the owner's folder page: the
+ * app header (logo, then the folder where the switcher would be) and the
+ * same list. Old usernames and slugs redirect to the current URL.
  */
 export async function generateMetadata({
   params,
@@ -43,14 +43,11 @@ export async function generateMetadata({
 
 export default async function SharedFolderPage({
   params,
-  searchParams,
 }: {
   params: Promise<Params>;
-  searchParams: Promise<{ cursor?: string }>;
 }) {
   const { username, slug } = await params;
-  const { cursor } = await searchParams;
-  const page = await getPublicFolderPage(username, slug, { cursor });
+  const page = await getPublicFolderPage(username, slug);
 
   if (!page) notFound();
   if (page.kind === "redirect") {
@@ -58,110 +55,52 @@ export default async function SharedFolderPage({
   }
 
   const timeZone = await getRequestTimeZone();
-  const groups = groupLinksByDate(
-    page.links.map((link) => ({
-      ...link,
-      description: null,
-      thumbnail: null,
-      folderId: null,
-    })),
-    { timeZone },
-  );
   const { owner, folder } = page;
 
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-10">
-      <header className="flex items-center gap-3">
-        <Avatar className="size-8">
-          {owner.image ? <AvatarImage src={owner.image} alt="" /> : null}
-          <AvatarFallback>{owner.name.slice(0, 1).toUpperCase()}</AvatarFallback>
-        </Avatar>
-        <Typography component="span" className="flex flex-col">
-          <Typography component="span" size="small" className="font-medium text-foreground">
-            {owner.name}
-          </Typography>
-          <Typography component="span" size="mini">
-            @{owner.username}
-          </Typography>
-        </Typography>
-      </header>
-
-      <section className="flex flex-col gap-2">
-        <Typography component="h1" variant="h1" className="flex items-center gap-2 text-2xl">
-          <Typography component="span" aria-hidden className="text-2xl">
-            {folder.emoji}
-          </Typography>
-          {folder.name}
-        </Typography>
-        {folder.description ? (
-          <Typography component="p" size="small">
-            {folder.description}
-          </Typography>
-        ) : null}
-      </section>
-
-      {groups.length === 0 ? (
-        <Typography component="p" size="small">
-          No links here yet.
-        </Typography>
-      ) : (
-        <div className="flex flex-col gap-8">
-          {groups.map((group) => (
-            <section key={group.label} className="flex flex-col gap-2">
-              <Typography component="h2" size="mini" className="ms-2 font-medium">
-                {group.label}
-              </Typography>
-              <ul className="flex flex-col">
-                {group.links.map((link) => (
-                  <Typography component="li" key={link.id}>
-                    <a
-                      href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="grid h-12 grid-cols-[20px_1fr] items-center gap-4 rounded-md p-2 outline-none hover:bg-accent/40 focus-visible:ring-3 focus-visible:ring-ring"
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={link.favicon} alt="" className="size-5 rounded" />
-                      <Typography component="span" className="flex min-w-0 items-baseline gap-2">
-                        <Typography
-                          component="span"
-                          size="small"
-                          className="min-w-0 truncate font-medium text-accent-foreground"
-                        >
-                          {link.title}
-                        </Typography>
-                        <Typography component="span" size="small" className="hidden shrink-0 md:block">
-                          {formatDomain(link.domain)}
-                        </Typography>
-                      </Typography>
-                    </a>
-                  </Typography>
-                ))}
-              </ul>
-            </section>
-          ))}
-          {page.nextCursor ? (
-            <Link
-              href={`${publicFolderPath(owner.username, folder.slug)}?cursor=${encodeURIComponent(page.nextCursor)}`}
-              className="self-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+    <>
+      {/* The app header's frame (header.tsx), with the folder as a label
+          where the switcher would be. */}
+      <header className="fixed inset-x-0 top-0 z-50 transform-none">
+        <div className="flex w-full items-center gap-2 bg-linear-to-b from-background to-transparent p-4">
+          <div className="shrink-0">
+            <Logo size={32} pathname="/" />
+          </div>
+          <Separator
+            orientation="vertical"
+            className="data-vertical:h-5 data-vertical:self-center"
+          />
+          {/* The switcher button's box (ghost, sm, ps-2), so the emoji and
+              name sit where they do in the app. */}
+          <div className="flex h-8 min-w-0 items-center gap-2 ps-2">
+            <FolderEmoji emoji={folder.emoji} />
+            <Typography
+              component="h1"
+              size="small"
+              className="max-w-52 shrink-0 truncate text-foreground"
             >
-              Older links
-            </Link>
-          ) : null}
+              {folder.name}
+            </Typography>
+            {folder.description ? (
+              <Typography
+                component="p"
+                size="small"
+                className="hidden min-w-0 truncate sm:block"
+              >
+                {folder.description}
+              </Typography>
+            ) : null}
+          </div>
         </div>
-      )}
-
-      <footer className="border-t pt-6">
-        <Typography component="p" size="mini">
-          Made with{" "}
-          <Link
-            href="/"
-            className="font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            Purl
-          </Link>
-        </Typography>
-      </footer>
-    </div>
+      </header>
+      <div className="wrapper-private flex flex-1 flex-col gap-8 pt-24 pb-12">
+        <SharedFolderList
+          initialLinks={page.links}
+          initialNextCursor={page.nextCursor}
+          timeZone={timeZone}
+          apiPath={`/api/public/folders/${owner.username}/${folder.slug}`}
+        />
+      </div>
+    </>
   );
 }

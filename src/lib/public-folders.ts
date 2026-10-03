@@ -8,11 +8,13 @@ import prisma from "@/lib/prisma";
 /** Links per page on a shared folder (first render and each "load more"). */
 export const PUBLIC_FOLDER_PAGE_SIZE = 50;
 
-/** A link as visitors see it: only what the list shows. */
+/** A link as visitors see it: what the list and its hover preview show. */
 export type PublicLink = {
   id: string;
   url: string;
   title: string;
+  description: string | null;
+  thumbnail: string | null;
   domain: string;
   favicon: string;
   contentType: ContentType;
@@ -132,6 +134,8 @@ export async function getPublicFolderPage(
       id: link.id,
       url: link.url,
       title: link.title,
+      description: link.description,
+      thumbnail: link.thumbnail,
       domain: link.domain,
       favicon: link.favicon,
       contentType: link.contentType,
