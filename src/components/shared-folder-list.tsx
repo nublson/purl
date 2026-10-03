@@ -5,7 +5,14 @@ import type { PublicLink } from "@/lib/public-folders";
 import type { Link } from "@/utils/links";
 import { PackageOpen } from "lucide-react";
 import { BouncingDots } from "loading-dev";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { cn } from "@/lib/utils";
 import { SharedLinkCard } from "./shared-link-card";
 import { useSharedFolderView } from "./shared-folder-view";
@@ -114,15 +121,17 @@ export function SharedFolderList({
       {view === "grid" ? (
         <ul
           aria-label="Links"
-          // 2 columns on phones, 3 on tablets, 4 on desktop; cards up to
-          // 210px, centered. Gutters widen with the room (16 → 40px).
-          // items-start: each card keeps its own height.
-          className="grid w-full grid-cols-[repeat(2,minmax(0,210px))] items-start justify-center gap-x-4 gap-y-6 md:grid-cols-[repeat(3,minmax(0,210px))] md:gap-x-10 md:gap-y-10 lg:grid-cols-[repeat(4,minmax(0,210px))]"
+          // Masonry: 2 columns on phones, 3 on tablets, 4 on desktop; cards
+          // up to 210px, centered, gutters 16 → 40px. 1px rows with no row
+          // gap: each card spans its own height (see MasonryItem), so a
+          // short card sits right under the one above it. DOM order stays
+          // newest first, left to right, for keyboard and screen readers.
+          className="grid w-full auto-rows-[1px] grid-cols-[repeat(2,minmax(0,210px))] justify-center gap-x-4 md:grid-cols-[repeat(3,minmax(0,210px))] md:gap-x-10 lg:grid-cols-[repeat(4,minmax(0,210px))]"
         >
           {links.map((link, index) => (
-            <li key={link.id}>
+            <MasonryItem key={link.id}>
               <SharedLinkCard link={link} eagerThumbnail={index < 4} />
-            </li>
+            </MasonryItem>
           ))}
         </ul>
       ) : (
@@ -157,5 +166,35 @@ export function SharedFolderList({
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * A grid cell that spans as many 1px rows as its card is tall, plus the
+ * vertical gutter (its bottom padding: 24px, 40px from md). Measured before
+ * paint and again whenever the card resizes (fonts, a title rewrapping).
+ */
+function MasonryItem({ children }: { children: ReactNode }) {
+  const [span, setSpan] = useState<number | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    const measure = () => setSpan(Math.ceil(box.getBoundingClientRect().height));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <li
+      // Hidden until measured, so cards never paint stacked on each other.
+      className={span === null ? "invisible" : undefined}
+      style={span === null ? undefined : { gridRowEnd: `span ${span}` }}
+    >
+      <div ref={boxRef} className="pb-6 md:pb-10">
+        {children}
+      </div>
+    </li>
   );
 }

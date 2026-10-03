@@ -72,7 +72,18 @@ test.describe("Shared folders, visited signed out", () => {
       await page.screenshot({ path: `${process.env.SHARE_SCREENSHOTS}/${testInfo.project.name}-grid.png` });
     }
 
-    await list.click();
+    // The choice is remembered: a reload opens straight in the grid.
+    await page.reload();
+    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(5);
+    await expect(page.getByRole("button", { name: "Grid view" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    await waitForHydration(page, 'button[aria-label="Grid view"]');
+    await page.getByRole("button", { name: "List view" }).click();
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
+    await page.reload();
     await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
   });
 
