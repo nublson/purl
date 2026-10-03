@@ -21,10 +21,43 @@ const PREVIEW_DEBOUNCE_MS = 300;
 type Preview = Pick<
   Link,
   "url" | "domain" | "title" | "favicon" | "thumbnail" | "contentType" | "description"
->;
+> & {
+  /** You already have this URL: saving refreshes that link. */
+  saved: boolean;
+};
 
-/** Previews already fetched this session, by URL. */
-const previewCache = new Map<string, Preview>();
+/** How long a fetched preview is reused (typing the same URL again). */
+const PREVIEW_TTL_MS = 5 * 60_000;
+/** Most previews kept; the oldest go first. */
+const PREVIEW_CACHE_SIZE = 50;
+
+/** Recent previews by URL, oldest first (Map keeps insertion order). */
+const previewCache = new Map<string, { preview: Preview; at: number }>();
+
+function cachedPreview(url: string): Preview | null {
+  const entry = previewCache.get(url);
+  if (!entry) return null;
+  if (Date.now() - entry.at > PREVIEW_TTL_MS) {
+    previewCache.delete(url);
+    return null;
+  }
+  return entry.preview;
+}
+
+function cachePreview(url: string, preview: Preview) {
+  previewCache.delete(url);
+  previewCache.set(url, { preview, at: Date.now() });
+  while (previewCache.size > PREVIEW_CACHE_SIZE) {
+    const oldest = previewCache.keys().next().value;
+    if (oldest === undefined) break;
+    previewCache.delete(oldest);
+  }
+}
+
+/** Drops `url`'s preview, e.g. once it's saved (its `saved` is now stale). */
+export function forgetLinkPreview(url: string) {
+  previewCache.delete(url);
+}
 
 /**
  * `url`'s preview (`GET /api/links/preview`), fetched once the URL has
@@ -36,10 +69,10 @@ function useLinkPreview(url: string): Preview | null {
     url: string;
     preview: Preview;
   } | null>(null);
-  const cached = previewCache.get(url) ?? null;
+  const cached = cachedPreview(url);
 
   React.useEffect(() => {
-    if (previewCache.has(url)) return;
+    if (cachedPreview(url)) return;
     const controller = new AbortController();
     const timer = setTimeout(() => {
       fetch(`/api/links/preview?url=${encodeURIComponent(url)}`, {
@@ -48,7 +81,7 @@ function useLinkPreview(url: string): Preview | null {
         .then(async (res) => {
           if (!res.ok) return;
           const preview = (await res.json()) as Preview;
-          previewCache.set(url, preview);
+          cachePreview(url, preview);
           setFetched({ url, preview });
         })
         .catch(() => {
@@ -68,8 +101,9 @@ function useLinkPreview(url: string): Preview | null {
  * First row of the list while the search field holds a URL: the link as it
  * would look saved (favicon, title, domain, from a preview fetch), with +
  * where a saved row has its menu. + (or Enter in the field) saves it. Says
- * when the URL is already saved; saving again just refreshes it (or files
- * it into this folder).
+ * when the URL is already saved (the server's answer once the preview is
+ * in; `alreadySaved`, from the loaded list, until then); saving again just
+ * refreshes it (or files it into this folder).
  */
 export function OmniboxSaveRow({
   url,
@@ -81,12 +115,14 @@ export function OmniboxSaveRow({
   onSave: () => void;
 }) {
   const preview = useLinkPreview(url);
+  // The server knows every saved link; the loaded list is only a first guess.
+  const saved = preview ? preview.saved : alreadySaved;
   const shown = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
   const link: Link | null = preview
     ? { ...preview, id: "preview", createdAt: new Date(0), folderId: null }
     : null;
 
-  const label = `Save ${link?.title ?? shown}${alreadySaved ? " (already saved)" : ""}`;
+  const label = `Save ${link?.title ?? shown}${saved ? " (already saved)" : ""}`;
   return (
     // The whole row saves (as Enter in the field does).
     <button
@@ -131,7 +167,7 @@ export function OmniboxSaveRow({
         >
           {link ? formatDomain(link.domain) : null}
         </Typography>
-        {alreadySaved ? (
+        {saved ? (
           <Typography component="span" size="mini" className="shrink-0">
             Already saved
           </Typography>
@@ -151,7 +187,7 @@ export function OmniboxSaveRow({
           component="span"
           className={cn(
             buttonVariants({
-              variant: alreadySaved ? "outline" : "default",
+              variant: saved ? "outline" : "default",
               size: "icon-xs",
             }),
             // Press feedback lives on the +: scaling the whole row would look wrong.

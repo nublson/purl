@@ -101,3 +101,9 @@ export function getLeavingPhase(id: string): LeavingPhase | undefined {
 export function useLeavingLinks(): ReadonlyMap<string, { phase: LeavingPhase }> {
   return useSyncExternalStore(subscribe, () => leaving, () => EMPTY);
 }
+
+/** Drops every leaving mark (the list they belong to is going away). */
+export function clearLeavingLinks() {
+  if (leaving.size === 0) return;
+  commit(new Map());
+}

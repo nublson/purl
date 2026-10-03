@@ -67,12 +67,22 @@ test.describe("Search field", () => {
   test("an exact URL that's saved says so", async ({ page, seed }) => {
     await seed.link({ url: "https://example.com/post", title: "A post" });
     await open(page, "/home");
-    await field(page).fill("http://www.example.com/post/");
+    await field(page).fill("https://example.com/post");
     await expect(saveRow(page)).toContainText("Already saved");
     // A click anywhere on the row saves (here: refreshes the saved link).
     await saveRow(page).click({ position: { x: 200, y: 24 } });
     await expect(field(page)).toHaveValue("");
     await expect(rows(page)).toHaveCount(1, { timeout: 20_000 });
+  });
+
+  test("a URL saved outside the list on screen still says Already saved", async ({ page, seed }) => {
+    await seed.folder({ name: "Reading", slug: "reading" });
+    const work = await seed.folder({ name: "Work", slug: "work" });
+    await seed.link({ url: "https://example.com/post", title: "A post", folderId: work });
+    await open(page, "/folders/reading");
+    await field(page).fill("https://example.com/post");
+    // Not in this folder's list; the server's answer arrives with the preview.
+    await expect(saveRow(page)).toContainText("Already saved", { timeout: 15_000 });
   });
 
   test("a folder searches itself, and Search all links widens it", async ({ page, seed }) => {

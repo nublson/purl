@@ -660,6 +660,21 @@ export async function moveLinkToFolder(
 }
 
 /**
+ * Whether `userId` already saved any of `urls`, matched the way saving
+ * matches (exact URL), so "Already saved" agrees with what a save would do.
+ */
+export async function isUrlSavedForUser(
+  userId: string,
+  urls: string[],
+): Promise<boolean> {
+  const found = await prisma.link.findFirst({
+    where: { userId, url: { in: Array.from(new Set(urls)) } },
+    select: { id: true },
+  });
+  return found !== null;
+}
+
+/**
  * Moves every link in `linkIds` owned by `userId` into `folderId` (or out of
  * its folder with `null`) in one write. Ids that aren't the user's are
  * skipped and reported in `notFound`. Throws `FolderNotFoundError` when

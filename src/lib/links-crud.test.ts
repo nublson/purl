@@ -67,6 +67,7 @@ const {
   deleteLinksForUser,
   searchLinksForUser,
   listLinksForUser,
+  isUrlSavedForUser,
   scrapeLinkMetadata,
   UnauthorizedError,
 } = await import("./links");
@@ -1172,6 +1173,21 @@ describe("listLinksForUser – search", () => {
       where: Record<string, unknown>;
     };
     expect(where).toEqual({ userId: "user-123" });
+  });
+});
+
+describe("isUrlSavedForUser", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("matches the user's links by exact URL, any of the given forms", async () => {
+    vi.mocked(prisma.link.findFirst).mockResolvedValue({ id: "l1" } as never);
+    expect(await isUrlSavedForUser("user-123", ["a.com", "https://a.com/", "a.com"])).toBe(true);
+    expect(prisma.link.findFirst).toHaveBeenCalledWith({
+      where: { userId: "user-123", url: { in: ["a.com", "https://a.com/"] } },
+      select: { id: true },
+    });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
+    expect(await isUrlSavedForUser("user-123", ["b.com"])).toBe(false);
   });
 });
 

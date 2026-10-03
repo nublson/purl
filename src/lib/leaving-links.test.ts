@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  clearLeavingLinks,
   getLeavingPhase as phaseOf,
   leavingFadeRemaining,
   LINK_LEAVE_MS,
@@ -29,5 +30,12 @@ describe("leaving links", () => {
     // ...one that started after does.
     settleLeavingLinks(1_000);
     expect(phaseOf("a")).toBeUndefined();
+  });
+
+  it("clearLeavingLinks drops every mark", () => {
+    markLinksLeaving(["b"]);
+    vi.advanceTimersByTime(LINK_LEAVE_MS);
+    clearLeavingLinks();
+    expect(phaseOf("b")).toBeUndefined();
   });
 });

@@ -7,7 +7,11 @@ const mockGetSessionUser = vi.fn();
 vi.mock("@/lib/session", () => ({ getSessionUser: mockGetSessionUser }));
 
 const mockResolve = vi.fn();
-vi.mock("@/lib/links", () => ({ resolveLinkFromUrl: mockResolve }));
+const mockIsSaved = vi.fn();
+vi.mock("@/lib/links", () => ({
+  resolveLinkFromUrl: mockResolve,
+  isUrlSavedForUser: mockIsSaved,
+}));
 
 const { GET } = await import("./route");
 
@@ -29,14 +33,17 @@ describe("GET /api/links/preview", () => {
     vi.clearAllMocks();
     mockGetSessionUser.mockResolvedValue({ id: "user-1" });
     mockResolve.mockResolvedValue(PREVIEW);
+    mockIsSaved.mockResolvedValue(false);
   });
 
-  it("resolves the URL's metadata without saving, cacheable for a few minutes", async () => {
+  it("resolves the URL's metadata without saving, and says whether it's saved", async () => {
+    mockIsSaved.mockResolvedValue(true);
     const res = await get("?url=example.com");
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(PREVIEW);
+    expect(await res.json()).toEqual({ ...PREVIEW, saved: true });
     expect(mockResolve).toHaveBeenCalledWith("https://example.com/");
-    expect(res.headers.get("Cache-Control")).toBe("private, max-age=300");
+    expect(mockIsSaved).toHaveBeenCalledWith("user-1", ["example.com", "https://example.com/"]);
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
   });
 
   it("rejects a missing or invalid URL", async () => {

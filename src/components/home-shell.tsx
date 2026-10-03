@@ -4,6 +4,7 @@ import { LinkGroup } from "@/components/link-group";
 import { LinkSelectionBar } from "@/components/link-selection-bar";
 import { LinkOmnibox } from "@/components/link-omnibox";
 import {
+  forgetLinkPreview,
   OmniboxSaveRow,
   OmniboxSearchAllRow,
 } from "@/components/omnibox-rows";
@@ -14,6 +15,7 @@ import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
 import {
+  clearLeavingLinks,
   leavingFadeRemaining,
   LINKS_MOVED_EVENT,
   markLinksLeaving,
@@ -89,6 +91,9 @@ export function HomeShell({
   // What the list is filtered by: the field, trimmed and debounced.
   const [searchQuery, setSearchQuery] = useState("");
   const searchQueryRef = useRef("");
+  // The search `nextCursor` belongs to: a cursor only pages the list it came
+  // from, so loadMore never sends an old list's cursor with a new query.
+  const cursorQueryRef = useRef("");
   const [groups, setGroups] = useState(initialGroups);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
@@ -127,8 +132,9 @@ export function HomeShell({
       : Math.max(countGroupedLinks(groupsRef.current), HOME_LINKS_PAGE_SIZE);
     try {
       const params = new URLSearchParams({ limit: String(limit) });
+      const query = searchQueryRef.current;
       if (folderId) params.set("folderId", folderId);
-      if (searchQueryRef.current) params.set("q", searchQueryRef.current);
+      if (query) params.set("q", query);
       const page = await fetchLinksPage(params);
       if (seq !== reloadSeq.current) return;
       // Rows moved out are still fading: let that finish before they go.
@@ -139,6 +145,7 @@ export function HomeShell({
       }
       setGroups(page.groups);
       setNextCursor(page.nextCursor);
+      cursorQueryRef.current = query;
       // The list now says where every row is: rows faded out by a move
       // before this reload began are gone (or back, after Undo).
       settleLeavingLinks(startedAt);
@@ -163,7 +170,12 @@ export function HomeShell({
       markLinksLeaving(ids.filter((id) => shown.has(id)));
     };
     window.addEventListener(LINKS_MOVED_EVENT, onMoved);
-    return () => window.removeEventListener(LINKS_MOVED_EVENT, onMoved);
+    return () => {
+      window.removeEventListener(LINKS_MOVED_EVENT, onMoved);
+      // The marks belong to this page's list: another folder (where the
+      // links may have moved) must not hide them.
+      clearLeavingLinks();
+    };
   }, [folderId]);
 
   // The list follows the search field, a moment after typing stops.
@@ -199,6 +211,8 @@ export function HomeShell({
     );
   const saveFromField = useCallback(() => {
     if (!saveUrl) return;
+    // Its preview's "saved" is about to be wrong.
+    forgetLinkPreview(saveUrl);
     // Back to the whole list first, so the new row shows where it lands.
     setQuery("");
     setSearchQuery("");
@@ -255,6 +269,9 @@ export function HomeShell({
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
+    // A new search is loading: this cursor is the old list's.
+    const query = searchQueryRef.current;
+    if (cursorQueryRef.current !== query) return;
     setLoadingMore(true);
     const seq = reloadSeq.current;
     try {
@@ -263,10 +280,10 @@ export function HomeShell({
         cursor: nextCursor,
       });
       if (folderId) params.set("folderId", folderId);
-      if (searchQueryRef.current) params.set("q", searchQueryRef.current);
+      if (query) params.set("q", query);
       const page = await fetchLinksPage(params);
       // A reload started meanwhile already has fresher data.
-      if (seq !== reloadSeq.current) return;
+      if (seq !== reloadSeq.current || cursorQueryRef.current !== query) return;
       // The time zone changed under the list (e.g. the cookie correction
       // above): relabel everything instead of mixing headings from two zones.
       if (page.timeZone && page.timeZone !== groupsTimeZone) {
