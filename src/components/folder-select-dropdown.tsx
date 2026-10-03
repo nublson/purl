@@ -47,8 +47,9 @@ type FolderDialog =
 /**
  * Header folder switcher: shows where you are (Home or the current folder),
  * links to every folder, and opens the New / Edit / Delete folder dialogs.
- * Digit keys switch folders anywhere in the app (0 = Home, 1–9 = the first
- * nine folders in menu order); each row shows its key unless it's current.
+ * Digit keys switch folders anywhere in the app (1 = Home, then 2–9 and 0
+ * for the first nine folders in menu order); each row shows its key unless
+ * it's current.
  */
 export function FolderSelectDropdown() {
   const { folders, max, totalLinks } = useFolders();

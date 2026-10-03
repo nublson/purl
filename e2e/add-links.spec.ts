@@ -124,7 +124,8 @@ test.describe("Add links", () => {
     await page.keyboard.press("a");
     await option(page, "Alpha").click();
     await popover(page).getByRole("button", { name: "Clear" }).focus();
-    await page.keyboard.press("2");
+    // 3 is Work (1 = Home, 2 = Reading, the folder on screen).
+    await page.keyboard.press("3");
     // Give a navigation time to start before checking it didn't.
     await page.waitForTimeout(800);
     await expect(page).toHaveURL(/\/folders\/reading$/);
