@@ -8,7 +8,7 @@ const rows = (page: Page) => page.locator('[data-cy="link-item"]');
 const field = (page: Page) =>
   page.getByRole("searchbox", { name: "Search your links or paste a link to save" });
 const saveRow = (page: Page) => page.locator('[data-cy="omnibox-save-row"]');
-const saveButton = (page: Page) => saveRow(page).getByRole("button", { name: /^Save / });
+const saveButton = saveRow;
 
 async function open(page: Page, path: string) {
   await page.goto(path);
@@ -69,6 +69,10 @@ test.describe("Search field", () => {
     await open(page, "/home");
     await field(page).fill("http://www.example.com/post/");
     await expect(saveRow(page)).toContainText("Already saved");
+    // A click anywhere on the row saves (here: refreshes the saved link).
+    await saveRow(page).click({ position: { x: 200, y: 24 } });
+    await expect(field(page)).toHaveValue("");
+    await expect(rows(page)).toHaveCount(1, { timeout: 20_000 });
   });
 
   test("a folder searches itself, and Search all links widens it", async ({ page, seed }) => {

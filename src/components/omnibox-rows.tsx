@@ -1,13 +1,13 @@
 "use client";
 
+import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import type { Link } from "@/utils/links";
 import { ArrowUpRight, Plus } from "lucide-react";
 import * as React from "react";
 import { LinkIcon } from "./link-icon";
-import { TooltipWrapper } from "./tooltip-wrapper";
 import { Typography } from "./typography";
-import { Button } from "./ui/button";
+import { buttonVariants } from "./ui/button";
 import { Skeleton } from "./ui/skeleton";
 
 /** Shared row shape: the list rows' 48px height, 20px media column and 16px gap. */
@@ -85,11 +85,15 @@ export function OmniboxSaveRow({
     ? { ...preview, id: "preview", createdAt: new Date(0), folderId: null }
     : null;
 
+  const label = `Save ${link?.title ?? shown}${alreadySaved ? " (already saved)" : ""}`;
   return (
-    <div
+    // The whole row saves (as Enter in the field does).
+    <button
+      type="button"
       data-cy="omnibox-save-row"
-      // Same hover as a saved row (instant, like the list's).
-      className="grid h-12 w-full grid-cols-[20px_1fr_auto] items-center gap-4 rounded-md p-2 transition-none hover:bg-accent/40"
+      aria-label={label}
+      className="grid h-12 w-full cursor-pointer grid-cols-[20px_1fr_auto] items-center gap-4 rounded-md p-2 text-start outline-none transition-none hover:bg-accent/40 focus-visible:ring-3 focus-visible:ring-ring"
+      onClick={onSave}
     >
       <Typography
         component="span"
@@ -119,20 +123,23 @@ export function OmniboxSaveRow({
           </Typography>
         ) : null}
       </Typography>
-      <TooltipWrapper content="Save (↵)">
-        {/* Primary: the one thing this not-yet-saved row is for (and what
-            Enter does). Already saved, saving again only refreshes it. */}
-        <Button
-          variant={alreadySaved ? "outline" : "default"}
-          size="icon-sm"
-          aria-label={`Save ${link?.title ?? shown}${alreadySaved ? " (already saved)" : ""}`}
-          className="cursor-pointer"
-          onClick={onSave}
-        >
-          <Plus />
-        </Button>
-      </TooltipWrapper>
-    </div>
+      {/* The row's cue, drawn as a button: primary for the one thing this
+          not-yet-saved row is for; outline when it's already saved and
+          saving again only refreshes it. */}
+      <Typography
+        component="span"
+        aria-hidden
+        className={cn(
+          buttonVariants({
+            variant: alreadySaved ? "outline" : "default",
+            size: "icon-sm",
+          }),
+          "pointer-events-none",
+        )}
+      >
+        <Plus />
+      </Typography>
+    </button>
   );
 }
 
