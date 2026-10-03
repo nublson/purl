@@ -525,6 +525,9 @@ describe("normalizeFolderEmoji", () => {
     ["🇵🇹", "🇵🇹"],
     // Skin-tone modifier and variation selector.
     ["👍🏽", "👍🏽"],
+    // Toned emoji from the picker's skin tones: ZWJ sequences with modifiers.
+    ["🧑🏿‍🎨", "🧑🏿‍🎨"],
+    ["🫱🏼‍🫲🏿", "🫱🏼‍🫲🏿"],
     ["✈️", "✈️"],
     // Keycap sequence.
     ["1️⃣", "1️⃣"],
