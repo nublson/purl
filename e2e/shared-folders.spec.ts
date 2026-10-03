@@ -163,6 +163,7 @@ test.describe("Share popover", () => {
       await dialog.getByRole("switch", { name: "Public" }).click();
       await expect(dialog.getByRole("switch", { name: "Public" })).toBeChecked();
       await expect(copy).toBeEnabled();
+      await expect(page.getByRole("button", { name: "Public, sharing settings" })).toBeVisible();
       // The switch is its own confirmation: no toast.
       await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
       await expect

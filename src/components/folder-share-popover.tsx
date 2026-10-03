@@ -81,9 +81,13 @@ export function FolderSharePopover() {
     <Popover>
       <PopoverTrigger asChild>
         <Button
-          // Ghost while private; filled once the folder is public.
+          // Private: the action ("Share", ghost). Public: the state, in the
+          // switch's word ("Public", filled), so a shared folder reads as
+          // shared at a glance. The name keeps the visible word first.
           variant={isPublic ? "secondary" : "ghost"}
           size="sm"
+          aria-label={isPublic ? "Public, sharing settings" : undefined}
+          aria-haspopup="dialog"
           className="cursor-pointer"
         >
           {isPublic ? (
@@ -91,7 +95,7 @@ export function FolderSharePopover() {
           ) : (
             <Lock data-icon="inline-start" />
           )}
-          Share
+          {isPublic ? "Public" : "Share"}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-80 gap-0 p-0">
