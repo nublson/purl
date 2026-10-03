@@ -5,6 +5,7 @@ import { isApplePlatform } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { Search, X } from "lucide-react";
 import * as React from "react";
+import { OMNIBOX_SHELL } from "./omnibox-shell";
 import { Kbd } from "./ui/kbd";
 
 /** Keys that focus the field from anywhere on the page. */
@@ -57,9 +58,8 @@ export function LinkOmnibox({
     <form
       role="search"
       className={cn(
-        "fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-30 mx-auto flex h-11 w-[calc(100%-2rem)] max-w-2xl items-center gap-2 rounded-xl bg-popover ps-3 pe-1.5 text-popover-foreground",
         // Same raised surface and layered shadow as the selection bar.
-        "shadow-[0_0_0_1px_var(--border),0_2px_4px_-1px_oklch(0_0_0/0.12),0_8px_24px_-4px_oklch(0_0_0/0.24)]",
+        OMNIBOX_SHELL,
         // Focused: the 1px edge takes the ring color (the input itself has
         // no outline). Only that shadow changes; nothing moves.
         "transition-[box-shadow] duration-150 ease-out-strong has-[input:focus-visible]:shadow-[0_0_0_1px_var(--ring),0_2px_4px_-1px_oklch(0_0_0/0.12),0_8px_24px_-4px_oklch(0_0_0/0.24)]",
