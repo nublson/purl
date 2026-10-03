@@ -61,7 +61,9 @@ export function LinkOmnibox({
           keeps them from showing below and around it. */}
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-20 h-[calc(5.5rem+env(safe-area-inset-bottom))] bg-linear-to-t from-background from-70% to-transparent"
+        // Solid exactly up to the field's top (1rem + 44px + the safe
+        // area), then a 1.75rem fade, whatever the device's inset.
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-20 h-[calc(5.5rem+env(safe-area-inset-bottom))] bg-[linear-gradient(to_top,var(--background)_calc(3.75rem+env(safe-area-inset-bottom)),transparent)]"
       />
       <form
         role="search"

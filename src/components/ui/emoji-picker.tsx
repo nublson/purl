@@ -214,24 +214,54 @@ function EmojiPickerFooter({
           aria-label="Skin tone"
           className="flex min-w-0 flex-1 items-center gap-0.5"
           data-slot="emoji-picker-skin-tones"
+          // Radio group keys: one Tab stop (the checked tone); arrows move
+          // between tones and check them; Enter, Space or a click confirm
+          // and close.
+          onKeyDown={(event) => {
+            const step =
+              event.key === "ArrowRight" || event.key === "ArrowDown"
+                ? 1
+                : event.key === "ArrowLeft" || event.key === "ArrowUp"
+                  ? -1
+                  : 0;
+            if (!step) return;
+            event.preventDefault();
+            const index = variations.findIndex((v) => v.skinTone === skinTone);
+            const next =
+              variations[(index + step + variations.length) % variations.length];
+            setSkinTone(next.skinTone);
+            writeSkinTone(next.skinTone);
+            event.currentTarget
+              .querySelector<HTMLButtonElement>(
+                `[data-skin-tone="${next.skinTone}"]`,
+              )
+              ?.focus();
+          }}
         >
-          {variations.map((variation) => (
-            <button
-              key={variation.skinTone}
-              type="button"
-              role="radio"
-              aria-checked={variation.skinTone === skinTone}
-              aria-label={SKIN_TONE_LABELS[variation.skinTone]}
-              className="flex size-8 items-center justify-center rounded-sm text-lg leading-none transition-[scale] duration-150 ease-out hover:bg-accent active:scale-[0.96] aria-checked:bg-accent"
-              onClick={() => {
-                setSkinTone(variation.skinTone);
-                writeSkinTone(variation.skinTone);
-                setChoosing(false);
-              }}
-            >
-              {variation.emoji}
-            </button>
-          ))}
+          {variations.map((variation) => {
+            const checked = variation.skinTone === skinTone;
+            return (
+              <button
+                key={variation.skinTone}
+                type="button"
+                role="radio"
+                aria-checked={checked}
+                aria-label={SKIN_TONE_LABELS[variation.skinTone]}
+                tabIndex={checked ? 0 : -1}
+                data-skin-tone={variation.skinTone}
+                // Opening the tones moves focus to the current one.
+                autoFocus={checked}
+                className="flex size-8 items-center justify-center rounded-sm text-lg leading-none outline-none transition-[scale] duration-150 ease-out hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.96] aria-checked:bg-accent"
+                onClick={() => {
+                  setSkinTone(variation.skinTone);
+                  writeSkinTone(variation.skinTone);
+                  setChoosing(false);
+                }}
+              >
+                {variation.emoji}
+              </button>
+            );
+          })}
         </div>
       ) : (
         <EmojiPickerPrimitive.ActiveEmoji>

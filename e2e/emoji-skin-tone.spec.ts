@@ -34,3 +34,29 @@ test("pick a skin tone, choose a toned emoji, and the tone is remembered", async
   await page.getByRole("dialog").getByRole("button", { name: /^Folder emoji:/ }).click();
   await expect(page.locator('[data-slot="emoji-picker-skin-tone-trigger"]')).toHaveText("✋🏿");
 });
+
+test("the skin tones are one Tab stop, and arrows move between them", async ({ page }) => {
+  await page.goto("/home");
+  await waitForHydration(page, 'button[aria-label^="Folder:"]');
+  await page.getByRole("button", { name: "Folder: Home" }).click();
+  await page.getByRole("menuitem", { name: "New folder" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: /^Folder emoji:/ }).click();
+  await page.getByRole("button", { name: "Choose skin tone" }).click();
+
+  const tones = page.getByRole("radiogroup", { name: "Skin tone" });
+  // Focus lands on the checked tone; only it is in the Tab order.
+  await expect(tones.getByRole("radio", { checked: true })).toBeFocused();
+  await expect(tones.locator('[tabindex="0"]')).toHaveCount(1);
+
+  await page.keyboard.press("ArrowRight");
+  const light = tones.getByRole("radio", { name: "Light skin tone", exact: true });
+  await expect(light).toBeFocused();
+  await expect(light).toHaveAttribute("aria-checked", "true");
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowLeft");
+  await expect(tones.getByRole("radio", { name: "Dark skin tone", exact: true })).toBeFocused();
+
+  // Enter confirms and closes.
+  await page.keyboard.press("Enter");
+  await expect(tones).toHaveCount(0);
+});
