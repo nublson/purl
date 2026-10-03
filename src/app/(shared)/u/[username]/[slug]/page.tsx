@@ -70,22 +70,24 @@ export default async function SharedFolderPage({
             orientation="vertical"
             className="data-vertical:h-5 data-vertical:self-center"
           />
-          {/* The switcher button's box (ghost, sm, ps-2), so the emoji and
-              name sit where they do in the app. */}
-          <div className="flex h-8 min-w-0 items-center gap-2 ps-2">
+          {/* Where the app's folder switcher sits (its ghost button's ps-2),
+              so the emoji lines up with the app. The name and description
+              stack in two lines that fill the logo's 32px: the name leads,
+              the description reads as its subtitle. */}
+          <div className="grid min-w-0 grid-cols-[16px_minmax(0,1fr)] items-center gap-x-2 ps-2">
             <FolderEmoji emoji={folder.emoji} />
             <Typography
               component="h1"
               size="small"
-              className="max-w-52 shrink-0 truncate text-foreground"
+              className="truncate leading-[18px] font-medium text-foreground"
             >
               {folder.name}
             </Typography>
             {folder.description ? (
               <Typography
                 component="p"
-                size="small"
-                className="hidden min-w-0 truncate sm:block"
+                size="mini"
+                className="col-start-2 truncate leading-[14px]"
               >
                 {folder.description}
               </Typography>
