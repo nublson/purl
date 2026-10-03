@@ -1,6 +1,7 @@
 "use client";
 
 import { LinkGroup } from "@/components/link-group";
+import { LinkSelectionBar } from "@/components/link-selection-bar";
 import { PasteHandler } from "@/components/paste-handler";
 import { LinkItemSkeleton } from "@/components/skeletons";
 import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
@@ -22,7 +23,7 @@ import {
   timeZoneToPersist,
 } from "@/utils/time-zone";
 import { BouncingDots } from "loading-dev";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { LinkGroupEmpty } from "./link-group-empty";
 
@@ -258,11 +259,27 @@ export function HomeShell({
     );
   }, [groups, pendingDeletes]);
 
+  // Each loaded link's folder, for the selection bar's "Remove from folders".
+  const folderById = useMemo(
+    () =>
+      new Map(
+        groups.flatMap((group) =>
+          group.links.map((link) => [link.id, link.folderId ?? null] as const),
+        ),
+      ),
+    [groups],
+  );
+  const folderOf = useCallback(
+    (linkId: string) => folderById.get(linkId),
+    [folderById],
+  );
+
   // A selection belongs to one list: switching folders or leaving drops it.
   useEffect(() => () => linkSelection.clear(), [folderId]);
 
   return (
     <>
+      <LinkSelectionBar folderOf={folderOf} />
       <PasteHandler
         onPasteStart={onPasteStart}
         onSaveSuccess={onSaveSuccess}

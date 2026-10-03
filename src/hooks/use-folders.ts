@@ -97,6 +97,7 @@ export function useCurrentFolder(): FolderSummary | null {
 export function useFolderActions(): {
   createFolder: (
     input: CreateFolderInput,
+    opts?: { quiet?: boolean },
   ) => Promise<ActionResult<FolderSummary>>;
   updateFolder: (
     id: string,
@@ -114,6 +115,7 @@ export function useFolderActions(): {
   moveLinks: (
     linkIds: string[],
     folderId: string | null,
+    opts?: { target?: FolderSummary },
   ) => Promise<ActionResult<{ moved: number }>>;
 } {
   const { folders, upsertFolder, removeFolderLocally, initialTotalLinks } =
@@ -125,7 +127,10 @@ export function useFolderActions(): {
   const currentFolder = useCurrentFolder();
 
   const createFolder = useCallback(
-    async (input: CreateFolderInput): Promise<ActionResult<FolderSummary>> => {
+    async (
+      input: CreateFolderInput,
+      opts?: { quiet?: boolean },
+    ): Promise<ActionResult<FolderSummary>> => {
       const result = await postFolder(input);
       if (result.ok) {
         // Patch the list locally before navigating: the background refetch
@@ -133,9 +138,13 @@ export function useFolderActions(): {
         // this the new folder page's useCurrentFolder() would briefly (and
         // wrongly) resolve to null on the very next render.
         upsertFolder(result.data);
-        toast.success("Folder created");
         notifyLinksChanged();
-        router.push(`/folders/${result.data.slug}`);
+        // `quiet`: the caller follows up itself (e.g. moving the selected
+        // links into it, whose toast names the new folder) and stays put.
+        if (!opts?.quiet) {
+          toast.success("Folder created");
+          router.push(`/folders/${result.data.slug}`);
+        }
       }
       return result;
     },
@@ -271,6 +280,9 @@ export function useFolderActions(): {
     async (
       linkIds: string[],
       folderId: string | null,
+      // The target folder when the caller has it and the list may not yet
+      // (a folder created a moment ago), so the toast can name it.
+      opts?: { target?: FolderSummary },
     ): Promise<ActionResult<{ moved: number }>> => {
       const result = await patchLinksFolder(linkIds, folderId);
       if (!result.ok) {
@@ -293,7 +305,10 @@ export function useFolderActions(): {
         sourceIds.size === 1
           ? (folders.find((folder) => folder.id === onlySource) ?? null)
           : null;
-      const target = folders.find((folder) => folder.id === folderId) ?? null;
+      const target =
+        opts?.target ??
+        folders.find((folder) => folder.id === folderId) ??
+        null;
 
       toast.success(
         formatBulkMoveMessage({ count: moved.length, target, source }),

@@ -31,7 +31,18 @@ const MAX_NAME_LENGTH = 60;
 type DialogFolderFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-} & ({ mode: "create"; folder?: undefined } | { mode: "edit"; folder: FolderSummary });
+} & (
+  | {
+      mode: "create";
+      folder?: undefined;
+      /**
+       * Set to stay on the page after creating: no "Folder created" toast
+       * or navigation; this gets the new folder instead.
+       */
+      onCreated?: (folder: FolderSummary) => void;
+    }
+  | { mode: "edit"; folder: FolderSummary; onCreated?: undefined }
+);
 
 /**
  * Controlled "New folder" / "Edit folder" dialog. The form mounts only while
@@ -42,6 +53,7 @@ export function DialogFolderForm({
   onOpenChange,
   mode,
   folder,
+  onCreated,
 }: DialogFolderFormProps) {
   return (
     <DialogWrapper
@@ -49,7 +61,11 @@ export function DialogFolderForm({
       open={open}
       onOpenChange={onOpenChange}
       content={
-        <FolderForm folder={folder} onDone={() => onOpenChange(false)} />
+        <FolderForm
+          folder={folder}
+          onCreated={onCreated}
+          onDone={() => onOpenChange(false)}
+        />
       }
     />
   );
@@ -66,9 +82,11 @@ function errorFieldFor(code: string | undefined): ErrorField {
 
 function FolderForm({
   folder,
+  onCreated,
   onDone,
 }: {
   folder?: FolderSummary;
+  onCreated?: (folder: FolderSummary) => void;
   onDone: () => void;
 }) {
   const { createFolder, updateFolder } = useFolderActions();
@@ -122,15 +140,19 @@ function FolderForm({
           ...(emojiChanged ? { emoji } : {}),
           ...(descriptionChanged ? { description: trimmedDescription } : {}),
         })
-      : await createFolder({
-          name: trimmedName,
-          ...(emoji ? { emoji } : {}),
-          ...(trimmedDescription ? { description: trimmedDescription } : {}),
-        });
+      : await createFolder(
+          {
+            name: trimmedName,
+            ...(emoji ? { emoji } : {}),
+            ...(trimmedDescription ? { description: trimmedDescription } : {}),
+          },
+          { quiet: onCreated !== undefined },
+        );
     setPending(false);
 
     if (result.ok) {
       onDone();
+      if (!folder) onCreated?.(result.data);
     } else {
       setError({ field: errorFieldFor(result.code), message: result.error });
     }

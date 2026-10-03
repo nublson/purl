@@ -41,11 +41,12 @@ export const LinkGroup = ({
         {prependItems}
         {visibleLinks.map((link, index) => (
           // content-visibility skips layout/paint for off-screen rows; the
-          // intrinsic size (one row) keeps the scrollbar stable.
+          // intrinsic size (one row) keeps the scrollbar stable. Adjacent
+          // selected rows join into one shape: square the corners they share.
           <div
             key={link.id}
             role="listitem"
-            className="[content-visibility:auto] [contain-intrinsic-size:auto_50px]"
+            className="[content-visibility:auto] [contain-intrinsic-size:auto_50px] [&:has(+div>[data-selected])>[data-selected]]:rounded-b-none [&:has(>[data-selected])+div>[data-selected]]:rounded-t-none"
           >
             <LinkItem
               link={link}

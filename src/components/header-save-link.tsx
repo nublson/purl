@@ -2,6 +2,7 @@
 
 import { useCurrentFolder } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
+import { isApplePlatform } from "@/lib/platform";
 import { requestSaveUrl, saveLink } from "@/lib/save-link";
 import { Chromium, ClipboardPaste, ExternalLink, Plus } from "lucide-react";
 import { usePathname } from "next/navigation";
@@ -29,14 +30,6 @@ function safeHttpsUrl(value: string | undefined) {
   } catch {
     return null;
   }
-}
-
-function isApplePlatform() {
-  if (typeof navigator === "undefined") return false;
-  const platform =
-    (navigator as Navigator & { userAgentData?: { platform?: string } })
-      .userAgentData?.platform ?? navigator.platform;
-  return /mac|iphone|ipad/i.test(platform);
 }
 
 /**
