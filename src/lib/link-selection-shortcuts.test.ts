@@ -49,6 +49,7 @@ describe("selectionShortcutLabel", () => {
     expect(selectionShortcutLabel("selectAll", { apple: true })).toBe("⌘A");
     expect(selectionShortcutLabel("selectAll", { apple: false })).toBe("Ctrl+A");
     expect(selectionShortcutLabel("delete", { apple: true })).toBe("⌫");
+    expect(selectionShortcutLabel("delete", { apple: false })).toBe("Del");
     expect(selectionShortcutLabel("clear", { apple: false })).toBe("Esc");
   });
 });

@@ -50,7 +50,8 @@ import { Kbd } from "./ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 /** Keys typed into these are text, not selection shortcuts. */
-const TEXT_TARGETS = "input, textarea, select, [contenteditable=''], [contenteditable='true']";
+const TEXT_TARGETS =
+  "input, textarea, select, [contenteditable=''], [contenteditable='true']";
 
 /**
  * Floating bar for the selected links (Home or a folder page): the count
@@ -193,7 +194,11 @@ export function LinkSelectionBar({
               "shadow-[0_0_0_1px_var(--border),0_2px_4px_-1px_oklch(0_0_0/0.12),0_8px_24px_-4px_oklch(0_0_0/0.24)]",
             )}
           >
-            <ShortcutTooltip label="Clear selection" shortcut="clear" apple={apple}>
+            <ShortcutTooltip
+              label="Clear selection"
+              shortcut="clear"
+              apple={apple}
+            >
               <Button
                 variant="ghost"
                 size="sm"
@@ -224,7 +229,11 @@ export function LinkSelectionBar({
                 ) : (
                   <Square data-icon="inline-start" />
                 )}
-                <Typography component="span" size="small" className="font-medium text-current max-sm:hidden">
+                <Typography
+                  component="span"
+                  size="small"
+                  className="font-medium text-current max-sm:hidden"
+                >
                   {allSelected ? "Deselect all" : "Select all"}
                 </Typography>
               </Button>
@@ -253,7 +262,9 @@ export function LinkSelectionBar({
                 variant="ghost"
                 size="icon-sm"
                 aria-label={`Delete ${formatLinkCount(shownCount)}`}
-                className="rounded-lg text-muted-foreground hover:text-foreground"
+                // Muted at rest so it doesn't outweigh Move; the destructive
+                // variant's colors only on hover or focus, right before a click.
+                className="rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:border-destructive/40 focus-visible:bg-destructive/10 focus-visible:text-destructive focus-visible:ring-destructive dark:hover:bg-destructive/20 dark:focus-visible:bg-destructive/20"
                 onClick={deleteSelected}
               >
                 <Trash />
@@ -287,7 +298,9 @@ function ShortcutTooltip({
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent side="top" sideOffset={8}>
         {label}
-        {shortcut ? <Kbd>{selectionShortcutLabel(shortcut, { apple })}</Kbd> : null}
+        {shortcut ? (
+          <Kbd>{selectionShortcutLabel(shortcut, { apple })}</Kbd>
+        ) : null}
       </TooltipContent>
     </Tooltip>
   );
@@ -330,7 +343,10 @@ function MoveMenu({
           <Button variant="ghost" size="sm" className="rounded-lg">
             <FolderInput data-icon="inline-start" />
             Move
-            <ChevronUp data-icon="inline-end" className="text-muted-foreground" />
+            <ChevronUp
+              data-icon="inline-end"
+              className="text-muted-foreground"
+            />
           </Button>
         </DropdownMenuTrigger>
       </ShortcutTooltip>

@@ -40,7 +40,8 @@ export function selectionShortcutLabel(
     case "selectAll":
       return apple ? "⌘A" : "Ctrl+A";
     case "delete":
-      return apple ? "⌫" : "Delete";
+      // "Del", as keyboards print it: "Delete" would repeat the tooltip's label.
+      return apple ? "⌫" : "Del";
     case "move":
       return "M";
   }
