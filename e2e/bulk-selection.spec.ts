@@ -155,3 +155,42 @@ test.describe("Link selection on a phone", () => {
     await page.screenshot({ path: testInfo.outputPath("phone.png") });
   });
 });
+
+test.describe("Link selection, after deselecting", () => {
+  test("the row gets its favicon back and no menu button while not hovered", async ({ page, seed }) => {
+    await seedLinks(seed, ["Alpha", "Bravo"]);
+    await openHome(page);
+
+    const row = rows(page).first();
+    await row.hover();
+    await checkbox(page, "Bravo").click();
+    await checkbox(page, "Bravo").click();
+    await expect(bar(page)).toHaveCount(0);
+    // Pointer away: the checkbox keeps focus from the click, but that's not
+    // keyboard focus, so the row looks as it did before.
+    await page.mouse.move(0, 0);
+
+    const favicon = row.locator("div.contents > *").first();
+    await expect(favicon).toHaveCSS("opacity", "1");
+    await expect(checkbox(page, "Bravo")).toHaveCSS("opacity", "0");
+    // The menu button fades with its container.
+    await expect(row.locator('[data-slot="item-actions"]')).toHaveCSS("opacity", "0");
+  });
+
+  test("keyboard focus still reveals the checkbox", async ({ page, seed, browserName }) => {
+    // WebKit skips buttons on Tab (Safari's default), so it can't reach the checkbox.
+    test.skip(browserName === "webkit", "Tab skips buttons in WebKit");
+    await seedLinks(seed, ["Alpha"]);
+    await openHome(page);
+
+    await page.keyboard.press("Tab");
+    // Tab to the row's checkbox (after the link).
+    for (let i = 0; i < 10; i++) {
+      if (await checkbox(page, "Alpha").evaluate((el) => el === document.activeElement)) break;
+      await page.keyboard.press("Tab");
+    }
+    await expect(checkbox(page, "Alpha")).toBeFocused();
+    await expect(checkbox(page, "Alpha")).toHaveCSS("opacity", "1");
+    await expect(rows(page).first().locator("div.contents > *").first()).toHaveCSS("opacity", "0");
+  });
+});

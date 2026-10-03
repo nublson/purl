@@ -251,7 +251,9 @@ export const LinkItem = React.forwardRef<
             "contents *:transition-opacity *:duration-150 *:ease-out-strong",
             selecting
               ? "*:opacity-0"
-              : "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-focus-within/media:*:opacity-0",
+              : // Keyboard focus only: a mouse click leaves focus on the
+                // checkbox, and the favicon must come back once you move away.
+                "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-has-[:focus-visible]/media:*:opacity-0",
           )}
         >
           <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
@@ -290,7 +292,7 @@ export const LinkItem = React.forwardRef<
       </ItemContent>
       {selecting ? null : (
         <ItemActions
-          className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-focus-within/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100"
+          className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100"
           onMouseEnter={() => {
             hoveringActionsRef.current = true;
             clearOpenTimer();
