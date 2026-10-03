@@ -168,7 +168,15 @@ export function useFolderActions(): {
         // router.replace below, so useCurrentFolder() on the new slug
         // resolves immediately instead of racing the background refetch.
         upsertFolder(result.data);
-        toast.success(renamed ? "Folder renamed" : "Folder updated");
+        toast.success(
+          renamed
+            ? "Folder renamed"
+            : input.isPublic === true
+              ? "Folder is public"
+              : input.isPublic === false
+                ? "Folder is private"
+                : "Folder updated",
+        );
         notifyLinksChanged();
         const onThisFolder = currentFolder?.id === id;
         const newPath = `/folders/${result.data.slug}`;

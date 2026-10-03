@@ -557,6 +557,17 @@ describe("deleteFolderTool", () => {
   });
 });
 
+describe("updateFolderTool – sharing", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("passes isPublic through to make a folder public", async () => {
+    mockUpdateFolder.mockResolvedValue({ id: "f1", isPublic: true });
+    const out = await updateFolderTool("user-1", { folderId: "f1", isPublic: true });
+    expect(mockUpdateFolder).toHaveBeenCalledWith("user-1", "f1", { isPublic: true });
+    expect(parse(out)).toEqual({ id: "f1", isPublic: true });
+  });
+});
+
 describe("moveLinkTool", () => {
   beforeEach(() => vi.clearAllMocks());
 

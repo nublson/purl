@@ -45,6 +45,8 @@ const feedbackPostLimiter = () => makeLimiter("feedback_post", 10, "1 m");
 const usernameCheckLimiter = () => makeLimiter("username_check", 60, "1 m");
 // Each preview fetches the page (the search field's Save row).
 const linkPreviewLimiter = () => makeLimiter("link_preview", 60, "1 m");
+// Shared folder pages and their "load more": public, so limited per IP.
+const publicFolderLimiter = () => makeLimiter("public_folder", 120, "1 m");
 const usernameChangeLimiter = () => makeLimiter("username_change", 10, "1 h");
 
 const v1Limiter = () => makeLimiter("v1", 120, "1 m");
@@ -59,6 +61,7 @@ let cachedFeedbackPost: Ratelimit | null | undefined;
 let cachedMcp: Ratelimit | null | undefined;
 let cachedUsernameCheck: Ratelimit | null | undefined;
 let cachedLinkPreview: Ratelimit | null | undefined;
+let cachedPublicFolder: Ratelimit | null | undefined;
 let cachedUsernameChange: Ratelimit | null | undefined;
 
 export function getAuthRateLimiter(): Ratelimit | null {
@@ -110,4 +113,9 @@ export function getMcpRateLimiter(): Ratelimit | null {
 export function getLinkPreviewRateLimiter(): Ratelimit | null {
   if (cachedLinkPreview === undefined) cachedLinkPreview = linkPreviewLimiter();
   return cachedLinkPreview;
+}
+
+export function getPublicFolderRateLimiter(): Ratelimit | null {
+  if (cachedPublicFolder === undefined) cachedPublicFolder = publicFolderLimiter();
+  return cachedPublicFolder;
 }

@@ -1,4 +1,9 @@
-import { mapFolderError, parseDescriptionField, parseEmojiField } from "@/lib/folder-errors";
+import {
+  mapFolderError,
+  parseDescriptionField,
+  parseEmojiField,
+  parseIsPublicField,
+} from "@/lib/folder-errors";
 import { deleteFolder, updateFolder } from "@/lib/folders";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { LINKS_ORIGIN_HEADER, parseLinksOrigin } from "@/lib/realtime-constants";
@@ -14,7 +19,12 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: { name?: unknown; emoji?: unknown; description?: unknown };
+  let body: {
+    name?: unknown;
+    emoji?: unknown;
+    description?: unknown;
+    isPublic?: unknown;
+  };
   try {
     body = await request.json();
   } catch {
@@ -33,10 +43,17 @@ export async function PATCH(
   if (emoji instanceof NextResponse) return emoji;
   const description = parseDescriptionField(body?.description);
   if (description instanceof NextResponse) return description;
+  const isPublic = parseIsPublicField(body?.isPublic);
+  if (isPublic instanceof NextResponse) return isPublic;
 
   try {
     const { id } = await context.params;
-    const folder = await updateFolder(userId, id, { name, emoji, description });
+    const folder = await updateFolder(userId, id, {
+      name,
+      emoji,
+      description,
+      isPublic,
+    });
     broadcastLinksChanged(
       userId,
       parseLinksOrigin(request.headers.get(LINKS_ORIGIN_HEADER)),

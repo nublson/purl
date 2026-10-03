@@ -40,6 +40,8 @@ export type FolderSummary = {
   emoji: string;
   /** Optional one-line description; `null` when unset. */
   description: string | null;
+  /** Readable by anyone at `/@username/slug` (not indexed by search engines). */
+  isPublic: boolean;
   linkCount: number;
 };
 
@@ -92,6 +94,7 @@ type FolderRowWithCount = {
   slug: string;
   emoji?: string | null;
   description?: string | null;
+  isPublic?: boolean;
   _count: { links: number };
 };
 
@@ -102,6 +105,7 @@ function toSummary(row: FolderRowWithCount): FolderSummary {
     slug: row.slug,
     emoji: row.emoji || DEFAULT_FOLDER_EMOJI,
     description: row.description || null,
+    isPublic: row.isPublic ?? false,
     linkCount: row._count.links,
   };
 }
@@ -344,6 +348,8 @@ export type FolderUpdate = {
   emoji?: string | null;
   /** Up to 160 characters, or `null`/`""` to clear it. */
   description?: string | null;
+  /** Share it at `/@username/slug` (`true`) or make it private again. */
+  isPublic?: boolean;
 };
 
 /** Thrown when `updateFolder` is called with no fields to change. Routes map this to 400. */
@@ -369,18 +375,29 @@ export async function updateFolder(
   const hasName = input.name !== undefined;
   const hasEmoji = input.emoji !== undefined;
   const hasDescription = input.description !== undefined;
-  if (!hasName && !hasEmoji && !hasDescription) {
+  const hasIsPublic = input.isPublic !== undefined;
+  if (!hasName && !hasEmoji && !hasDescription && !hasIsPublic) {
     throw new FolderUpdateEmptyError();
   }
 
-  await assertFolderOwned(userId, id);
+  const existing = await prisma.folder.findFirst({
+    where: { id, userId },
+    select: { slug: true },
+  });
+  if (!existing) {
+    throw new FolderNotFoundError();
+  }
 
   const data: {
     name?: string;
     slug?: string;
     emoji?: string | null;
     description?: string | null;
+    isPublic?: boolean;
   } = {};
+  if (hasIsPublic) {
+    data.isPublic = input.isPublic;
+  }
   if (hasEmoji) {
     data.emoji = normalizeFolderEmoji(input.emoji);
   }
@@ -394,11 +411,25 @@ export async function updateFolder(
     data.slug = await generateUniqueSlug(userId, trimmed, id);
   }
 
+  const slugChanged = data.slug !== undefined && data.slug !== existing.slug;
+
   try {
-    const updated = await prisma.folder.update({
-      where: { id },
-      data,
-      include: { _count: { select: { links: true } } },
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.folder.update({
+        where: { id },
+        data,
+        include: { _count: { select: { links: true } } },
+      });
+      if (slugChanged) {
+        // The old slug keeps working for shared links: it redirects to the
+        // new one (a folder that later takes that slug wins over it).
+        await tx.folderSlugRedirect.upsert({
+          where: { userId_slug: { userId, slug: existing.slug } },
+          create: { userId, slug: existing.slug, folderId: id },
+          update: { folderId: id },
+        });
+      }
+      return row;
     });
     return toSummary(updated as FolderRowWithCount);
   } catch (error) {

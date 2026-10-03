@@ -19,6 +19,7 @@ vi.mock("@/lib/upstash-rate-limit", () => ({
   getLinksPostRateLimiter: vi.fn(),
   getUsernameCheckRateLimiter: vi.fn(),
   getLinkPreviewRateLimiter: vi.fn(),
+  getPublicFolderRateLimiter: vi.fn(),
   getV1RateLimiter: vi.fn().mockReturnValue({ limit: limitMock }),
   getV1PostRateLimiter: vi.fn(),
   getMcpRateLimiter: vi.fn(),
@@ -30,6 +31,7 @@ const {
   getLinksPostRateLimiter,
   getUsernameCheckRateLimiter,
   getLinkPreviewRateLimiter,
+  getPublicFolderRateLimiter,
   getV1RateLimiter,
   getV1PostRateLimiter,
   getMcpRateLimiter,
@@ -64,6 +66,7 @@ describe("rateLimitApiRequest", () => {
     vi.mocked(getFeedbackPostRateLimiter).mockReset();
     vi.mocked(getUsernameCheckRateLimiter).mockReset();
     vi.mocked(getLinkPreviewRateLimiter).mockReset();
+    vi.mocked(getPublicFolderRateLimiter).mockReset();
   });
 
   describe("unmatched routes", () => {
@@ -205,6 +208,18 @@ describe("rateLimitApiRequest", () => {
       const retryAfter = Number(result!.headers.get("Retry-After"));
       expect(retryAfter).toBeGreaterThanOrEqual(1);
     });
+  });
+
+  describe("shared folders", () => {
+    it.each(["/@nublson/design", "/api/public/folders/nublson/design"])(
+      "limits GET %s by IP",
+      async (path) => {
+        vi.mocked(getPublicFolderRateLimiter).mockReturnValue(mockLimiter() as never);
+        limitMock.mockResolvedValue({ success: false, reset: Date.now() + 10_000 });
+        const result = await rateLimitApiRequest(makeRequest(path, "GET"));
+        expect(result!.status).toBe(429);
+      },
+    );
   });
 
   describe("link previews", () => {

@@ -32,6 +32,8 @@ model User {
   accounts      Account[]
   links         Link[]
   folders       Folder[]
+  /// Usernames this user had before: shared /@username URLs redirect.
+  usernameRedirects UsernameRedirect[]
 
   @@unique([email])
   @@map("users")
@@ -63,9 +65,13 @@ model Folder {
   slug        String
   emoji       String?
   description String?
+  /// Readable by anyone at /@username/slug (no index); off by default.
+  isPublic    Boolean  @default(false)
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   links       Link[]
+  /// Slugs this folder had before a rename: shared URLs redirect.
+  slugRedirects FolderSlugRedirect[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -73,6 +79,33 @@ model Folder {
   @@unique([userId, slug])
   @@index([userId, createdAt])
   @@map("folders")
+}
+
+/// A folder's previous slug, so /@username/old-slug redirects after a
+/// rename. A live folder with the slug always wins over a redirect.
+model FolderSlugRedirect {
+  id        String   @id @default(cuid())
+  userId    String
+  slug      String
+  folderId  String
+  folder    Folder   @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, slug])
+  @@index([folderId])
+  @@map("folder_slug_redirects")
+}
+
+/// A user's previous username, so /@old-name/... redirects after a change.
+/// A user who has the username now always wins over a redirect.
+model UsernameRedirect {
+  username  String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("username_redirects")
 }
 
 model Session {

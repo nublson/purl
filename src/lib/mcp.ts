@@ -177,6 +177,7 @@ export type UpdateFolderArgs = {
   name?: string;
   emoji?: string | null;
   description?: string | null;
+  isPublic?: boolean;
 };
 
 export async function updateFolderTool(
@@ -337,7 +338,7 @@ export function registerPurlTools(server: McpServer): void {
 
   server.tool(
     "update_folder",
-    "Rename a folder or change its emoji or description. Omitted fields are left unchanged.",
+    "Rename a folder, change its emoji or description, or share it publicly (isPublic: true makes it readable by anyone at purl.live/@username/folder-slug, not indexed by search engines). Omitted fields are left unchanged.",
     {
       folderId: z.string().describe("Folder id from list_folders"),
       name: z.string().optional().describe("New name (up to 60 characters)"),
@@ -351,6 +352,10 @@ export function registerPurlTools(server: McpServer): void {
         .nullable()
         .optional()
         .describe("Up to 160 characters; null or an empty string clears it"),
+      isPublic: z
+        .boolean()
+        .optional()
+        .describe("Share the folder publicly (true) or make it private again (false)"),
     },
     { destructiveHint: false, idempotentHint: true },
     async (args, extra) => updateFolderTool(getUserId(extra), args),
