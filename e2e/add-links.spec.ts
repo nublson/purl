@@ -25,7 +25,7 @@ async function seedSpaced(seed: { link: (l: { url: string; title: string; folder
 test.use({ colorScheme: "dark" });
 
 test.describe("Add links", () => {
-  test("from the + menu: 10 most recent by default, search, one click adds", async ({ page, seed }, testInfo) => {
+  test("from the + menu: 10 most recent by default, check several, add them together", async ({ page, seed }, testInfo) => {
     const reading = await seed.folder({ name: "Reading", slug: "reading", emoji: "📚" });
     await seed.link({ url: "https://in-reading.example", title: "Already here", folderId: reading });
     await seedSpaced(seed, Array.from({ length: 12 }, (_, i) => ({
@@ -45,22 +45,28 @@ test.describe("Add links", () => {
     await expect(option(page, "Saved 11")).toBeVisible();
     await expect(option(page, "Saved 01")).toHaveCount(0);
     await expect(option(page, "Already here")).toHaveCount(0);
-    await page.screenshot({ path: testInfo.outputPath("add-links-popover.png") });
-
+    // Clicking checks; checks survive a new search.
+    await option(page, "Saved 11").click();
+    await option(page, "Saved 10").click();
+    await expect(option(page, "Saved 11")).toHaveAttribute("data-checked", "true");
     await search(page).fill("Saved 01");
     await expect(popover(page).getByRole("option")).toHaveCount(1);
     await option(page, "Saved 01").click();
-    await expect(page.getByText("Moved 1 link to 📚 Reading")).toBeVisible();
-    // Stays open for more.
+    await page.screenshot({ path: testInfo.outputPath("add-links-popover.png") });
+    await popover(page).getByRole("button", { name: /Add 3 links/ }).click();
+
+    await expect(page.getByText("Moved 3 links to 📚 Reading")).toBeVisible();
+    // Stays open for more, with nothing checked.
     await expect(popover(page)).toBeVisible();
-    await expect(rows(page)).toHaveCount(2);
+    await expect(popover(page).getByRole("button", { name: /Add \d/ })).toHaveCount(0);
+    await expect(rows(page)).toHaveCount(4);
 
     await page.keyboard.press("Escape");
     await expect(popover(page)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Add", exact: true })).toBeFocused();
   });
 
-  test("the empty state's button and the A shortcut open it; Enter adds", async ({ page, seed }) => {
+  test("the empty state's button and the A shortcut open it; Enter checks, Cmd/Ctrl+Enter adds", async ({ page, seed }) => {
     await seed.folder({ name: "Reading", slug: "reading" });
     const work = await seed.folder({ name: "Work", slug: "work", emoji: "💼" });
     await seed.link({ url: "https://a.example", title: "Filed elsewhere", folderId: work });
@@ -78,6 +84,8 @@ test.describe("Add links", () => {
     await expect(popover(page)).toBeVisible();
     await expect(option(page, "Filed elsewhere")).toBeVisible();
     await page.keyboard.press("Enter");
+    await expect(option(page, "Filed elsewhere")).toHaveAttribute("data-checked", "true");
+    await page.keyboard.press("ControlOrMeta+Enter");
     await expect(rows(page)).toHaveCount(1);
     await expect(popover(page).getByText("Every link you’ve saved is already here.")).toBeVisible();
 

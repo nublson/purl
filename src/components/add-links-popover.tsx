@@ -10,7 +10,8 @@ import {
   useAddLinksPopoverAnchor,
   type AddLinksAnchor,
 } from "@/lib/add-links-popover";
-import { formatFolderLabel } from "@/lib/folder-display";
+import { formatFolderLabel, formatLinkCount } from "@/lib/folder-display";
+import { isApplePlatform } from "@/lib/platform";
 import { formatDomain } from "@/utils/formatter";
 import { parseJsonLinks, type Link } from "@/utils/links";
 import * as React from "react";
@@ -24,7 +25,10 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
 } from "./ui/command";
+import { Button } from "./ui/button";
+import { Kbd } from "./ui/kbd";
 import { Popover, PopoverAnchor, PopoverContent } from "./ui/popover";
 
 /** Links shown at a time: the 10 most recent by default, or 10 matches. */
@@ -40,8 +44,9 @@ type Results =
 /**
  * "Add links" on a folder page: a popover attached to `children` (its
  * anchor) with a search field and your 10 most recent links that aren't in
- * this folder (searching shows 10 matches). Picking one moves it into the
- * folder (Undo in the toast) and the list refills, so you can keep adding.
+ * this folder (searching shows 10 matches). Click (or Enter) checks links,
+ * and checks survive a new search; "Add N links" (or ⌘/Ctrl+Enter) moves
+ * them all in as one move with one Undo toast, and the list refills.
  * Opens when `addLinksPopover.open(placement)` is called.
  */
 export function AddLinksPopover({
@@ -103,7 +108,11 @@ function AddLinksPicker({ folder }: { folder: FolderSummary }) {
   });
   // Bumped after an add, to refill the list.
   const [refreshToken, setRefreshToken] = React.useState(0);
-  const [adding, setAdding] = React.useState<ReadonlySet<string>>(new Set());
+  // Checked links, kept across searches.
+  const [checked, setChecked] = React.useState<ReadonlyMap<string, Link>>(
+    () => new Map(),
+  );
+  const [adding, setAdding] = React.useState(false);
 
   React.useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
@@ -135,29 +144,50 @@ function AddLinksPicker({ folder }: { folder: FolderSummary }) {
     return () => controller.abort();
   }, [debouncedQuery, folder.id, refreshToken]);
 
-  async function add(link: Link) {
-    if (adding.has(link.id)) return;
-    setAdding((current) => new Set(current).add(link.id));
-    const result = await moveLinks([link.id], folder.id, { target: folder });
-    setAdding((current) => {
-      const next = new Set(current);
-      next.delete(link.id);
+  const toggle = (link: Link) => {
+    setChecked((current) => {
+      const next = new Map(current);
+      if (next.has(link.id)) next.delete(link.id);
+      else next.set(link.id, link);
       return next;
     });
+  };
+
+  async function addChecked() {
+    if (checked.size === 0 || adding) return;
+    const ids = Array.from(checked.keys());
+    setAdding(true);
+    const result = await moveLinks(ids, folder.id, { target: folder });
+    setAdding(false);
     if (!result.ok) return;
-    // Gone from this list right away; the refetch brings the next one in.
+    setChecked(new Map());
+    // Gone from this list right away; the refetch brings the next ones in.
     setResults((current) => ({
       ...current,
-      links: current.links.filter((l) => l.id !== link.id),
+      links: current.links.filter((l) => !ids.includes(l.id)),
     }));
     setRefreshToken((t) => t + 1);
   }
+
+  const [apple, setApple] = React.useState(false);
+  React.useEffect(() => setApple(isApplePlatform()), []);
 
   const folderById = new Map(folders.map((f) => [f.id, f]));
   const searching = debouncedQuery.trim().length > 0;
 
   return (
-    <Command shouldFilter={false} loop className="rounded-md!">
+    <Command
+      shouldFilter={false}
+      loop
+      className="rounded-md!"
+      onKeyDown={(event) => {
+        // ⌘/Ctrl+Enter adds; plain Enter checks the highlighted link.
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+          event.preventDefault();
+          void addChecked();
+        }
+      }}
+    >
       <CommandInput
         autoFocus
         value={query}
@@ -187,10 +217,10 @@ function AddLinksPicker({ folder }: { folder: FolderSummary }) {
                 <CommandItem
                   key={link.id}
                   value={link.id}
-                  disabled={adding.has(link.id)}
-                  onSelect={() => void add(link)}
-                  // The trailing check slot isn't used here.
-                  className="gap-2.5 *:last:hidden"
+                  data-checked={checked.has(link.id)}
+                  disabled={adding}
+                  onSelect={() => toggle(link)}
+                  className="gap-2.5"
                 >
                   <Typography
                     component="span"
@@ -209,6 +239,11 @@ function AddLinksPicker({ folder }: { folder: FolderSummary }) {
                       {formatDomain(link.domain)}
                     </Typography>
                   </Typography>
+                  {checked.has(link.id) ? (
+                    <Typography component="span" className="sr-only">
+                      Checked
+                    </Typography>
+                  ) : null}
                   {other ? (
                     // In another folder: adding moves it out of there.
                     <Typography
@@ -228,6 +263,33 @@ function AddLinksPicker({ folder }: { folder: FolderSummary }) {
           </CommandGroup>
         ) : null}
       </CommandList>
+      {checked.size > 0 ? (
+        <>
+          <CommandSeparator className="mx-0 my-1" />
+          <div className="flex items-center justify-between gap-2 p-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={adding}
+              className="text-muted-foreground hover:text-foreground"
+              onClick={() => setChecked(new Map())}
+            >
+              Clear
+            </Button>
+            <Button
+              size="sm"
+              disabled={adding}
+              aria-keyshortcuts={apple ? "Meta+Enter" : "Control+Enter"}
+              onClick={() => void addChecked()}
+            >
+              {adding ? "Adding…" : `Add ${formatLinkCount(checked.size)}`}
+              <Kbd aria-hidden="true" className="bg-primary-foreground/15 text-primary-foreground">
+                {apple ? "⌘↵" : "Ctrl+↵"}
+              </Kbd>
+            </Button>
+          </div>
+        </>
+      ) : null}
     </Command>
   );
 }
