@@ -290,48 +290,52 @@ export const LinkItem = React.forwardRef<
           </Typography>
         </ItemTitle>
       </ItemContent>
-      {selecting ? null : (
-        <ItemActions
-          className="z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100"
-          onMouseEnter={() => {
-            hoveringActionsRef.current = true;
-            clearOpenTimer();
-            clearCloseTimer();
+      {/* Stays in the layout while selecting (hidden and inert): its 32px
+          button sets the row's 48px height, so the row can't shift. */}
+      <ItemActions
+        inert={selecting}
+        className={cn(
+          selecting && "invisible",
+          "z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100",
+        )}
+        onMouseEnter={() => {
+          hoveringActionsRef.current = true;
+          clearOpenTimer();
+          clearCloseTimer();
+        }}
+        onMouseLeave={() => {
+          hoveringActionsRef.current = false;
+          scheduleOpen();
+        }}
+      >
+        <LinkMenu
+          link={link}
+          onDelete={() => {
+            const rows = Array.from(
+              document.querySelectorAll<HTMLElement>(
+                '[data-cy="link-item"] > a[href]',
+              ),
+            );
+            const index = rows.indexOf(anchorRef.current as HTMLElement);
+            const target =
+              index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
+            deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
+            // The row (and its menu trigger) unmounts once hidden; then move
+            // focus to the neighboring row only if focus fell to the body.
+            setTimeout(() => {
+              requestAnimationFrame(() => {
+                const active = document.activeElement;
+                if (
+                  target?.isConnected &&
+                  (!active || active === document.body)
+                ) {
+                  target.focus();
+                }
+              });
+            }, LINK_DELETE_FADE_MS);
           }}
-          onMouseLeave={() => {
-            hoveringActionsRef.current = false;
-            scheduleOpen();
-          }}
-        >
-          <LinkMenu
-            link={link}
-            onDelete={() => {
-              const rows = Array.from(
-                document.querySelectorAll<HTMLElement>(
-                  '[data-cy="link-item"] > a[href]',
-                ),
-              );
-              const index = rows.indexOf(anchorRef.current as HTMLElement);
-              const target =
-                index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
-              deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
-              // The row (and its menu trigger) unmounts once hidden; then move
-              // focus to the neighboring row only if focus fell to the body.
-              setTimeout(() => {
-                requestAnimationFrame(() => {
-                  const active = document.activeElement;
-                  if (
-                    target?.isConnected &&
-                    (!active || active === document.body)
-                  ) {
-                    target.focus();
-                  }
-                });
-              }, LINK_DELETE_FADE_MS);
-            }}
-          />
-        </ItemActions>
-      )}
+        />
+      </ItemActions>
     </Item>
   );
 

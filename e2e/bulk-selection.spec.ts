@@ -194,3 +194,19 @@ test.describe("Link selection, after deselecting", () => {
     await expect(rows(page).first().locator("div.contents > *").first()).toHaveCSS("opacity", "0");
   });
 });
+
+test.describe("Link selection, row size", () => {
+  test("rows keep their height in selection mode", async ({ page, seed }) => {
+    await seedLinks(seed, ["Alpha", "Bravo"]);
+    await openHome(page);
+
+    const heights = () =>
+      rows(page).evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
+    const before = await heights();
+
+    await rows(page).first().hover();
+    await checkbox(page, "Bravo").click();
+    await expect(bar(page)).toBeVisible();
+    expect(await heights()).toEqual(before);
+  });
+});
