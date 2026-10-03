@@ -46,7 +46,7 @@ export const LinkGroup = ({
           <div
             key={link.id}
             role="listitem"
-            className="[content-visibility:auto] [contain-intrinsic-size:auto_50px] [&:has(+div>[data-selected])>[data-selected]]:rounded-b-none [&:has(>[data-selected])+div>[data-selected]]:rounded-t-none"
+            className="[content-visibility:auto] [contain-intrinsic-size:auto_48px] [&:has(+div>[data-selected])>[data-selected]]:rounded-b-none [&:has(>[data-selected])+div>[data-selected]]:rounded-t-none"
           >
             <LinkItem
               link={link}

@@ -153,7 +153,9 @@ export const LinkItem = React.forwardRef<
       data-cy="link-item"
       data-selected={selected || undefined}
       className={cn(
-        "w-full p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
+        // border-0: Item's 1px border is for its outline variant and its own
+        // focus ring; this row uses neither (the link draws the focus ring).
+        "w-full border-0 p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
         selected && "bg-accent/60 hover:bg-accent/60",
         deletePhase === "fading" &&
           "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",

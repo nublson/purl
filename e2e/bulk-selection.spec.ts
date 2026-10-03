@@ -196,13 +196,14 @@ test.describe("Link selection, after deselecting", () => {
 });
 
 test.describe("Link selection, row size", () => {
-  test("rows keep their height in selection mode", async ({ page, seed }) => {
+  test("rows keep their 48px height in selection mode", async ({ page, seed }) => {
     await seedLinks(seed, ["Alpha", "Bravo"]);
     await openHome(page);
 
     const heights = () =>
       rows(page).evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
     const before = await heights();
+    expect(before).toEqual([48, 48]);
 
     await rows(page).first().hover();
     await checkbox(page, "Bravo").click();
