@@ -1,6 +1,8 @@
 "use client";
 
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
+import { useLeavingLinks } from "@/lib/leaving-links";
+import { ARRIVE, ARRIVE_ICON, ARRIVE_LATE } from "@/lib/motion";
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
 import {
   linkSelection,
@@ -45,6 +47,12 @@ const LinkMenu = dynamic(
 interface LinkItemProps {
   link: LinkType;
   eagerFavicon?: boolean;
+  /**
+   * The link was just saved: its real details arrive in place of the
+   * saving placeholder (favicon, title, then domain fade in as their blur
+   * clears).
+   */
+  arriving?: boolean;
 }
 
 export const LinkItem = React.forwardRef<
@@ -57,6 +65,7 @@ export const LinkItem = React.forwardRef<
     onMouseEnter,
     onMouseLeave,
     eagerFavicon,
+    arriving = false,
     ...rest
   },
   ref,
@@ -65,6 +74,8 @@ export const LinkItem = React.forwardRef<
   // Deleting is owned by `deleteLinkWithUndo` (it outlives this row): the
   // row fades while "fading", then `LinkGroup` hides it behind an Undo toast.
   const deletePhase = usePendingLinkDeletes().get(link.id);
+  // Moved out of the folder on screen: the same exit as a delete.
+  const leaving = useLeavingLinks().get(link.id)?.phase === "fading";
   // Selection mode (anything selected): every row shows its checkbox, a
   // click toggles the row instead of opening it, and row menus hide so
   // every action goes through the selection bar.
@@ -157,8 +168,11 @@ export const LinkItem = React.forwardRef<
         // focus ring; this row uses neither (the link draws the focus ring).
         "w-full border-0 p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
         selected && "bg-accent/60 hover:bg-accent/60",
-        deletePhase === "fading" &&
+        (deletePhase === "fading" || leaving) &&
           "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
+        // Undo: back in the way it left (fade only with reduced motion).
+        deletePhase === "restoring" &&
+          "animate-in fade-in-0 slide-in-from-left-2 duration-200 ease-out-strong motion-reduce:[--tw-enter-translate-x:0]",
         className,
       )}
       onPointerDown={(event) => {
@@ -214,7 +228,9 @@ export const LinkItem = React.forwardRef<
         // reader control; a click anywhere on the row toggles it.
         aria-hidden={selecting || undefined}
         tabIndex={selecting ? -1 : undefined}
-        className="absolute inset-0 z-0 w-full rounded-md outline-none [-webkit-touch-callout:none] focus-visible:ring-3 focus-visible:ring-ring"
+        // ring-inset: the list clips each row to its box (content-visibility),
+        // so a ring drawn outside the link would be cut to the corners.
+        className="absolute inset-0 z-0 w-full rounded-md outline-none [-webkit-touch-callout:none] focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset"
         onClick={(event) => {
           if (longPressedRef.current) {
             longPressedRef.current = false;
@@ -258,7 +274,13 @@ export const LinkItem = React.forwardRef<
                 "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-has-[:focus-visible]/media:*:opacity-0",
           )}
         >
-          <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
+          {arriving ? (
+            <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
+              <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
+            </Typography>
+          ) : (
+            <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
+          )}
         </div>
         <Checkbox
           checked={selected}
@@ -284,14 +306,20 @@ export const LinkItem = React.forwardRef<
         <ItemTitle>
           <Typography
             size="small"
-            className="text-accent-foreground font-medium line-clamp-2 wrap-anywhere md:line-clamp-1"
+            className={cn(
+              "text-accent-foreground font-medium line-clamp-2 wrap-anywhere md:line-clamp-1",
+              arriving && ARRIVE,
+            )}
           >
             {link.title}
           </Typography>
           <Typography
             component="span"
             size="small"
-            className="text-muted-foreground font-normal hidden md:block"
+            className={cn(
+              "text-muted-foreground font-normal hidden md:block",
+              arriving && ARRIVE_LATE,
+            )}
           >
             {formatDomain(link.domain)}
           </Typography>
@@ -317,7 +345,7 @@ export const LinkItem = React.forwardRef<
       >
         <LinkMenu
           link={link}
-          onDelete={() => {
+          onDelete={({ byKeyboard }) => {
             const rows = Array.from(
               document.querySelectorAll<HTMLElement>(
                 '[data-cy="link-item"] > a[href]',
@@ -329,6 +357,8 @@ export const LinkItem = React.forwardRef<
             deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
             // The row (and its menu trigger) unmounts once hidden; then move
             // focus to the neighboring row only if focus fell to the body.
+            // Its focus ring shows only for a keyboard delete: after a click
+            // the user isn't navigating by keyboard.
             setTimeout(() => {
               requestAnimationFrame(() => {
                 const active = document.activeElement;
@@ -336,7 +366,9 @@ export const LinkItem = React.forwardRef<
                   target?.isConnected &&
                   (!active || active === document.body)
                 ) {
-                  target.focus();
+                  // `focusVisible` isn't in TS's DOM types yet; browsers
+                  // without it ignore the option.
+                  target.focus({ focusVisible: byKeyboard } as FocusOptions);
                 }
               });
             }, LINK_DELETE_FADE_MS);

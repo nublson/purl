@@ -43,7 +43,7 @@ export default async function FolderPage({
   }
 
   return (
-    <div className="wrapper-private flex flex-1 flex-col gap-8 pt-24 pb-20">
+    <div className="wrapper-private flex flex-1 flex-col gap-8 pt-24 pb-36">
       {/* Folder header / empty-state slot: the user's header (rename/delete,
           switcher) and empty state are wired in here in a follow-up pass.
           Until then, this heading only covers accessibility/SEO. */}

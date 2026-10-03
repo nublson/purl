@@ -63,21 +63,13 @@ export function AddLinksPopover({
   const open = useAddLinksPopoverAnchor() === placement;
   const anchorRef = React.useRef<HTMLDivElement>(null);
 
-  // Its anchor going away closes it (the store outlives the page), unless
-  // it's the empty state's: adding the first links removes the empty state,
-  // so the picker moves under the header's + button, where one is shown
-  // (pointer devices), and stays open for more.
+  // Its anchor going away closes it (the store outlives the page), but only
+  // if it's open on that anchor: the empty state disappearing must not close
+  // the header's picker. Adding the first links from the empty state removes
+  // it, so that picker closes too: the job is done.
   React.useEffect(
     () => () => {
-      if (addLinksPopover.current() !== placement) return;
-      if (
-        placement === "empty" &&
-        window.matchMedia("(hover: hover)").matches
-      ) {
-        addLinksPopover.open("header");
-      } else {
-        addLinksPopover.close();
-      }
+      if (addLinksPopover.current() === placement) addLinksPopover.close();
     },
     [placement],
   );

@@ -5,6 +5,7 @@ import {
   getLinksPostRateLimiter,
   getMcpRateLimiter,
   getUsernameCheckRateLimiter,
+  getLinkPreviewRateLimiter,
   getV1PostRateLimiter,
   getV1RateLimiter,
 } from "@/lib/upstash-rate-limit";
@@ -56,7 +57,8 @@ function tooManyRequests(reset: number) {
 /**
  * Edge rate limits for sensitive API routes. Returns a response when the limit is exceeded.
  * For `/api/auth/*`, returns `NextResponse.next()` when allowed so the rest of the proxy can skip session work.
- * Also limits POST `/api/feedback` and the username availability check.
+ * Also limits POST `/api/feedback`, the username availability check and
+ * link previews (`/api/links/preview`, which fetch the page).
  * Username changes are limited per user in their route, after the session
  * check.
  */
@@ -97,6 +99,15 @@ export async function rateLimitApiRequest(
 
   if (pathname === "/api/links" && request.method === "POST") {
     const limiter = getLinksPostRateLimiter();
+    if (limiter) {
+      const { success, reset } = await limiter.limit(ip);
+      if (!success) return tooManyRequests(reset);
+    }
+    return null;
+  }
+
+  if (pathname === "/api/links/preview" && request.method === "GET") {
+    const limiter = getLinkPreviewRateLimiter();
     if (limiter) {
       const { success, reset } = await limiter.limit(ip);
       if (!success) return tooManyRequests(reset);

@@ -10,11 +10,16 @@ export const LINK_DELETE_UNDO_MS = 5000;
 /** How long a deleted row fades out before it's hidden (matches the row's `duration-200` exit). */
 export const LINK_DELETE_FADE_MS = 200;
 
+/** How long a row restored by Undo animates back in (mirrors the fade-out). */
+export const LINK_RESTORE_MS = 200;
+
 /**
  * Where a deleted link is in the list: `"fading"` while its row animates
  * out, then `"hidden"`. The list hides `"hidden"` ids (see `LinkGroup`).
+ * `"restoring"`: brought back (Undo, a re-save, a failed delete) and
+ * animating back in; it's no longer being deleted.
  */
-export type PendingLinkDeletePhase = "fading" | "hidden";
+export type PendingLinkDeletePhase = "fading" | "hidden" | "restoring";
 
 /**
  * Links deleted from the list but not yet deleted on the server, so the
@@ -72,7 +77,23 @@ function bindFlushOnPageHide() {
 
 /** Whether `linkId` was deleted from the list (fading, hidden, or already sent). */
 export function isLinkDeletePending(linkId: string): boolean {
-  return pending.has(linkId);
+  const phase = pending.get(linkId);
+  return phase !== undefined && phase !== "restoring";
+}
+
+/**
+ * Brings deleted rows back with an entrance that mirrors their exit
+ * (`"restoring"`), then clears them once it has played.
+ */
+function restoreRows(ids: Iterable<string>) {
+  const list = Array.from(ids);
+  setPhase(list, "restoring");
+  setTimeout(() => {
+    setPhase(
+      list.filter((id) => pending.get(id) === "restoring"),
+      null,
+    );
+  }, LINK_RESTORE_MS);
 }
 
 /** `linkId`'s delete phase, or `undefined` when it isn't being deleted. */
@@ -150,7 +171,7 @@ export function deleteLinksWithUndo(
     for (const id of toDelete) waiting.delete(id);
     setPhase(toDelete, "hidden");
     const restore = (message: string) => {
-      setPhase(toDelete, null);
+      restoreRows(toDelete);
       toast.error(message);
     };
     const what = toDelete.length === 1 ? "the link" : "the links";
@@ -190,7 +211,7 @@ export function deleteLinksWithUndo(
     settled = true;
     clearTimeout(hideTimer);
     for (const id of remaining) waiting.delete(id);
-    setPhase(remaining, null);
+    restoreRows(remaining);
     remaining.clear();
     toast.dismiss(toastId);
   };
@@ -204,7 +225,7 @@ export function deleteLinksWithUndo(
     }
     remaining.delete(id);
     waiting.delete(id);
-    setPhase(id, null);
+    restoreRows([id]);
   };
 
   for (const id of ids) {

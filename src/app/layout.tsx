@@ -83,7 +83,9 @@ export default function RootLayout({
           <TooltipProvider>
             {children}
 
-            <Toaster />
+            {/* Above the search field pinned to the bottom of the app's lists
+                (1rem + 44px field + a 12px gap). */}
+            <Toaster offset={{ bottom: 72 }} mobileOffset={{ bottom: 72 }} />
           </TooltipProvider>
         </ThemeProvider>
         <SpeedInsights />

@@ -2,15 +2,32 @@
 
 import { LinkGroup } from "@/components/link-group";
 import { LinkSelectionBar } from "@/components/link-selection-bar";
+import { LinkOmnibox } from "@/components/link-omnibox";
+import {
+  forgetLinkPreview,
+  OmniboxSaveRow,
+  OmniboxSearchAllRow,
+} from "@/components/omnibox-rows";
 import { PasteHandler } from "@/components/paste-handler";
 import { LinkItemSkeleton } from "@/components/skeletons";
 import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
-import { useFolders } from "@/hooks/use-folders";
+import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
+import {
+  clearLeavingLinks,
+  leavingFadeRemaining,
+  LINKS_MOVED_EVENT,
+  markLinksLeaving,
+  settleLeavingLinks,
+  useLeavingLinks,
+  type LinksMovedDetail,
+} from "@/lib/leaving-links";
 import { coolPreviews } from "@/lib/link-preview-warmth";
 import { linkSelection, setSelectableLinks } from "@/lib/link-selection";
+import { isSameLinkUrl, omniboxSaveUrl } from "@/lib/omnibox";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
+import { requestSaveUrl } from "@/lib/save-link";
 import {
   countGroupedLinks,
   mergeLinkGroups,
@@ -23,12 +40,16 @@ import {
   timeZoneToPersist,
 } from "@/utils/time-zone";
 import { BouncingDots } from "loading-dev";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { LinkGroupEmpty } from "./link-group-empty";
 
 /** Coming back to the app after at least this long away refreshes the list. */
 const RETURN_REFRESH_AFTER_MS = 30_000;
+
+/** Wait after the last keystroke before the list follows the search field. */
+const SEARCH_DEBOUNCE_MS = 250;
 
 type LinksPageResponse = {
   groups: Parameters<typeof parseJsonLinkGroups>[0];
@@ -62,9 +83,22 @@ export function HomeShell({
   const { version } = useLinksSyncState();
   const { setLinksTotal } = useLinksSyncActions();
   const { refresh: refreshFolders } = useFolders();
+  const currentFolder = useCurrentFolder();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // The search field. `?q=` (from a folder's "Search all links") seeds it.
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
+  // What the list is filtered by: the field, trimmed and debounced.
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchQueryRef = useRef("");
+  // The search `nextCursor` belongs to: a cursor only pages the list it came
+  // from, so loadMore never sends an old list's cursor with a new query.
+  const cursorQueryRef = useRef("");
   const [groups, setGroups] = useState(initialGroups);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  // The link just saved, while its row plays the arrival.
+  const [arrivingId, setArrivingId] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   // The zone the displayed groups were labeled in; pages from another zone
   // must not be merged into them.
@@ -85,26 +119,107 @@ export function HomeShell({
   }, [groups]);
   const reloadSeq = useRef(0);
 
-  /** Re-fetches exactly as many links as are loaded, so pages stay consistent after inserts/deletes. */
-  const reload = useCallback(async () => {
+  /**
+   * Re-fetches exactly as many links as are loaded, so pages stay consistent
+   * after inserts/deletes; `fresh` starts over from the first page (a new
+   * search). Follows the current search.
+   */
+  const reload = useCallback(async ({ fresh = false } = {}) => {
     const seq = ++reloadSeq.current;
-    const limit = Math.max(
-      countGroupedLinks(groupsRef.current),
-      HOME_LINKS_PAGE_SIZE,
-    );
+    const startedAt = Date.now();
+    const limit = fresh
+      ? HOME_LINKS_PAGE_SIZE
+      : Math.max(countGroupedLinks(groupsRef.current), HOME_LINKS_PAGE_SIZE);
     try {
       const params = new URLSearchParams({ limit: String(limit) });
+      const query = searchQueryRef.current;
       if (folderId) params.set("folderId", folderId);
+      if (query) params.set("q", query);
       const page = await fetchLinksPage(params);
       if (seq !== reloadSeq.current) return;
+      // Rows moved out are still fading: let that finish before they go.
+      const wait = leavingFadeRemaining();
+      if (wait > 0) {
+        await new Promise((resolve) => setTimeout(resolve, wait));
+        if (seq !== reloadSeq.current) return;
+      }
       setGroups(page.groups);
       setNextCursor(page.nextCursor);
+      cursorQueryRef.current = query;
+      // The list now says where every row is: rows faded out by a move
+      // before this reload began are gone (or back, after Undo).
+      settleLeavingLinks(startedAt);
       if (page.timeZone) setGroupsTimeZone(page.timeZone);
       if (typeof page.total === "number") setLinksTotal(page.total);
     } catch {
       // Keep the current list; the next change or reload will retry.
     }
   }, [setLinksTotal, folderId]);
+
+  // A folder page: links moved out of it fade out (like a delete) before
+  // the reload drops them.
+  useEffect(() => {
+    if (!folderId) return;
+    const onMoved = (event: Event) => {
+      const { ids, folderId: target } = (event as CustomEvent<LinksMovedDetail>)
+        .detail;
+      if (target === folderId) return;
+      const shown = new Set(
+        groupsRef.current.flatMap((group) => group.links.map((link) => link.id)),
+      );
+      markLinksLeaving(ids.filter((id) => shown.has(id)));
+    };
+    window.addEventListener(LINKS_MOVED_EVENT, onMoved);
+    return () => {
+      window.removeEventListener(LINKS_MOVED_EVENT, onMoved);
+      // The marks belong to this page's list: another folder (where the
+      // links may have moved) must not hide them.
+      clearLeavingLinks();
+    };
+  }, [folderId]);
+
+  // The list follows the search field, a moment after typing stops.
+  useEffect(() => {
+    const next = query.trim();
+    const timer = setTimeout(() => setSearchQuery(next), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    if (searchQuery === searchQueryRef.current) return;
+    searchQueryRef.current = searchQuery;
+    void reload({ fresh: true });
+  }, [searchQuery, reload]);
+
+  // `?q=` has done its job once read: drop it so a reload or share of the
+  // URL doesn't bring back a stale search.
+  useEffect(() => {
+    if (!searchParams.has("q")) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("q");
+    window.history.replaceState(window.history.state, "", url);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When the field holds a URL: the URL to save, and whether it's already
+  // in the list.
+  const saveUrl = omniboxSaveUrl(query);
+  const alreadySaved =
+    saveUrl !== null &&
+    groups.some((group) =>
+      group.links.some((link) => isSameLinkUrl(link.url, saveUrl)),
+    );
+  const saveFromField = useCallback(() => {
+    if (!saveUrl) return;
+    // Its preview's "saved" is about to be wrong.
+    forgetLinkPreview(saveUrl);
+    // Back to the whole list first, so the new row shows where it lands.
+    setQuery("");
+    setSearchQuery("");
+    if (!requestSaveUrl(saveUrl)) {
+      toast.error("Unable to save the link yet. Try again in a moment.");
+    }
+  }, [saveUrl]);
 
   // Coming back after a while (e.g. an installed app resumed on iOS, whose
   // Realtime connection may have dropped while suspended) quietly reloads
@@ -154,6 +269,9 @@ export function HomeShell({
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
+    // A new search is loading: this cursor is the old list's.
+    const query = searchQueryRef.current;
+    if (cursorQueryRef.current !== query) return;
     setLoadingMore(true);
     const seq = reloadSeq.current;
     try {
@@ -162,9 +280,10 @@ export function HomeShell({
         cursor: nextCursor,
       });
       if (folderId) params.set("folderId", folderId);
+      if (query) params.set("q", query);
       const page = await fetchLinksPage(params);
       // A reload started meanwhile already has fresher data.
-      if (seq !== reloadSeq.current) return;
+      if (seq !== reloadSeq.current || cursorQueryRef.current !== query) return;
       // The time zone changed under the list (e.g. the cookie correction
       // above): relabel everything instead of mixing headings from two zones.
       if (page.timeZone && page.timeZone !== groupsTimeZone) {
@@ -211,9 +330,19 @@ export function HomeShell({
     setPendingUrl(url);
   }, []);
 
-  const onSaveSuccess = useCallback(async () => {
+  const onSaveSuccess = useCallback(async (newLinkId?: string) => {
+    // Set before the reload, so the real row mounts already arriving.
+    if (newLinkId) setArrivingId(newLinkId);
     await reload();
     setPendingUrl(null);
+    // Once the row is in, give the arrival (200ms + the domain's 40ms) time
+    // to play, then stop marking it (unless a newer save took over).
+    if (newLinkId) {
+      setTimeout(
+        () => setArrivingId((id) => (id === newLinkId ? null : id)),
+        500,
+      );
+    }
     // The new row is only visual; announce the save for screen readers too.
     // On a folder page, `saveLink` (via PasteHandler's own
     // `useCurrentFolder()`, which inside the page's CurrentFolderProvider
@@ -240,11 +369,13 @@ export function HomeShell({
   // Every loaded link deleted (awaiting Undo) and nothing left to load reads
   // as empty, so the empty state shows instead of a blank list.
   const pendingDeletes = usePendingLinkDeletes();
+  const leavingLinks = useLeavingLinks();
+  const isHidden = (id: string) =>
+    pendingDeletes.get(id) === "hidden" ||
+    leavingLinks.get(id)?.phase === "hidden";
   const allLinksHidden =
     !nextCursor &&
-    groups.every((group) =>
-      group.links.every((link) => pendingDeletes.get(link.id) === "hidden"),
-    );
+    groups.every((group) => group.links.every((link) => isHidden(link.id)));
 
   // The selectable links are the ones on screen, in display order; a link
   // that leaves the list (moved out of this folder, deleted) leaves the
@@ -253,11 +384,15 @@ export function HomeShell({
     setSelectableLinks(
       groups.flatMap((group) =>
         group.links
-          .filter((link) => pendingDeletes.get(link.id) !== "hidden")
+          .filter(
+            (link) =>
+              pendingDeletes.get(link.id) !== "hidden" &&
+              leavingLinks.get(link.id)?.phase !== "hidden",
+          )
           .map((link) => link.id),
       ),
     );
-  }, [groups, pendingDeletes]);
+  }, [groups, pendingDeletes, leavingLinks]);
 
   // Each loaded link's folder, for the selection bar's "Remove from folders".
   const folderById = useMemo(
@@ -279,14 +414,26 @@ export function HomeShell({
 
   return (
     <>
-      <LinkSelectionBar folderOf={folderOf} />
       <PasteHandler
         onPasteStart={onPasteStart}
         onSaveSuccess={onSaveSuccess}
         onSaveError={onSaveError}
       />
+      {saveUrl ? (
+        <OmniboxSaveRow
+          url={saveUrl}
+          alreadySaved={alreadySaved}
+          onSave={saveFromField}
+        />
+      ) : null}
       {(!groups.length || allLinksHidden) && !showSyntheticToday ? (
-        <LinkGroupEmpty inFolder={Boolean(folderId)} />
+        // A URL that matches nothing: the Save row above is the answer.
+        searchQuery && saveUrl ? null : (
+          <LinkGroupEmpty
+            inFolder={Boolean(folderId)}
+            query={searchQuery || undefined}
+          />
+        )
       ) : (
         // Leaving the list resets the preview hover delay (see
         // link-preview-warmth); gaps between date groups don't.
@@ -303,6 +450,7 @@ export function HomeShell({
               key={group.label}
               label={group.label}
               links={group.links}
+              newLinkId={arrivingId}
               prependItems={
                 group.label === "Today" && showSkeleton ? (
                   <LinkItemSkeleton url={skeletonUrl} animateIn />
@@ -342,6 +490,29 @@ export function HomeShell({
           </div>
         </div>
       )}
+      {/* A folder searches only itself; this widens it to every link. */}
+      {folderId && searchQuery ? (
+        <OmniboxSearchAllRow
+          query={searchQuery}
+          onSearchAll={() =>
+            router.push(`/home?q=${encodeURIComponent(searchQuery)}`)
+          }
+        />
+      ) : null}
+      {/* Pinned to the bottom, so they come last in the page too: keyboard
+          order follows the screen (list, selection bar, search field). */}
+      <LinkSelectionBar folderOf={folderOf} />
+      <LinkOmnibox
+        value={query}
+        onChange={setQuery}
+        onSave={saveFromField}
+        saveUrl={saveUrl}
+        placeholder={
+          folderId
+            ? `Search ${currentFolder?.name ?? "this folder"} or paste a link`
+            : "Search or paste a link"
+        }
+      />
     </>
   );
 }

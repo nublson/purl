@@ -1,5 +1,6 @@
 "use client";
 
+import { useLeavingLinks } from "@/lib/leaving-links";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { Link } from "@/utils/links";
 import type { ReactNode } from "react";
@@ -9,6 +10,7 @@ import { ItemGroup } from "./ui/item";
 interface LinkGroupProps {
   label: string;
   links: Link[];
+  /** The link just saved: its row plays the arrival (see `LinkItem`). */
   newLinkId?: string | null;
   prependItems?: ReactNode;
   eagerFirstLinkFavicon?: boolean;
@@ -17,6 +19,7 @@ interface LinkGroupProps {
 export const LinkGroup = ({
   label,
   links,
+  newLinkId,
   prependItems,
   eagerFirstLinkFavicon = false,
 }: LinkGroupProps) => {
@@ -24,8 +27,12 @@ export const LinkGroup = ({
   // Links deleted but still undoable are hidden here, and a day whose links
   // are all hidden drops its heading too.
   const pendingDeletes = usePendingLinkDeletes();
+  // Links moved out of this folder fade out, then hide the same way.
+  const leaving = useLeavingLinks();
   const visibleLinks = links.filter(
-    (link) => pendingDeletes.get(link.id) !== "hidden",
+    (link) =>
+      pendingDeletes.get(link.id) !== "hidden" &&
+      leaving.get(link.id)?.phase !== "hidden",
   );
   if (visibleLinks.length === 0 && !prependItems) return null;
 
@@ -51,6 +58,7 @@ export const LinkGroup = ({
             <LinkItem
               link={link}
               eagerFavicon={eagerFirstLinkFavicon && index === 0}
+              arriving={link.id === newLinkId}
             />
           </div>
         ))}

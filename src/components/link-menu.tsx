@@ -22,8 +22,11 @@ import {
 
 interface LinkMenuProps {
   link: LinkType;
-  /** Delete was chosen; the row animates out, then deletes with Undo (see `LinkItem`). */
-  onDelete: () => void;
+  /**
+   * Delete was chosen; the row animates out, then deletes with Undo (see
+   * `LinkItem`). `byKeyboard`: chosen with Enter/Space rather than a click.
+   */
+  onDelete: (opts: { byKeyboard: boolean }) => void;
 }
 
 export function LinkMenu({ link, onDelete }: LinkMenuProps) {
@@ -82,7 +85,12 @@ export function LinkMenu({ link, onDelete }: LinkMenuProps) {
             <Pencil /> Edit
           </DropdownMenuItem>
         </EditDialog>
-        <DropdownMenuItem data-cy="delete-link-menu-item" variant="destructive" onClick={onDelete}>
+        <DropdownMenuItem
+          data-cy="delete-link-menu-item"
+          variant="destructive"
+          // A click from the keyboard (Enter/Space) has no pointer: detail 0.
+          onClick={(event) => onDelete({ byKeyboard: event.detail === 0 })}
+        >
           <Trash /> Delete
         </DropdownMenuItem>
       </DropdownMenuGroup>
