@@ -19,6 +19,7 @@ import {
   type SelectionShortcut,
 } from "@/lib/link-selection-shortcuts";
 import { deleteLinksWithUndo } from "@/lib/pending-link-deletes";
+import { EASE_OUT_STRONG } from "@/lib/motion";
 import { isApplePlatform } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import {
@@ -31,7 +32,7 @@ import {
   Trash,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import * as React from "react";
 import { DialogFolderForm } from "./dialog-folder-form";
 import { FolderEmoji } from "./folder-emoji";
@@ -79,6 +80,8 @@ export function LinkSelectionBar({
   // The links "New folder…" was chosen for, moved once the folder exists.
   const newFolderLinks = React.useRef<string[]>([]);
   const toolbarRef = React.useRef<HTMLDivElement>(null);
+  // Reduced motion: the bar still fades, but doesn't slide.
+  const reduceMotion = useReducedMotion();
 
   const { notifyLinksChanged } = useLinksSyncActions();
   const { moveLinks } = useFolderActions();
@@ -182,11 +185,20 @@ export function LinkSelectionBar({
             role="toolbar"
             aria-label="Selected links"
             onKeyDown={onToolbarKeyDown}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            // Softer out than in: a shorter drop.
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
+            // Rises from where it's anchored (the bottom edge). Full
+            // transform strings stay on the GPU; `x`/`y` shorthands don't.
+            initial={{
+              opacity: 0,
+              transform: reduceMotion ? "translateY(0px)" : "translateY(8px)",
+            }}
+            animate={{ opacity: 1, transform: "translateY(0px)" }}
+            // Out the way it came, shorter and quicker than the entrance.
+            exit={{
+              opacity: 0,
+              transform: reduceMotion ? "translateY(0px)" : "translateY(4px)",
+              transition: { duration: 0.15, ease: EASE_OUT_STRONG },
+            }}
+            transition={{ duration: 0.2, ease: EASE_OUT_STRONG }}
             className={cn(
               "fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-1 rounded-xl bg-popover p-1 text-popover-foreground",
               // Elevation from layered shadows; the 1px ring is the edge.

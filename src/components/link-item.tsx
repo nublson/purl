@@ -247,10 +247,11 @@ export const LinkItem = React.forwardRef<
             or keyboard focus, and on every row while selecting. */}
         <div
           className={cn(
-            "contents",
+            // Cross-fades with the checkbox: a fast opacity swap, no movement.
+            "contents *:transition-opacity *:duration-150 *:ease-out-strong",
             selecting
-              ? "*:invisible"
-              : "[@media(hover:hover)]:group-hover/item:*:invisible group-focus-within/media:*:invisible",
+              ? "*:opacity-0"
+              : "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-focus-within/media:*:opacity-0",
           )}
         >
           <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
@@ -259,7 +260,7 @@ export const LinkItem = React.forwardRef<
           checked={selected}
           aria-label={`Select ${link.title}`}
           className={cn(
-            "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background",
+            "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background transition-[opacity,box-shadow] duration-150 ease-out-strong",
             selecting
               ? "opacity-100"
               : "opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:group-hover/item:opacity-100",
