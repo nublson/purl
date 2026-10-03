@@ -69,7 +69,7 @@ export function FolderSharePopover() {
     try {
       await navigator.clipboard.writeText(`${window.location.origin}${path}`);
     } catch {
-      toast.error("Couldn’t copy the link. Select it and copy it instead.");
+      toast.error("Unable to copy the link. Select it and copy it instead.");
       return;
     }
     setCopied(true);
@@ -97,7 +97,9 @@ export function FolderSharePopover() {
       <PopoverContent align="end" sideOffset={8} className="w-80 gap-0 p-0">
         <PopoverHeader className="gap-1 p-4 pb-3">
           <PopoverTitle>Visibility</PopoverTitle>
-          <PopoverDescription>Make this folder public to everyone.</PopoverDescription>
+          <PopoverDescription>
+            Anyone with the link can see this folder and its links.
+          </PopoverDescription>
         </PopoverHeader>
         <div className="px-4">
           <Separator />

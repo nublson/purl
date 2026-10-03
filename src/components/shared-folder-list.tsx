@@ -96,7 +96,7 @@ export function SharedFolderList({
           </EmptyMedia>
           <EmptyTitle>No links yet</EmptyTitle>
           <EmptyDescription>
-            Nothing has been added to this folder yet.
+            Links added to this folder will show up here.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>

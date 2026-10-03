@@ -105,7 +105,7 @@ export function parseIsPublicField(
 ): boolean | undefined | NextResponse {
   if (value === undefined || typeof value === "boolean") return value;
   return NextResponse.json(
-    { error: "isPublic must be true or false", code: "INVALID_PUBLIC" },
+    { error: "isPublic must be true or false.", code: "INVALID_PUBLIC" },
     { status: 400 },
   );
 }
