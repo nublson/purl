@@ -8,7 +8,6 @@ import {
   getPublicFolderPage,
   publicFolderPath,
 } from "@/lib/public-folders";
-import { getRequestTimeZone } from "@/lib/time-zone";
 import { LayoutGrid, List } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
@@ -17,9 +16,10 @@ type Params = { username: string; slug: string };
 
 /**
  * A shared folder: /@username/slug (see the rewrite in next.config.ts).
- * Read-only, never indexed. Looks exactly like the owner's folder page: the
- * app header (logo, then the folder where the switcher would be) and the
- * same list. Old usernames and slugs redirect to the current URL.
+ * Read-only, never indexed. The app header's frame (logo, then the folder
+ * where the switcher would be, view buttons on the right) and the owner's
+ * rows in one list, newest first. Old usernames and slugs redirect to the
+ * current URL.
  */
 export async function generateMetadata({
   params,
@@ -56,7 +56,6 @@ export default async function SharedFolderPage({
     permanentRedirect(publicFolderPath(page.username, page.slug));
   }
 
-  const timeZone = await getRequestTimeZone();
   const { owner, folder } = page;
 
   return (
@@ -116,7 +115,6 @@ export default async function SharedFolderPage({
         <SharedFolderList
           initialLinks={page.links}
           initialNextCursor={page.nextCursor}
-          timeZone={timeZone}
           apiPath={`/api/public/folders/${owner.username}/${folder.slug}`}
         />
       </div>

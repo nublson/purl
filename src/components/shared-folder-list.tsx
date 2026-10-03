@@ -2,10 +2,10 @@
 
 import { coolPreviews } from "@/lib/link-preview-warmth";
 import type { PublicLink } from "@/lib/public-folders";
-import { groupLinksByDate, type Link } from "@/utils/links";
+import type { Link } from "@/utils/links";
 import { PackageOpen } from "lucide-react";
 import { BouncingDots } from "loading-dev";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { SharedLinkItem } from "./shared-link-item";
 import {
   Empty,
@@ -21,28 +21,22 @@ function toLink(link: PublicLink): Link {
 }
 
 /**
- * A shared folder's links, laid out like the owner's list (`HomeShell` +
- * `LinkGroup`): grouped by day, older pages load as you scroll, from the
- * public endpoint (`apiPath`).
+ * A shared folder's links in one list, newest first, with the owner's rows
+ * (no day headings). Older pages load as you scroll, from the public
+ * endpoint (`apiPath`).
  */
 export function SharedFolderList({
   initialLinks,
   initialNextCursor,
-  timeZone,
   apiPath,
 }: {
   initialLinks: PublicLink[];
   initialNextCursor: string | null;
-  timeZone: string;
   apiPath: string;
 }) {
   const [links, setLinks] = useState(() => initialLinks.map(toLink));
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [loadingMore, setLoadingMore] = useState(false);
-  const groups = useMemo(
-    () => groupLinksByDate(links, { timeZone }),
-    [links, timeZone],
-  );
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
@@ -87,7 +81,7 @@ export function SharedFolderList({
 
   useEffect(() => coolPreviews, []);
 
-  if (groups.length === 0) {
+  if (links.length === 0) {
     return (
       <Empty data-cy="link-group-empty">
         <EmptyHeader>
@@ -105,37 +99,17 @@ export function SharedFolderList({
 
   return (
     <div className="flex flex-col gap-8" onMouseLeave={coolPreviews}>
-      {groups.map((group, groupIndex) => {
-        const headingId = `link-group-${group.label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-        return (
-          <section
-            key={group.label}
-            aria-labelledby={headingId}
-            className="flex w-full flex-col items-start justify-start gap-4"
+      <ItemGroup aria-label="Links" className="w-full gap-0">
+        {links.map((link, index) => (
+          <div
+            key={link.id}
+            role="listitem"
+            className="[content-visibility:auto] [contain-intrinsic-size:auto_48px]"
           >
-            <h2
-              id={headingId}
-              className="ms-2 text-xs font-medium text-muted-foreground"
-            >
-              {group.label}
-            </h2>
-            <ItemGroup aria-labelledby={headingId} className="w-full gap-0">
-              {group.links.map((link, index) => (
-                <div
-                  key={link.id}
-                  role="listitem"
-                  className="[content-visibility:auto] [contain-intrinsic-size:auto_48px]"
-                >
-                  <SharedLinkItem
-                    link={link}
-                    eagerFavicon={groupIndex === 0 && index === 0}
-                  />
-                </div>
-              ))}
-            </ItemGroup>
-          </section>
-        );
-      })}
+            <SharedLinkItem link={link} eagerFavicon={index === 0} />
+          </div>
+        ))}
+      </ItemGroup>
       <div
         role="status"
         className="relative flex h-10 w-full items-center justify-center text-muted-foreground"
