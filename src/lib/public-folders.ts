@@ -4,6 +4,7 @@ import type { ContentType } from "@/generated/prisma/enums";
 import { DEFAULT_FOLDER_EMOJI } from "@/lib/folder-display";
 import { listLinksForUser } from "@/lib/links";
 import prisma from "@/lib/prisma";
+import { publicFolderPath } from "@/lib/public-folder-path";
 
 /** Links per page on a shared folder (first render and each "load more"). */
 export const PUBLIC_FOLDER_PAGE_SIZE = 50;
@@ -46,10 +47,7 @@ export type PublicFolderPage =
   /** An old username or slug: send visitors to the current URL. */
   | { kind: "redirect"; username: string; slug: string };
 
-/** Where a shared folder lives: `/@username/slug`. */
-export function publicFolderPath(username: string, slug: string): string {
-  return `/@${username}/${slug}`;
-}
+export { publicFolderPath };
 
 /**
  * A public folder's page for visitors: its owner, the folder and one page

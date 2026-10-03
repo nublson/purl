@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, test, waitForHydration } from "./fixtures";
 
 // Public folders at /@username/slug: readable by anyone (no session),
 // never indexed, 404 when private, and old URLs redirect after a rename.
@@ -131,6 +131,54 @@ test.describe("Shared folders, managed by the owner", () => {
     } finally {
       // The worker's other tests use the original username.
       await page.request.patch("/api/user/username", { data: { username: original } });
+      await visitor.close();
+    }
+  });
+});
+
+test.describe("Share popover", () => {
+  test("the Public switch shares the folder and the link copies", async ({
+    page,
+    seed,
+    testUser,
+  }, testInfo) => {
+    await seed.folder({ name: "Design", slug: "design" });
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => {});
+    await page.goto("/folders/design");
+    const share = page.getByRole("button", { name: "Share" });
+    await waitForHydration(page, 'button[aria-label^="Folder:"]');
+    await share.click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText("Visibility")).toBeVisible();
+    await expect(dialog.getByText(`/@${testUser.username}/design`)).toBeVisible();
+    const copy = dialog.getByRole("button", { name: "Copy link" });
+    await expect(copy).toBeDisabled();
+    if (process.env.SHARE_SCREENSHOTS) {
+      await page.screenshot({ path: `${process.env.SHARE_SCREENSHOTS}/${testInfo.project.name}-private.png` });
+    }
+
+    const visitor = await page.context().browser()!.newContext();
+    try {
+      await dialog.getByRole("switch", { name: "Public" }).click();
+      await expect(dialog.getByRole("switch", { name: "Public" })).toBeChecked();
+      await expect(copy).toBeEnabled();
+      await expect
+        .poll(async () => (await visitor.request.get(`/@${testUser.username}/design`)).status())
+        .toBe(200);
+      if (process.env.SHARE_SCREENSHOTS) {
+        await page.screenshot({ path: `${process.env.SHARE_SCREENSHOTS}/${testInfo.project.name}-public.png` });
+      }
+
+      await copy.click();
+      await expect(dialog.getByRole("button", { name: "Link copied" })).toBeVisible();
+
+      await dialog.getByRole("switch", { name: "Public" }).click();
+      await expect(dialog.getByRole("switch", { name: "Public" })).not.toBeChecked();
+      await expect
+        .poll(async () => (await visitor.request.get(`/@${testUser.username}/design`)).status())
+        .toBe(404);
+    } finally {
       await visitor.close();
     }
   });
