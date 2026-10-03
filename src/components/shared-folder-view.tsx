@@ -13,8 +13,10 @@ const VIEW_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 const ViewContext = React.createContext<{
   view: SharedFolderView;
+  /** The visitor has switched views on this page (not just the saved one). */
+  switched: boolean;
   setView: (view: SharedFolderView) => void;
-}>({ view: "list", setView: () => {} });
+}>({ view: "list", switched: false, setView: () => {} });
 
 /**
  * The shared folder page's view (list, the default, or grid): set by the
@@ -29,16 +31,22 @@ export function SharedFolderViewProvider({
   children: React.ReactNode;
 }) {
   const [view, setViewState] = React.useState(initialView);
+  const [switched, setSwitched] = React.useState(false);
   const setView = React.useCallback((next: SharedFolderView) => {
     setViewState(next);
+    setSwitched(true);
     document.cookie = `${SHARED_FOLDER_VIEW_COOKIE}=${next}; path=/; max-age=${VIEW_COOKIE_MAX_AGE}; samesite=lax`;
   }, []);
-  const value = React.useMemo(() => ({ view, setView }), [view, setView]);
+  const value = React.useMemo(
+    () => ({ view, switched, setView }),
+    [view, switched, setView],
+  );
   return <ViewContext.Provider value={value}>{children}</ViewContext.Provider>;
 }
 
 export function useSharedFolderView() {
-  return React.useContext(ViewContext).view;
+  const { view, switched } = React.useContext(ViewContext);
+  return { view, switched };
 }
 
 /** The header's List / Grid buttons: the current view is filled. */

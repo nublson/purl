@@ -122,6 +122,57 @@ test.describe("Shared folders, visited signed out", () => {
     await expect(page.locator('ul[aria-label="Links"] .animate-pulse')).toHaveCount(0);
   });
 
+  test("grid cards arrive on first load and with each new page, not on a view switch", async ({
+    page,
+    seed,
+    testUser,
+  }, testInfo) => {
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    for (let i = 0; i < 51; i++) {
+      await seed.link({ url: `https://m${i}.example`, title: `Card ${i}`, folderId: design });
+    }
+    await page.context().addCookies([
+      { name: "purl-shared-view", value: "grid", url: testInfo.project.use.baseURL! },
+    ]);
+    // Count card arrivals in the page (200ms animations are too short to
+    // catch from outside): animations that start on a grid cell's box.
+    await page.addInitScript(() => {
+      const w = window as Window & { __cardArrivals?: number };
+      w.__cardArrivals = 0;
+      document.addEventListener("animationstart", (event) => {
+        const target = event.target as HTMLElement;
+        if (target.parentElement?.tagName === "LI" && target.querySelector('[data-cy="link-card"]')) {
+          w.__cardArrivals! += 1;
+        }
+      });
+    });
+    const arrivals = () =>
+      page.evaluate(() => (window as Window & { __cardArrivals?: number }).__cardArrivals ?? 0);
+    const reset = () =>
+      page.evaluate(() => {
+        (window as Window & { __cardArrivals?: number }).__cardArrivals = 0;
+      });
+
+    await page.goto(`/@${testUser.username}/design`);
+    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(50);
+    await expect.poll(arrivals).toBeGreaterThan(0);
+
+    // A view switch only fades the layout in: the cards don't arrive again.
+    await waitForHydration(page, 'button[aria-label="Grid view"]');
+    await page.waitForTimeout(700);
+    await page.getByRole("button", { name: "List view" }).click();
+    await reset();
+    await page.getByRole("button", { name: "Grid view" }).click();
+    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(50);
+    await page.waitForTimeout(300);
+    expect(await arrivals()).toBe(0);
+
+    // The next page's card arrives.
+    await page.locator('[data-cy="link-card"]').last().scrollIntoViewIfNeeded();
+    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(51);
+    await expect.poll(arrivals).toBeGreaterThan(0);
+  });
+
   test("a private or missing folder is a 404, and so is an unknown user", async ({
     page,
     seed,

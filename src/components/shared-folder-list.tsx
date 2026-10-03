@@ -11,8 +11,10 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from "react";
+import { ARRIVE } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
   SHARED_GRID_COLUMNS,
@@ -22,6 +24,18 @@ import { SharedLinkCard } from "./shared-link-card";
 
 /** Placeholder cards while the next page loads: one row at four columns. */
 const LOAD_MORE_CARDS = 4;
+/** Cards staggered on first load (40ms apart); later ones start with the last. */
+const STAGGERED_CARDS = 8;
+/** Long enough for the last staggered card's 200ms arrival to finish. */
+const ARRIVAL_WINDOW_MS = 600;
+/**
+ * A card arriving: `ARRIVE` after its own delay (`--arrive-delay`), hidden
+ * until it starts. Reduced motion: no stagger (ARRIVE is already fade only).
+ */
+const CARD_ARRIVE = cn(
+  ARRIVE,
+  "fill-mode-backwards [animation-delay:var(--arrive-delay)] motion-reduce:[animation-delay:0ms]",
+);
 import { useSharedFolderView } from "./shared-folder-view";
 import { SharedLinkItem } from "./shared-link-item";
 import {
@@ -54,7 +68,24 @@ export function SharedFolderList({
   const [links, setLinks] = useState(() => initialLinks.map(toLink));
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [loadingMore, setLoadingMore] = useState(false);
-  const view = useSharedFolderView();
+  const { view, switched } = useSharedFolderView();
+  // Motion (find-animation-opportunities): links that are new to the page
+  // arrive (ARRIVE: fade in as a 4px blur clears, 200ms); links that only
+  // remount because the view changed don't. `intro` covers the first load
+  // (the swap from the skeleton), `arrivingIds` each loaded-more page.
+  const [intro, setIntro] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setIntro(false), ARRIVAL_WINDOW_MS);
+    return () => clearTimeout(timer);
+  }, []);
+  const [arrivingIds, setArrivingIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  useEffect(() => {
+    if (arrivingIds.size === 0) return;
+    const timer = setTimeout(() => setArrivingIds(new Set()), ARRIVAL_WINDOW_MS);
+    return () => clearTimeout(timer);
+  }, [arrivingIds]);
   // Masonry needs measured cards, which only exist in the browser: the
   // server's HTML (and the first paint before hydration) shows the cards in
   // plain rows, and the grid switches to masonry before the next paint.
@@ -75,6 +106,7 @@ export function SharedFolderList({
         links: PublicLink[];
         nextCursor: string | null;
       };
+      setArrivingIds(new Set(page.links.map((link) => link.id)));
       setLinks((current) => {
         const seen = new Set(current.map((link) => link.id));
         return [
@@ -132,48 +164,81 @@ export function SharedFolderList({
 
   return (
     <div className={frame} onMouseLeave={coolPreviews}>
-      {view === "grid" ? (
-        <ul
-          aria-label="Links"
-          // Masonry: 2 columns on phones, 3 on tablets, 4 on desktop; cards
-          // up to 210px, centered, gutters 16 → 40px. 1px rows with no row
-          // gap: each card spans its own height (see MasonryItem), so a
-          // short card sits right under the one above it. DOM order stays
-          // newest first, left to right, for keyboard and screen readers.
-          className={cn(
-            "grid w-full",
-            masonry ? "auto-rows-[1px]" : "items-start",
-            SHARED_GRID_COLUMNS,
-          )}
-        >
-          {links.map((link, index) => (
-            <MasonryItem key={link.id} masonry={masonry}>
-              <SharedLinkCard link={link} eagerThumbnail={index < 4} />
-            </MasonryItem>
-          ))}
-          {/* The next page on its way: a row of placeholder cards where
-              the new cards will land. */}
-          {loadingMore
-            ? Array.from({ length: LOAD_MORE_CARDS }, (_, index) => (
-                <MasonryItem key={`loading-${index}`} masonry={masonry}>
-                  <SharedLinkCardSkeleton />
+      {/* Keyed by view: switching remounts it, and after a switch (not on
+          page load) the new layout fades in, opacity only, 150ms. */}
+      <div
+        key={view}
+        className={cn(
+          "w-full",
+          switched && "animate-in fade-in-0 duration-150 ease-out-strong",
+        )}
+      >
+        {view === "grid" ? (
+          <ul
+            aria-label="Links"
+            // Masonry: 2 columns on phones, 3 on tablets, 4 on desktop; cards
+            // up to 210px, centered, gutters 16 → 40px. 1px rows with no row
+            // gap: each card spans its own height (see MasonryItem), so a
+            // short card sits right under the one above it. DOM order stays
+            // newest first, left to right, for keyboard and screen readers.
+            className={cn(
+              "grid w-full",
+              masonry ? "auto-rows-[1px]" : "items-start",
+              SHARED_GRID_COLUMNS,
+            )}
+          >
+            {links.map((link, index) => {
+              // First load: the first cards arrive 40ms apart (the rest
+              // with the last of them); a loaded-more page arrives at once.
+              const arriving = intro || arrivingIds.has(link.id);
+              const delay = intro ? Math.min(index, STAGGERED_CARDS - 1) * 40 : 0;
+              return (
+                <MasonryItem
+                  key={link.id}
+                  masonry={masonry}
+                  className={
+                    arriving
+                      ? CARD_ARRIVE
+                      : undefined
+                  }
+                  style={
+                    arriving
+                      ? ({ "--arrive-delay": `${delay}ms` } as CSSProperties)
+                      : undefined
+                  }
+                >
+                  <SharedLinkCard link={link} eagerThumbnail={index < 4} />
                 </MasonryItem>
-              ))
-            : null}
-        </ul>
-      ) : (
-        <ItemGroup aria-label="Links" className="w-full gap-0">
-          {links.map((link, index) => (
-            <div
-              key={link.id}
-              role="listitem"
-              className="[content-visibility:auto] [contain-intrinsic-size:auto_48px]"
-            >
-              <SharedLinkItem link={link} eagerFavicon={index === 0} />
-            </div>
-          ))}
-        </ItemGroup>
-      )}
+              );
+            })}
+            {/* The next page on its way: a row of placeholder cards where
+                the new cards will land. */}
+            {loadingMore
+              ? Array.from({ length: LOAD_MORE_CARDS }, (_, index) => (
+                  <MasonryItem key={`loading-${index}`} masonry={masonry}>
+                    <SharedLinkCardSkeleton />
+                  </MasonryItem>
+                ))
+              : null}
+          </ul>
+        ) : (
+          <ItemGroup
+            aria-label="Links"
+            // First load: the rows arrive together (no stagger in a list).
+            className={cn("w-full gap-0", intro && ARRIVE)}
+          >
+            {links.map((link, index) => (
+              <div
+                key={link.id}
+                role="listitem"
+                className="[content-visibility:auto] [contain-intrinsic-size:auto_48px]"
+              >
+                <SharedLinkItem link={link} eagerFavicon={index === 0} />
+              </div>
+            ))}
+          </ItemGroup>
+        )}
+      </div>
       {/* Load more: the scroll sentinel and the loading announcement,
           always rendered so the status region exists before it speaks.
           The list shows dots in a 40px strip (like the owner's list);
@@ -215,9 +280,14 @@ export function SharedFolderList({
  */
 function MasonryItem({
   masonry,
+  className,
+  style,
   children,
 }: {
   masonry: boolean;
+  /** For the card's box (e.g. its arrival animation). */
+  className?: string;
+  style?: CSSProperties;
   children: ReactNode;
 }) {
   const [span, setSpan] = useState<number | null>(null);
@@ -243,7 +313,11 @@ function MasonryItem({
         masonry && span !== null ? { gridRowEnd: `span ${span}` } : undefined
       }
     >
-      <div ref={boxRef} className="pb-4 md:pb-10">
+      <div
+        ref={boxRef}
+        className={cn("pb-4 md:pb-10", className)}
+        style={style}
+      >
         {children}
       </div>
     </li>

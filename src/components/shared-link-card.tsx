@@ -25,7 +25,7 @@ export function SharedLinkCard({
       rel="noopener noreferrer"
       aria-label={`${link.title} (opens in new tab)`}
       data-cy="link-card"
-      className="flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 outline-none transition-[box-shadow] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring [@media(hover:hover)]:hover:ring-foreground/25"
+      className="flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 outline-none transition-[box-shadow,scale] duration-150 ease-out focus-visible:ring-3 active:scale-[0.98] motion-reduce:active:scale-100 focus-visible:ring-ring [@media(hover:hover)]:hover:ring-foreground/25"
     >
       {/* 16:10, full-bleed: the card's rounded corners clip it. */}
       <LinkPreviewThumbnail
