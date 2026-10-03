@@ -115,6 +115,23 @@ describe("proxy", () => {
     expect(auth.auth.api.getSession).not.toHaveBeenCalled();
   });
 
+  it.each(["/@nublson/design", "/u/nublson/design", "/api/public/folders/nublson/design"])(
+    "lets anyone read shared folders: %s passes without a session lookup",
+    async (path) => {
+      const res = await proxy(createRequest(path));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+      expect(auth.auth.api.getSession).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still gates look-alike private paths", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+    const res = await proxy(createRequest("/upload"));
+    expect(res.headers.get("location")).toContain("/");
+    expect(auth.auth.api.getSession).toHaveBeenCalled();
+  });
+
   it("looks up the session on / to redirect signed-in users", async () => {
     vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
     await proxy(createRequest("/"));

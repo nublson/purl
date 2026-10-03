@@ -94,3 +94,18 @@ export function parseDescriptionField(
     { status: 400 },
   );
 }
+
+/**
+ * Reads the optional `isPublic` field of a folder update: absent →
+ * `undefined` (unchanged), a boolean → passed on, anything else → a 400
+ * `INVALID_PUBLIC` response.
+ */
+export function parseIsPublicField(
+  value: unknown,
+): boolean | undefined | NextResponse {
+  if (value === undefined || typeof value === "boolean") return value;
+  return NextResponse.json(
+    { error: "isPublic must be true or false.", code: "INVALID_PUBLIC" },
+    { status: 400 },
+  );
+}

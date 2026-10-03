@@ -50,7 +50,19 @@ const nextConfig: NextConfig = {
       { source: "/login", destination: "/", permanent: true },
       { source: "/signup", destination: "/", permanent: true },
       { source: "/verify-email", destination: "/", permanent: true },
+      // Shared folders live at /@username/slug; /u/... is only the
+      // internal route behind that rewrite.
+      {
+        source: "/u/:username/:slug",
+        destination: "/@:username/:slug",
+        permanent: true,
+      },
     ];
+  },
+  async rewrites() {
+    // App directory segments can't start with "@" (that's parallel routes),
+    // so the public /@username/slug URL is served by /u/[username]/[slug].
+    return [{ source: "/@:username/:slug", destination: "/u/:username/:slug" }];
   },
   async headers() {
     // X-Frame-Options and friends everywhere; the CSP in production only.

@@ -110,6 +110,8 @@ export type UpdateFolderInput = {
   name?: string;
   emoji?: string | null;
   description?: string | null;
+  /** Share at `/@username/slug` (`true`) or make private again. */
+  isPublic?: boolean;
 };
 
 export function postFolder(

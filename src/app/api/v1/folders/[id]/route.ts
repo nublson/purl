@@ -1,6 +1,7 @@
 import {
   mapFolderError,
   parseDescriptionField,
+  parseIsPublicField,
   parseEmojiField,
 } from "@/lib/folder-errors";
 import { deleteFolder, updateFolder } from "@/lib/folders";
@@ -13,7 +14,7 @@ export async function OPTIONS(): Promise<Response> {
   return corsPreflightResponse();
 }
 
-/** Updates a folder: `{ name?, emoji?, description? }` (`null` clears emoji/description). Same rules and errors as the app's `PATCH /api/folders/[id]`. */
+/** Updates a folder: `{ name?, emoji?, description?, isPublic? }` (`null` clears emoji/description; `isPublic` shares it at `/@username/slug`). Same rules and errors as the app's `PATCH /api/folders/[id]`. */
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
@@ -23,7 +24,12 @@ export async function PATCH(
     return addCors(NextResponse.json({ error: "Unauthorized" }, { status: 401 }));
   }
 
-  let body: { name?: unknown; emoji?: unknown; description?: unknown };
+  let body: {
+    name?: unknown;
+    emoji?: unknown;
+    description?: unknown;
+    isPublic?: unknown;
+  };
   try {
     body = await request.json();
   } catch {
@@ -42,10 +48,17 @@ export async function PATCH(
   if (emoji instanceof NextResponse) return addCors(emoji);
   const description = parseDescriptionField(body?.description);
   if (description instanceof NextResponse) return addCors(description);
+  const isPublic = parseIsPublicField(body?.isPublic);
+  if (isPublic instanceof NextResponse) return addCors(isPublic);
 
   try {
     const { id } = await context.params;
-    const folder = await updateFolder(user.id, id, { name, emoji, description });
+    const folder = await updateFolder(user.id, id, {
+      name,
+      emoji,
+      description,
+      isPublic,
+    });
     broadcastLinksChanged(user.id);
     return addCors(NextResponse.json(folder));
   } catch (e) {

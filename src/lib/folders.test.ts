@@ -13,6 +13,9 @@ vi.mock("@/lib/prisma", () => ({
     link: {
       deleteMany: vi.fn(),
     },
+    folderSlugRedirect: {
+      upsert: vi.fn(),
+    },
     $transaction: vi.fn(),
   },
 }));
@@ -47,6 +50,7 @@ const { MAX_FOLDERS } = await import("./limits");
 const txExecuteRaw = vi.fn();
 const tx = {
   folder: prisma.folder,
+  folderSlugRedirect: prisma.folderSlugRedirect,
   $executeRaw: txExecuteRaw,
 };
 
@@ -59,6 +63,7 @@ function resetMocks() {
   vi.mocked(prisma.folder.update).mockReset();
   vi.mocked(prisma.folder.delete).mockReset();
   vi.mocked(prisma.link.deleteMany).mockReset();
+  vi.mocked(prisma.folderSlugRedirect.upsert).mockReset();
   vi.mocked(prisma.$transaction)
     .mockReset()
     // Interactive form: run the callback against `tx`. (deleteFolder's tests
@@ -167,6 +172,7 @@ describe("createFolder", () => {
       slug: "books-3",
       emoji: DEFAULT_FOLDER_EMOJI,
       description: null,
+      isPublic: false,
       linkCount: 0,
     });
     expect(prisma.folder.create).toHaveBeenCalledWith(
@@ -257,6 +263,7 @@ describe("createFolder", () => {
       slug: "books",
       emoji: DEFAULT_FOLDER_EMOJI,
       description: null,
+      isPublic: false,
       linkCount: 0,
     });
     expect(order).toEqual([
@@ -302,6 +309,7 @@ describe("updateFolder", () => {
     expect(err).toBeInstanceOf(FolderNotFoundError);
     expect(prisma.folder.findFirst).toHaveBeenCalledWith({
       where: { id: "folder-1", userId: "user-1" },
+      select: { slug: true },
     });
   });
 
@@ -331,6 +339,7 @@ describe("updateFolder", () => {
       slug: "books",
       emoji: DEFAULT_FOLDER_EMOJI,
       description: null,
+      isPublic: false,
       linkCount: 3,
     });
     expect(prisma.folder.findFirst).toHaveBeenNthCalledWith(2, {
@@ -340,6 +349,44 @@ describe("updateFolder", () => {
         NOT: { id: "folder-1" },
       },
     });
+  });
+
+  it("keeps the old slug as a redirect when a rename changes it", async () => {
+    vi.mocked(prisma.folder.findFirst)
+      .mockResolvedValueOnce({ slug: "books" } as never)
+      .mockResolvedValueOnce(null);
+    vi.mocked(prisma.folder.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.folder.update).mockResolvedValue({
+      id: "folder-1",
+      name: "Trips",
+      slug: "trips",
+      _count: { links: 0 },
+    } as never);
+
+    await updateFolder("user-1", "folder-1", { name: "Trips" });
+    expect(prisma.folderSlugRedirect.upsert).toHaveBeenCalledWith({
+      where: { userId_slug: { userId: "user-1", slug: "books" } },
+      create: { userId: "user-1", slug: "books", folderId: "folder-1" },
+      update: { folderId: "folder-1" },
+    });
+  });
+
+  it("makes a folder public on its own, without touching the slug", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValueOnce({ slug: "books" } as never);
+    vi.mocked(prisma.folder.update).mockResolvedValue({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      isPublic: true,
+      _count: { links: 2 },
+    } as never);
+
+    const result = await updateFolder("user-1", "folder-1", { isPublic: true });
+    expect(result.isPublic).toBe(true);
+    expect(prisma.folder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { isPublic: true } }),
+    );
+    expect(prisma.folderSlugRedirect.upsert).not.toHaveBeenCalled();
   });
 
   it("regenerates and de-collides the slug on rename", async () => {
@@ -431,6 +478,7 @@ describe("updateFolder", () => {
       slug: "books",
       emoji: "📚",
       description: null,
+      isPublic: false,
       linkCount: 2,
     });
     expect(prisma.folder.update).toHaveBeenCalledWith(
@@ -843,6 +891,7 @@ describe("listFoldersForUser", () => {
       slug: "banana",
       emoji: DEFAULT_FOLDER_EMOJI,
       description: null,
+      isPublic: false,
       linkCount: 0,
     });
     // A stored emoji wins over the default.
@@ -874,6 +923,7 @@ describe("getFolderBySlug", () => {
       slug: "books",
       emoji: "📚",
       description: null,
+      isPublic: false,
       linkCount: 4,
     });
   });

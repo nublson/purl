@@ -1,6 +1,7 @@
 "use client";
 
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
+import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
 import { Globe } from "lucide-react";
 import * as React from "react";
@@ -10,12 +11,15 @@ export type LinkPreviewThumbnailProps = {
   thumbnailSrc: string | null;
   /** Eager-load preview thumbnail (first above-the-fold row) for LCP. */
   eagerThumbnail?: boolean;
+  /** Overrides the box (e.g. another aspect ratio or radius). */
+  className?: string;
 };
 
 export function LinkPreviewThumbnail({
   link,
   thumbnailSrc,
   eagerThumbnail = false,
+  className,
 }: LinkPreviewThumbnailProps) {
   const [thumbFailed, setThumbFailed] = React.useState(false);
   const [faviconFailed, setFaviconFailed] = React.useState(false);
@@ -31,7 +35,12 @@ export function LinkPreviewThumbnail({
     !showThumb && Boolean(faviconSrc) && !faviconFailed;
 
   return (
-    <div className="relative w-full aspect-video overflow-hidden rounded-t-lg bg-muted/30 flex items-center justify-center">
+    <div
+      className={cn(
+        "relative w-full aspect-video overflow-hidden rounded-t-lg bg-muted/30 flex items-center justify-center",
+        className,
+      )}
+    >
       {showThumb && thumbnailSrc ? (
         // eslint-disable-next-line @next/next/no-img-element -- user-controlled OG URLs; avoid next/image optimizer SSRF
         <img

@@ -11,7 +11,7 @@ import { Pool } from "pg";
  */
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-export type TestUser = { id: string; email: string };
+export type TestUser = { id: string; email: string; username: string };
 
 /**
  * Creates (or reuses) a `@purl.test` user. `.test` is a reserved domain
@@ -25,7 +25,7 @@ export async function createTestUser(email: string, name: string): Promise<TestU
     `INSERT INTO "users" ("id", "name", "email", "emailVerified", "username", "createdAt", "updatedAt")
      VALUES ($1, $2, $3, true, $4, now(), now())
      ON CONFLICT ("email") DO UPDATE SET "name" = EXCLUDED."name", "updatedAt" = now()
-     RETURNING "id", "email"`,
+     RETURNING "id", "email", "username"`,
     [randomUUID(), name, email, username],
   );
   return rows[0];
@@ -35,6 +35,7 @@ export async function createTestUser(email: string, name: string): Promise<TestU
 export async function resetTestUserData(userId: string): Promise<void> {
   await pool.query(`DELETE FROM "links" WHERE "userId" = $1`, [userId]);
   await pool.query(`DELETE FROM "folders" WHERE "userId" = $1`, [userId]);
+  await pool.query(`DELETE FROM "username_redirects" WHERE "userId" = $1`, [userId]);
 }
 
 /** Deletes the user; links, folders, sessions and accounts cascade. */
@@ -45,27 +46,46 @@ export async function deleteTestUser(userId: string): Promise<void> {
 /** Inserts a link row directly: no metadata fetch, no outbound HTTP. */
 export async function seedLink(
   userId: string,
-  { url, title, folderId }: { url: string; title?: string; folderId?: string },
+  {
+    url,
+    title,
+    description,
+    folderId,
+  }: { url: string; title?: string; description?: string; folderId?: string },
 ): Promise<string> {
   const domain = new URL(url).hostname;
   const id = randomUUID();
   await pool.query(
-    `INSERT INTO "links" ("id", "url", "title", "favicon", "domain", "userId", "folderId")
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [id, url, title ?? domain, `https://${domain}/favicon.ico`, domain, userId, folderId ?? null],
+    `INSERT INTO "links" ("id", "url", "title", "description", "favicon", "domain", "userId", "folderId")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      id,
+      url,
+      title ?? domain,
+      description ?? null,
+      `https://${domain}/favicon.ico`,
+      domain,
+      userId,
+      folderId ?? null,
+    ],
   );
   return id;
 }
 
 export async function seedFolder(
   userId: string,
-  { name, slug, emoji }: { name: string; slug: string; emoji?: string },
+  {
+    name,
+    slug,
+    emoji,
+    isPublic = false,
+  }: { name: string; slug: string; emoji?: string; isPublic?: boolean },
 ): Promise<string> {
   const id = randomUUID();
   await pool.query(
-    `INSERT INTO "folders" ("id", "name", "slug", "emoji", "userId", "updatedAt")
-     VALUES ($1, $2, $3, $4, $5, now())`,
-    [id, name, slug, emoji ?? null, userId],
+    `INSERT INTO "folders" ("id", "name", "slug", "emoji", "isPublic", "userId", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, now())`,
+    [id, name, slug, emoji ?? null, isPublic, userId],
   );
   return id;
 }

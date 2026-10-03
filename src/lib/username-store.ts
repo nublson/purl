@@ -20,7 +20,8 @@ export async function isUsernameTaken(
 }
 
 /**
- * Sets `userId`'s username. Relies on the DB's unique constraint as the
+ * Sets `userId`'s username, keeping the old one as a redirect for shared
+ * `/@username/...` URLs. Relies on the DB's unique constraint as the
  * final word on collisions (a race can slip past an earlier
  * `isUsernameTaken` check), reporting those as `"taken"` instead of
  * throwing. Prisma reports a unique-constraint violation as error code
@@ -33,9 +34,27 @@ export async function setUsername(
   username: string,
 ): Promise<"ok" | "taken"> {
   try {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { username },
+    await prisma.$transaction(async (tx) => {
+      const current = await tx.user.findUnique({
+        where: { id: userId },
+        select: { username: true },
+      });
+      await tx.user.update({
+        where: { id: userId },
+        data: { username },
+      });
+      // The new name is live now: any redirect from it (yours or someone
+      // else's old name) is moot.
+      await tx.usernameRedirect.deleteMany({ where: { username } });
+      // The old name keeps shared /@old-name/... links working until
+      // someone else takes it (a live username always wins).
+      if (current && current.username !== username) {
+        await tx.usernameRedirect.upsert({
+          where: { username: current.username },
+          create: { username: current.username, userId },
+          update: { userId },
+        });
+      }
     });
     return "ok";
   } catch (error) {

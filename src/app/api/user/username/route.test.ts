@@ -8,12 +8,18 @@ vi.mock("@/lib/require-browser-session", () => ({
 
 const mockFindUnique = vi.fn();
 const mockUpdate = vi.fn();
+const client = {
+  user: {
+    findUnique: mockFindUnique,
+    update: mockUpdate,
+  },
+  // setUsername keeps the old name as a redirect.
+  usernameRedirect: { deleteMany: vi.fn(), upsert: vi.fn() },
+};
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    user: {
-      findUnique: mockFindUnique,
-      update: mockUpdate,
-    },
+    ...client,
+    $transaction: (cb: (tx: typeof client) => unknown) => cb(client),
   },
 }));
 

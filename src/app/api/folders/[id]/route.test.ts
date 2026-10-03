@@ -57,6 +57,30 @@ describe("PATCH /api/folders/[id]", () => {
     mockBroadcastLinksChanged.mockReset();
   });
 
+  it("shares or unshares the folder with isPublic", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockUpdateFolder.mockResolvedValue({ id: "f1", isPublic: true });
+    const res = await PATCH(patchRequest({ isPublic: true }), {
+      params: Promise.resolve({ id: "f1" }),
+    });
+    expect(res.status).toBe(200);
+    expect(mockUpdateFolder).toHaveBeenCalledWith(
+      "user-1",
+      "f1",
+      expect.objectContaining({ isPublic: true }),
+    );
+  });
+
+  it("returns 400 INVALID_PUBLIC for a non-boolean isPublic", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    const res = await PATCH(patchRequest({ isPublic: "yes" }), {
+      params: Promise.resolve({ id: "f1" }),
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("INVALID_PUBLIC");
+    expect(mockUpdateFolder).not.toHaveBeenCalled();
+  });
+
   it("returns 401 when there is no browser session", async () => {
     mockGetBrowserSessionUserId.mockResolvedValue(null);
     const res = await PATCH(patchRequest({ name: "Reading" }), ctx());

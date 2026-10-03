@@ -7,7 +7,12 @@ type WhenAuthenticated = "next" | "redirect";
 type PublicRoute = {
   path: string;
   whenAuthenticated: WhenAuthenticated;
-  match?: "exact" | "prefix";
+  /**
+   * `exact` (default), `prefix` (the path or anything under `path/`), or
+   * `startsWith` (any pathname beginning with `path`, e.g. `/@` for
+   * `/@username/...`).
+   */
+  match?: "exact" | "prefix" | "startsWith";
 };
 
 const publicRoutes: PublicRoute[] = [
@@ -30,6 +35,12 @@ const publicRoutes: PublicRoute[] = [
     match: "prefix",
     whenAuthenticated: "next",
   },
+  // Shared folders: anyone can read a public folder, signed in or not. The
+  // page is /@username/slug (rewritten to /u/...); its data lives under
+  // /api/public.
+  { path: "/@", match: "startsWith", whenAuthenticated: "next" },
+  { path: "/u", match: "prefix", whenAuthenticated: "next" },
+  { path: "/api/public", match: "prefix", whenAuthenticated: "next" },
 ];
 
 const REDIRECT_WHEN_NOT_AUTHENTICATED = "/";
@@ -38,6 +49,9 @@ const DEFAULT_PAGE = "/home";
 function matchesPublicRoute(pathname: string, route: PublicRoute): boolean {
   if ((route.match ?? "exact") === "exact") {
     return pathname === route.path;
+  }
+  if (route.match === "startsWith") {
+    return pathname.startsWith(route.path);
   }
   return pathname === route.path || pathname.startsWith(`${route.path}/`);
 }
