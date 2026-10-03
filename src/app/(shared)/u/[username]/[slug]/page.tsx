@@ -48,9 +48,11 @@ export async function generateMetadata({
   const page = await resolveForRequest(username, slug);
   const robots = { index: false, follow: false };
   if (!page || page.kind !== "folder") return { robots };
-  const title = `${page.folder.emoji} ${page.folder.name} · @${page.owner.username}`;
+  // "Design by nublson | Purl": absolute, so the app's "%s · Purl"
+  // template doesn't apply.
+  const title = `${page.folder.name} by ${page.owner.username} | Purl`;
   return {
-    title,
+    title: { absolute: title },
     description: page.folder.description ?? undefined,
     robots,
     openGraph: {

@@ -28,6 +28,11 @@ test.describe("Shared folders, visited signed out", () => {
       "https://a.example",
     );
     await expect(page.getByText("Not in the folder")).toHaveCount(0);
+    await expect(page).toHaveTitle(`Design by ${testUser.username} | Purl`);
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      "content",
+      `Design by ${testUser.username} | Purl`,
+    );
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
       "content",
       /noindex/,
