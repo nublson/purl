@@ -7,9 +7,11 @@ import {
 } from "@/components/shared-folder-view";
 import { Typography } from "@/components/typography";
 import { Separator } from "@/components/ui/separator";
+import { SharedFolderSkeleton } from "@/components/skeletons/shared-folder";
 import {
-  getPublicFolderPage,
+  listPublicFolderLinks,
   publicFolderPath,
+  resolvePublicFolder,
 } from "@/lib/public-folders";
 import {
   parseSharedFolderView,
@@ -18,8 +20,12 @@ import {
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
+import { cache, Suspense } from "react";
 
 type Params = { username: string; slug: string };
+
+/** One lookup per request, shared by the metadata and the page. */
+const resolveForRequest = cache(resolvePublicFolder);
 
 /**
  * A shared folder: /@username/slug (see the rewrite in next.config.ts).
@@ -27,6 +33,11 @@ type Params = { username: string; slug: string };
  * where the switcher would be, view buttons on the right) and the owner's
  * rows in one list, newest first. Old usernames and slugs redirect to the
  * current URL.
+ *
+ * The folder is resolved before anything streams, so a private or missing
+ * folder answers a real 404 and a renamed one a real 308. Only the links
+ * load behind a skeleton (no route-level loading.tsx: that would send 200
+ * before notFound() runs).
  */
 export async function generateMetadata({
   params,
@@ -34,7 +45,7 @@ export async function generateMetadata({
   params: Promise<Params>;
 }): Promise<Metadata> {
   const { username, slug } = await params;
-  const page = await getPublicFolderPage(username, slug, { limit: 1 });
+  const page = await resolveForRequest(username, slug);
   const robots = { index: false, follow: false };
   if (!page || page.kind !== "folder") return { robots };
   const title = `${page.folder.emoji} ${page.folder.name} · @${page.owner.username}`;
@@ -56,7 +67,7 @@ export default async function SharedFolderPage({
   params: Promise<Params>;
 }) {
   const { username, slug } = await params;
-  const page = await getPublicFolderPage(username, slug);
+  const page = await resolveForRequest(username, slug);
 
   if (!page) notFound();
   if (page.kind === "redirect") {
@@ -98,11 +109,30 @@ export default async function SharedFolderPage({
           <SharedFolderViewToggle />
         </div>
       </header>
-      <SharedFolderList
-        initialLinks={page.links}
-        initialNextCursor={page.nextCursor}
-        apiPath={`/api/public/folders/${owner.username}/${folder.slug}`}
-      />
+      <Suspense fallback={<SharedFolderSkeleton view={initialView} />}>
+        <SharedFolderLinks
+          ids={page.ids}
+          apiPath={`/api/public/folders/${owner.username}/${folder.slug}`}
+        />
+      </Suspense>
     </SharedFolderViewProvider>
+  );
+}
+
+/** The first page of links, streamed in behind the skeleton. */
+async function SharedFolderLinks({
+  ids,
+  apiPath,
+}: {
+  ids: { userId: string; folderId: string };
+  apiPath: string;
+}) {
+  const { links, nextCursor } = await listPublicFolderLinks(ids);
+  return (
+    <SharedFolderList
+      initialLinks={links}
+      initialNextCursor={nextCursor}
+      apiPath={apiPath}
+    />
   );
 }

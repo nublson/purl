@@ -14,7 +14,14 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/utils";
+import {
+  SHARED_GRID_COLUMNS,
+  SharedLinkCardSkeleton,
+} from "./skeletons/shared-folder";
 import { SharedLinkCard } from "./shared-link-card";
+
+/** Placeholder cards while the next page loads: one row at four columns. */
+const LOAD_MORE_CARDS = 4;
 import { useSharedFolderView } from "./shared-folder-view";
 import { SharedLinkItem } from "./shared-link-item";
 import {
@@ -94,7 +101,7 @@ export function SharedFolderList({
 
   // Grid: room for four 210px cards and their 40px gaps (4×210 + 3×40).
   const frame = cn(
-    "flex flex-1 flex-col gap-8 pt-24 pb-12",
+    "flex flex-1 flex-col pt-24 pb-12",
     view === "grid" ? "mx-auto w-full max-w-[960px]" : "wrapper-private",
   );
 
@@ -126,13 +133,22 @@ export function SharedFolderList({
           // gap: each card spans its own height (see MasonryItem), so a
           // short card sits right under the one above it. DOM order stays
           // newest first, left to right, for keyboard and screen readers.
-          className="grid w-full auto-rows-[1px] grid-cols-[repeat(2,minmax(0,210px))] justify-center gap-x-4 md:grid-cols-[repeat(3,minmax(0,210px))] md:gap-x-10 lg:grid-cols-[repeat(4,minmax(0,210px))]"
+          className={cn("grid w-full auto-rows-[1px]", SHARED_GRID_COLUMNS)}
         >
           {links.map((link, index) => (
             <MasonryItem key={link.id}>
               <SharedLinkCard link={link} eagerThumbnail={index < 4} />
             </MasonryItem>
           ))}
+          {/* The next page on its way: a row of placeholder cards where
+              the new cards will land. */}
+          {loadingMore
+            ? Array.from({ length: LOAD_MORE_CARDS }, (_, index) => (
+                <MasonryItem key={`loading-${index}`}>
+                  <SharedLinkCardSkeleton />
+                </MasonryItem>
+              ))
+            : null}
         </ul>
       ) : (
         <ItemGroup aria-label="Links" className="w-full gap-0">
@@ -147,9 +163,17 @@ export function SharedFolderList({
           ))}
         </ItemGroup>
       )}
+      {/* Load more: the scroll sentinel and the loading announcement,
+          always rendered so the status region exists before it speaks.
+          The list shows dots in a 40px strip (like the owner's list);
+          the grid shows placeholder cards instead, so its strip has no
+          height. */}
       <div
         role="status"
-        className="relative flex h-10 w-full items-center justify-center text-muted-foreground"
+        className={cn(
+          "relative flex w-full items-center justify-center text-muted-foreground",
+          view === "grid" ? "h-0" : "mt-8 h-10",
+        )}
       >
         {nextCursor && (
           <div
@@ -160,7 +184,9 @@ export function SharedFolderList({
         )}
         {loadingMore ? (
           <>
-            <BouncingDots size={20} className="gap-1! *:size-1!" />
+            {view === "list" ? (
+              <BouncingDots size={20} className="gap-1! *:size-1!" />
+            ) : null}
             <span className="sr-only">Loading more links</span>
           </>
         ) : null}

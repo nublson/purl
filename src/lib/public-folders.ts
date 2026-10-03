@@ -50,24 +50,28 @@ export type PublicFolderPage =
 export { publicFolderPath };
 
 /**
- * A public folder's page for visitors: its owner, the folder and one page
- * of links (newest first, `cursor` from the previous page). An old
- * username or slug (renamed since it was shared) gives `kind: "redirect"`
- * with the current ones; a live username or slug always wins over an old
- * one. `null` when there's no such folder or it isn't public: a private
- * folder looks exactly like a missing one.
+ * Which public folder `/@username/slug` points at, without its links. An
+ * old username or slug (renamed since it was shared) gives
+ * `kind: "redirect"` with the current ones; a live username or slug always
+ * wins over an old one. `null` when there's no such folder or it isn't
+ * public: a private folder looks exactly like a missing one. `ids` are for
+ * server use only (loading the links); never send them to visitors.
  */
-export async function getPublicFolderPage(
+export async function resolvePublicFolder(
   username: string,
   slug: string,
-  opts: { cursor?: string | null; limit?: number } = {},
-): Promise<PublicFolderPage | null> {
+): Promise<
+  | {
+      kind: "folder";
+      owner: PublicOwner;
+      folder: PublicFolder;
+      ids: { userId: string; folderId: string };
+    }
+  | { kind: "redirect"; username: string; slug: string }
+  | null
+> {
   const wantedUsername = username.toLowerCase();
   const wantedSlug = slug.toLowerCase();
-  const limit = Math.min(
-    Math.max(Math.trunc(opts.limit ?? PUBLIC_FOLDER_PAGE_SIZE), 1),
-    PUBLIC_FOLDER_PAGE_SIZE * 2,
-  );
 
   let redirected = false;
   let user = await prisma.user.findUnique({
@@ -112,13 +116,6 @@ export async function getPublicFolderPage(
     return { kind: "redirect", username: user.username, slug: folder.slug };
   }
 
-  const { links, nextCursor } = await listLinksForUser(user.id, {
-    limit,
-    cursor: opts.cursor ?? null,
-    contentType: null,
-    folderId: folder.id,
-  });
-
   return {
     kind: "folder",
     owner: { name: user.name, image: user.image ?? null, username: user.username },
@@ -128,6 +125,29 @@ export async function getPublicFolderPage(
       emoji: folder.emoji || DEFAULT_FOLDER_EMOJI,
       description: folder.description || null,
     },
+    ids: { userId: user.id, folderId: folder.id },
+  };
+}
+
+/**
+ * One page of a resolved public folder's links (newest first, `cursor`
+ * from the previous page), with only public fields.
+ */
+export async function listPublicFolderLinks(
+  ids: { userId: string; folderId: string },
+  opts: { cursor?: string | null; limit?: number } = {},
+): Promise<{ links: PublicLink[]; nextCursor: string | null }> {
+  const limit = Math.min(
+    Math.max(Math.trunc(opts.limit ?? PUBLIC_FOLDER_PAGE_SIZE), 1),
+    PUBLIC_FOLDER_PAGE_SIZE * 2,
+  );
+  const { links, nextCursor } = await listLinksForUser(ids.userId, {
+    limit,
+    cursor: opts.cursor ?? null,
+    contentType: null,
+    folderId: ids.folderId,
+  });
+  return {
     links: links.map((link) => ({
       id: link.id,
       url: link.url,
@@ -139,6 +159,28 @@ export async function getPublicFolderPage(
       contentType: link.contentType,
       createdAt: link.createdAt,
     })),
+    nextCursor,
+  };
+}
+
+/**
+ * A public folder's page for visitors: its owner, the folder and one page
+ * of links. Same outcomes as `resolvePublicFolder` (redirect, or `null`
+ * for a private or missing folder).
+ */
+export async function getPublicFolderPage(
+  username: string,
+  slug: string,
+  opts: { cursor?: string | null; limit?: number } = {},
+): Promise<PublicFolderPage | null> {
+  const resolved = await resolvePublicFolder(username, slug);
+  if (!resolved || resolved.kind === "redirect") return resolved;
+  const { links, nextCursor } = await listPublicFolderLinks(resolved.ids, opts);
+  return {
+    kind: "folder",
+    owner: resolved.owner,
+    folder: resolved.folder,
+    links,
     nextCursor,
   };
 }

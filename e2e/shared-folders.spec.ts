@@ -87,6 +87,41 @@ test.describe("Shared folders, visited signed out", () => {
     await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
   });
 
+  test("loading more in the grid shows placeholder cards, then the next page", async ({
+    page,
+    seed,
+    testUser,
+  }, testInfo) => {
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    // One more than a page (PUBLIC_FOLDER_PAGE_SIZE = 50).
+    for (let i = 0; i < 51; i++) {
+      await seed.link({ url: `https://l${i}.example`, title: `Link ${i}`, folderId: design });
+    }
+    // A returning visitor who chose the grid.
+    await page.context().addCookies([
+      { name: "purl-shared-view", value: "grid", url: testInfo.project.use.baseURL! },
+    ]);
+    // Hold the next page until the placeholders have been seen.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/public/folders/**", async (route) => {
+      await held;
+      await route.continue();
+    });
+
+    await page.goto(`/@${testUser.username}/design`);
+    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(50);
+    await page.locator('[data-cy="link-card"]').last().scrollIntoViewIfNeeded();
+    await expect(page.getByText("Loading more links")).toBeAttached();
+    await expect(page.locator('ul[aria-label="Links"] .animate-pulse').first()).toBeVisible();
+    if (process.env.SHARE_SCREENSHOTS) {
+      await page.screenshot({ path: `${process.env.SHARE_SCREENSHOTS}/${testInfo.project.name}-grid-loading.png` });
+    }
+    release();
+    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(51);
+    await expect(page.locator('ul[aria-label="Links"] .animate-pulse')).toHaveCount(0);
+  });
+
   test("a private or missing folder is a 404, and so is an unknown user", async ({
     page,
     seed,
