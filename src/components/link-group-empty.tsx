@@ -1,6 +1,7 @@
 "use client";
 
-import { addLinksDialog } from "@/lib/add-links-dialog";
+import { useCurrentFolder } from "@/hooks/use-folders";
+import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
 import { ListPlus, PackageOpen } from "lucide-react";
 
 import {
@@ -11,7 +12,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { ADD_LINKS_SHORTCUT } from "./dialog-add-links";
+import { AddLinksPopover } from "./add-links-popover";
 import { Button } from "./ui/button";
 import { Kbd } from "./ui/kbd";
 
@@ -20,6 +21,7 @@ import { Kbd } from "./ui/kbd";
  * pull in links you've already saved.
  */
 export function LinkGroupEmpty({ inFolder = false }: { inFolder?: boolean }) {
+  const folder = useCurrentFolder();
   return (
     <Empty data-cy="link-group-empty">
       <EmptyHeader>
@@ -33,18 +35,21 @@ export function LinkGroupEmpty({ inFolder = false }: { inFolder?: boolean }) {
             : "Paste a link anywhere on this page to save it."}
         </EmptyDescription>
       </EmptyHeader>
-      {inFolder ? (
+      {inFolder && folder ? (
         <EmptyContent>
-          <Button
-            variant="outline"
-            size="sm"
-            aria-keyshortcuts={ADD_LINKS_SHORTCUT}
-            onClick={() => addLinksDialog.open()}
-          >
-            <ListPlus data-icon="inline-start" />
-            Add links
-            <Kbd aria-hidden="true">{ADD_LINKS_SHORTCUT}</Kbd>
-          </Button>
+          <AddLinksPopover folder={folder} placement="empty">
+            <Button
+              variant="outline"
+              size="sm"
+              aria-haspopup="dialog"
+              aria-keyshortcuts={ADD_LINKS_SHORTCUT}
+              onClick={() => addLinksPopover.open("empty")}
+            >
+              <ListPlus data-icon="inline-start" />
+              Add links
+              <Kbd aria-hidden="true">{ADD_LINKS_SHORTCUT}</Kbd>
+            </Button>
+          </AddLinksPopover>
         </EmptyContent>
       ) : null}
     </Empty>

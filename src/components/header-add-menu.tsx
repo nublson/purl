@@ -2,13 +2,14 @@
 
 import { useCurrentFolder } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
-import { addLinksDialog } from "@/lib/add-links-dialog";
+import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
+import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { isApplePlatform } from "@/lib/platform";
 import { requestSaveUrl, saveLink } from "@/lib/save-link";
 import { Chromium, ClipboardPaste, ExternalLink, ListPlus, Plus } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useId, useRef } from "react";
-import { ADD_LINKS_SHORTCUT } from "./dialog-add-links";
+import { useEffect, useId, useRef } from "react";
+import { AddLinksPopover } from "./add-links-popover";
 import { toast } from "sonner";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Button } from "./ui/button";
@@ -38,16 +39,34 @@ function safeHttpsUrl(value: string | undefined) {
  * The header's + menu (pointer devices): teaches paste-anywhere and offers
  * "Paste link" for people who can't easily press the shortcut (voice
  * control, switch access, trackpad-only). On a folder page it also offers
- * "Add links", which opens the folder's `DialogAddLinks`.
+ * "Add links" (also `A`), which opens `AddLinksPopover` under the + button.
  */
 export function HeaderAddMenu() {
   const { notifyLinksChanged } = useLinksSyncActions();
   const currentFolder = useCurrentFolder();
   const pathname = usePathname();
   const hintId = useId();
-  // Set by "Add links": the dialog opens once the menu has closed and
-  // handed focus back to the + button, so the dialog returns focus there.
+  // Set by "Add links": the popover opens once the menu has closed and
+  // handed focus back to the + button, so it returns focus there.
   const pendingAddLinks = useRef(false);
+
+  // `A` on a folder page opens "Add links" (not while typing, or with a
+  // dialog or menu open).
+  useEffect(() => {
+    if (!currentFolder) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+        return;
+      }
+      if (event.key.toLowerCase() !== ADD_LINKS_SHORTCUT.toLowerCase()) return;
+      if (isTypingTarget(event.target) || isOverlayOpen()) return;
+      event.preventDefault();
+      addLinksPopover.open("header");
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [currentFolder]);
 
   async function handlePasteLink() {
     let text: string;
@@ -97,7 +116,7 @@ export function HeaderAddMenu() {
     }
   }
 
-  return (
+  const menu = (
     <DropdownWrapper
       align="end"
       className="w-64"
@@ -105,7 +124,7 @@ export function HeaderAddMenu() {
         if (!pendingAddLinks.current) return;
         pendingAddLinks.current = false;
         event.preventDefault();
-        addLinksDialog.open();
+        addLinksPopover.open("header");
       }}
       trigger={
         <Button
@@ -175,5 +194,14 @@ export function HeaderAddMenu() {
         </>
       ) : null}
     </DropdownWrapper>
+  );
+
+  // On a folder page, "Add links" opens under the + button.
+  return currentFolder ? (
+    <AddLinksPopover folder={currentFolder} placement="header" align="end">
+      <div className="inline-flex">{menu}</div>
+    </AddLinksPopover>
+  ) : (
+    menu
   );
 }

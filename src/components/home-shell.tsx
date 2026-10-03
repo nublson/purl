@@ -1,12 +1,11 @@
 "use client";
 
-import { DialogAddLinks } from "@/components/dialog-add-links";
 import { LinkGroup } from "@/components/link-group";
 import { LinkSelectionBar } from "@/components/link-selection-bar";
 import { PasteHandler } from "@/components/paste-handler";
 import { LinkItemSkeleton } from "@/components/skeletons";
 import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
-import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
+import { useFolders } from "@/hooks/use-folders";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
 import { coolPreviews } from "@/lib/link-preview-warmth";
@@ -63,8 +62,6 @@ export function HomeShell({
   const { version } = useLinksSyncState();
   const { setLinksTotal } = useLinksSyncActions();
   const { refresh: refreshFolders } = useFolders();
-  // On a folder page: the folder the "Add links" dialog files into.
-  const currentFolder = useCurrentFolder();
   const [groups, setGroups] = useState(initialGroups);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
@@ -283,9 +280,6 @@ export function HomeShell({
   return (
     <>
       <LinkSelectionBar folderOf={folderOf} />
-      {folderId && currentFolder ? (
-        <DialogAddLinks folder={currentFolder} />
-      ) : null}
       <PasteHandler
         onPasteStart={onPasteStart}
         onSaveSuccess={onSaveSuccess}
