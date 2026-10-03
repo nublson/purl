@@ -65,6 +65,7 @@ const {
   moveLinkToFolder,
   moveLinksToFolder,
   deleteLinksForUser,
+  searchLinksForUser,
   scrapeLinkMetadata,
   UnauthorizedError,
 } = await import("./links");
@@ -1078,6 +1079,60 @@ describe("moveLinksToFolder", () => {
     await expect(moveLinksToFolder("user-123", ["l1"], "f1")).rejects.toBeInstanceOf(
       FolderNotFoundError,
     );
+  });
+});
+
+describe("searchLinksForUser", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(assertFolderOwned).mockResolvedValue(undefined);
+    vi.mocked(prisma.link.findMany).mockResolvedValue([]);
+  });
+
+  it("matches title, domain or URL case-insensitively, leaving out the folder's links", async () => {
+    await searchLinksForUser("user-123", { query: "  React ", notInFolderId: "f1", limit: 20 });
+    expect(assertFolderOwned).toHaveBeenCalledWith("user-123", "f1");
+    expect(prisma.link.findMany).toHaveBeenCalledWith({
+      where: {
+        userId: "user-123",
+        AND: [
+          { OR: [{ folderId: null }, { folderId: { not: "f1" } }] },
+          {
+            OR: [
+              { title: { contains: "React", mode: "insensitive" } },
+              { domain: { contains: "React", mode: "insensitive" } },
+              { url: { contains: "React", mode: "insensitive" } },
+            ],
+          },
+        ],
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 21,
+    });
+  });
+
+  it("lists everything for a blank query, caps the limit, and reports hasMore", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue(
+      Array.from({ length: 3 }, (_, i) => makeRow({ id: `l${i}` })) as never,
+    );
+    const result = await searchLinksForUser("user-123", { query: "", limit: 2 });
+    expect(prisma.link.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: "user-123" }, take: 3 }),
+    );
+    expect(result.links.map((link) => link.id)).toEqual(["l0", "l1"]);
+    expect(result.hasMore).toBe(true);
+
+    await searchLinksForUser("user-123", { query: "", limit: 10_000 });
+    expect(prisma.link.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({ take: 101 }),
+    );
+  });
+
+  it("throws FolderNotFoundError for someone else's folder", async () => {
+    vi.mocked(assertFolderOwned).mockRejectedValue(new FolderNotFoundError());
+    await expect(
+      searchLinksForUser("user-123", { query: "", notInFolderId: "x", limit: 5 }),
+    ).rejects.toBeInstanceOf(FolderNotFoundError);
   });
 });
 

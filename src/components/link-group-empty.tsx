@@ -1,25 +1,57 @@
-import { PackageOpen } from "lucide-react";
+"use client";
+
+import { useCurrentFolder } from "@/hooks/use-folders";
+import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
+import { ListPlus, PackageOpen } from "lucide-react";
 
 import {
   Empty,
+  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
+import { AddLinksPopover } from "./add-links-popover";
+import { Button } from "./ui/button";
+import { Kbd } from "./ui/kbd";
 
-export function LinkGroupEmpty() {
+/**
+ * Empty list. On a folder page (`inFolder`) it also offers "Add links" to
+ * pull in links you've already saved.
+ */
+export function LinkGroupEmpty({ inFolder = false }: { inFolder?: boolean }) {
+  const folder = useCurrentFolder();
   return (
     <Empty data-cy="link-group-empty">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <PackageOpen />
         </EmptyMedia>
-        <EmptyTitle>No links yet</EmptyTitle>
+        <EmptyTitle>{inFolder ? "No links in this folder yet" : "No links yet"}</EmptyTitle>
         <EmptyDescription>
-          Paste a link anywhere on this page to save it.
+          {inFolder
+            ? "Paste a link to save it here, or add links you’ve already saved."
+            : "Paste a link anywhere on this page to save it."}
         </EmptyDescription>
       </EmptyHeader>
+      {inFolder && folder ? (
+        <EmptyContent>
+          <AddLinksPopover folder={folder} placement="empty">
+            <Button
+              variant="outline"
+              size="sm"
+              aria-haspopup="dialog"
+              aria-keyshortcuts={ADD_LINKS_SHORTCUT}
+              onClick={() => addLinksPopover.open("empty")}
+            >
+              <ListPlus data-icon="inline-start" />
+              Add links
+              <Kbd aria-hidden="true">{ADD_LINKS_SHORTCUT}</Kbd>
+            </Button>
+          </AddLinksPopover>
+        </EmptyContent>
+      ) : null}
     </Empty>
   );
 }

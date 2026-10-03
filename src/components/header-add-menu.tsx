@@ -2,10 +2,14 @@
 
 import { useCurrentFolder } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
+import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
+import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
+import { isApplePlatform } from "@/lib/platform";
 import { requestSaveUrl, saveLink } from "@/lib/save-link";
-import { Chromium, ClipboardPaste, ExternalLink, Plus } from "lucide-react";
+import { Chromium, ClipboardPaste, ExternalLink, ListPlus, Plus } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
+import { AddLinksPopover } from "./add-links-popover";
 import { toast } from "sonner";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Button } from "./ui/button";
@@ -31,25 +35,38 @@ function safeHttpsUrl(value: string | undefined) {
   }
 }
 
-function isApplePlatform() {
-  if (typeof navigator === "undefined") return false;
-  const platform =
-    (navigator as Navigator & { userAgentData?: { platform?: string } })
-      .userAgentData?.platform ?? navigator.platform;
-  return /mac|iphone|ipad/i.test(platform);
-}
-
 /**
- * Save menu for pointer devices, where the inline field is hidden. Teaches
- * paste-anywhere and offers "Paste link" for people who can't easily press
- * the shortcut (voice control, switch access, trackpad-only). Touch devices
- * keep the inline field on /home.
+ * The header's + menu (pointer devices): teaches paste-anywhere and offers
+ * "Paste link" for people who can't easily press the shortcut (voice
+ * control, switch access, trackpad-only). On a folder page it also offers
+ * "Add links" (also `A`), which opens `AddLinksPopover` under the + button.
  */
-export function HeaderSaveLink() {
+export function HeaderAddMenu() {
   const { notifyLinksChanged } = useLinksSyncActions();
   const currentFolder = useCurrentFolder();
   const pathname = usePathname();
   const hintId = useId();
+  // Set by "Add links": the popover opens once the menu has closed and
+  // handed focus back to the + button, so it returns focus there.
+  const pendingAddLinks = useRef(false);
+
+  // `A` on a folder page opens "Add links" (not while typing, or with a
+  // dialog or menu open).
+  useEffect(() => {
+    if (!currentFolder) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
+        return;
+      }
+      if (event.key.toLowerCase() !== ADD_LINKS_SHORTCUT.toLowerCase()) return;
+      if (isTypingTarget(event.target) || isOverlayOpen()) return;
+      event.preventDefault();
+      addLinksPopover.open("header");
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [currentFolder]);
 
   async function handlePasteLink() {
     let text: string;
@@ -99,13 +116,19 @@ export function HeaderSaveLink() {
     }
   }
 
-  return (
+  const menu = (
     <DropdownWrapper
       align="end"
       className="w-64"
+      onCloseAutoFocus={(event) => {
+        if (!pendingAddLinks.current) return;
+        pendingAddLinks.current = false;
+        event.preventDefault();
+        addLinksPopover.open("header");
+      }}
       trigger={
         <Button
-          aria-label="Save link"
+          aria-label="Add"
           variant="ghost"
           size="icon-sm"
           className="hidden cursor-pointer text-muted-foreground [@media(hover:hover)]:inline-flex"
@@ -134,6 +157,21 @@ export function HeaderSaveLink() {
           <ClipboardPaste />
           Paste link
         </DropdownMenuItem>
+        {/* Folder pages only: pick links you've already saved. */}
+        {currentFolder ? (
+          <DropdownMenuItem
+            aria-keyshortcuts={ADD_LINKS_SHORTCUT}
+            onSelect={() => {
+              pendingAddLinks.current = true;
+            }}
+          >
+            <ListPlus />
+            Add links
+            <Kbd aria-hidden="true" className="ms-auto">
+              {ADD_LINKS_SHORTCUT}
+            </Kbd>
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuGroup>
       {CHROME_EXTENSION_URL ? (
         <>
@@ -156,5 +194,14 @@ export function HeaderSaveLink() {
         </>
       ) : null}
     </DropdownWrapper>
+  );
+
+  // On a folder page, "Add links" opens under the + button.
+  return currentFolder ? (
+    <AddLinksPopover folder={currentFolder} placement="header" align="end">
+      <div className="inline-flex">{menu}</div>
+    </AddLinksPopover>
+  ) : (
+    menu
   );
 }

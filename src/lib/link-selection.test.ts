@@ -85,6 +85,14 @@ describe("linkSelection store", () => {
     expect(linkSelection.selectedIds()).toEqual(["b", "c", "d"]);
   });
 
+  it("remove unselects only the given links", () => {
+    linkSelection.toggle("a");
+    linkSelection.toggle("c");
+    linkSelection.toggle("d");
+    linkSelection.remove(["a", "c"]);
+    expect(linkSelection.selectedIds()).toEqual(["d"]);
+  });
+
   it("drops links that leave the list", () => {
     linkSelection.selectAll();
     setSelectableLinks(["a", "e"]);

@@ -77,10 +77,14 @@ let state: LinkSelectionState = EMPTY_SELECTION;
 let order: readonly string[] = [];
 const listeners = new Set<() => void>();
 
+function notify() {
+  for (const listener of listeners) listener();
+}
+
 function setState(next: LinkSelectionState) {
   if (next === state) return;
   state = next;
-  for (const listener of listeners) listener();
+  notify();
 }
 
 function subscribe(listener: () => void) {
@@ -96,6 +100,24 @@ export function useSelectedLinkIds(): ReadonlySet<string> {
     subscribe,
     () => state.selected,
     () => EMPTY_SET,
+  );
+}
+
+/** Whether any link is selected (selection mode); re-renders only when that flips. */
+export function useIsSelectionActive(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => state.selected.size > 0,
+    () => false,
+  );
+}
+
+/** How many links the list offers for selection (what Select all selects). */
+export function useSelectableLinkCount(): number {
+  return useSyncExternalStore(
+    subscribe,
+    () => order.length,
+    () => 0,
   );
 }
 
@@ -122,6 +144,16 @@ export const linkSelection = {
   selectAll() {
     setState({ selected: new Set(order), anchor: state.anchor });
   },
+  /** Unselects `ids` (e.g. the links an action just moved), keeping the rest. */
+  remove(ids: readonly string[]) {
+    const gone = new Set(ids);
+    const kept = Array.from(state.selected).filter((id) => !gone.has(id));
+    if (kept.length === state.selected.size) return;
+    setState({
+      selected: kept.length ? new Set(kept) : EMPTY_SET,
+      anchor: state.anchor !== null && gone.has(state.anchor) ? null : state.anchor,
+    });
+  },
   /** Leaves selection mode. */
   clear() {
     setState(EMPTY_SELECTION);
@@ -137,6 +169,9 @@ export const linkSelection = {
  * Links no longer in it leave the selection.
  */
 export function setSelectableLinks(ids: readonly string[]) {
+  const lengthChanged = ids.length !== order.length;
   order = ids;
-  setState(retainInSelection(state, ids));
+  const next = retainInSelection(state, ids);
+  if (next !== state) setState(next);
+  else if (lengthChanged) notify();
 }

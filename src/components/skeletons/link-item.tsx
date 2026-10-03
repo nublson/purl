@@ -29,10 +29,10 @@ export function LinkItemSkeleton({
       aria-busy
       onAnimationEnd={onAnimationEnd}
       className={cn(
-        "p-2 gap-4 grid h-[50px] grid-cols-[20px_1fr] relative pointer-events-none",
+        "border-0 p-2 gap-4 grid h-12 grid-cols-[20px_1fr] relative pointer-events-none",
         animateIn && "animate-in fade-in-0 slide-in-from-bottom-2 duration-300",
         animateOut &&
-          "overflow-hidden border-0 animate-out fade-out-0 slide-out-to-left-2 duration-200 h-0 py-0",
+          "overflow-hidden animate-out fade-out-0 slide-out-to-left-2 duration-200 h-0 py-0",
       )}
     >
       <ItemMedia
