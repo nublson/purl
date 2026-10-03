@@ -1,6 +1,7 @@
 "use client";
 
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
+import { useLeavingLinks } from "@/lib/leaving-links";
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
 import {
   linkSelection,
@@ -65,6 +66,8 @@ export const LinkItem = React.forwardRef<
   // Deleting is owned by `deleteLinkWithUndo` (it outlives this row): the
   // row fades while "fading", then `LinkGroup` hides it behind an Undo toast.
   const deletePhase = usePendingLinkDeletes().get(link.id);
+  // Moved out of the folder on screen: the same exit as a delete.
+  const leaving = useLeavingLinks().get(link.id)?.phase === "fading";
   // Selection mode (anything selected): every row shows its checkbox, a
   // click toggles the row instead of opening it, and row menus hide so
   // every action goes through the selection bar.
@@ -157,8 +160,11 @@ export const LinkItem = React.forwardRef<
         // focus ring; this row uses neither (the link draws the focus ring).
         "w-full border-0 p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
         selected && "bg-accent/60 hover:bg-accent/60",
-        deletePhase === "fading" &&
+        (deletePhase === "fading" || leaving) &&
           "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
+        // Undo: back in the way it left (fade only with reduced motion).
+        deletePhase === "restoring" &&
+          "animate-in fade-in-0 slide-in-from-left-2 duration-200 ease-out-strong motion-reduce:[--tw-enter-translate-x:0]",
         className,
       )}
       onPointerDown={(event) => {

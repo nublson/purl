@@ -21,6 +21,7 @@ import {
   formatFolderLabel,
   formatLinkCount,
 } from "@/lib/folder-display";
+import { announceLinksMoved } from "@/lib/leaving-links";
 import { MAX_FOLDERS } from "@/lib/limits";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useCallback, useMemo } from "react";
@@ -235,6 +236,7 @@ export function useFolderActions(): {
         toast.error(result.error);
         return result;
       }
+      announceLinksMoved({ ids: [linkId], folderId });
 
       const target = folders.find((folder) => folder.id === folderId);
       const source = folders.find((folder) => folder.id === opts?.from);
@@ -298,6 +300,7 @@ export function useFolderActions(): {
         return { ok: false, error };
       }
 
+      announceLinksMoved({ ids: moved.map(({ id }) => id), folderId });
       const move = Symbol("bulk-move");
       for (const { id } of moved) latestMoveByLink.set(id, move);
       const sourceIds = new Set(moved.map((link) => link.previousFolderId));

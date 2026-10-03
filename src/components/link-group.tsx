@@ -1,5 +1,6 @@
 "use client";
 
+import { useLeavingLinks } from "@/lib/leaving-links";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { Link } from "@/utils/links";
 import type { ReactNode } from "react";
@@ -24,8 +25,12 @@ export const LinkGroup = ({
   // Links deleted but still undoable are hidden here, and a day whose links
   // are all hidden drops its heading too.
   const pendingDeletes = usePendingLinkDeletes();
+  // Links moved out of this folder fade out, then hide the same way.
+  const leaving = useLeavingLinks();
   const visibleLinks = links.filter(
-    (link) => pendingDeletes.get(link.id) !== "hidden",
+    (link) =>
+      pendingDeletes.get(link.id) !== "hidden" &&
+      leaving.get(link.id)?.phase !== "hidden",
   );
   if (visibleLinks.length === 0 && !prependItems) return null;
 

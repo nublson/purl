@@ -92,7 +92,7 @@ export function OmniboxSaveRow({
       type="button"
       data-cy="omnibox-save-row"
       aria-label={label}
-      className="grid h-12 w-full cursor-pointer grid-cols-[20px_1fr_auto] items-center gap-4 rounded-md p-2 text-start outline-none transition-none hover:bg-accent/40 focus-visible:ring-3 focus-visible:ring-ring"
+      className="group/save grid h-12 w-full cursor-pointer grid-cols-[20px_1fr_auto] items-center gap-4 rounded-md p-2 text-start outline-none transition-none hover:bg-accent/40 focus-visible:ring-3 focus-visible:ring-ring"
       onClick={onSave}
     >
       <Typography
@@ -134,7 +134,8 @@ export function OmniboxSaveRow({
             variant: alreadySaved ? "outline" : "default",
             size: "icon-sm",
           }),
-          "pointer-events-none",
+          // Press feedback lives on the +: scaling the whole row would look wrong.
+          "pointer-events-none ease-out-strong group-active/save:scale-[0.96]",
         )}
       >
         <Plus />

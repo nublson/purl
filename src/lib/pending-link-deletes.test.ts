@@ -22,6 +22,7 @@ const {
   isLinkDeletePending,
   LINK_DELETE_FADE_MS,
   LINK_DELETE_UNDO_MS,
+  LINK_RESTORE_MS,
 } = await import("./pending-link-deletes");
 
 function lastToastOptions(): ToastOptions {
@@ -65,6 +66,18 @@ describe("deleteLinkWithUndo", () => {
     expect(dismissMock).toHaveBeenCalledWith("link-delete-link-b");
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(onDeleted).not.toHaveBeenCalled();
+  });
+
+  it("Undo plays the row back in, then clears it", () => {
+    vi.useFakeTimers();
+    deleteLinkWithUndo("link-r", { onDeleted: vi.fn() });
+    vi.advanceTimersByTime(LINK_DELETE_FADE_MS);
+    lastToastOptions().action?.onClick();
+
+    expect(getLinkDeletePhase("link-r")).toBe("restoring");
+    expect(isLinkDeletePending("link-r")).toBe(false);
+    vi.advanceTimersByTime(LINK_RESTORE_MS);
+    expect(getLinkDeletePhase("link-r")).toBeUndefined();
   });
 
   it("registers the delete immediately, fading then hidden on its own timer", () => {

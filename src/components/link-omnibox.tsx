@@ -60,6 +60,9 @@ export function LinkOmnibox({
         "fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-30 mx-auto flex h-11 w-[calc(100%-2rem)] max-w-2xl items-center gap-2 rounded-xl bg-popover ps-3 pe-1.5 text-popover-foreground",
         // Same raised surface and layered shadow as the selection bar.
         "shadow-[0_0_0_1px_var(--border),0_2px_4px_-1px_oklch(0_0_0/0.12),0_8px_24px_-4px_oklch(0_0_0/0.24)]",
+        // Focused: the 1px edge takes the ring color (the input itself has
+        // no outline). Only that shadow changes; nothing moves.
+        "transition-[box-shadow] duration-150 ease-out-strong has-[input:focus-visible]:shadow-[0_0_0_1px_var(--ring),0_2px_4px_-1px_oklch(0_0_0/0.12),0_8px_24px_-4px_oklch(0_0_0/0.24)]",
         className,
       )}
       onSubmit={(event) => {
@@ -91,11 +94,19 @@ export function LinkOmnibox({
         // 16px text: iOS zooms the page into smaller inputs.
         className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground sm:text-sm [&::-webkit-search-cancel-button]:hidden"
       />
-      {value ? (
+      {/* ✕ (with text) and the ⌘K hint (empty) share one spot and
+          cross-fade: opacity, scale and blur (opacity only with reduced
+          motion). Both stay mounted; the hidden one is inert. */}
+      <div className="grid shrink-0 place-items-center *:col-start-1 *:row-start-1">
         <button
           type="button"
           aria-label="Clear search"
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"
+          inert={!value}
+          className={cn(
+            "flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-[opacity,scale,filter,color,background-color] duration-150 ease-out-strong hover:bg-accent hover:text-foreground",
+            !value &&
+              "pointer-events-none scale-25 opacity-0 blur-[4px] motion-reduce:scale-100 motion-reduce:blur-none",
+          )}
           onClick={() => {
             onChange("");
             inputRef.current?.focus();
@@ -103,14 +114,17 @@ export function LinkOmnibox({
         >
           <X className="size-4" />
         </button>
-      ) : (
         <Kbd
           aria-hidden="true"
-          className="me-1.5 hidden [@media(hover:hover)]:inline-flex"
+          className={cn(
+            "me-1.5 hidden transition-[opacity,scale,filter] duration-150 ease-out-strong [@media(hover:hover)]:inline-flex",
+            value &&
+              "scale-25 opacity-0 blur-[4px] motion-reduce:scale-100 motion-reduce:blur-none",
+          )}
         >
           {apple ? "⌘K" : "Ctrl+K"}
         </Kbd>
-      )}
+      </div>
     </form>
   );
 }

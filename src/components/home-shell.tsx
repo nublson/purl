@@ -13,6 +13,14 @@ import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
 import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
+import {
+  leavingFadeRemaining,
+  LINKS_MOVED_EVENT,
+  markLinksLeaving,
+  settleLeavingLinks,
+  useLeavingLinks,
+  type LinksMovedDetail,
+} from "@/lib/leaving-links";
 import { coolPreviews } from "@/lib/link-preview-warmth";
 import { linkSelection, setSelectableLinks } from "@/lib/link-selection";
 import { isSameLinkUrl, omniboxSaveUrl } from "@/lib/omnibox";
@@ -111,6 +119,7 @@ export function HomeShell({
    */
   const reload = useCallback(async ({ fresh = false } = {}) => {
     const seq = ++reloadSeq.current;
+    const startedAt = Date.now();
     const limit = fresh
       ? HOME_LINKS_PAGE_SIZE
       : Math.max(countGroupedLinks(groupsRef.current), HOME_LINKS_PAGE_SIZE);
@@ -120,14 +129,40 @@ export function HomeShell({
       if (searchQueryRef.current) params.set("q", searchQueryRef.current);
       const page = await fetchLinksPage(params);
       if (seq !== reloadSeq.current) return;
+      // Rows moved out are still fading: let that finish before they go.
+      const wait = leavingFadeRemaining();
+      if (wait > 0) {
+        await new Promise((resolve) => setTimeout(resolve, wait));
+        if (seq !== reloadSeq.current) return;
+      }
       setGroups(page.groups);
       setNextCursor(page.nextCursor);
+      // The list now says where every row is: rows faded out by a move
+      // before this reload began are gone (or back, after Undo).
+      settleLeavingLinks(startedAt);
       if (page.timeZone) setGroupsTimeZone(page.timeZone);
       if (typeof page.total === "number") setLinksTotal(page.total);
     } catch {
       // Keep the current list; the next change or reload will retry.
     }
   }, [setLinksTotal, folderId]);
+
+  // A folder page: links moved out of it fade out (like a delete) before
+  // the reload drops them.
+  useEffect(() => {
+    if (!folderId) return;
+    const onMoved = (event: Event) => {
+      const { ids, folderId: target } = (event as CustomEvent<LinksMovedDetail>)
+        .detail;
+      if (target === folderId) return;
+      const shown = new Set(
+        groupsRef.current.flatMap((group) => group.links.map((link) => link.id)),
+      );
+      markLinksLeaving(ids.filter((id) => shown.has(id)));
+    };
+    window.addEventListener(LINKS_MOVED_EVENT, onMoved);
+    return () => window.removeEventListener(LINKS_MOVED_EVENT, onMoved);
+  }, [folderId]);
 
   // The list follows the search field, a moment after typing stops.
   useEffect(() => {
@@ -305,11 +340,13 @@ export function HomeShell({
   // Every loaded link deleted (awaiting Undo) and nothing left to load reads
   // as empty, so the empty state shows instead of a blank list.
   const pendingDeletes = usePendingLinkDeletes();
+  const leavingLinks = useLeavingLinks();
+  const isHidden = (id: string) =>
+    pendingDeletes.get(id) === "hidden" ||
+    leavingLinks.get(id)?.phase === "hidden";
   const allLinksHidden =
     !nextCursor &&
-    groups.every((group) =>
-      group.links.every((link) => pendingDeletes.get(link.id) === "hidden"),
-    );
+    groups.every((group) => group.links.every((link) => isHidden(link.id)));
 
   // The selectable links are the ones on screen, in display order; a link
   // that leaves the list (moved out of this folder, deleted) leaves the
@@ -318,11 +355,15 @@ export function HomeShell({
     setSelectableLinks(
       groups.flatMap((group) =>
         group.links
-          .filter((link) => pendingDeletes.get(link.id) !== "hidden")
+          .filter(
+            (link) =>
+              pendingDeletes.get(link.id) !== "hidden" &&
+              leavingLinks.get(link.id)?.phase !== "hidden",
+          )
           .map((link) => link.id),
       ),
     );
-  }, [groups, pendingDeletes]);
+  }, [groups, pendingDeletes, leavingLinks]);
 
   // Each loaded link's folder, for the selection bar's "Remove from folders".
   const folderById = useMemo(
