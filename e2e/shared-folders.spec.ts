@@ -63,7 +63,7 @@ test.describe("Shared folders, visited signed out", () => {
     await expect(page.locator('[data-cy="link-item"]')).toHaveCount(0);
     const cards = page.locator('[data-cy="link-card"]');
     await expect(cards).toHaveCount(5);
-    await expect(cards.filter({ hasText: "Bravo article" })).toContainText("Notes about Bravo");
+    await expect(cards.filter({ hasText: "Bravo article" })).toContainText("bravo.example");
     await expect(cards.filter({ hasText: "Alpha article" })).toHaveAttribute(
       "href",
       "https://alpha.example",

@@ -85,26 +85,26 @@ export function SharedFolderList({
 
   useEffect(() => coolPreviews, []);
 
-  // Grid: room for four 210px cards and their 16px gaps (4×210 + 3×16).
+  // Grid: room for four 210px cards and their 40px gaps (4×210 + 3×40).
   const frame = cn(
     "flex flex-1 flex-col gap-8 pt-24 pb-12",
-    view === "grid" ? "mx-auto w-full max-w-[888px]" : "wrapper-private",
+    view === "grid" ? "mx-auto w-full max-w-[960px]" : "wrapper-private",
   );
 
   if (links.length === 0) {
     return (
       <div className={frame}>
-      <Empty data-cy="link-group-empty">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <PackageOpen />
-          </EmptyMedia>
-          <EmptyTitle>No links yet</EmptyTitle>
-          <EmptyDescription>
-            Links added to this folder will show up here.
-          </EmptyDescription>
-        </EmptyHeader>
-      </Empty>
+        <Empty data-cy="link-group-empty">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <PackageOpen />
+            </EmptyMedia>
+            <EmptyTitle>No links yet</EmptyTitle>
+            <EmptyDescription>
+              Links added to this folder will show up here.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       </div>
     );
   }
@@ -114,9 +114,9 @@ export function SharedFolderList({
       {view === "grid" ? (
         <ul
           aria-label="Links"
-          // Fixed 210px cards: as many columns as fit, up to four (the
-          // frame's width), centered.
-          className="grid grid-cols-[repeat(auto-fill,210px)] justify-center gap-4"
+          // Four 210px columns (the frame's width) with wide gutters;
+          // items-start: each card keeps its own height.
+          className="grid w-full grid-cols-4 items-start justify-center gap-x-10 gap-y-10"
         >
           {links.map((link, index) => (
             <li key={link.id}>

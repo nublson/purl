@@ -52,15 +52,10 @@ export function LinkPreview({
   );
 }
 
-/** The card's surface: the hover card's box, for cards shown in place. */
-export const LINK_PREVIEW_CARD_SURFACE =
-  "flex flex-col overflow-hidden rounded-lg bg-popover text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10";
-
 /**
  * What a preview card shows: the thumbnail (or favicon), title and
- * description. The hover card and the shared folder's grid cards both use
- * it, so they look the same. `pdfThumbnail: false` skips the PDF render
- * (it needs the signed-in PDF proxy) for the regular thumbnail.
+ * description. `pdfThumbnail: false` skips the PDF render (it needs the
+ * signed-in PDF proxy) for the regular thumbnail.
  */
 export function LinkPreviewBody({
   link,
