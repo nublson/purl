@@ -48,15 +48,15 @@ export async function generateMetadata({
   const page = await resolveForRequest(username, slug);
   const robots = { index: false, follow: false };
   if (!page || page.kind !== "folder") return { robots };
-  // "Design by nublson | Purl": absolute, so the app's "%s · Purl"
-  // template doesn't apply.
-  const title = `${page.folder.name} by ${page.owner.username} | Purl`;
+  // "🎨 Design by @nublson · Purl": the app's "%s · Purl" template adds
+  // the suffix to the tab title; link previews get it spelled out.
+  const title = `${page.folder.emoji} ${page.folder.name} by @${page.owner.username}`;
   return {
-    title: { absolute: title },
+    title,
     description: page.folder.description ?? undefined,
     robots,
     openGraph: {
-      title,
+      title: `${title} · Purl`,
       description: page.folder.description ?? undefined,
       url: publicFolderPath(page.owner.username, page.folder.slug),
     },
