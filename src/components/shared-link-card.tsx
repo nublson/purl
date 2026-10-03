@@ -25,16 +25,16 @@ export function SharedLinkCard({
       rel="noopener noreferrer"
       aria-label={`${link.title} (opens in new tab)`}
       data-cy="link-card"
-      className="flex flex-col overflow-hidden bg-card ring-1 ring-foreground/10 outline-none transition-[box-shadow] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring [@media(hover:hover)]:hover:ring-foreground/25"
+      className="flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 outline-none transition-[box-shadow] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring [@media(hover:hover)]:hover:ring-foreground/25"
     >
-      {/* 16:10, square corners: the card is the frame. */}
+      {/* 16:10, full-bleed: the card's rounded corners clip it. */}
       <LinkPreviewThumbnail
         link={link}
         thumbnailSrc={thumbnailSrc}
         eagerThumbnail={eagerThumbnail}
         className="aspect-[16/10] rounded-none"
       />
-      <span className="grid grid-cols-[16px_minmax(0,1fr)] gap-x-3 gap-y-1 p-4">
+      <span className="grid grid-cols-[16px_minmax(0,1fr)] gap-x-2 gap-y-1 p-3 md:gap-x-3 md:p-4">
         {/* Centered on the title's first line: a box one title line tall
             (text-sm leading-normal, so 1lh = that line), nudged 1px down
             to the lowercase letters' middle, where the eye reads it. */}

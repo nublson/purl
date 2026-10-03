@@ -114,9 +114,10 @@ export function SharedFolderList({
       {view === "grid" ? (
         <ul
           aria-label="Links"
-          // Four 210px columns (the frame's width) with wide gutters;
+          // 2 columns on phones, 3 on tablets, 4 on desktop; cards up to
+          // 210px, centered. Gutters widen with the room (16 → 40px).
           // items-start: each card keeps its own height.
-          className="grid w-full grid-cols-4 items-start justify-center gap-x-10 gap-y-10"
+          className="grid w-full grid-cols-[repeat(2,minmax(0,210px))] items-start justify-center gap-x-4 gap-y-6 md:grid-cols-[repeat(3,minmax(0,210px))] md:gap-x-10 md:gap-y-10 lg:grid-cols-[repeat(4,minmax(0,210px))]"
         >
           {links.map((link, index) => (
             <li key={link.id}>
