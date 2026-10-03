@@ -171,8 +171,9 @@ export function SharedFolderList({
 
 /**
  * A grid cell that spans as many 1px rows as its card is tall, plus the
- * vertical gutter (its bottom padding: 24px, 40px from md). Measured before
- * paint and again whenever the card resizes (fonts, a title rewrapping).
+ * vertical gutter (its bottom padding, the same as the column gap: 16px,
+ * 40px from md). Measured before paint and again whenever the card
+ * resizes (fonts, a title rewrapping).
  */
 function MasonryItem({ children }: { children: ReactNode }) {
   const [span, setSpan] = useState<number | null>(null);
@@ -180,7 +181,10 @@ function MasonryItem({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     const box = boxRef.current;
     if (!box) return;
-    const measure = () => setSpan(Math.ceil(box.getBoundingClientRect().height));
+    // Nearest pixel: fractional card heights (16:10 thumbnails) round to
+    // within half a pixel of the gutter, either way.
+    const measure = () =>
+      setSpan(Math.round(box.getBoundingClientRect().height));
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(box);
@@ -192,7 +196,7 @@ function MasonryItem({ children }: { children: ReactNode }) {
       className={span === null ? "invisible" : undefined}
       style={span === null ? undefined : { gridRowEnd: `span ${span}` }}
     >
-      <div ref={boxRef} className="pb-6 md:pb-10">
+      <div ref={boxRef} className="pb-4 md:pb-10">
         {children}
       </div>
     </li>
