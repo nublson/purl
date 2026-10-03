@@ -156,5 +156,8 @@ test.describe("Search field on a phone", () => {
     expect(box.x + box.width).toBeLessThanOrEqual(375 - 16);
     expect(box.y + box.height).toBeLessThanOrEqual(812 - 16);
     expect(box.y).toBeGreaterThan(700);
+    // The band behind it is solid up to its top (then fades).
+    const band = page.locator('form[role="search"]').locator("xpath=preceding-sibling::div[1]");
+    expect(await band.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain("linear-gradient");
   });
 });

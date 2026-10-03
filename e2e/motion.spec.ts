@@ -19,10 +19,30 @@ test.describe("Motion", () => {
     await page.locator('[data-cy="delete-link-menu-item"]').click();
     await expect(rows(page)).toHaveCount(0);
 
+    // Record in the page whether the row plays its entrance (200ms: too
+    // short to catch reliably from outside under load).
+    await page.evaluate(() => {
+      const w = window as Window & { __sawRestore?: boolean };
+      w.__sawRestore = false;
+      const check = () => {
+        for (const row of document.querySelectorAll('[data-cy="link-item"]')) {
+          if (row.className.includes("animate-in")) w.__sawRestore = true;
+        }
+      };
+      new MutationObserver(check).observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+    });
     await page.getByRole("button", { name: "Undo" }).click();
-    await expect(rows(page).first()).toHaveClass(/animate-in/);
-    await expect(rows(page).first()).not.toHaveClass(/animate-in/);
     await expect(rows(page)).toHaveCount(1);
+    // Then it's an ordinary row again.
+    await expect(rows(page).first()).not.toHaveClass(/animate-in/);
+    expect(
+      await page.evaluate(() => (window as Window & { __sawRestore?: boolean }).__sawRestore),
+    ).toBe(true);
   });
 
   test("a row moved out of the folder on screen fades out before it goes", async ({ page, seed }) => {
@@ -37,12 +57,27 @@ test.describe("Motion", () => {
     await rows(page).first().hover();
     await page.getByRole("checkbox", { name: "Select Bravo" }).click();
     await page.getByRole("toolbar", { name: "Selected links" }).getByRole("button", { name: "Move" }).click();
+    // Record, inside the page, whether Bravo's row ever plays the exit: the
+    // fade lasts 200ms, too short to catch reliably from outside under load.
+    await page.evaluate(() => {
+      const w = window as Window & { __sawLeave?: boolean };
+      w.__sawLeave = false;
+      new MutationObserver(() => {
+        for (const row of document.querySelectorAll('[data-cy="link-item"]')) {
+          if (row.textContent?.includes("Bravo") && row.className.includes("animate-out")) {
+            w.__sawLeave = true;
+          }
+        }
+      }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ["class"] });
+    });
     await page.getByRole("menuitem", { name: "Work" }).click();
 
     const bravo = rows(page).filter({ hasText: "Bravo" });
-    await expect(bravo).toHaveClass(/animate-out/);
-    await expect(bravo).toHaveCount(0);
+    await expect(bravo).toHaveCount(0, { timeout: 15_000 });
     await expect(rows(page)).toHaveCount(1);
+    expect(
+      await page.evaluate(() => (window as Window & { __sawLeave?: boolean }).__sawLeave),
+    ).toBe(true);
   });
 
   test("the search field shows focus and cross-fades ✕ with the ⌘K hint", async ({ page, seed }) => {
@@ -76,11 +111,34 @@ test.describe("Motion", () => {
     await expect(previewTitle).toBeVisible({ timeout: 15_000 });
     await expect(previewTitle).toHaveClass(/animate-in/);
 
+    // Record in the page whether the new row's title plays the arrival
+    // (it lasts a moment: too short to catch reliably from outside).
+    await page.evaluate(() => {
+      const w = window as Window & { __sawArrive?: boolean };
+      w.__sawArrive = false;
+      new MutationObserver(() => {
+        for (const row of document.querySelectorAll('[data-cy="link-item"]')) {
+          if (
+            row.textContent?.includes("Example Domain") &&
+            row.querySelector('[class*="animate-in"]')
+          ) {
+            w.__sawArrive = true;
+          }
+        }
+      }).observe(document.body, {
+        subtree: true,
+        childList: true,
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+    });
     await field(page).press("Enter");
     const row = rows(page).filter({ hasText: "Example Domain" });
     await expect(row).toHaveCount(1, { timeout: 20_000 });
-    await expect(row.getByText("Example Domain")).toHaveClass(/animate-in/);
     // Only for a moment: then it's an ordinary row.
     await expect(row.getByText("Example Domain")).not.toHaveClass(/animate-in/);
+    expect(
+      await page.evaluate(() => (window as Window & { __sawArrive?: boolean }).__sawArrive),
+    ).toBe(true);
   });
 });

@@ -55,76 +55,87 @@ export function LinkOmnibox({
   }, []);
 
   return (
-    <form
-      role="search"
-      className={cn(
-        // Same raised surface and layered shadow as the selection bar.
-        OMNIBOX_SHELL,
-        // Focused: the 1px edge takes the ring color (the input itself has
-        // no outline). Only that shadow changes; nothing moves.
-        "transition-[box-shadow] duration-150 ease-out-strong has-[input:focus-visible]:shadow-[0_0_0_1px_var(--ring),0_2px_4px_-1px_oklch(0_0_0/0.12),0_8px_24px_-4px_oklch(0_0_0/0.24)]",
-        className,
-      )}
-      onSubmit={(event) => {
-        event.preventDefault();
-        if (saveUrl) onSave();
-        else inputRef.current?.blur();
-      }}
-    >
-      <Search aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-      <input
-        ref={inputRef}
-        type="search"
-        // "Go" on phone keyboards: Enter saves a URL or ends the search.
-        enterKeyHint={saveUrl ? "go" : "search"}
-        autoComplete="off"
-        autoCorrect="off"
-        autoCapitalize="none"
-        spellCheck={false}
-        aria-label="Search your links or paste a link to save"
-        placeholder={placeholder}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key !== "Escape") return;
-          event.preventDefault();
-          if (value) onChange("");
-          else event.currentTarget.blur();
-        }}
-        // 16px text: iOS zooms the page into smaller inputs.
-        className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground sm:text-sm [&::-webkit-search-cancel-button]:hidden"
+    <>
+      {/* Rows scroll under the field: a band of page background (solid up to
+          the field, then fading out above it, like the header's at the top)
+          keeps them from showing below and around it. */}
+      <div
+        aria-hidden
+        // Solid exactly up to the field's top (1rem + 44px + the safe
+        // area), then a 1.75rem fade, whatever the device's inset.
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-20 h-[calc(5.5rem+env(safe-area-inset-bottom))] bg-[linear-gradient(to_top,var(--background)_calc(3.75rem+env(safe-area-inset-bottom)),transparent)]"
       />
-      {/* ✕ (with text) and the ⌘K hint (empty) share one spot and
-          cross-fade: opacity, scale and blur (opacity only with reduced
-          motion). Both stay mounted; the hidden one is inert. */}
-      <div className="grid shrink-0 place-items-center *:col-start-1 *:row-start-1">
-        <button
-          type="button"
-          aria-label="Clear search"
-          inert={!value}
-          className={cn(
-            "flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-[opacity,scale,filter,color,background-color] duration-150 ease-out-strong hover:bg-accent hover:text-foreground",
-            !value &&
-              "pointer-events-none scale-25 opacity-0 blur-[4px] motion-reduce:scale-100 motion-reduce:blur-none",
-          )}
-          onClick={() => {
-            onChange("");
-            inputRef.current?.focus();
+      <form
+        role="search"
+        className={cn(
+          // Same raised surface and layered shadow as the selection bar.
+          OMNIBOX_SHELL,
+          // Focused: the 1px edge takes the ring color (the input itself has
+          // no outline). Only that shadow changes; nothing moves.
+          "transition-[box-shadow] duration-150 ease-out-strong has-[input:focus-visible]:shadow-[0_0_0_1px_var(--ring),0_2px_4px_-1px_oklch(0_0_0/0.12),0_8px_24px_-4px_oklch(0_0_0/0.24)]",
+          className,
+        )}
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (saveUrl) onSave();
+          else inputRef.current?.blur();
+        }}
+      >
+        <Search aria-hidden className="size-4 shrink-0 text-muted-foreground" />
+        <input
+          ref={inputRef}
+          type="search"
+          // "Go" on phone keyboards: Enter saves a URL or ends the search.
+          enterKeyHint={saveUrl ? "go" : "search"}
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          aria-label="Search your links or paste a link to save"
+          placeholder={placeholder}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape") return;
+            event.preventDefault();
+            if (value) onChange("");
+            else event.currentTarget.blur();
           }}
-        >
-          <X className="size-4" />
-        </button>
-        <Kbd
-          aria-hidden="true"
-          className={cn(
-            "me-1.5 hidden transition-[opacity,scale,filter] duration-150 ease-out-strong [@media(hover:hover)]:inline-flex",
-            value &&
-              "scale-25 opacity-0 blur-[4px] motion-reduce:scale-100 motion-reduce:blur-none",
-          )}
-        >
-          {apple ? "⌘K" : "Ctrl+K"}
-        </Kbd>
-      </div>
-    </form>
+          // 16px text: iOS zooms the page into smaller inputs.
+          className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground sm:text-sm [&::-webkit-search-cancel-button]:hidden"
+        />
+        {/* ✕ (with text) and the ⌘K hint (empty) share one spot and
+            cross-fade: opacity, scale and blur (opacity only with reduced
+            motion). Both stay mounted; the hidden one is inert. */}
+        <div className="grid shrink-0 place-items-center *:col-start-1 *:row-start-1">
+          <button
+            type="button"
+            aria-label="Clear search"
+            inert={!value}
+            className={cn(
+              "flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-[opacity,scale,filter,color,background-color] duration-150 ease-out-strong hover:bg-accent hover:text-foreground",
+              !value &&
+                "pointer-events-none scale-25 opacity-0 blur-[4px] motion-reduce:scale-100 motion-reduce:blur-none",
+            )}
+            onClick={() => {
+              onChange("");
+              inputRef.current?.focus();
+            }}
+          >
+            <X className="size-4" />
+          </button>
+          <Kbd
+            aria-hidden="true"
+            className={cn(
+              "me-1.5 hidden transition-[opacity,scale,filter] duration-150 ease-out-strong [@media(hover:hover)]:inline-flex",
+              value &&
+                "scale-25 opacity-0 blur-[4px] motion-reduce:scale-100 motion-reduce:blur-none",
+            )}
+          >
+            {apple ? "⌘K" : "Ctrl+K"}
+          </Kbd>
+        </div>
+      </form>
+    </>
   );
 }

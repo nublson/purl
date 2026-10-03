@@ -21,6 +21,8 @@ import {
   DEFAULT_FOLDER_EMOJI,
   MAX_FOLDER_DESCRIPTION_LENGTH,
 } from "@/lib/folder-display";
+import { suggestFolderEmoji } from "@/lib/emoji-suggestion";
+import { cn } from "@/lib/utils";
 import * as React from "react";
 import { DialogWrapper } from "./dialog-wrapper";
 import { Typography } from "./typography";
@@ -112,6 +114,11 @@ function FolderForm({
 
   const trimmedName = name.trim();
   const trimmedDescription = description.trim();
+  // New folders only, until an emoji is picked: the name suggests one
+  // ("Reading list" → 📚), which shows on the button and is what gets saved.
+  const suggestedEmoji =
+    !folder && emoji === null ? suggestFolderEmoji(trimmedName) : null;
+  const chosenEmoji = emoji ?? suggestedEmoji;
   const nameChanged = folder ? trimmedName !== folder.name : true;
   const emojiChanged = folder ? emoji !== folder.emoji : emoji !== null;
   const descriptionChanged = folder
@@ -143,7 +150,7 @@ function FolderForm({
       : await createFolder(
           {
             name: trimmedName,
-            ...(emoji ? { emoji } : {}),
+            ...(chosenEmoji ? { emoji: chosenEmoji } : {}),
             ...(trimmedDescription ? { description: trimmedDescription } : {}),
           },
           { quiet: onCreated !== undefined },
@@ -166,6 +173,7 @@ function FolderForm({
           <div className="flex gap-2">
             <FolderEmojiPicker
               value={emoji}
+              suggested={suggestedEmoji}
               disabled={pending}
               invalid={nameError !== null}
               describedBy={nameError ? nameErrorId : undefined}
@@ -278,15 +286,19 @@ function FolderEmojiPicker({
   invalid,
   describedBy,
   onChange,
+  suggested,
 }: {
   value: string | null;
+  /** Shown (and saved) while nothing is picked; `null` = no suggestion. */
+  suggested?: string | null;
   disabled: boolean;
   invalid: boolean;
   describedBy?: string;
   onChange: (emoji: string) => void;
 }) {
   const [open, setOpen] = React.useState(false);
-  const shown = value ?? DEFAULT_FOLDER_EMOJI;
+  const shown = value ?? suggested ?? DEFAULT_FOLDER_EMOJI;
+  const isSuggestion = value === null && Boolean(suggested);
 
   return (
     // Modal so the popover's scroll lock sits above the dialog's: without it
@@ -298,15 +310,22 @@ function FolderEmojiPicker({
           variant="outline"
           size="icon"
           disabled={disabled}
-          aria-label={`Folder emoji: ${shown}. Choose another`}
+          aria-label={`Folder emoji: ${shown}${isSuggestion ? " (suggested)" : ""}. Choose another`}
           aria-invalid={invalid ? true : undefined}
           aria-describedby={describedBy}
           className="text-lg leading-none"
         >
           <Typography
+            // Remounts when the emoji changes, so a new suggestion fades in
+            // (opacity and scale only; reduced motion: fade).
+            key={shown}
             component="span"
             aria-hidden="true"
-            className="text-lg leading-none"
+            className={cn(
+              "text-lg leading-none",
+              isSuggestion &&
+                "animate-in fade-in-0 zoom-in-75 duration-150 ease-out-strong motion-reduce:[--tw-enter-scale:1]",
+            )}
           >
             {shown}
           </Typography>
