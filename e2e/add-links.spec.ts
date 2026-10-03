@@ -96,7 +96,7 @@ test.describe("Add links", () => {
     ).toBeVisible();
   });
 
-  test("adding from the empty state keeps the picker open (under the + button)", async ({ page, seed }) => {
+  test("adding from the empty state closes the picker, and doesn't open the header's", async ({ page, seed }) => {
     await seed.folder({ name: "Reading", slug: "reading" });
     await seed.link({ url: "https://a.example", title: "Alpha" });
     await seed.link({ url: "https://b.example", title: "Bravo" });
@@ -110,10 +110,9 @@ test.describe("Add links", () => {
     await option(page, "Alpha").click();
     await popover(page).getByRole("button", { name: /Add 1 link/ }).click();
     await expect(rows(page)).toHaveCount(1);
-    // The empty state (its anchor) is gone, but the picker stays open.
+    // The empty state (its anchor) is gone: no picker anywhere.
     await page.waitForTimeout(500);
-    await expect(popover(page)).toBeVisible();
-    await expect(option(page, "Bravo")).toBeVisible();
+    await expect(popover(page)).toHaveCount(0);
   });
 
   test("folder digits don't navigate away while the picker is open", async ({ page, seed }) => {
