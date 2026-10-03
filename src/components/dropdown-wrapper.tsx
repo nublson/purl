@@ -11,15 +11,20 @@ interface DropdownWrapperProps extends React.ComponentProps<
 > {
   trigger: React.ReactNode;
   children: React.ReactNode;
+  /** Controlled open state (optional; uncontrolled when omitted). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function DropdownWrapper({
   trigger,
   children,
+  open,
+  onOpenChange,
   ...props
 }: DropdownWrapperProps) {
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger className="cursor-pointer" asChild>
         {trigger}
       </DropdownMenuTrigger>

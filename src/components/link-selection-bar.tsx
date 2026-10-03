@@ -19,6 +19,7 @@ import {
   type SelectionShortcut,
 } from "@/lib/link-selection-shortcuts";
 import { deleteLinksWithUndo } from "@/lib/pending-link-deletes";
+import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { EASE_OUT_STRONG } from "@/lib/motion";
 import { isApplePlatform } from "@/lib/platform";
 import { cn } from "@/lib/utils";
@@ -48,10 +49,6 @@ import {
 } from "./ui/dropdown-menu";
 import { Kbd } from "./ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-
-/** Keys typed into these are text, not selection shortcuts. */
-const TEXT_TARGETS =
-  "input, textarea, select, [contenteditable=''], [contenteditable='true']";
 
 /**
  * Floating bar for the selected links (Home or a folder page): the count
@@ -123,13 +120,7 @@ export function LinkSelectionBar({
     if (count === 0) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
-      if (
-        event.target instanceof Element &&
-        event.target.closest(TEXT_TARGETS)
-      ) {
-        return;
-      }
-      if (document.body.hasAttribute("data-scroll-locked")) return;
+      if (isTypingTarget(event.target) || isOverlayOpen()) return;
       const shortcut = matchSelectionShortcut(event, {
         apple: isApplePlatform(),
       });

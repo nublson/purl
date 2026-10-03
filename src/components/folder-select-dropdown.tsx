@@ -6,8 +6,14 @@ import {
   type FolderSummary,
 } from "@/hooks/use-folders";
 import { Check, ChevronDown, Pencil, Plus, Trash } from "lucide-react";
+import {
+  folderShortcutKey,
+  HOME_SHORTCUT,
+  matchFolderShortcut,
+} from "@/lib/folder-shortcuts";
+import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
 import { DialogDeleteFolder } from "./dialog-delete-folder";
 import { DialogFolderForm } from "./dialog-folder-form";
@@ -15,6 +21,7 @@ import { DropdownWrapper } from "./dropdown-wrapper";
 import { FolderEmoji } from "./folder-emoji";
 import { Typography } from "./typography";
 import { Button } from "./ui/button";
+import { Kbd } from "./ui/kbd";
 import {
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -40,6 +47,8 @@ type FolderDialog =
 /**
  * Header folder switcher: shows where you are (Home or the current folder),
  * links to every folder, and opens the New / Edit / Delete folder dialogs.
+ * Digit keys switch folders anywhere in the app (0 = Home, 1–9 = the first
+ * nine folders in menu order); each row shows its key unless it's current.
  */
 export function FolderSelectDropdown() {
   const { folders, max, totalLinks } = useFolders();
@@ -48,6 +57,34 @@ export function FolderSelectDropdown() {
   const onHome = pathname === "/home";
   const atCap = folders.length >= max;
   const capHintId = React.useId();
+  const router = useRouter();
+  const [menuOpen, setMenuOpen] = React.useState(false);
+
+  /** Handles a folder shortcut; returns whether the key was one. */
+  const goToShortcut = React.useCallback(
+    (event: KeyboardEvent | React.KeyboardEvent) => {
+      const target = matchFolderShortcut(event, folders);
+      if (!target) return false;
+      event.preventDefault();
+      const href = target === "home" ? "/home" : `/folders/${target.slug}`;
+      setMenuOpen(false);
+      if (pathname !== href) router.push(href);
+      return true;
+    },
+    [folders, pathname, router],
+  );
+
+  // Anywhere in the app, except while typing or with a dialog or menu open
+  // (this menu handles its own keys below).
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat) return;
+      if (isTypingTarget(event.target) || isOverlayOpen()) return;
+      goToShortcut(event);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [goToShortcut]);
 
   // Dialogs live outside the menu (Radix only mounts menu content while it's
   // open). A menu item records which dialog it wants; it opens from the
@@ -85,6 +122,12 @@ export function FolderSelectDropdown() {
         />
       ) : null}
       <DropdownWrapper
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        // Digits switch folders here too, ahead of the menu's typeahead.
+        onKeyDown={(event) => {
+          if (!event.repeat) goToShortcut(event);
+        }}
         className="w-60"
         align="start"
         alignOffset={MENU_ALIGN_OFFSET}
@@ -122,10 +165,14 @@ export function FolderSelectDropdown() {
       >
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link href="/home" aria-current={onHome ? "page" : undefined}>
+            <Link
+              href="/home"
+              aria-current={onHome ? "page" : undefined}
+              aria-keyshortcuts={HOME_SHORTCUT}
+            >
               <FolderEmoji emoji={HOME_EMOJI} />
               <RowLabel name="Home" count={totalLinks} />
-              <CurrentMark active={onHome} />
+              <CurrentMark active={onHome} shortcut={HOME_SHORTCUT} />
             </Link>
           </DropdownMenuItem>
         </DropdownMenuGroup>
@@ -135,17 +182,21 @@ export function FolderSelectDropdown() {
           at the bottom is the cue that the list scrolls.
         */}
         <DropdownMenuGroup className="max-h-60 overflow-y-auto overscroll-y-contain">
-          {folders.map((folder) => {
+          {folders.map((folder, index) => {
             const active = currentFolder?.id === folder.id;
             return (
               <DropdownMenuItem key={folder.id} asChild>
                 <Link
                   href={`/folders/${folder.slug}`}
                   aria-current={active ? "page" : undefined}
+                  aria-keyshortcuts={folderShortcutKey(index) ?? undefined}
                 >
                   <FolderEmoji emoji={folder.emoji} />
                   <RowLabel name={folder.name} count={folder.linkCount} />
-                  <CurrentMark active={active} />
+                  <CurrentMark
+                    active={active}
+                    shortcut={folderShortcutKey(index)}
+                  />
                 </Link>
               </DropdownMenuItem>
             );
@@ -236,14 +287,27 @@ function RowLabel({ name, count }: { name: string; count: number | null }) {
   );
 }
 
-/** Fixed-width trailing slot so counts line up whether or not a row is checked. */
-function CurrentMark({ active }: { active: boolean }) {
+/**
+ * Trailing slot: the check on the current row, otherwise the row's shortcut
+ * key. Fixed width, so counts line up whichever it shows.
+ */
+function CurrentMark({
+  active,
+  shortcut,
+}: {
+  active: boolean;
+  shortcut?: string | null;
+}) {
   return (
     <Typography
       component="span"
-      className="ms-auto flex size-4 shrink-0 items-center justify-center"
+      className="ms-auto flex h-4 min-w-5 shrink-0 items-center justify-center"
     >
-      {active ? <Check aria-hidden="true" /> : null}
+      {active ? (
+        <Check aria-hidden="true" />
+      ) : shortcut ? (
+        <Kbd aria-hidden="true">{shortcut}</Kbd>
+      ) : null}
     </Typography>
   );
 }
