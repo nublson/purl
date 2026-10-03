@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/session";
 import { getUsageSummaryForUser } from "@/lib/usage-summary";
 import { Suspense } from "react";
 import { FolderSelectDropdown } from "./folder-select-dropdown";
-import { HeaderSaveLink } from "./header-save-link";
+import { HeaderAddMenu } from "./header-add-menu";
 import { Logo } from "./logo";
 import { HeaderActionsFallback } from "./skeletons/header-actions-fallback";
 import { Separator } from "./ui/separator";
@@ -20,7 +20,7 @@ async function HeaderActions() {
     <CurrentUserProvider user={user} enabledProviders={enabledProviders}>
       <UsageProvider usageSummary={usageSummary}>
         <div className="flex items-center justify-end gap-2">
-          <HeaderSaveLink />
+          <HeaderAddMenu />
           <User />
         </div>
       </UsageProvider>

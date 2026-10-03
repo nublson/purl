@@ -732,6 +732,61 @@ export async function deleteLink(id: string): Promise<boolean> {
   return true;
 }
 
+/** Most results one link search returns. */
+export const MAX_LINK_SEARCH_RESULTS = 100;
+/** Longest search query accepted (longer input is cut). */
+export const MAX_LINK_SEARCH_QUERY_LENGTH = 200;
+
+export type SearchLinksOptions = {
+  /** Matched case-insensitively against title, domain and URL; blank lists everything. */
+  query: string;
+  /** Leave out links already in this folder (links in other folders or none stay). */
+  notInFolderId?: string;
+  limit: number;
+};
+
+/**
+ * The user's links matching `query`, newest first, up to `limit`, with
+ * `hasMore` when more match. Used by the "Add links" dialog on folder pages
+ * (`notInFolderId` = that folder). Throws `FolderNotFoundError` when
+ * `notInFolderId` isn't the user's folder.
+ */
+export async function searchLinksForUser(
+  userId: string,
+  opts: SearchLinksOptions,
+): Promise<{ links: Link[]; hasMore: boolean }> {
+  const { notInFolderId } = opts;
+  const limit = Math.min(Math.max(Math.trunc(opts.limit), 1), MAX_LINK_SEARCH_RESULTS);
+  const query = opts.query.trim().slice(0, MAX_LINK_SEARCH_QUERY_LENGTH);
+
+  if (notInFolderId !== undefined) {
+    await assertFolderOwned(userId, notInFolderId);
+  }
+
+  const and: object[] = [];
+  if (notInFolderId !== undefined) {
+    // `not` alone would also drop unfiled links (SQL NULL comparison).
+    and.push({ OR: [{ folderId: null }, { folderId: { not: notInFolderId } }] });
+  }
+  if (query) {
+    and.push({
+      OR: (["title", "domain", "url"] as const).map((field) => ({
+        [field]: { contains: query, mode: "insensitive" as const },
+      })),
+    });
+  }
+
+  const rows = await prisma.link.findMany({
+    where: { userId, ...(and.length ? { AND: and } : {}) },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
+  });
+  return {
+    links: rows.slice(0, limit).map(mapRowToLink),
+    hasMore: rows.length > limit,
+  };
+}
+
 export type ListLinksOptions = {
   limit: number;
   cursor: string | null;

@@ -2,11 +2,13 @@
 
 import { useCurrentFolder } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
+import { addLinksDialog } from "@/lib/add-links-dialog";
 import { isApplePlatform } from "@/lib/platform";
 import { requestSaveUrl, saveLink } from "@/lib/save-link";
-import { Chromium, ClipboardPaste, ExternalLink, Plus } from "lucide-react";
+import { Chromium, ClipboardPaste, ExternalLink, ListPlus, Plus } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useId } from "react";
+import { useId, useRef } from "react";
+import { ADD_LINKS_SHORTCUT } from "./dialog-add-links";
 import { toast } from "sonner";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Button } from "./ui/button";
@@ -33,16 +35,19 @@ function safeHttpsUrl(value: string | undefined) {
 }
 
 /**
- * Save menu for pointer devices, where the inline field is hidden. Teaches
- * paste-anywhere and offers "Paste link" for people who can't easily press
- * the shortcut (voice control, switch access, trackpad-only). Touch devices
- * keep the inline field on /home.
+ * The header's + menu (pointer devices): teaches paste-anywhere and offers
+ * "Paste link" for people who can't easily press the shortcut (voice
+ * control, switch access, trackpad-only). On a folder page it also offers
+ * "Add links", which opens the folder's `DialogAddLinks`.
  */
-export function HeaderSaveLink() {
+export function HeaderAddMenu() {
   const { notifyLinksChanged } = useLinksSyncActions();
   const currentFolder = useCurrentFolder();
   const pathname = usePathname();
   const hintId = useId();
+  // Set by "Add links": the dialog opens once the menu has closed and
+  // handed focus back to the + button, so the dialog returns focus there.
+  const pendingAddLinks = useRef(false);
 
   async function handlePasteLink() {
     let text: string;
@@ -96,9 +101,15 @@ export function HeaderSaveLink() {
     <DropdownWrapper
       align="end"
       className="w-64"
+      onCloseAutoFocus={(event) => {
+        if (!pendingAddLinks.current) return;
+        pendingAddLinks.current = false;
+        event.preventDefault();
+        addLinksDialog.open();
+      }}
       trigger={
         <Button
-          aria-label="Save link"
+          aria-label="Add"
           variant="ghost"
           size="icon-sm"
           className="hidden cursor-pointer text-muted-foreground [@media(hover:hover)]:inline-flex"
@@ -127,6 +138,21 @@ export function HeaderSaveLink() {
           <ClipboardPaste />
           Paste link
         </DropdownMenuItem>
+        {/* Folder pages only: pick links you've already saved. */}
+        {currentFolder ? (
+          <DropdownMenuItem
+            aria-keyshortcuts={ADD_LINKS_SHORTCUT}
+            onSelect={() => {
+              pendingAddLinks.current = true;
+            }}
+          >
+            <ListPlus />
+            Add links
+            <Kbd aria-hidden="true" className="ms-auto">
+              {ADD_LINKS_SHORTCUT}
+            </Kbd>
+          </DropdownMenuItem>
+        ) : null}
       </DropdownMenuGroup>
       {CHROME_EXTENSION_URL ? (
         <>
