@@ -245,7 +245,7 @@ export const LinkItem = React.forwardRef<
       >
         {/* The favicon gives way to the checkbox on hover (pointer devices)
             or keyboard focus, and on every row while selecting. */}
-        <span
+        <div
           className={cn(
             "contents",
             selecting
@@ -254,7 +254,7 @@ export const LinkItem = React.forwardRef<
           )}
         >
           <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
-        </span>
+        </div>
         <Checkbox
           checked={selected}
           aria-label={`Select ${link.title}`}

@@ -38,7 +38,7 @@ test.describe("Link selection", () => {
     await expect(bar(page)).toBeVisible();
     await expect(bar(page)).toContainText("1 selected");
     // Every row shows its checkbox, and row menus are gone.
-    await expect(page.getByRole("checkbox", { name: /^Select / })).toHaveCount(3);
+    await expect(rows(page).getByRole("checkbox")).toHaveCount(3);
     await expect(page.getByRole("button", { name: "Open link menu" })).toHaveCount(0);
 
     // A click on the row toggles it instead of opening the link.
@@ -63,9 +63,16 @@ test.describe("Link selection", () => {
     await rows(page).nth(2).click({ modifiers: ["Shift"] });
     await expect(bar(page)).toContainText("3 selected");
 
-    await bar(page).getByRole("button", { name: "Select all" }).click();
+    const selectAll = bar(page).getByRole("checkbox", { name: "Select all" });
+    await expect(selectAll).toHaveAttribute("aria-checked", "mixed");
+    const width = (await selectAll.boundingBox())!.width;
+    await selectAll.click();
     await expect(bar(page)).toContainText("4 selected");
-    await bar(page).getByRole("button", { name: "Deselect all" }).click();
+    await expect(selectAll).toHaveAttribute("aria-checked", "true");
+    await expect(selectAll).toContainText("Deselect all");
+    // Same width for both labels: the bar doesn't jump.
+    expect((await selectAll.boundingBox())!.width).toBe(width);
+    await selectAll.click();
     await expect(bar(page)).toHaveCount(0);
   });
 
@@ -133,7 +140,7 @@ test.describe("Link selection on a phone", () => {
     await openHome(page);
     await rows(page).first().hover();
     await checkbox(page, "Bravo").click();
-    await bar(page).getByRole("button", { name: "Select all" }).click();
+    await bar(page).getByRole("checkbox", { name: "Select all" }).click();
     await expect(bar(page)).toContainText("2 selected");
 
     const box = await bar(page).boundingBox();

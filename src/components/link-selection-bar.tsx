@@ -27,8 +27,7 @@ import {
   FolderInput,
   FolderMinus,
   FolderPlus,
-  Square,
-  SquareCheck,
+  Minus,
   Trash,
   X,
 } from "lucide-react";
@@ -216,25 +215,40 @@ export function LinkSelectionBar({
               shortcut={allSelected ? undefined : "selectAll"}
               apple={apple}
             >
+              {/* The list's master checkbox: partly checked (some selected)
+                  or checked (all), drawn like the rows' checkboxes. */}
               <Button
                 variant="ghost"
                 size="sm"
-                aria-label={allSelected ? "Deselect all" : "Select all"}
+                role="checkbox"
+                aria-checked={allSelected ? true : "mixed"}
+                aria-label="Select all"
                 // Icon-only on phones, where the full bar wouldn't fit.
                 className="rounded-lg text-muted-foreground hover:text-foreground max-sm:w-8 max-sm:px-0"
                 onClick={toggleAll}
               >
-                {allSelected ? (
-                  <SquareCheck data-icon="inline-start" />
-                ) : (
-                  <Square data-icon="inline-start" />
-                )}
+                <MasterCheckbox checked={allSelected} />
+                {/* Both labels share one grid cell, so the button keeps the
+                    longer one's width and the bar never jumps. */}
                 <Typography
                   component="span"
-                  size="small"
-                  className="font-medium text-current max-sm:hidden"
+                  aria-hidden
+                  className="grid max-sm:hidden"
                 >
-                  {allSelected ? "Deselect all" : "Select all"}
+                  <Typography
+                    component="span"
+                    size="small"
+                    className="invisible col-start-1 row-start-1 font-medium"
+                  >
+                    Deselect all
+                  </Typography>
+                  <Typography
+                    component="span"
+                    size="small"
+                    className="col-start-1 row-start-1 font-medium text-current"
+                  >
+                    {allSelected ? "Deselect all" : "Select all"}
+                  </Typography>
                 </Typography>
               </Button>
             </ShortcutTooltip>
@@ -274,6 +288,29 @@ export function LinkSelectionBar({
         ) : null}
       </AnimatePresence>
     </>
+  );
+}
+
+/**
+ * The Select all control's box: a dash while only some links are selected,
+ * the rows' checked fill once all are. Decorative; the button carries the
+ * checkbox role and state.
+ */
+function MasterCheckbox({ checked }: { checked: boolean }) {
+  return (
+    <Typography
+      component="span"
+      aria-hidden
+      data-icon="inline-start"
+      className={cn(
+        "flex size-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors duration-150 ease-out [&_svg]:size-3.5",
+        checked
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-input text-foreground dark:bg-input/30",
+      )}
+    >
+      {checked ? <Check /> : <Minus />}
+    </Typography>
   );
 }
 
