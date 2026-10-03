@@ -214,7 +214,9 @@ export const LinkItem = React.forwardRef<
         // reader control; a click anywhere on the row toggles it.
         aria-hidden={selecting || undefined}
         tabIndex={selecting ? -1 : undefined}
-        className="absolute inset-0 z-0 w-full rounded-md outline-none [-webkit-touch-callout:none] focus-visible:ring-3 focus-visible:ring-ring"
+        // ring-inset: the list clips each row to its box (content-visibility),
+        // so a ring drawn outside the link would be cut to the corners.
+        className="absolute inset-0 z-0 w-full rounded-md outline-none [-webkit-touch-callout:none] focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset"
         onClick={(event) => {
           if (longPressedRef.current) {
             longPressedRef.current = false;
@@ -317,7 +319,7 @@ export const LinkItem = React.forwardRef<
       >
         <LinkMenu
           link={link}
-          onDelete={() => {
+          onDelete={({ byKeyboard }) => {
             const rows = Array.from(
               document.querySelectorAll<HTMLElement>(
                 '[data-cy="link-item"] > a[href]',
@@ -329,6 +331,8 @@ export const LinkItem = React.forwardRef<
             deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
             // The row (and its menu trigger) unmounts once hidden; then move
             // focus to the neighboring row only if focus fell to the body.
+            // Its focus ring shows only for a keyboard delete: after a click
+            // the user isn't navigating by keyboard.
             setTimeout(() => {
               requestAnimationFrame(() => {
                 const active = document.activeElement;
@@ -336,7 +340,9 @@ export const LinkItem = React.forwardRef<
                   target?.isConnected &&
                   (!active || active === document.body)
                 ) {
-                  target.focus();
+                  // `focusVisible` isn't in TS's DOM types yet; browsers
+                  // without it ignore the option.
+                  target.focus({ focusVisible: byKeyboard } as FocusOptions);
                 }
               });
             }, LINK_DELETE_FADE_MS);

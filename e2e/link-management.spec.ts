@@ -87,3 +87,35 @@ test.describe("Link management", () => {
     await expect(linkItems(page)).toHaveCount(1);
   });
 });
+
+test.describe("Link management, focus after delete", () => {
+  test("the next row gets focus without a ring after a mouse delete, and an unclipped ring after a keyboard delete", async ({ page, seed }) => {
+    await seed.link({ url: "https://a.example", title: "Alpha" });
+    await seed.link({ url: "https://b.example", title: "Bravo" });
+    await seed.link({ url: "https://c.example", title: "Charlie" });
+    await page.goto("/home");
+    const rows = page.locator('[data-cy="link-item"]');
+    await expect(rows).toHaveCount(3);
+
+    // Mouse: focus moves on, but no ring.
+    await waitForHydration(page, MENU_BUTTON);
+    await rows.first().hover();
+    await rows.first().locator(MENU_BUTTON).click();
+    await page.locator('[data-cy="delete-link-menu-item"]').click();
+    await expect(rows).toHaveCount(2);
+    const next = rows.first().locator("> a[href]");
+    await expect(next).toBeFocused();
+    expect(await next.evaluate((el) => el.matches(":focus-visible"))).toBe(false);
+
+    // Keyboard: open the menu and delete with Enter; the ring shows, inset.
+    await rows.first().locator(MENU_BUTTON).focus();
+    await page.keyboard.press("Enter");
+    await page.locator('[data-cy="delete-link-menu-item"]').focus();
+    await page.keyboard.press("Enter");
+    await expect(rows).toHaveCount(1);
+    const last = rows.first().locator("> a[href]");
+    await expect(last).toBeFocused();
+    expect(await last.evaluate((el) => el.matches(":focus-visible"))).toBe(true);
+    expect(await last.evaluate((el) => getComputedStyle(el).boxShadow)).toContain("inset");
+  });
+});
