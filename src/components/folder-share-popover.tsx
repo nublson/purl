@@ -80,7 +80,12 @@ export function FolderSharePopover() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="secondary" size="sm" className="cursor-pointer">
+        <Button
+          // Ghost while private; filled once the folder is public.
+          variant={isPublic ? "secondary" : "ghost"}
+          size="sm"
+          className="cursor-pointer"
+        >
           {isPublic ? (
             <Globe data-icon="inline-start" />
           ) : (
