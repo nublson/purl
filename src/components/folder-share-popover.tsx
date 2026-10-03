@@ -55,7 +55,11 @@ export function FolderSharePopover() {
     if (!folder) return;
     setOptimistic(next);
     setSaving(true);
-    const result = await updateFolder(folder.id, { isPublic: next });
+    const result = await updateFolder(
+      folder.id,
+      { isPublic: next },
+      { quiet: true },
+    );
     setSaving(false);
     setOptimistic(null);
     if (!result.ok) toast.error(result.error);

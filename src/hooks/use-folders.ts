@@ -103,6 +103,7 @@ export function useFolderActions(): {
   updateFolder: (
     id: string,
     input: UpdateFolderInput,
+    opts?: { quiet?: boolean },
   ) => Promise<ActionResult<FolderSummary>>;
   deleteFolder: (
     id: string,
@@ -156,6 +157,7 @@ export function useFolderActions(): {
     async (
       id: string,
       input: UpdateFolderInput,
+      opts?: { quiet?: boolean },
     ): Promise<ActionResult<FolderSummary>> => {
       // Captured before the request: the local list is patched below.
       const previousName = folders.find((folder) => folder.id === id)?.name;
@@ -168,15 +170,11 @@ export function useFolderActions(): {
         // router.replace below, so useCurrentFolder() on the new slug
         // resolves immediately instead of racing the background refetch.
         upsertFolder(result.data);
-        toast.success(
-          renamed
-            ? "Folder renamed"
-            : input.isPublic === true
-              ? "Folder is public"
-              : input.isPublic === false
-                ? "Folder is private"
-                : "Folder updated",
-        );
+        // `quiet`: the caller shows the result itself (the Share popover's
+        // switch).
+        if (!opts?.quiet) {
+          toast.success(renamed ? "Folder renamed" : "Folder updated");
+        }
         notifyLinksChanged();
         const onThisFolder = currentFolder?.id === id;
         const newPath = `/folders/${result.data.slug}`;

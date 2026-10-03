@@ -163,6 +163,8 @@ test.describe("Share popover", () => {
       await dialog.getByRole("switch", { name: "Public" }).click();
       await expect(dialog.getByRole("switch", { name: "Public" })).toBeChecked();
       await expect(copy).toBeEnabled();
+      // The switch is its own confirmation: no toast.
+      await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
       await expect
         .poll(async () => (await visitor.request.get(`/@${testUser.username}/design`)).status())
         .toBe(200);
