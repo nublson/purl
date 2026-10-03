@@ -369,10 +369,13 @@ export function HomeShell({
         />
       ) : null}
       {(!groups.length || allLinksHidden) && !showSyntheticToday ? (
-        <LinkGroupEmpty
-          inFolder={Boolean(folderId)}
-          query={searchQuery || undefined}
-        />
+        // A URL that matches nothing: the Save row above is the answer.
+        searchQuery && saveUrl ? null : (
+          <LinkGroupEmpty
+            inFolder={Boolean(folderId)}
+            query={searchQuery || undefined}
+          />
+        )
       ) : (
         // Leaving the list resets the preview hover delay (see
         // link-preview-warmth); gaps between date groups don't.

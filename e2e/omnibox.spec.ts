@@ -7,7 +7,8 @@ import { expect, test, waitForHydration } from "./fixtures";
 const rows = (page: Page) => page.locator('[data-cy="link-item"]');
 const field = (page: Page) =>
   page.getByRole("searchbox", { name: "Search your links or paste a link to save" });
-const saveRow = (page: Page) => page.getByRole("button", { name: /^Save / });
+const saveRow = (page: Page) => page.locator('[data-cy="omnibox-save-row"]');
+const saveButton = (page: Page) => saveRow(page).getByRole("button", { name: /^Save / });
 
 async function open(page: Page, path: string) {
   await page.goto(path);
@@ -48,12 +49,15 @@ test.describe("Search field", () => {
     await open(page, "/home");
 
     await field(page).fill("iana.org");
-    await expect(saveRow(page)).toHaveAccessibleName("Save iana.org");
+    await expect(saveRow(page)).toBeVisible();
     await expect(rows(page)).toHaveCount(1);
     await page.screenshot({ path: testInfo.outputPath("omnibox-save.png") });
 
     await field(page).fill("example.com");
-    await expect(saveRow(page)).toHaveAccessibleName("Save example.com");
+    // The row shows the page's title once its preview loads.
+    await expect(saveButton(page)).toHaveAccessibleName("Save Example Domain", { timeout: 15_000 });
+    await expect(saveRow(page)).toContainText("example.com");
+    await page.screenshot({ path: testInfo.outputPath("omnibox-preview.png") });
     await field(page).press("Enter");
     await expect(field(page)).toHaveValue("");
     await expect(rows(page).filter({ hasText: "example.com" })).toHaveCount(1, { timeout: 20_000 });
@@ -64,7 +68,7 @@ test.describe("Search field", () => {
     await seed.link({ url: "https://example.com/post", title: "A post" });
     await open(page, "/home");
     await field(page).fill("http://www.example.com/post/");
-    await expect(saveRow(page)).toHaveAccessibleName("Save www.example.com/post (already saved)");
+    await expect(saveRow(page)).toContainText("Already saved");
   });
 
   test("a folder searches itself, and Search all links widens it", async ({ page, seed }) => {

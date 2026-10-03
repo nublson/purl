@@ -1,17 +1,74 @@
 "use client";
 
+import { formatDomain } from "@/utils/formatter";
+import type { Link } from "@/utils/links";
 import { ArrowUpRight, Plus } from "lucide-react";
+import * as React from "react";
+import { LinkIcon } from "./link-icon";
+import { TooltipWrapper } from "./tooltip-wrapper";
 import { Typography } from "./typography";
-import { Kbd } from "./ui/kbd";
+import { Button } from "./ui/button";
+import { Skeleton } from "./ui/skeleton";
 
 /** Shared row shape: the list rows' 48px height, 20px media column and 16px gap. */
 const ROW =
   "grid h-12 w-full grid-cols-[20px_1fr_auto] items-center gap-4 rounded-md p-2 text-start outline-none transition-colors duration-150 hover:bg-accent/40 focus-visible:ring-3 focus-visible:ring-ring";
 
+/** Wait for the URL to settle before fetching its preview. */
+const PREVIEW_DEBOUNCE_MS = 300;
+
+type Preview = Pick<
+  Link,
+  "url" | "domain" | "title" | "favicon" | "thumbnail" | "contentType" | "description"
+>;
+
+/** Previews already fetched this session, by URL. */
+const previewCache = new Map<string, Preview>();
+
 /**
- * First row of the list while the search field holds a URL: saves it
- * (Enter in the field does the same). Says so when the URL is already
- * saved; saving again just refreshes it (or files it into this folder).
+ * `url`'s preview (`GET /api/links/preview`), fetched once the URL has
+ * settled; null while loading or if it failed.
+ */
+function useLinkPreview(url: string): Preview | null {
+  // Keyed by URL, so a preview for an earlier URL never shows for this one.
+  const [fetched, setFetched] = React.useState<{
+    url: string;
+    preview: Preview;
+  } | null>(null);
+  const cached = previewCache.get(url) ?? null;
+
+  React.useEffect(() => {
+    if (previewCache.has(url)) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetch(`/api/links/preview?url=${encodeURIComponent(url)}`, {
+        signal: controller.signal,
+      })
+        .then(async (res) => {
+          if (!res.ok) return;
+          const preview = (await res.json()) as Preview;
+          previewCache.set(url, preview);
+          setFetched({ url, preview });
+        })
+        .catch(() => {
+          // No preview: the row keeps showing the URL itself.
+        });
+    }, PREVIEW_DEBOUNCE_MS);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [url]);
+
+  return cached ?? (fetched?.url === url ? fetched.preview : null);
+}
+
+/**
+ * First row of the list while the search field holds a URL: the link as it
+ * would look saved (favicon, title, domain, from a preview fetch), with +
+ * where a saved row has its menu. + (or Enter in the field) saves it. Says
+ * when the URL is already saved; saving again just refreshes it (or files
+ * it into this folder).
  */
 export function OmniboxSaveRow({
   url,
@@ -22,31 +79,38 @@ export function OmniboxSaveRow({
   alreadySaved: boolean;
   onSave: () => void;
 }) {
+  const preview = useLinkPreview(url);
   const shown = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const link: Link | null = preview
+    ? { ...preview, id: "preview", createdAt: new Date(0), folderId: null }
+    : null;
+
   return (
-    <button
-      type="button"
-      aria-label={`Save ${shown}${alreadySaved ? " (already saved)" : ""}`}
-      className={ROW}
-      onClick={onSave}
+    <div
+      data-cy="omnibox-save-row"
+      className="grid h-12 w-full grid-cols-[20px_1fr_auto] items-center gap-4 rounded-md p-2"
     >
       <Typography
         component="span"
         aria-hidden
-        className="flex size-5 items-center justify-center rounded bg-accent text-foreground"
+        className="relative flex size-5 items-center justify-center overflow-hidden rounded"
       >
-        <Plus className="size-3.5" />
+        {link ? (
+          <LinkIcon link={link} size="default" />
+        ) : (
+          <Skeleton className="size-5 rounded" />
+        )}
       </Typography>
       <Typography component="span" className="flex min-w-0 items-baseline gap-2">
         <Typography
           component="span"
           size="small"
-          className="shrink-0 font-medium text-accent-foreground"
+          className="min-w-0 truncate font-medium text-accent-foreground"
         >
-          Save
+          {link?.title ?? shown}
         </Typography>
-        <Typography component="span" size="small" className="min-w-0 truncate">
-          {shown}
+        <Typography component="span" size="small" className="hidden shrink-0 md:block">
+          {link ? formatDomain(link.domain) : null}
         </Typography>
         {alreadySaved ? (
           <Typography component="span" size="mini" className="shrink-0">
@@ -54,10 +118,18 @@ export function OmniboxSaveRow({
           </Typography>
         ) : null}
       </Typography>
-      <Kbd aria-hidden="true" className="me-1.5">
-        ↵
-      </Kbd>
-    </button>
+      <TooltipWrapper content="Save (↵)">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Save ${link?.title ?? shown}${alreadySaved ? " (already saved)" : ""}`}
+          className="cursor-pointer text-muted-foreground hover:text-foreground"
+          onClick={onSave}
+        >
+          <Plus />
+        </Button>
+      </TooltipWrapper>
+    </div>
   );
 }
 

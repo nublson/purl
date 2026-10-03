@@ -43,6 +43,8 @@ const feedbackPostLimiter = () => makeLimiter("feedback_post", 10, "1 m");
 // The availability check runs (debounced) as the user types a new username;
 // a change is rare, so it gets a much tighter budget.
 const usernameCheckLimiter = () => makeLimiter("username_check", 60, "1 m");
+// Each preview fetches the page (the search field's Save row).
+const linkPreviewLimiter = () => makeLimiter("link_preview", 60, "1 m");
 const usernameChangeLimiter = () => makeLimiter("username_change", 10, "1 h");
 
 const v1Limiter = () => makeLimiter("v1", 120, "1 m");
@@ -56,6 +58,7 @@ let cachedV1Post: Ratelimit | null | undefined;
 let cachedFeedbackPost: Ratelimit | null | undefined;
 let cachedMcp: Ratelimit | null | undefined;
 let cachedUsernameCheck: Ratelimit | null | undefined;
+let cachedLinkPreview: Ratelimit | null | undefined;
 let cachedUsernameChange: Ratelimit | null | undefined;
 
 export function getAuthRateLimiter(): Ratelimit | null {
@@ -102,4 +105,9 @@ export function getUsernameChangeRateLimiter(): Ratelimit | null {
 export function getMcpRateLimiter(): Ratelimit | null {
   if (cachedMcp === undefined) cachedMcp = mcpLimiter();
   return cachedMcp;
+}
+
+export function getLinkPreviewRateLimiter(): Ratelimit | null {
+  if (cachedLinkPreview === undefined) cachedLinkPreview = linkPreviewLimiter();
+  return cachedLinkPreview;
 }

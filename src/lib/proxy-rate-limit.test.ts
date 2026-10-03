@@ -18,6 +18,7 @@ vi.mock("@/lib/upstash-rate-limit", () => ({
   getFeedbackPostRateLimiter: vi.fn(),
   getLinksPostRateLimiter: vi.fn(),
   getUsernameCheckRateLimiter: vi.fn(),
+  getLinkPreviewRateLimiter: vi.fn(),
   getV1RateLimiter: vi.fn().mockReturnValue({ limit: limitMock }),
   getV1PostRateLimiter: vi.fn(),
   getMcpRateLimiter: vi.fn(),
@@ -28,6 +29,7 @@ const {
   getFeedbackPostRateLimiter,
   getLinksPostRateLimiter,
   getUsernameCheckRateLimiter,
+  getLinkPreviewRateLimiter,
   getV1RateLimiter,
   getV1PostRateLimiter,
   getMcpRateLimiter,
@@ -61,6 +63,7 @@ describe("rateLimitApiRequest", () => {
     vi.mocked(getLinksPostRateLimiter).mockReset();
     vi.mocked(getFeedbackPostRateLimiter).mockReset();
     vi.mocked(getUsernameCheckRateLimiter).mockReset();
+    vi.mocked(getLinkPreviewRateLimiter).mockReset();
   });
 
   describe("unmatched routes", () => {
@@ -201,6 +204,18 @@ describe("rateLimitApiRequest", () => {
       expect(result!.status).toBe(429);
       const retryAfter = Number(result!.headers.get("Retry-After"));
       expect(retryAfter).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("link previews", () => {
+    it("limits GET /api/links/preview by IP", async () => {
+      vi.mocked(getLinkPreviewRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: false, reset: Date.now() + 10_000 });
+
+      const result = await rateLimitApiRequest(
+        makeRequest("/api/links/preview?url=example.com", "GET"),
+      );
+      expect(result!.status).toBe(429);
     });
   });
 
