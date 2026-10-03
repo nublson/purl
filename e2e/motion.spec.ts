@@ -63,4 +63,24 @@ test.describe("Motion", () => {
     await expect(clear).toHaveCSS("opacity", "1");
     await expect(clear).not.toHaveAttribute("inert");
   });
+
+  test("a saved link's details arrive in place, in the Save row and in the list", async ({ page }) => {
+    await page.goto("/home");
+    await waitForHydration(page, 'form[role="search"] input');
+    await page.waitForLoadState("networkidle");
+
+    await field(page).fill("example.com");
+    const saveRow = page.locator('[data-cy="omnibox-save-row"]');
+    // The preview's title replaces the URL with the arrival animation.
+    const previewTitle = saveRow.getByText("Example Domain");
+    await expect(previewTitle).toBeVisible({ timeout: 15_000 });
+    await expect(previewTitle).toHaveClass(/animate-in/);
+
+    await field(page).press("Enter");
+    const row = rows(page).filter({ hasText: "Example Domain" });
+    await expect(row).toHaveCount(1, { timeout: 20_000 });
+    await expect(row.getByText("Example Domain")).toHaveClass(/animate-in/);
+    // Only for a moment: then it's an ordinary row.
+    await expect(row.getByText("Example Domain")).not.toHaveClass(/animate-in/);
+  });
 });

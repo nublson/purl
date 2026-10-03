@@ -92,6 +92,8 @@ export function HomeShell({
   const [groups, setGroups] = useState(initialGroups);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  // The link just saved, while its row plays the arrival.
+  const [arrivingId, setArrivingId] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   // The zone the displayed groups were labeled in; pages from another zone
   // must not be merged into them.
@@ -311,9 +313,19 @@ export function HomeShell({
     setPendingUrl(url);
   }, []);
 
-  const onSaveSuccess = useCallback(async () => {
+  const onSaveSuccess = useCallback(async (newLinkId?: string) => {
+    // Set before the reload, so the real row mounts already arriving.
+    if (newLinkId) setArrivingId(newLinkId);
     await reload();
     setPendingUrl(null);
+    // Once the row is in, give the arrival (200ms + the domain's 40ms) time
+    // to play, then stop marking it (unless a newer save took over).
+    if (newLinkId) {
+      setTimeout(
+        () => setArrivingId((id) => (id === newLinkId ? null : id)),
+        500,
+      );
+    }
     // The new row is only visual; announce the save for screen readers too.
     // On a folder page, `saveLink` (via PasteHandler's own
     // `useCurrentFolder()`, which inside the page's CurrentFolderProvider
@@ -421,6 +433,7 @@ export function HomeShell({
               key={group.label}
               label={group.label}
               links={group.links}
+              newLinkId={arrivingId}
               prependItems={
                 group.label === "Today" && showSkeleton ? (
                   <LinkItemSkeleton url={skeletonUrl} animateIn />

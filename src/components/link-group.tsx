@@ -10,6 +10,7 @@ import { ItemGroup } from "./ui/item";
 interface LinkGroupProps {
   label: string;
   links: Link[];
+  /** The link just saved: its row plays the arrival (see `LinkItem`). */
   newLinkId?: string | null;
   prependItems?: ReactNode;
   eagerFirstLinkFavicon?: boolean;
@@ -18,6 +19,7 @@ interface LinkGroupProps {
 export const LinkGroup = ({
   label,
   links,
+  newLinkId,
   prependItems,
   eagerFirstLinkFavicon = false,
 }: LinkGroupProps) => {
@@ -56,6 +58,7 @@ export const LinkGroup = ({
             <LinkItem
               link={link}
               eagerFavicon={eagerFirstLinkFavicon && index === 0}
+              arriving={link.id === newLinkId}
             />
           </div>
         ))}

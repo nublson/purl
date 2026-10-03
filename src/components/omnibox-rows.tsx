@@ -1,5 +1,6 @@
 "use client";
 
+import { ARRIVE, ARRIVE_ICON, ARRIVE_LATE } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import type { Link } from "@/utils/links";
@@ -101,20 +102,33 @@ export function OmniboxSaveRow({
         className="relative flex size-5 items-center justify-center overflow-hidden rounded"
       >
         {link ? (
-          <LinkIcon link={link} size="default" />
+          // The preview arriving: the favicon, then title, then domain
+          // fade in as their blur clears (see ARRIVE).
+          <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
+            <LinkIcon link={link} size="default" />
+          </Typography>
         ) : (
           <Skeleton className="size-5 rounded" />
         )}
       </Typography>
       <Typography component="span" className="flex min-w-0 items-baseline gap-2">
         <Typography
+          // Remounts when the preview lands, so the title plays its arrival.
+          key={link ? "title" : "url"}
           component="span"
           size="small"
-          className="min-w-0 truncate font-medium text-accent-foreground"
+          className={cn(
+            "min-w-0 truncate font-medium text-accent-foreground",
+            link && ARRIVE,
+          )}
         >
           {link?.title ?? shown}
         </Typography>
-        <Typography component="span" size="small" className="hidden shrink-0 md:block">
+        <Typography
+          component="span"
+          size="small"
+          className={cn("hidden shrink-0 md:block", link && ARRIVE_LATE)}
+        >
           {link ? formatDomain(link.domain) : null}
         </Typography>
         {alreadySaved ? (

@@ -2,6 +2,7 @@
 
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { useLeavingLinks } from "@/lib/leaving-links";
+import { ARRIVE, ARRIVE_ICON, ARRIVE_LATE } from "@/lib/motion";
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
 import {
   linkSelection,
@@ -46,6 +47,12 @@ const LinkMenu = dynamic(
 interface LinkItemProps {
   link: LinkType;
   eagerFavicon?: boolean;
+  /**
+   * The link was just saved: its real details arrive in place of the
+   * saving placeholder (favicon, title, then domain fade in as their blur
+   * clears).
+   */
+  arriving?: boolean;
 }
 
 export const LinkItem = React.forwardRef<
@@ -58,6 +65,7 @@ export const LinkItem = React.forwardRef<
     onMouseEnter,
     onMouseLeave,
     eagerFavicon,
+    arriving = false,
     ...rest
   },
   ref,
@@ -266,7 +274,13 @@ export const LinkItem = React.forwardRef<
                 "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-has-[:focus-visible]/media:*:opacity-0",
           )}
         >
-          <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
+          {arriving ? (
+            <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
+              <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
+            </Typography>
+          ) : (
+            <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
+          )}
         </div>
         <Checkbox
           checked={selected}
@@ -292,14 +306,20 @@ export const LinkItem = React.forwardRef<
         <ItemTitle>
           <Typography
             size="small"
-            className="text-accent-foreground font-medium line-clamp-2 wrap-anywhere md:line-clamp-1"
+            className={cn(
+              "text-accent-foreground font-medium line-clamp-2 wrap-anywhere md:line-clamp-1",
+              arriving && ARRIVE,
+            )}
           >
             {link.title}
           </Typography>
           <Typography
             component="span"
             size="small"
-            className="text-muted-foreground font-normal hidden md:block"
+            className={cn(
+              "text-muted-foreground font-normal hidden md:block",
+              arriving && ARRIVE_LATE,
+            )}
           >
             {formatDomain(link.domain)}
           </Typography>
