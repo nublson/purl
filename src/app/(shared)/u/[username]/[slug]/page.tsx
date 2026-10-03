@@ -1,14 +1,16 @@
 import { FolderEmoji } from "@/components/folder-emoji";
 import { Logo } from "@/components/logo";
 import { SharedFolderList } from "@/components/shared-folder-list";
+import {
+  SharedFolderViewProvider,
+  SharedFolderViewToggle,
+} from "@/components/shared-folder-view";
 import { Typography } from "@/components/typography";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   getPublicFolderPage,
   publicFolderPath,
 } from "@/lib/public-folders";
-import { LayoutGrid, List } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 
@@ -59,7 +61,7 @@ export default async function SharedFolderPage({
   const { owner, folder } = page;
 
   return (
-    <>
+    <SharedFolderViewProvider>
       {/* The app header's frame (header.tsx), with the folder as a label
           where the switcher would be. */}
       <header className="fixed inset-x-0 top-0 z-50 transform-none">
@@ -85,39 +87,14 @@ export default async function SharedFolderPage({
               </Typography>
             </div>
           </div>
-          {/* List / grid view. Not wired yet: list is the only view. */}
-          <div
-            role="group"
-            aria-label="View"
-            className="flex shrink-0 items-center gap-1"
-          >
-            <Button
-              variant="secondary"
-              size="icon-sm"
-              aria-label="List view"
-              aria-pressed="true"
-            >
-              <List />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Grid view"
-              aria-pressed="false"
-              className="text-muted-foreground"
-            >
-              <LayoutGrid />
-            </Button>
-          </div>
+          <SharedFolderViewToggle />
         </div>
       </header>
-      <div className="wrapper-private flex flex-1 flex-col gap-8 pt-24 pb-12">
-        <SharedFolderList
-          initialLinks={page.links}
-          initialNextCursor={page.nextCursor}
-          apiPath={`/api/public/folders/${owner.username}/${folder.slug}`}
-        />
-      </div>
-    </>
+      <SharedFolderList
+        initialLinks={page.links}
+        initialNextCursor={page.nextCursor}
+        apiPath={`/api/public/folders/${owner.username}/${folder.slug}`}
+      />
+    </SharedFolderViewProvider>
   );
 }

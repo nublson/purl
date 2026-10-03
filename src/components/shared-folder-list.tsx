@@ -6,6 +6,9 @@ import type { Link } from "@/utils/links";
 import { PackageOpen } from "lucide-react";
 import { BouncingDots } from "loading-dev";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+import { SharedLinkCard } from "./shared-link-card";
+import { useSharedFolderView } from "./shared-folder-view";
 import { SharedLinkItem } from "./shared-link-item";
 import {
   Empty,
@@ -21,8 +24,8 @@ function toLink(link: PublicLink): Link {
 }
 
 /**
- * A shared folder's links in one list, newest first, with the owner's rows
- * (no day headings). Older pages load as you scroll, from the public
+ * A shared folder's links, newest first: the owner's rows in one list (no
+ * day headings), or preview cards in a grid, per the header's view toggle. Older pages load as you scroll, from the public
  * endpoint (`apiPath`).
  */
 export function SharedFolderList({
@@ -37,6 +40,7 @@ export function SharedFolderList({
   const [links, setLinks] = useState(() => initialLinks.map(toLink));
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [loadingMore, setLoadingMore] = useState(false);
+  const view = useSharedFolderView();
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
@@ -81,8 +85,15 @@ export function SharedFolderList({
 
   useEffect(() => coolPreviews, []);
 
+  // Grid: room for four 210px cards and their 16px gaps (4×210 + 3×16).
+  const frame = cn(
+    "flex flex-1 flex-col gap-8 pt-24 pb-12",
+    view === "grid" ? "mx-auto w-full max-w-[888px]" : "wrapper-private",
+  );
+
   if (links.length === 0) {
     return (
+      <div className={frame}>
       <Empty data-cy="link-group-empty">
         <EmptyHeader>
           <EmptyMedia variant="icon">
@@ -94,22 +105,38 @@ export function SharedFolderList({
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
+      </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-8" onMouseLeave={coolPreviews}>
-      <ItemGroup aria-label="Links" className="w-full gap-0">
-        {links.map((link, index) => (
-          <div
-            key={link.id}
-            role="listitem"
-            className="[content-visibility:auto] [contain-intrinsic-size:auto_48px]"
-          >
-            <SharedLinkItem link={link} eagerFavicon={index === 0} />
-          </div>
-        ))}
-      </ItemGroup>
+    <div className={frame} onMouseLeave={coolPreviews}>
+      {view === "grid" ? (
+        <ul
+          aria-label="Links"
+          // Fixed 210px cards: as many columns as fit, up to four (the
+          // frame's width), centered.
+          className="grid grid-cols-[repeat(auto-fill,210px)] justify-center gap-4"
+        >
+          {links.map((link, index) => (
+            <li key={link.id}>
+              <SharedLinkCard link={link} eagerThumbnail={index < 4} />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ItemGroup aria-label="Links" className="w-full gap-0">
+          {links.map((link, index) => (
+            <div
+              key={link.id}
+              role="listitem"
+              className="[content-visibility:auto] [contain-intrinsic-size:auto_48px]"
+            >
+              <SharedLinkItem link={link} eagerFavicon={index === 0} />
+            </div>
+          ))}
+        </ItemGroup>
+      )}
       <div
         role="status"
         className="relative flex h-10 w-full items-center justify-center text-muted-foreground"

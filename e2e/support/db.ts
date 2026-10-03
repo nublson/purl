@@ -46,14 +46,28 @@ export async function deleteTestUser(userId: string): Promise<void> {
 /** Inserts a link row directly: no metadata fetch, no outbound HTTP. */
 export async function seedLink(
   userId: string,
-  { url, title, folderId }: { url: string; title?: string; folderId?: string },
+  {
+    url,
+    title,
+    description,
+    folderId,
+  }: { url: string; title?: string; description?: string; folderId?: string },
 ): Promise<string> {
   const domain = new URL(url).hostname;
   const id = randomUUID();
   await pool.query(
-    `INSERT INTO "links" ("id", "url", "title", "favicon", "domain", "userId", "folderId")
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [id, url, title ?? domain, `https://${domain}/favicon.ico`, domain, userId, folderId ?? null],
+    `INSERT INTO "links" ("id", "url", "title", "description", "favicon", "domain", "userId", "folderId")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [
+      id,
+      url,
+      title ?? domain,
+      description ?? null,
+      `https://${domain}/favicon.ico`,
+      domain,
+      userId,
+      folderId ?? null,
+    ],
   );
   return id;
 }

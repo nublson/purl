@@ -24,7 +24,12 @@ type TestFixtures = {
   signedIn: boolean;
   /** Seeding helpers bound to `testUser`. */
   seed: {
-    link: (link: { url: string; title?: string; folderId?: string }) => Promise<string>;
+    link: (link: {
+      url: string;
+      title?: string;
+      description?: string;
+      folderId?: string;
+    }) => Promise<string>;
     folder: (folder: {
       name: string;
       slug: string;

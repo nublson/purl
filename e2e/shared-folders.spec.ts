@@ -35,6 +35,47 @@ test.describe("Shared folders, visited signed out", () => {
     await expect(page.getByRole("link", { name: "Purl" })).toHaveAttribute("href", "/");
   });
 
+  test("the view toggle switches between the list and a grid of cards", async ({
+    page,
+    seed,
+    testUser,
+  }, testInfo) => {
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    for (const [i, title] of ["Alpha", "Bravo", "Charlie", "Delta", "Echo"].entries()) {
+      await seed.link({
+        url: `https://${title.toLowerCase()}.example`,
+        title: `${title} article`,
+        description: i % 2 ? `Notes about ${title}` : undefined,
+        folderId: design,
+      });
+    }
+    await page.goto(`/@${testUser.username}/design`);
+    await waitForHydration(page, 'button[aria-label="Grid view"]');
+
+    const list = page.getByRole("button", { name: "List view" });
+    const grid = page.getByRole("button", { name: "Grid view" });
+    await expect(list).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
+
+    await grid.click();
+    await expect(grid).toHaveAttribute("aria-pressed", "true");
+    await expect(list).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(0);
+    const cards = page.locator('[data-cy="link-card"]');
+    await expect(cards).toHaveCount(5);
+    await expect(cards.filter({ hasText: "Bravo article" })).toContainText("Notes about Bravo");
+    await expect(cards.filter({ hasText: "Alpha article" })).toHaveAttribute(
+      "href",
+      "https://alpha.example",
+    );
+    if (process.env.SHARE_SCREENSHOTS) {
+      await page.screenshot({ path: `${process.env.SHARE_SCREENSHOTS}/${testInfo.project.name}-grid.png` });
+    }
+
+    await list.click();
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
+  });
+
   test("a private or missing folder is a 404, and so is an unknown user", async ({
     page,
     seed,
