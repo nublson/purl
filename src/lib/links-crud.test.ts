@@ -66,6 +66,7 @@ const {
   moveLinksToFolder,
   deleteLinksForUser,
   searchLinksForUser,
+  listLinksForUser,
   scrapeLinkMetadata,
   UnauthorizedError,
 } = await import("./links");
@@ -1133,6 +1134,44 @@ describe("searchLinksForUser", () => {
     await expect(
       searchLinksForUser("user-123", { query: "", notInFolderId: "x", limit: 5 }),
     ).rejects.toBeInstanceOf(FolderNotFoundError);
+  });
+});
+
+describe("listLinksForUser – search", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(prisma.link.findMany).mockResolvedValue([]);
+  });
+
+  it("filters by query alongside the keyset cursor", async () => {
+    await listLinksForUser("user-123", {
+      limit: 30,
+      cursor: "2025-06-15T10:00:00.000Z_link-9",
+      contentType: null,
+      query: " Blog ",
+    });
+    const { where } = vi.mocked(prisma.link.findMany).mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
+    expect(where.AND).toEqual([
+      {
+        OR: [
+          { title: { contains: "Blog", mode: "insensitive" } },
+          { domain: { contains: "Blog", mode: "insensitive" } },
+          { url: { contains: "Blog", mode: "insensitive" } },
+        ],
+      },
+    ]);
+    // The cursor keeps its own top-level OR.
+    expect(where.OR).toBeDefined();
+  });
+
+  it("adds no filter for a blank query", async () => {
+    await listLinksForUser("user-123", { limit: 30, cursor: null, contentType: null, query: "   " });
+    const { where } = vi.mocked(prisma.link.findMany).mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
+    expect(where).toEqual({ userId: "user-123" });
   });
 });
 

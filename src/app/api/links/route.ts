@@ -49,8 +49,9 @@ export async function OPTIONS(request: NextRequest) {
 
 /**
  * Session-authenticated list for the /home infinite scroll and reloads.
- * `limit` (1..MAX_SAVED_LINKS, default one page) and `cursor` (ISO createdAt of
- * the last loaded link). Returns date-grouped links plus the user's total count.
+ * `limit` (1..MAX_SAVED_LINKS, default one page), `cursor` (ISO createdAt of
+ * the last loaded link), `folderId`, and `q` (search: title, domain or URL,
+ * case-insensitive). Returns date-grouped links plus the user's total count.
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
     : HOME_LINKS_PAGE_SIZE;
   const cursor = params.get("cursor");
   const folderId = params.get("folderId") ?? undefined;
+  const query = params.get("q") ?? undefined;
 
   const timeZone = resolveRequestTimeZone({
     cookie: request.cookies.get(TIME_ZONE_COOKIE)?.value,
@@ -67,7 +69,13 @@ export async function GET(request: NextRequest) {
   });
 
   try {
-    const page = await getLinksPageForCurrentUser(limit, cursor, true, folderId);
+    const page = await getLinksPageForCurrentUser(
+      limit,
+      cursor,
+      true,
+      folderId,
+      query,
+    );
     return NextResponse.json({
       groups: groupLinksByDate(page.links, { timeZone }),
       nextCursor: page.nextCursor,

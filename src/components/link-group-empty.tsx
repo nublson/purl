@@ -2,7 +2,7 @@
 
 import { useCurrentFolder } from "@/hooks/use-folders";
 import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
-import { ListPlus, PackageOpen } from "lucide-react";
+import { ListPlus, PackageOpen, SearchX } from "lucide-react";
 
 import {
   Empty,
@@ -18,10 +18,32 @@ import { Kbd } from "./ui/kbd";
 
 /**
  * Empty list. On a folder page (`inFolder`) it also offers "Add links" to
- * pull in links you've already saved.
+ * pull in links you've already saved. With a search (`query`) it says
+ * nothing matched instead.
  */
-export function LinkGroupEmpty({ inFolder = false }: { inFolder?: boolean }) {
+export function LinkGroupEmpty({
+  inFolder = false,
+  query,
+}: {
+  inFolder?: boolean;
+  query?: string;
+}) {
   const folder = useCurrentFolder();
+  if (query) {
+    return (
+      <Empty data-cy="link-group-empty">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <SearchX />
+          </EmptyMedia>
+          <EmptyTitle>No links match “{query}”</EmptyTitle>
+          <EmptyDescription>
+            Try another word, or paste a link to save it.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    );
+  }
   return (
     <Empty data-cy="link-group-empty">
       <EmptyHeader>

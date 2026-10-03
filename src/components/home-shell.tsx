@@ -2,15 +2,22 @@
 
 import { LinkGroup } from "@/components/link-group";
 import { LinkSelectionBar } from "@/components/link-selection-bar";
+import { LinkOmnibox } from "@/components/link-omnibox";
+import {
+  OmniboxSaveRow,
+  OmniboxSearchAllRow,
+} from "@/components/omnibox-rows";
 import { PasteHandler } from "@/components/paste-handler";
 import { LinkItemSkeleton } from "@/components/skeletons";
 import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
-import { useFolders } from "@/hooks/use-folders";
+import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
 import { HOME_LINKS_PAGE_SIZE } from "@/lib/limits";
 import { coolPreviews } from "@/lib/link-preview-warmth";
 import { linkSelection, setSelectableLinks } from "@/lib/link-selection";
+import { isSameLinkUrl, omniboxSaveUrl } from "@/lib/omnibox";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
+import { requestSaveUrl } from "@/lib/save-link";
 import {
   countGroupedLinks,
   mergeLinkGroups,
@@ -23,12 +30,16 @@ import {
   timeZoneToPersist,
 } from "@/utils/time-zone";
 import { BouncingDots } from "loading-dev";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { LinkGroupEmpty } from "./link-group-empty";
 
 /** Coming back to the app after at least this long away refreshes the list. */
 const RETURN_REFRESH_AFTER_MS = 30_000;
+
+/** Wait after the last keystroke before the list follows the search field. */
+const SEARCH_DEBOUNCE_MS = 250;
 
 type LinksPageResponse = {
   groups: Parameters<typeof parseJsonLinkGroups>[0];
@@ -62,6 +73,14 @@ export function HomeShell({
   const { version } = useLinksSyncState();
   const { setLinksTotal } = useLinksSyncActions();
   const { refresh: refreshFolders } = useFolders();
+  const currentFolder = useCurrentFolder();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // The search field. `?q=` (from a folder's "Search all links") seeds it.
+  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
+  // What the list is filtered by: the field, trimmed and debounced.
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchQueryRef = useRef("");
   const [groups, setGroups] = useState(initialGroups);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
@@ -85,16 +104,20 @@ export function HomeShell({
   }, [groups]);
   const reloadSeq = useRef(0);
 
-  /** Re-fetches exactly as many links as are loaded, so pages stay consistent after inserts/deletes. */
-  const reload = useCallback(async () => {
+  /**
+   * Re-fetches exactly as many links as are loaded, so pages stay consistent
+   * after inserts/deletes; `fresh` starts over from the first page (a new
+   * search). Follows the current search.
+   */
+  const reload = useCallback(async ({ fresh = false } = {}) => {
     const seq = ++reloadSeq.current;
-    const limit = Math.max(
-      countGroupedLinks(groupsRef.current),
-      HOME_LINKS_PAGE_SIZE,
-    );
+    const limit = fresh
+      ? HOME_LINKS_PAGE_SIZE
+      : Math.max(countGroupedLinks(groupsRef.current), HOME_LINKS_PAGE_SIZE);
     try {
       const params = new URLSearchParams({ limit: String(limit) });
       if (folderId) params.set("folderId", folderId);
+      if (searchQueryRef.current) params.set("q", searchQueryRef.current);
       const page = await fetchLinksPage(params);
       if (seq !== reloadSeq.current) return;
       setGroups(page.groups);
@@ -105,6 +128,47 @@ export function HomeShell({
       // Keep the current list; the next change or reload will retry.
     }
   }, [setLinksTotal, folderId]);
+
+  // The list follows the search field, a moment after typing stops.
+  useEffect(() => {
+    const next = query.trim();
+    const timer = setTimeout(() => setSearchQuery(next), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    if (searchQuery === searchQueryRef.current) return;
+    searchQueryRef.current = searchQuery;
+    void reload({ fresh: true });
+  }, [searchQuery, reload]);
+
+  // `?q=` has done its job once read: drop it so a reload or share of the
+  // URL doesn't bring back a stale search.
+  useEffect(() => {
+    if (!searchParams.has("q")) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("q");
+    window.history.replaceState(window.history.state, "", url);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When the field holds a URL: the URL to save, and whether it's already
+  // in the list.
+  const saveUrl = omniboxSaveUrl(query);
+  const alreadySaved =
+    saveUrl !== null &&
+    groups.some((group) =>
+      group.links.some((link) => isSameLinkUrl(link.url, saveUrl)),
+    );
+  const saveFromField = useCallback(() => {
+    if (!saveUrl) return;
+    // Back to the whole list first, so the new row shows where it lands.
+    setQuery("");
+    setSearchQuery("");
+    if (!requestSaveUrl(saveUrl)) {
+      toast.error("Unable to save the link yet. Try again in a moment.");
+    }
+  }, [saveUrl]);
 
   // Coming back after a while (e.g. an installed app resumed on iOS, whose
   // Realtime connection may have dropped while suspended) quietly reloads
@@ -162,6 +226,7 @@ export function HomeShell({
         cursor: nextCursor,
       });
       if (folderId) params.set("folderId", folderId);
+      if (searchQueryRef.current) params.set("q", searchQueryRef.current);
       const page = await fetchLinksPage(params);
       // A reload started meanwhile already has fresher data.
       if (seq !== reloadSeq.current) return;
@@ -285,8 +350,29 @@ export function HomeShell({
         onSaveSuccess={onSaveSuccess}
         onSaveError={onSaveError}
       />
+      <LinkOmnibox
+        value={query}
+        onChange={setQuery}
+        onSave={saveFromField}
+        saveUrl={saveUrl}
+        placeholder={
+          folderId
+            ? `Search ${currentFolder?.name ?? "this folder"} or paste a link`
+            : "Search or paste a link"
+        }
+      />
+      {saveUrl ? (
+        <OmniboxSaveRow
+          url={saveUrl}
+          alreadySaved={alreadySaved}
+          onSave={saveFromField}
+        />
+      ) : null}
       {(!groups.length || allLinksHidden) && !showSyntheticToday ? (
-        <LinkGroupEmpty inFolder={Boolean(folderId)} />
+        <LinkGroupEmpty
+          inFolder={Boolean(folderId)}
+          query={searchQuery || undefined}
+        />
       ) : (
         // Leaving the list resets the preview hover delay (see
         // link-preview-warmth); gaps between date groups don't.
@@ -342,6 +428,15 @@ export function HomeShell({
           </div>
         </div>
       )}
+      {/* A folder searches only itself; this widens it to every link. */}
+      {folderId && searchQuery ? (
+        <OmniboxSearchAllRow
+          query={searchQuery}
+          onSearchAll={() =>
+            router.push(`/home?q=${encodeURIComponent(searchQuery)}`)
+          }
+        />
+      ) : null}
     </>
   );
 }

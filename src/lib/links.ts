@@ -358,12 +358,19 @@ export const getLinksPageForCurrentUser = cache(
     cursor: string | null = null,
     withTotal = false,
     folderId?: string,
+    query?: string,
   ): Promise<LinksPage> => {
     const userId = await getCurrentUserId();
     // `total` always reflects the user's overall saved-link count (the Usage
-    // meter), regardless of `folderId` filtering the returned page.
+    // meter), regardless of `folderId` or `query` filtering the returned page.
     const [{ links, nextCursor }, total] = await Promise.all([
-      listLinksForUser(userId, { limit, cursor, contentType: null, folderId }),
+      listLinksForUser(userId, {
+        limit,
+        cursor,
+        contentType: null,
+        folderId,
+        query,
+      }),
       withTotal ? prisma.link.count({ where: { userId } }) : undefined,
     ]);
     return { links: links.map(mapRowToLink), nextCursor, total };
@@ -737,6 +744,21 @@ export const MAX_LINK_SEARCH_RESULTS = 100;
 /** Longest search query accepted (longer input is cut). */
 export const MAX_LINK_SEARCH_QUERY_LENGTH = 200;
 
+/**
+ * Prisma condition matching `query` against a link's title, domain or URL
+ * (case-insensitive), or null for a blank query. Cuts the query at
+ * `MAX_LINK_SEARCH_QUERY_LENGTH`.
+ */
+function linkQueryWhere(query: string | undefined) {
+  const text = (query ?? "").trim().slice(0, MAX_LINK_SEARCH_QUERY_LENGTH);
+  if (!text) return null;
+  return {
+    OR: (["title", "domain", "url"] as const).map((field) => ({
+      [field]: { contains: text, mode: "insensitive" as const },
+    })),
+  };
+}
+
 export type SearchLinksOptions = {
   /** Matched case-insensitively against title, domain and URL; blank lists everything. */
   query: string;
@@ -757,7 +779,6 @@ export async function searchLinksForUser(
 ): Promise<{ links: Link[]; hasMore: boolean }> {
   const { notInFolderId } = opts;
   const limit = Math.min(Math.max(Math.trunc(opts.limit), 1), MAX_LINK_SEARCH_RESULTS);
-  const query = opts.query.trim().slice(0, MAX_LINK_SEARCH_QUERY_LENGTH);
 
   if (notInFolderId !== undefined) {
     await assertFolderOwned(userId, notInFolderId);
@@ -768,13 +789,8 @@ export async function searchLinksForUser(
     // `not` alone would also drop unfiled links (SQL NULL comparison).
     and.push({ OR: [{ folderId: null }, { folderId: { not: notInFolderId } }] });
   }
-  if (query) {
-    and.push({
-      OR: (["title", "domain", "url"] as const).map((field) => ({
-        [field]: { contains: query, mode: "insensitive" as const },
-      })),
-    });
-  }
+  const matches = linkQueryWhere(opts.query);
+  if (matches) and.push(matches);
 
   const rows = await prisma.link.findMany({
     where: { userId, ...(and.length ? { AND: and } : {}) },
@@ -792,6 +808,8 @@ export type ListLinksOptions = {
   cursor: string | null;
   contentType: string | null;
   folderId?: string;
+  /** Only links whose title, domain or URL contains this (case-insensitive). */
+  query?: string;
 };
 
 export type ListLinksResult = {
@@ -830,7 +848,7 @@ export async function listLinksForUser(
   userId: string,
   opts: ListLinksOptions,
 ): Promise<ListLinksResult> {
-  const { limit, cursor, contentType, folderId } = opts;
+  const { limit, cursor, contentType, folderId, query } = opts;
 
   if (folderId !== undefined) {
     await assertFolderOwned(userId, folderId);
@@ -842,9 +860,14 @@ export async function listLinksForUser(
     folderId?: string;
     createdAt?: { lt: Date };
     OR?: ({ createdAt: { lt: Date } } | { createdAt: Date; id: { lt: string } })[];
+    AND?: object[];
   };
 
   const where: WhereInput = { userId };
+
+  // In AND: the cursor below already uses the top-level OR.
+  const matches = linkQueryWhere(query);
+  if (matches) where.AND = [matches];
 
   if (contentType) {
     where.contentType = contentType as ContentType;
