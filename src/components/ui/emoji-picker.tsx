@@ -226,7 +226,12 @@ function EmojiPickerFooter({
                   : 0;
             if (!step) return;
             event.preventDefault();
-            const index = variations.findIndex((v) => v.skinTone === skinTone);
+            // From the focused tone, not state: quick presses can arrive
+            // before React re-renders with the last one.
+            const focused = (event.target as HTMLElement).dataset.skinTone;
+            const index = variations.findIndex(
+              (v) => v.skinTone === (focused ?? skinTone),
+            );
             const next =
               variations[(index + step + variations.length) % variations.length];
             setSkinTone(next.skinTone);
