@@ -55,6 +55,13 @@ export function SharedFolderList({
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [loadingMore, setLoadingMore] = useState(false);
   const view = useSharedFolderView();
+  // Masonry needs measured cards, which only exist in the browser: the
+  // server's HTML (and the first paint before hydration) shows the cards in
+  // plain rows, and the grid switches to masonry before the next paint.
+  const [masonry, setMasonry] = useState(false);
+  useLayoutEffect(() => {
+    if (view === "grid") setMasonry(true);
+  }, [view]);
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
@@ -133,10 +140,14 @@ export function SharedFolderList({
           // gap: each card spans its own height (see MasonryItem), so a
           // short card sits right under the one above it. DOM order stays
           // newest first, left to right, for keyboard and screen readers.
-          className={cn("grid w-full auto-rows-[1px]", SHARED_GRID_COLUMNS)}
+          className={cn(
+            "grid w-full",
+            masonry ? "auto-rows-[1px]" : "items-start",
+            SHARED_GRID_COLUMNS,
+          )}
         >
           {links.map((link, index) => (
-            <MasonryItem key={link.id}>
+            <MasonryItem key={link.id} masonry={masonry}>
               <SharedLinkCard link={link} eagerThumbnail={index < 4} />
             </MasonryItem>
           ))}
@@ -144,7 +155,7 @@ export function SharedFolderList({
               the new cards will land. */}
           {loadingMore
             ? Array.from({ length: LOAD_MORE_CARDS }, (_, index) => (
-                <MasonryItem key={`loading-${index}`}>
+                <MasonryItem key={`loading-${index}`} masonry={masonry}>
                   <SharedLinkCardSkeleton />
                 </MasonryItem>
               ))
@@ -199,9 +210,16 @@ export function SharedFolderList({
  * A grid cell that spans as many 1px rows as its card is tall, plus the
  * vertical gutter (its bottom padding, the same as the column gap: 16px,
  * 40px from md). Measured before paint and again whenever the card
- * resizes (fonts, a title rewrapping).
+ * resizes (fonts, a title rewrapping). Before `masonry` is on, the cell is
+ * a plain grid row (its padding is still the gutter).
  */
-function MasonryItem({ children }: { children: ReactNode }) {
+function MasonryItem({
+  masonry,
+  children,
+}: {
+  masonry: boolean;
+  children: ReactNode;
+}) {
   const [span, setSpan] = useState<number | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -218,9 +236,12 @@ function MasonryItem({ children }: { children: ReactNode }) {
   }, []);
   return (
     <li
-      // Hidden until measured, so cards never paint stacked on each other.
-      className={span === null ? "invisible" : undefined}
-      style={span === null ? undefined : { gridRowEnd: `span ${span}` }}
+      // In masonry, hidden until measured so cards never paint stacked on
+      // each other (a card added later is measured before its first paint).
+      className={masonry && span === null ? "invisible" : undefined}
+      style={
+        masonry && span !== null ? { gridRowEnd: `span ${span}` } : undefined
+      }
     >
       <div ref={boxRef} className="pb-4 md:pb-10">
         {children}

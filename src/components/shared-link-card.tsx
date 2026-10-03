@@ -32,14 +32,17 @@ export function SharedLinkCard({
         link={link}
         thumbnailSrc={thumbnailSrc}
         eagerThumbnail={eagerThumbnail}
-        className="aspect-[16/10] rounded-none"
+        // The card's border is the image's edge here: drop the thumbnail's
+        // own 1px outline so the edge isn't doubled.
+        className="aspect-[16/10] rounded-none [&_img]:outline-0"
       />
       <span className="grid grid-cols-[16px_minmax(0,1fr)] gap-x-2 gap-y-1 p-3 md:gap-x-3 md:p-4">
         {/* Centered on the title's first line: a box one title line tall
             (text-sm leading-normal, so 1lh = that line), nudged 1px down
             to the lowercase letters' middle, where the eye reads it. */}
         <span className="flex h-[1lh] translate-y-px items-center text-sm leading-normal">
-          <span className="flex size-4 items-center justify-center overflow-hidden *:size-4">
+          {/* Favicons get a faint 1px edge so dark ones read on the card. */}
+          <span className="flex size-4 items-center justify-center overflow-hidden *:size-4 [&>img]:outline [&>img]:-outline-offset-1 [&>img]:outline-black/10 dark:[&>img]:outline-white/10">
             <LinkIcon link={link} size="small" />
           </span>
         </span>

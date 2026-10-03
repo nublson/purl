@@ -23,6 +23,12 @@ import { Switch } from "./ui/switch";
 /** How long the copy button shows its check. */
 const COPIED_MS = 1500;
 
+/** Icon cross-fade (scale 0.25→1, opacity 0→1, blur 4px→0). */
+const ICON_SWAP =
+  "transition-[opacity,scale,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)]";
+const ICON_IN = "scale-100 opacity-100 blur-0";
+const ICON_OUT = "scale-25 opacity-0 blur-[4px]";
+
 /**
  * The header's Share button on a folder page (lock when private, globe when
  * public) and its popover: a Public switch and the folder's public link
@@ -90,11 +96,22 @@ export function FolderSharePopover() {
           aria-haspopup="dialog"
           className="cursor-pointer"
         >
-          {isPublic ? (
-            <Globe data-icon="inline-start" />
-          ) : (
-            <Lock data-icon="inline-start" />
-          )}
+          {/* Lock and globe cross-fade (same recipe as the copy button);
+              the label swaps instantly. */}
+          <span data-icon="inline-start" className="relative flex size-4">
+            <Lock
+              aria-hidden
+              className={cn(ICON_SWAP, isPublic ? ICON_OUT : ICON_IN)}
+            />
+            <Globe
+              aria-hidden
+              className={cn(
+                "absolute inset-0",
+                ICON_SWAP,
+                isPublic ? ICON_IN : ICON_OUT,
+              )}
+            />
+          </span>
           {isPublic ? "Public" : "Share"}
         </Button>
       </PopoverTrigger>
@@ -145,22 +162,17 @@ export function FolderSharePopover() {
               disabled={!isPublic}
               aria-label={copied ? "Link copied" : "Copy link"}
               onClick={() => void copyLink()}
-              className="relative cursor-pointer text-muted-foreground"
+              // Concentric with the field: its radius minus the 4px inset.
+              className="relative cursor-pointer rounded-[calc(var(--radius-md)-4px)] text-muted-foreground"
             >
-              {/* Cross-fade (better-ui icon recipe): both icons stay mounted. */}
+              {/* Cross-fade: both icons stay mounted. */}
               <Copy
                 aria-hidden
-                className={cn(
-                  "transition-[opacity,scale,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)]",
-                  copied ? "scale-25 opacity-0 blur-[4px]" : "scale-100 opacity-100 blur-0",
-                )}
+                className={cn(ICON_SWAP, copied ? ICON_OUT : ICON_IN)}
               />
               <Check
                 aria-hidden
-                className={cn(
-                  "absolute transition-[opacity,scale,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)]",
-                  copied ? "scale-100 opacity-100 blur-0" : "scale-25 opacity-0 blur-[4px]",
-                )}
+                className={cn("absolute", ICON_SWAP, copied ? ICON_IN : ICON_OUT)}
               />
             </Button>
           </div>
