@@ -88,7 +88,8 @@ export function OmniboxSaveRow({
   return (
     <div
       data-cy="omnibox-save-row"
-      className="grid h-12 w-full grid-cols-[20px_1fr_auto] items-center gap-4 rounded-md p-2"
+      // Same hover as a saved row (instant, like the list's).
+      className="grid h-12 w-full grid-cols-[20px_1fr_auto] items-center gap-4 rounded-md p-2 transition-none hover:bg-accent/40"
     >
       <Typography
         component="span"
