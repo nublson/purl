@@ -140,19 +140,26 @@ export function OmniboxSaveRow({
       {/* The row's cue, drawn as a button: primary for the one thing this
           not-yet-saved row is for; outline when it's already saved and
           saving again only refreshes it. */}
+      {/* A 24px button centred in the 32px slot a saved row's ⋯ menu takes,
+          so the two line up down the list. */}
       <Typography
         component="span"
         aria-hidden
-        className={cn(
-          buttonVariants({
-            variant: alreadySaved ? "outline" : "default",
-            size: "icon-sm",
-          }),
-          // Press feedback lives on the +: scaling the whole row would look wrong.
-          "pointer-events-none ease-out-strong group-active/save:scale-[0.96]",
-        )}
+        className="flex size-8 items-center justify-center"
       >
-        <Plus />
+        <Typography
+          component="span"
+          className={cn(
+            buttonVariants({
+              variant: alreadySaved ? "outline" : "default",
+              size: "icon-xs",
+            }),
+            // Press feedback lives on the +: scaling the whole row would look wrong.
+            "pointer-events-none ease-out-strong group-active/save:scale-[0.96]",
+          )}
+        >
+          <Plus />
+        </Typography>
       </Typography>
     </button>
   );
