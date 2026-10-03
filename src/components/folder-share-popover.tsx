@@ -159,7 +159,9 @@ export function FolderSharePopover() {
             <Button
               variant="ghost"
               size="icon-sm"
-              disabled={!isPublic}
+              // Only once sharing is saved: the switch moves right away, but
+              // the link works only after the server confirms.
+              disabled={!folder.isPublic || saving}
               aria-label={copied ? "Link copied" : "Copy link"}
               onClick={() => void copyLink()}
               // Concentric with the field: its radius minus the 4px inset.

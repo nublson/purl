@@ -38,6 +38,8 @@ const CARD_ARRIVE = cn(
 );
 import { useSharedFolderView } from "./shared-folder-view";
 import { SharedLinkItem } from "./shared-link-item";
+import { Typography } from "./typography";
+import { Button } from "./ui/button";
 import {
   Empty,
   EmptyDescription,
@@ -94,14 +96,28 @@ export function SharedFolderList({
     if (view === "grid") setMasonry(true);
   }, [view]);
 
+  // A failed page stops loading by scroll: retrying on its own would
+  // re-request while the sentinel stays in view (and spend the visitor's
+  // rate limit on a 429). 404: the folder is gone or private now, so there's
+  // nothing more to load. Anything else offers "Try again".
+  const [loadFailed, setLoadFailed] = useState(false);
+
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
     setLoadingMore(true);
+    setLoadFailed(false);
     try {
       const response = await fetch(
         `${apiPath}?cursor=${encodeURIComponent(nextCursor)}`,
       );
-      if (!response.ok) return;
+      if (response.status === 404) {
+        setNextCursor(null);
+        return;
+      }
+      if (!response.ok) {
+        setLoadFailed(true);
+        return;
+      }
       const page = (await response.json()) as {
         links: PublicLink[];
         nextCursor: string | null;
@@ -116,7 +132,7 @@ export function SharedFolderList({
       });
       setNextCursor(page.nextCursor);
     } catch {
-      // Sentinel stays visible; scrolling again retries.
+      setLoadFailed(true);
     } finally {
       setLoadingMore(false);
     }
@@ -125,7 +141,7 @@ export function SharedFolderList({
   const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const sentinel = sentinelRef.current;
-    if (!sentinel || !nextCursor) return;
+    if (!sentinel || !nextCursor || loadFailed) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) void loadMore();
@@ -134,7 +150,7 @@ export function SharedFolderList({
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
-  }, [nextCursor, loadMore]);
+  }, [nextCursor, loadMore, loadFailed]);
 
   useEffect(() => coolPreviews, []);
 
@@ -248,7 +264,7 @@ export function SharedFolderList({
         role="status"
         className={cn(
           "relative flex w-full items-center justify-center text-muted-foreground",
-          view === "grid" ? "h-0" : "mt-8 h-10",
+          view === "grid" && !loadFailed ? "h-0" : "mt-8 h-10",
         )}
       >
         {nextCursor && (
@@ -265,6 +281,20 @@ export function SharedFolderList({
             ) : null}
             <span className="sr-only">Loading more links</span>
           </>
+        ) : loadFailed ? (
+          <span className="flex items-center gap-2">
+            <Typography component="span" size="small">
+              Unable to load more links.
+            </Typography>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="cursor-pointer"
+              onClick={() => void loadMore()}
+            >
+              Try again
+            </Button>
+          </span>
         ) : null}
       </div>
     </div>

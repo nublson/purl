@@ -178,6 +178,40 @@ test.describe("Shared folders, visited signed out", () => {
     await expect.poll(arrivals).toBeGreaterThan(0);
   });
 
+  test("a failed page stops loading more until Try again", async ({ page, seed, testUser }) => {
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    for (let i = 0; i < 51; i++) {
+      await seed.link({ url: `https://f${i}.example`, title: `Fail ${i}`, folderId: design });
+    }
+    let requests = 0;
+    let fail = true;
+    await page.route("**/api/public/folders/**", async (route) => {
+      requests += 1;
+      if (fail) await route.fulfill({ status: 429, body: "{}" });
+      else await route.continue();
+    });
+
+    await page.goto(`/@${testUser.username}/design`);
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(50);
+    await waitForHydration(page, 'button[aria-label="Grid view"]');
+    // The page scrolls inside <main>; off-screen rows skip rendering
+    // (content-visibility), which WebKit's scrollIntoView won't reach.
+    await page.evaluate(() => {
+      const main = document.querySelector("main")!;
+      main.scrollTop = main.scrollHeight;
+    });
+    const retry = page.getByRole("button", { name: "Try again" });
+    await expect(retry).toBeVisible();
+    // No retries on its own while the sentinel stays in view.
+    await page.waitForTimeout(500);
+    expect(requests).toBe(1);
+
+    fail = false;
+    await retry.click();
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(51);
+    await expect(retry).toHaveCount(0);
+  });
+
   test("a private or missing folder is a 404, and so is an unknown user", async ({
     page,
     seed,
@@ -303,8 +337,18 @@ test.describe("Share popover", () => {
 
     const visitor = await page.context().browser()!.newContext();
     try {
+      // While sharing is still saving, the switch shows on but Copy waits
+      // for the server.
+      let release!: () => void;
+      const held = new Promise<void>((resolve) => (release = resolve));
+      await page.route("**/api/folders/*", async (route) => {
+        if (route.request().method() === "PATCH") await held;
+        await route.continue();
+      });
       await dialog.getByRole("switch", { name: "Public" }).click();
       await expect(dialog.getByRole("switch", { name: "Public" })).toBeChecked();
+      await expect(copy).toBeDisabled();
+      release();
       await expect(copy).toBeEnabled();
       await expect(page.getByRole("button", { name: "Public, sharing settings" })).toBeVisible();
       // The switch is its own confirmation: no toast.
