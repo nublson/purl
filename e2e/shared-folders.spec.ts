@@ -42,7 +42,7 @@ test.describe("Shared folders, visited signed out", () => {
     await expect(page.getByText("Things I keep coming back to")).toBeVisible();
     // Footer: who shared it, and Made with Purl (links home).
     const footer = page.locator("footer");
-    await expect(footer).toContainText("Shared by");
+    await expect(footer).toContainText("by");
     await expect(footer).toContainText(`@${testUser.username}`);
     await expect(footer.getByRole("link", { name: "Purl", exact: true })).toHaveAttribute(
       "href",

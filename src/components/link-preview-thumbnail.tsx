@@ -42,8 +42,8 @@ export function LinkPreviewThumbnail({
       )}
     >
       {showThumb && thumbnailSrc ? (
-        // eslint-disable-next-line @next/next/no-img-element -- user-controlled OG URLs; avoid next/image optimizer SSRF
-        <img
+        <FadeInImg
+          key={thumbnailSrc}
           src={thumbnailSrc}
           alt=""
           width={200}
@@ -55,8 +55,8 @@ export function LinkPreviewThumbnail({
           className="absolute inset-0 h-full w-full object-cover outline outline-black/10 -outline-offset-1 dark:outline-white/10"
         />
       ) : showFavicon && faviconSrc ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <FadeInImg
+          key={faviconSrc}
           src={faviconSrc}
           alt=""
           width={64}
@@ -74,5 +74,39 @@ export function LinkPreviewThumbnail({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * A remote image that fades in (150ms, opacity only) once it has loaded,
+ * over the tinted box behind it, instead of popping into an empty gap.
+ */
+function FadeInImg({
+  className,
+  onError,
+  ...props
+}: React.ImgHTMLAttributes<HTMLImageElement> & { src: string }) {
+  const [loaded, setLoaded] = React.useState(false);
+  const imgRef = React.useRef<HTMLImageElement>(null);
+  // An image that finished before hydration never fires onLoad for React.
+  React.useEffect(() => {
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      setLoaded(true);
+    }
+  }, []);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- user-controlled OG URLs; avoid next/image optimizer SSRF
+    <img
+      ref={imgRef}
+      alt=""
+      {...props}
+      onLoad={() => setLoaded(true)}
+      onError={onError}
+      className={cn(
+        "transition-opacity duration-150 ease-out",
+        loaded ? "opacity-100" : "opacity-0",
+        className,
+      )}
+    />
   );
 }

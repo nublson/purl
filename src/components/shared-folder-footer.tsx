@@ -7,10 +7,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 /**
  * A shared folder's footer, fixed at the bottom so it's in view however
- * long the list: "Shared by [avatar] @username · Made with [logo] Purl",
- * over the search field's band of page background, so links fade away
- * underneath. Each mark sits inline
- * before its name, sized to the text; a long username truncates.
+ * long the list: "by [avatar] @username · Made with [logo] Purl", over the
+ * search field's band of page background, so links fade away underneath.
+ * Each mark sits inline before its name, sized to the text; a long
+ * username truncates.
  */
 export function SharedFolderFooter({ owner }: { owner: PublicOwner }) {
   return (
@@ -19,14 +19,14 @@ export function SharedFolderFooter({ owner }: { owner: PublicOwner }) {
       <footer
         // A 44px row in the search field's spot, so the band is solid
         // exactly up to its top.
-        className="fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-30 mx-auto flex h-11 w-fit max-w-[calc(100%-2rem)] items-center"
+        className="fixed inset-x-0 bottom-[calc(1rem+var(--bottom-inset))] z-30 mx-auto flex h-11 w-fit max-w-[calc(100%-2rem)] items-center"
       >
         <Typography
           component="p"
           size="mini"
           className="flex min-w-0 items-center gap-x-1.5 whitespace-nowrap"
         >
-          Shared by
+          by
           <Typography
             component="span"
             size="mini"

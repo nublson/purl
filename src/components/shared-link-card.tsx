@@ -42,7 +42,7 @@ export function SharedLinkCard({
             to the lowercase letters' middle, where the eye reads it. */}
         <span className="flex h-[1lh] translate-y-px items-center text-sm leading-normal">
           {/* Favicons get a faint 1px edge so dark ones read on the card. */}
-          <span className="flex size-4 items-center justify-center overflow-hidden *:size-4 [&>img]:outline [&>img]:-outline-offset-1 [&>img]:outline-black/10 dark:[&>img]:outline-white/10">
+          <span className="flex size-4 items-center justify-center overflow-hidden *:size-4 [&_img]:outline [&_img]:-outline-offset-1 [&_img]:outline-black/10 dark:[&_img]:outline-white/10">
             <LinkIcon link={link} size="small" />
           </span>
         </span>

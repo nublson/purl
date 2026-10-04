@@ -204,7 +204,7 @@ export function LinkSelectionBar({
             transition={{ duration: 0.2, ease: EASE_OUT_STRONG }}
             className={cn(
               // Stacked on the search field: its 1rem + 44px + an 8px gap.
-              "fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-1 rounded-xl bg-popover p-1 text-popover-foreground",
+              "fixed inset-x-0 bottom-[calc(4.25rem+var(--bottom-inset))] z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-1 rounded-xl bg-popover p-1 text-popover-foreground",
               // Elevation from layered shadows; the 1px ring is the edge.
               "shadow-[0_0_0_1px_var(--border),0_2px_4px_-1px_oklch(0_0_0/0.12),0_8px_24px_-4px_oklch(0_0_0/0.24)]",
             )}
