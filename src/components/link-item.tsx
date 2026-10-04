@@ -21,6 +21,7 @@ import { formatDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
+import { FolderTag, useFolderTag } from "./folder-tag";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
 import { LinkSwipeRow } from "./link-swipe-row";
@@ -87,6 +88,7 @@ export const LinkItem = React.forwardRef<
   const isPhone = useIsPhone();
   // Read links stay in the list, faded back: opening one marks it read.
   const read = useIsLinkRead(link);
+  const folderTag = useFolderTag(link);
   const markOpened = () => {
     if (!read) void setLinksRead([link.id], true);
   };
@@ -380,6 +382,9 @@ export const LinkItem = React.forwardRef<
           >
             {formatDomain(link.domain)}
           </Typography>
+          {/* Home, with folder tags on: the link's folder, after the domain
+              (after the title on phones, which hide the domain). */}
+          {folderTag ? <FolderTag folder={folderTag} /> : null}
         </ItemTitle>
       </ItemContent>
       {/* Stays in the layout while selecting (hidden and inert): its 32px

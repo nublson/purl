@@ -1,30 +1,45 @@
 import "server-only";
 
-import { linkViewFromDb, linkViewToDb, type LinkView } from "@/lib/link-view";
+import {
+  DEFAULT_LAYOUT,
+  linkViewFromDb,
+  linkViewToDb,
+  type LayoutPrefs,
+} from "@/lib/link-view";
 import { prisma } from "@/lib/prisma";
 import { cache } from "react";
 
 /**
- * The user's saved view, read fresh from the database (the session's
- * cookie cache can be minutes old, and another device may have changed
- * it). Deduplicated per request.
+ * The user's saved layout (view, folder tags), read fresh from the
+ * database (the session's cookie cache can be minutes old, and another
+ * device may have changed it). Deduplicated per request.
  */
-export const getLinkViewForUser = cache(
-  async (userId: string): Promise<LinkView> => {
+export const getLayoutForUser = cache(
+  async (userId: string): Promise<LayoutPrefs> => {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { linkView: true },
+      select: { linkView: true, showFolderTags: true },
     });
-    return user ? linkViewFromDb(user.linkView) : "list";
+    if (!user) return DEFAULT_LAYOUT;
+    return {
+      view: linkViewFromDb(user.linkView),
+      folderTags: user.showFolderTags,
+    };
   },
 );
 
-export async function setLinkViewForUser(
+/** Saves the given layout settings (the others stay as they are). */
+export async function setLayoutForUser(
   userId: string,
-  view: LinkView,
+  change: Partial<LayoutPrefs>,
 ): Promise<void> {
   await prisma.user.update({
     where: { id: userId },
-    data: { linkView: linkViewToDb(view) },
+    data: {
+      ...(change.view ? { linkView: linkViewToDb(change.view) } : {}),
+      ...(change.folderTags !== undefined
+        ? { showFolderTags: change.folderTags }
+        : {}),
+    },
   });
 }

@@ -14,13 +14,13 @@ vi.mock("@/lib/prisma", () => ({
 const { PATCH } = await import("./route");
 
 function patchRequest(body: unknown) {
-  return new NextRequest("http://localhost/api/user/link-view", {
+  return new NextRequest("http://localhost/api/user/layout", {
     method: "PATCH",
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 }
 
-describe("PATCH /api/user/link-view", () => {
+describe("PATCH /api/user/layout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetBrowserSessionUserId.mockResolvedValue("user-1");
@@ -36,11 +36,24 @@ describe("PATCH /api/user/link-view", () => {
     });
   });
 
-  it("rejects anything but list or grid", async () => {
-    const res = await PATCH(patchRequest({ view: "cards" }));
-    expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ code: "INVALID_VIEW" });
-    expect((await PATCH(patchRequest("nope"))).status).toBe(400);
+  it("saves folder tags, alone or with the view", async () => {
+    await PATCH(patchRequest({ folderTags: true }));
+    expect(mockUpdate).toHaveBeenLastCalledWith({
+      where: { id: "user-1" },
+      data: { showFolderTags: true },
+    });
+    await PATCH(patchRequest({ view: "list", folderTags: false }));
+    expect(mockUpdate).toHaveBeenLastCalledWith({
+      where: { id: "user-1" },
+      data: { linkView: "LIST", showFolderTags: false },
+    });
+  });
+
+  it("rejects an empty or invalid change", async () => {
+    for (const body of [{}, { view: "cards" }, { folderTags: "yes" }, "nope"]) {
+      const res = await PATCH(patchRequest(body));
+      expect(res.status).toBe(400);
+    }
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 

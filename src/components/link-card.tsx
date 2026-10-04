@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
+import { FolderTag, useFolderTag } from "./folder-tag";
 import { LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
 import { Checkbox } from "./ui/checkbox";
 
@@ -53,6 +54,7 @@ export function LinkCard({
   const selecting = useIsSelectionActive();
   const selected = useIsLinkSelected(link.id);
   const read = useIsLinkRead(link);
+  const folderTag = useFolderTag(link);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const { handlers: longPress, consumeLongPress } = useLongPress(() =>
     linkSelection.toggle(link.id),
@@ -108,6 +110,7 @@ export function LinkCard({
           link={link}
           eagerThumbnail={eagerThumbnail}
           read={read}
+          tag={folderTag ? <FolderTag folder={folderTag} /> : null}
         />
       </div>
       <Checkbox

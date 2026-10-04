@@ -6,6 +6,35 @@
  */
 export type LinkView = "list" | "grid";
 
+/**
+ * The owner's layout settings, saved on the account: the view, and whether
+ * Home tags each link with its folder (`User.showFolderTags`, off by
+ * default).
+ */
+export type LayoutPrefs = { view: LinkView; folderTags: boolean };
+
+export const DEFAULT_LAYOUT: LayoutPrefs = { view: "list", folderTags: false };
+
+/**
+ * A layout change from a request body: `view` and/or `folderTags`, at
+ * least one, each valid; null otherwise.
+ */
+export function parseLayoutChange(body: unknown): Partial<LayoutPrefs> | null {
+  if (body === null || typeof body !== "object") return null;
+  const record = body as { view?: unknown; folderTags?: unknown };
+  const change: Partial<LayoutPrefs> = {};
+  if ("view" in record) {
+    const view = parseLinkView(record.view);
+    if (!view) return null;
+    change.view = view;
+  }
+  if ("folderTags" in record) {
+    if (typeof record.folderTags !== "boolean") return null;
+    change.folderTags = record.folderTags;
+  }
+  return Object.keys(change).length > 0 ? change : null;
+}
+
 /** A request body's or a stored value's view; anything else is invalid. */
 export function parseLinkView(value: unknown): LinkView | null {
   return value === "list" || value === "grid" ? value : null;

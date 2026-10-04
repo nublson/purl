@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
@@ -49,10 +50,13 @@ export function LinkCardContent({
   link,
   eagerThumbnail = false,
   read = false,
+  tag,
 }: {
   link: LinkType;
   eagerThumbnail?: boolean;
   read?: boolean;
+  /** Under the domain (the owner's grid: the link's folder tag). */
+  tag?: ReactNode;
 }) {
   const thumbnailSrc = link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
   return (
@@ -100,6 +104,7 @@ export function LinkCardContent({
         >
           {formatDomain(link.domain)}
         </Typography>
+        {tag ? <span className="col-start-2 mt-1 flex">{tag}</span> : null}
       </span>
     </>
   );

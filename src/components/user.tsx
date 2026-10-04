@@ -20,7 +20,7 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import { UserItem } from "./user-item";
-import { ViewModeMenu } from "./view-mode-menu";
+import { FolderTagsMenuItem, ViewModeMenu } from "./view-mode-menu";
 
 export function User() {
   const { user } = useCurrentUser();
@@ -110,6 +110,7 @@ export function User() {
             Layout
           </DropdownMenuLabel>
           <ViewModeMenu />
+          <FolderTagsMenuItem />
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>

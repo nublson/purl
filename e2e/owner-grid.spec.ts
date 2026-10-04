@@ -24,7 +24,7 @@ async function chooseView(page: Page, view: "List" | "Grid") {
   await openViewMode(page);
   const item = page.getByRole("menuitemradio", { name: view });
   const saved = page.waitForResponse(
-    (res) => res.url().endsWith("/api/user/link-view") && res.request().method() === "PATCH",
+    (res) => res.url().endsWith("/api/user/layout") && res.request().method() === "PATCH",
   );
   await item.click();
   expect((await saved).ok()).toBe(true);
@@ -99,5 +99,45 @@ test.describe("Owner grid view", () => {
     await page.getByRole("menuitem", { name: "Delete" }).click();
     await expect(card(page, "Bravo")).toHaveCount(0);
     await expect(page.getByText("Link deleted")).toBeVisible();
+  });
+
+  test("Folder tags show each link's folder on Home, saved on the account", async ({ page, seed }, testInfo) => {
+    const reading = await seed.folder({ name: "Reading", slug: "reading", emoji: "📚" });
+    await seed.link({ url: "https://alpha.example", title: "Alpha", folderId: reading });
+    await seed.link({ url: "https://bravo.example", title: "Bravo" });
+    await openHome(page);
+    const tags = page.locator('[data-cy="folder-tag"]');
+    await expect(tags).toHaveCount(0);
+
+    // On: the menu stays open, and the filed link gets its folder's tag.
+    await page.getByRole("button", { name: "Account menu" }).click();
+    const toggle = page.getByRole("menuitemcheckbox", { name: "Folder tags" });
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    const saved = page.waitForResponse(
+      (res) => res.url().endsWith("/api/user/layout") && res.request().method() === "PATCH",
+    );
+    await toggle.click();
+    expect((await saved).ok()).toBe(true);
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    await page.keyboard.press("Escape");
+    await expect(tags).toHaveCount(1);
+    await expect(page.locator('[data-cy="link-item"]').filter({ hasText: "Alpha" })).toContainText("Reading");
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: testInfo.outputPath("tags-list.png") });
+
+    // Saved: still on after a reload, in the grid too.
+    await page.reload();
+    await waitForHydration(page, '[data-cy="link-item"]');
+    await expect(tags).toHaveCount(1);
+    await chooseView(page, "Grid");
+    await expect(card(page, "Alpha").locator('[data-cy="folder-tag"]')).toHaveCount(1);
+    await page.mouse.move(0, 0);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: testInfo.outputPath("tags-grid.png") });
+
+    // A folder page shows no tags: every link there is in that folder.
+    await page.goto("/folders/reading");
+    await waitForHydration(page, '[data-cy="link-card"]');
+    await expect(tags).toHaveCount(0);
   });
 });

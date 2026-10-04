@@ -41,6 +41,8 @@ model User {
   usernameRedirects UsernameRedirect[]
   /// How the user's lists show links (Home, folders): rows or a grid of cards.
   linkView      LinkView  @default(LIST)
+  /// Whether Home tags each link with its folder (emoji and name).
+  showFolderTags Boolean  @default(false)
 
   @@unique([email])
   @@map("users")
