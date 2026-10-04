@@ -1,5 +1,9 @@
-import type { SharedFolderView } from "@/lib/shared-folder-view";
+import {
+  SHARED_GRID_COLUMNS,
+  type SharedFolderView,
+} from "@/lib/shared-folder-view";
 import { cn } from "@/lib/utils";
+import { SharedFolderDescription } from "../shared-folder-description";
 import { Typography } from "../typography";
 import { Skeleton } from "../ui/skeleton";
 
@@ -8,9 +12,6 @@ const ROW_TITLE_WIDTHS = ["w-2/5", "w-3/5", "w-1/3", "w-1/2", "w-2/5", "w-3/5"];
 /** Placeholder cards on first load: two rows at four columns. */
 const FIRST_LOAD_CARDS = 8;
 
-/** Grid columns and gutters, shared with the real grid (shared-folder-list). */
-export const SHARED_GRID_COLUMNS =
-  "grid-cols-[repeat(2,minmax(0,210px))] justify-center gap-x-4 md:grid-cols-[repeat(3,minmax(0,210px))] md:gap-x-10 lg:grid-cols-[repeat(4,minmax(0,210px))]";
 
 /**
  * A grid card while it loads: the real card's frame, thumbnail box and
@@ -36,7 +37,14 @@ export function SharedLinkCardSkeleton() {
  * The shared folder page while it loads, in the visitor's view: rows like
  * the list, or a grid of card placeholders.
  */
-export function SharedFolderSkeleton({ view }: { view: SharedFolderView }) {
+export function SharedFolderSkeleton({
+  view,
+  description,
+}: {
+  view: SharedFolderView;
+  /** Shown as it will be, so the rows don't shift when the links arrive. */
+  description: string | null;
+}) {
   return (
     <div
       aria-busy
@@ -48,6 +56,7 @@ export function SharedFolderSkeleton({ view }: { view: SharedFolderView }) {
       <Typography component="span" className="sr-only" role="status">
         Loading links
       </Typography>
+      <SharedFolderDescription description={description} view={view} />
       {view === "grid" ? (
         <div className={cn("grid w-full gap-y-4 md:gap-y-10", SHARED_GRID_COLUMNS)}>
           {Array.from({ length: FIRST_LOAD_CARDS }, (_, index) => (

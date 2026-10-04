@@ -112,7 +112,10 @@ export default async function SharedFolderPage({
           <SharedFolderViewToggle />
         </div>
       </header>
-      <Suspense fallback={<SharedFolderSkeleton view={initialView} />}>
+      <Suspense fallback={<SharedFolderSkeleton
+            view={initialView}
+            description={folder.description}
+          />}>
         <SharedFolderLinks
           ids={page.ids}
           apiPath={`/api/public/folders/${owner.username}/${folder.slug}`}

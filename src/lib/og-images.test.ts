@@ -1,14 +1,46 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/safe-outbound-fetch", () => ({
+// Only the network call is faked; the real byte-limited reader runs.
+vi.mock("@/lib/safe-outbound-fetch", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/safe-outbound-fetch")>()),
   safeFetch: vi.fn(),
 }));
 
 import { fetchImageAsDataUrl, OG_REMOTE_IMAGE_MAX_BYTES } from "@/lib/og-images";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
 import sharp from "sharp";
+import { crc32 } from "node:zlib";
 
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
+/** A real (tiny) PNG: every image is decoded-checked before use. */
+const PNG = new Uint8Array(
+  await sharp({ create: { width: 4, height: 4, channels: 3, background: "#123456" } })
+    .png()
+    .toBuffer(),
+);
+/** Just a PNG signature and header chunk claiming `width`×`height`. */
+function pngHeader(width: number, height: number) {
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr.set([8, 2, 0, 0, 0], 8); // 8-bit RGB
+  const type = Buffer.from("IHDR");
+  const length = Buffer.alloc(4);
+  length.writeUInt32BE(13);
+  const crc = Buffer.alloc(4);
+  crc.writeUInt32BE(crc32(Buffer.concat([type, ihdr])));
+  return new Uint8Array(
+    Buffer.concat([
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      length,
+      type,
+      ihdr,
+      crc,
+    ]),
+  );
+}
+
+/** Bytes that only claim to be an image. */
+const NOT_AN_IMAGE = new Uint8Array([0x3c, 0x68, 0x74, 0x6d, 0x6c, 0x3e]);
 
 function image(type: string, body: Uint8Array = PNG, status = 200) {
   return new Response(body as BodyInit, { status, headers: { "content-type": type } });
@@ -59,8 +91,40 @@ describe("fetchImageAsDataUrl", () => {
     expect(width).toBe(480);
   });
 
+  it("checks every image: the bytes decide, and the pixel cap holds", async () => {
+    // Labelled PNG, but HTML: rejected even though it's small.
+    vi.mocked(safeFetch).mockResolvedValueOnce(image("image/png", NOT_AN_IMAGE));
+    expect(await fetchImageAsDataUrl("https://a.example/fake.png")).toBeNull();
+    // Labelled JPEG, really a PNG: inlined as what it is.
+    vi.mocked(safeFetch).mockResolvedValueOnce(image("image/jpeg"));
+    expect(await fetchImageAsDataUrl("https://a.example/mislabelled.jpg")).toMatch(
+      /^data:image\/png;base64,/,
+    );
+    // A few bytes claiming 10000×10000 (over the 40M-pixel cap): rejected
+    // from the header alone.
+    vi.mocked(safeFetch).mockResolvedValueOnce(image("image/png", pngHeader(10_000, 10_000)));
+    expect(await fetchImageAsDataUrl("https://a.example/bomb.png")).toBeNull();
+  });
+
+  it("stops reading past the cap when Content-Length is missing", async () => {
+    let pulled = 0;
+    const chunk = new Uint8Array(1024 * 1024);
+    const endless = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        controller.enqueue(chunk);
+      },
+    });
+    vi.mocked(safeFetch).mockResolvedValue(
+      new Response(endless, { headers: { "content-type": "image/png" } }),
+    );
+    expect(await fetchImageAsDataUrl("https://a.example/endless.png")).toBeNull();
+    // 6MB cap in 1MB chunks: it gave up around the 7th, not at the end.
+    expect(pulled).toBeLessThan(10);
+  });
+
   it("skips what it can't convert or draw, errors and failures", async () => {
-    vi.mocked(safeFetch).mockResolvedValueOnce(image("image/webp"));
+    vi.mocked(safeFetch).mockResolvedValueOnce(image("image/webp", NOT_AN_IMAGE));
     expect(await fetchImageAsDataUrl("https://a.example/broken.webp")).toBeNull();
     vi.mocked(safeFetch).mockResolvedValueOnce(image("image/svg+xml"));
     expect(await fetchImageAsDataUrl("https://a.example/a.svg")).toBeNull();

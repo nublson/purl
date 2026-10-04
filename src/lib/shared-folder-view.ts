@@ -13,3 +13,11 @@ export function parseSharedFolderView(
 ): SharedFolderView {
   return value === "grid" ? "grid" : "list";
 }
+
+/**
+ * The shared folder grid's columns and gutters (2 / 3 / 4 columns of cards
+ * up to 210px, 16px gutters widening to 40px from md), shared by the grid,
+ * its skeleton and the description above it.
+ */
+export const SHARED_GRID_COLUMNS =
+  "grid-cols-[repeat(2,minmax(0,210px))] justify-center gap-x-4 md:grid-cols-[repeat(3,minmax(0,210px))] md:gap-x-10 lg:grid-cols-[repeat(4,minmax(0,210px))]";

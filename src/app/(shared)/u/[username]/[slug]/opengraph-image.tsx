@@ -65,6 +65,8 @@ const LOGO_SVG = `data:image/svg+xml;base64,${Buffer.from(
 ).toString("base64")}`;
 
 type FontWeight = 400 | 500 | 600;
+/** How long the font download may take before the preview goes without. */
+const FONT_TIMEOUT_MS = 3000;
 
 /**
  * Inter, like the app (400 text, 500 card titles as in `SharedLinkCard`,
@@ -78,6 +80,9 @@ function loadInter() {
     ([400, 500, 600] as const).map(async (weight) => {
       const response = await fetch(
         `https://cdn.jsdelivr.net/npm/@fontsource/inter@5/files/inter-latin-${weight}-normal.woff`,
+        // A stalled CDN must not hold the preview: give up and use the
+        // renderer's default font (retried on the next request).
+        { signal: AbortSignal.timeout(FONT_TIMEOUT_MS) },
       );
       if (!response.ok) throw new Error(`Inter ${weight}: ${response.status}`);
       return {

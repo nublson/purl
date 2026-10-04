@@ -15,11 +15,10 @@ import {
   type ReactNode,
 } from "react";
 import { ARRIVE } from "@/lib/motion";
+import { SHARED_GRID_COLUMNS } from "@/lib/shared-folder-view";
 import { cn } from "@/lib/utils";
-import {
-  SHARED_GRID_COLUMNS,
-  SharedLinkCardSkeleton,
-} from "./skeletons/shared-folder";
+import { SharedLinkCardSkeleton } from "./skeletons/shared-folder";
+import { SharedFolderDescription } from "./shared-folder-description";
 import { SharedLinkCard } from "./shared-link-card";
 
 /** Placeholder cards while the next page loads: one row at four columns. */
@@ -164,21 +163,9 @@ export function SharedFolderList({
     view === "grid" ? "mx-auto w-full max-w-[960px]" : "wrapper-private",
   );
 
-  // Lined up with what's below it: the rows' text inset (8px) in the list,
-  // the grid's first column in the grid (same columns, spanning them all).
-  const descriptionLine = description ? (
-    view === "grid" ? (
-      <div className={cn("mb-6 grid w-full", SHARED_GRID_COLUMNS)}>
-        <Typography component="p" size="small" className="col-span-full">
-          {description}
-        </Typography>
-      </div>
-    ) : (
-      <Typography component="p" size="small" className="mb-6 px-2">
-        {description}
-      </Typography>
-    )
-  ) : null;
+  const descriptionLine = (
+    <SharedFolderDescription description={description} view={view} />
+  );
 
   if (links.length === 0) {
     return (
