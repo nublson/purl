@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsPhone } from "@/hooks/use-is-phone";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { useLeavingLinks } from "@/lib/leaving-links";
 import { ARRIVE, ARRIVE_ICON, ARRIVE_LATE } from "@/lib/motion";
@@ -22,6 +23,7 @@ import dynamic from "next/dynamic";
 import * as React from "react";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
+import { LinkSwipeRow } from "./link-swipe-row";
 import { Typography } from "./typography";
 import { Checkbox } from "./ui/checkbox";
 import {
@@ -82,6 +84,7 @@ export const LinkItem = React.forwardRef<
   // every action goes through the selection bar.
   const selecting = useIsSelectionActive();
   const selected = useIsLinkSelected(link.id);
+  const isPhone = useIsPhone();
   // Read links stay in the list, faded back: opening one marks it read.
   const read = useIsLinkRead(link);
   const markOpened = () => {
@@ -164,6 +167,30 @@ export const LinkItem = React.forwardRef<
     });
   }, [previewOpen]);
 
+  const deleteRow = ({ byKeyboard }: { byKeyboard: boolean }) => {
+    const rows = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-cy="link-item"] > a[href]'),
+    );
+    const index = rows.indexOf(anchorRef.current as HTMLElement);
+    const target =
+      index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
+    deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
+    // The row (and its menu trigger) unmounts once hidden; then move
+    // focus to the neighboring row only if focus fell to the body.
+    // Its focus ring shows only for a keyboard delete: after a click
+    // the user isn't navigating by keyboard.
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        const active = document.activeElement;
+        if (target?.isConnected && (!active || active === document.body)) {
+          // `focusVisible` isn't in TS's DOM types yet; browsers
+          // without it ignore the option.
+          target.focus({ focusVisible: byKeyboard } as FocusOptions);
+        }
+      });
+    }, LINK_DELETE_FADE_MS);
+  };
+
   const content = (
     <Item
       ref={ref}
@@ -173,6 +200,9 @@ export const LinkItem = React.forwardRef<
         // border-0: Item's 1px border is for its outline variant and its own
         // focus ring; this row uses neither (the link draws the focus ring).
         "w-full border-0 p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
+        // Touch: a long-press selects the row, so it must not also start a
+        // text selection (which then spreads to the headings around it).
+        "[@media(pointer:coarse)]:select-none",
         selected && "bg-accent/60 hover:bg-accent/60",
         (deletePhase === "fading" || leaving) &&
           "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
@@ -366,59 +396,39 @@ export const LinkItem = React.forwardRef<
           scheduleOpen();
         }}
       >
-        <LinkMenu
-          link={link}
-          onDelete={({ byKeyboard }) => {
-            const rows = Array.from(
-              document.querySelectorAll<HTMLElement>(
-                '[data-cy="link-item"] > a[href]',
-              ),
-            );
-            const index = rows.indexOf(anchorRef.current as HTMLElement);
-            const target =
-              index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
-            deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
-            // The row (and its menu trigger) unmounts once hidden; then move
-            // focus to the neighboring row only if focus fell to the body.
-            // Its focus ring shows only for a keyboard delete: after a click
-            // the user isn't navigating by keyboard.
-            setTimeout(() => {
-              requestAnimationFrame(() => {
-                const active = document.activeElement;
-                if (
-                  target?.isConnected &&
-                  (!active || active === document.body)
-                ) {
-                  // `focusVisible` isn't in TS's DOM types yet; browsers
-                  // without it ignore the option.
-                  target.focus({ focusVisible: byKeyboard } as FocusOptions);
-                }
-              });
-            }, LINK_DELETE_FADE_MS);
-          }}
-        />
+        <LinkMenu link={link} onDelete={deleteRow} />
       </ItemActions>
     </Item>
   );
 
   return (
-    <LinkPreview
+    <LinkSwipeRow
       link={link}
-      eagerThumbnail={Boolean(eagerFavicon)}
-      open={previewOpen}
-      onOpenChange={() => {
-        // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.
-      }}
-      onPreviewMouseEnter={() => {
-        hoveringPreviewRef.current = true;
-        clearCloseTimer();
-      }}
-      onPreviewMouseLeave={() => {
-        hoveringPreviewRef.current = false;
-        scheduleClose();
-      }}
+      read={read}
+      // Phones only, and not while picking rows (a drag there is a scroll).
+      enabled={isPhone && !selecting}
+      leaving={deletePhase === "fading" || leaving}
+      onDelete={() => deleteRow({ byKeyboard: false })}
+      onSwipeStart={cancelLongPress}
     >
-      {content}
-    </LinkPreview>
+      <LinkPreview
+        link={link}
+        eagerThumbnail={Boolean(eagerFavicon)}
+        open={previewOpen}
+        onOpenChange={() => {
+          // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.
+        }}
+        onPreviewMouseEnter={() => {
+          hoveringPreviewRef.current = true;
+          clearCloseTimer();
+        }}
+        onPreviewMouseLeave={() => {
+          hoveringPreviewRef.current = false;
+          scheduleClose();
+        }}
+      >
+        {content}
+      </LinkPreview>
+    </LinkSwipeRow>
   );
 });
