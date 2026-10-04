@@ -191,10 +191,10 @@ export function LinkSwipeRow({
       className={cn(
         "relative rounded-md",
         enabled && "touch-pan-y",
-        // Held: the whole row (the buttons too) gets a hairline edge, drawn
-        // above the sliding content so its fill can't cover it.
-        away &&
-          "overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-20 after:rounded-md after:ring-1 after:ring-border after:ring-inset",
+        // Held: the track the row slides on gets a hairline edge (the
+        // buttons sit inside it). The row covers it where it is, so the
+        // two never draw competing edges.
+        away && "overflow-hidden ring-1 ring-border ring-inset",
       )}
       onPointerDown={(event) => {
         swipedRef.current = false;
@@ -323,13 +323,14 @@ export function LinkSwipeRow({
           </div>
         </div>
       ) : null}
-      {/* Off its resting place, the row is visibly held: the hover fill
-          (the edge is the wrapper's, around the buttons too). */}
+      {/* Off its resting place, the row is visibly held: the hover color,
+          made opaque (accent at 40% on the page background) so it covers
+          the track's edge instead of showing it through. */}
       <motion.div
         style={{ transform }}
         className={cn(
-          "rounded-md transition-[background-color] duration-150 ease-out-strong",
-          away && "bg-accent/40",
+          "relative rounded-md transition-[background-color] duration-150 ease-out-strong",
+          away && "bg-[color-mix(in_oklab,var(--accent)_40%,var(--background))]",
         )}
       >
         {children}
