@@ -1,7 +1,7 @@
 "use client";
 
 import { coolPreviews } from "@/lib/link-preview-warmth";
-import type { PublicLink } from "@/lib/public-folders";
+import type { PublicLink, PublicOwner } from "@/lib/public-folders";
 import type { Link } from "@/utils/links";
 import { PackageOpen } from "lucide-react";
 import { BouncingDots } from "loading-dev";
@@ -20,6 +20,7 @@ import {
   SHARED_GRID_COLUMNS,
   SharedLinkCardSkeleton,
 } from "./skeletons/shared-folder";
+import { SharedFolderFooter } from "./shared-folder-footer";
 import { SharedLinkCard } from "./shared-link-card";
 
 /** Placeholder cards while the next page loads: one row at four columns. */
@@ -62,10 +63,16 @@ export function SharedFolderList({
   initialLinks,
   initialNextCursor,
   apiPath,
+  description,
+  owner,
 }: {
   initialLinks: PublicLink[];
   initialNextCursor: string | null;
   apiPath: string;
+  /** The folder's description: one line above the links, when set. */
+  description: string | null;
+  /** Who shared it, for the footer. */
+  owner: PublicOwner;
 }) {
   const [links, setLinks] = useState(() => initialLinks.map(toLink));
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
@@ -160,9 +167,26 @@ export function SharedFolderList({
     view === "grid" ? "mx-auto w-full max-w-[960px]" : "wrapper-private",
   );
 
+  // Lined up with what's below it: the rows' text inset (8px) in the list,
+  // the grid's first column in the grid (same columns, spanning them all).
+  const descriptionLine = description ? (
+    view === "grid" ? (
+      <div className={cn("mb-6 grid w-full", SHARED_GRID_COLUMNS)}>
+        <Typography component="p" size="small" className="col-span-full">
+          {description}
+        </Typography>
+      </div>
+    ) : (
+      <Typography component="p" size="small" className="mb-6 px-2">
+        {description}
+      </Typography>
+    )
+  ) : null;
+
   if (links.length === 0) {
     return (
       <div className={frame}>
+        {descriptionLine}
         <Empty data-cy="link-group-empty">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -174,12 +198,14 @@ export function SharedFolderList({
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
+        <SharedFolderFooter owner={owner} />
       </div>
     );
   }
 
   return (
     <div className={frame} onMouseLeave={coolPreviews}>
+      {descriptionLine}
       {/* Keyed by view: switching remounts it, and after a switch (not on
           page load) the new layout fades in, opacity only, 150ms. */}
       <div
@@ -297,6 +323,7 @@ export function SharedFolderList({
           </span>
         ) : null}
       </div>
+      <SharedFolderFooter owner={owner} />
     </div>
   );
 }

@@ -15,6 +15,7 @@ test.describe("Shared folders, visited signed out", () => {
       name: "Design",
       slug: "design",
       emoji: "🎨",
+      description: "Things I keep coming back to",
       isPublic: true,
     });
     await seed.link({ url: "https://a.example", title: "Alpha article", folderId: design });
@@ -37,7 +38,15 @@ test.describe("Shared folders, visited signed out", () => {
       "content",
       /noindex/,
     );
-    await expect(page.getByRole("link", { name: "Purl" })).toHaveAttribute("href", "/");
+    await expect(page.getByText("Things I keep coming back to")).toBeVisible();
+    // Footer: who shared it, and Made with Purl (links home).
+    const footer = page.locator("footer");
+    await expect(footer).toContainText("Shared by");
+    await expect(footer).toContainText(`@${testUser.username}`);
+    await expect(footer.getByRole("link", { name: "Purl", exact: true })).toHaveAttribute(
+      "href",
+      "/",
+    );
   });
 
   test("the view toggle switches between the list and a grid of cards", async ({

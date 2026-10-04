@@ -12,6 +12,7 @@ import {
   listPublicFolderLinks,
   publicFolderPath,
   resolvePublicFolder,
+  type PublicOwner,
 } from "@/lib/public-folders";
 import {
   parseSharedFolderView,
@@ -115,6 +116,8 @@ export default async function SharedFolderPage({
         <SharedFolderLinks
           ids={page.ids}
           apiPath={`/api/public/folders/${owner.username}/${folder.slug}`}
+          description={folder.description}
+          owner={owner}
         />
       </Suspense>
     </SharedFolderViewProvider>
@@ -124,17 +127,19 @@ export default async function SharedFolderPage({
 /** The first page of links, streamed in behind the skeleton. */
 async function SharedFolderLinks({
   ids,
-  apiPath,
+  ...rest
 }: {
   ids: { userId: string; folderId: string };
   apiPath: string;
+  description: string | null;
+  owner: PublicOwner;
 }) {
   const { links, nextCursor } = await listPublicFolderLinks(ids);
   return (
     <SharedFolderList
       initialLinks={links}
       initialNextCursor={nextCursor}
-      apiPath={apiPath}
+      {...rest}
     />
   );
 }

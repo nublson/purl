@@ -78,14 +78,21 @@ export async function seedFolder(
     name,
     slug,
     emoji,
+    description,
     isPublic = false,
-  }: { name: string; slug: string; emoji?: string; isPublic?: boolean },
+  }: {
+    name: string;
+    slug: string;
+    emoji?: string;
+    description?: string;
+    isPublic?: boolean;
+  },
 ): Promise<string> {
   const id = randomUUID();
   await pool.query(
-    `INSERT INTO "folders" ("id", "name", "slug", "emoji", "isPublic", "userId", "updatedAt")
-     VALUES ($1, $2, $3, $4, $5, $6, now())`,
-    [id, name, slug, emoji ?? null, isPublic, userId],
+    `INSERT INTO "folders" ("id", "name", "slug", "emoji", "description", "isPublic", "userId", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, now())`,
+    [id, name, slug, emoji ?? null, description ?? null, isPublic, userId],
   );
   return id;
 }
