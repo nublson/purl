@@ -51,11 +51,17 @@ export function LinkFolderSubmenu({ link }: { link: LinkType }) {
           />
         </DropdownMenuItem>
         {expanded ? (
-          // Arrives from just above (opacity and a 4px drop, no JS); it
-          // collapses at once. Reduced motion: the fade only.
-          <DropdownMenuGroup className="max-h-[11.5rem] overflow-y-auto overscroll-y-contain ps-4 transition-[opacity,translate] duration-150 ease-out-strong starting:-translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0">
-            <LinkFolderItems link={link} />
-          </DropdownMenuGroup>
+          <>
+            {/* Lined up with the other items (no indent). Arrives from
+                just above (opacity and a 4px drop, no JS); it collapses at
+                once. Reduced motion: the fade only. */}
+            <DropdownMenuGroup className="max-h-[11.5rem] overflow-y-auto overscroll-y-contain transition-[opacity,translate] duration-150 ease-out-strong starting:-translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0">
+              <LinkFolderItems link={link} />
+            </DropdownMenuGroup>
+            {/* The folders end here; the menu's own items (Edit, Delete)
+                follow. */}
+            <DropdownMenuSeparator />
+          </>
         ) : null}
       </>
     );

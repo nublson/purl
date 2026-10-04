@@ -6,6 +6,7 @@ import { expect, test, waitForHydration } from "./fixtures";
 // only), so touch-action and pointer capture behave as on a phone.
 
 test.use({
+  colorScheme: "dark",
   viewport: { width: 390, height: 844 },
   hasTouch: true,
   isMobile: true,
@@ -142,14 +143,24 @@ test.describe("Link row swipe", () => {
 
   test("the row menu opens its folders right under Move to folder", async ({ page, seed }, testInfo) => {
     await seed.folder({ name: "Later", slug: "later", emoji: "⏳" });
-    await seed.link({ url: "https://alpha.example", title: "Alpha" });
+    const current = await seed.folder({
+      name: "A Folder With A Rather Long Name",
+      slug: "long",
+      emoji: "📚",
+    });
+    await seed.link({ url: "https://alpha.example", title: "Alpha", folderId: current });
     await openHome(page);
 
     await row(page, "Alpha").getByRole("button", { name: "Open link menu" }).tap();
+    const menu = page.getByRole("menu");
+    // Layout width: the menu's open animation scales it.
+    const menuWidth = () => menu.evaluate((el) => (el as HTMLElement).offsetWidth);
+    const closedWidth = await menuWidth();
     const trigger = page.getByRole("menuitem", { name: "Move to folder" });
     await trigger.tap();
     const folder = page.getByRole("menuitem", { name: /Later/ });
     await expect(folder).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: /Remove from A Folder/ })).toBeVisible();
     // Below its trigger, inside the same menu (not a side submenu).
     const triggerBox = (await trigger.boundingBox())!;
     // Once its 4px entrance has settled.
@@ -158,6 +169,12 @@ test.describe("Link row swipe", () => {
       .toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height - 1);
     const folderBox = (await folder.boundingBox())!;
     expect(folderBox.x + folderBox.width).toBeLessThanOrEqual(390);
+    // One width, open or not, and the folders line up with the menu's items.
+    expect(await menuWidth()).toBe(closedWidth);
+    expect(folderBox.x).toBe((await page.getByRole("menuitem", { name: "Edit" }).boundingBox())!.x);
+    // The folders end in a separator before Edit.
+    const separators = await menu.getByRole("separator").count();
+    expect(separators).toBeGreaterThanOrEqual(3);
     await page.screenshot({ path: testInfo.outputPath("folders-inline.png") });
 
     await folder.tap();

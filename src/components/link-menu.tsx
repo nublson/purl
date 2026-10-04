@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsPhone } from "@/hooks/use-is-phone";
 import { copyToClipboard } from "@/lib/clipboard";
 import { setLinksRead, useIsLinkRead } from "@/lib/link-read-state";
 import type { Link as LinkType } from "@/utils/links";
@@ -34,6 +35,7 @@ interface LinkMenuProps {
 
 export function LinkMenu({ link, onDelete }: LinkMenuProps) {
   const read = useIsLinkRead(link);
+  const isPhone = useIsPhone();
 
   async function handleOpenInNewTab() {
     window.open(link.url, "_blank");
@@ -62,7 +64,9 @@ export function LinkMenu({ link, onDelete }: LinkMenuProps) {
         </Button>
       }
       align="end"
-      className="w-full"
+      // Phones: one fixed width (the widest it gets, with folders open
+      // in place), so opening "Move to folder" doesn't resize the menu.
+      className={isPhone ? "w-60" : "w-full"}
     >
       <DropdownMenuGroup>
         <DropdownMenuItem
