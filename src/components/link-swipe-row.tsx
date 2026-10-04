@@ -15,7 +15,7 @@ import {
 } from "@/lib/swipe-row";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
-import { Check, CircleDot, FolderInput, Trash } from "lucide-react";
+import { FolderInput, Trash } from "lucide-react";
 import {
   animate,
   motion,
@@ -26,6 +26,7 @@ import {
 } from "motion/react";
 import * as React from "react";
 import { LINK_FOLDER_LIST, LinkFolderItems } from "./link-folder-submenu";
+import { ReadToggleIcon } from "./read-toggle-icon";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -290,7 +291,7 @@ export function LinkSwipeRow({
                   "motion-reduce:scale-100",
                 )}
               >
-                {read ? <CircleDot /> : <Check />}
+                <ReadToggleIcon read={read} />
               </div>
             </div>
           ) : null}

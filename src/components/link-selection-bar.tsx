@@ -28,8 +28,6 @@ import { cn } from "@/lib/utils";
 import {
   Check,
   ChevronUp,
-  Circle,
-  CircleCheck,
   FolderInput,
   FolderMinus,
   FolderPlus,
@@ -42,6 +40,7 @@ import * as React from "react";
 import { toast } from "sonner";
 import { DialogFolderForm } from "./dialog-folder-form";
 import { FolderEmoji } from "./folder-emoji";
+import { ReadToggleIcon } from "./read-toggle-icon";
 import { Typography } from "./typography";
 import { Button } from "./ui/button";
 import {
@@ -323,7 +322,7 @@ export function LinkSelectionBar({
                 className="rounded-lg"
                 onClick={toggleReadSelected}
               >
-                {allRead ? <Circle /> : <CircleCheck />}
+                <ReadToggleIcon read={allRead} />
               </Button>
             </ShortcutTooltip>
             <BarSeparator />

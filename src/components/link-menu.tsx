@@ -5,8 +5,6 @@ import { copyToClipboard } from "@/lib/clipboard";
 import { setLinksRead, useIsLinkRead } from "@/lib/link-read-state";
 import type { Link as LinkType } from "@/utils/links";
 import {
-  Circle,
-  CircleCheck,
   Ellipsis,
   ExternalLink,
   Link,
@@ -17,6 +15,7 @@ import { toast } from "sonner";
 import { EditDialog } from "./dialog-edit-link";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { LinkFolderSubmenu } from "./link-folder-submenu";
+import { ReadToggleIcon } from "./read-toggle-icon";
 import { Button } from "./ui/button";
 import {
   DropdownMenuGroup,
@@ -89,15 +88,8 @@ export function LinkMenu({ link, onDelete }: LinkMenuProps) {
             void setLinksRead([link.id], !read);
           }}
         >
-          {read ? (
-            <>
-              <Circle /> Mark as unread
-            </>
-          ) : (
-            <>
-              <CircleCheck /> Mark as read
-            </>
-          )}
+          <ReadToggleIcon read={read} />
+          {read ? "Mark as unread" : "Mark as read"}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <LinkFolderSubmenu link={link} />
