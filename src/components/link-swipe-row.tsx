@@ -145,6 +145,15 @@ export function LinkSwipeRow({
 
   React.useEffect(() => () => closeSwipeRow(link.id), [link.id]);
 
+  // A closed row has no Move menu: also when it closed without the menu
+  // closing itself (selection mode started, the buttons unmounted), so the
+  // next swipe can't bring it back unasked.
+  React.useEffect(() => {
+    if (isOpen) return;
+    setMoveOpen(false);
+    moveOpenRef.current = false;
+  }, [isOpen]);
+
   // While open: a touch anywhere else, or a scroll, closes it.
   React.useEffect(() => {
     if (!isOpen) return;
@@ -170,10 +179,19 @@ export function LinkSwipeRow({
     Boolean(actionsRef.current?.contains(target as Node)) ||
     !rootRef.current?.contains(target as Node);
 
+  // A touch stops a spring mid-way (`x.stop()` on pointer down). When it
+  // turns out not to be a swipe (a tap, a scroll), the row still has to
+  // reach its stop: open if it's the open row, else rest.
+  const returnToStop = () => settle(isOpen ? SWIPE_OPEN_X : 0);
+
   const release = (cancelled: boolean) => {
     const gesture = gestureRef.current;
     gestureRef.current = null;
-    if (gesture?.axis !== "x") return;
+    if (!gesture) return;
+    if (gesture.axis !== "x") {
+      returnToStop();
+      return;
+    }
     if (cancelled) {
       settle(gesture.base);
       if (gesture.base === 0) closeSwipeRow(link.id);
@@ -233,6 +251,7 @@ export function LinkSwipeRow({
           gesture.axis = swipeAxis(dx, dy);
           if (gesture.axis === "y") {
             gestureRef.current = null;
+            returnToStop();
             return;
           }
           if (gesture.axis === null) return;

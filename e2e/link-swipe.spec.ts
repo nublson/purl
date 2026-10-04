@@ -133,12 +133,26 @@ test.describe("Link row swipe", () => {
   });
 
   test("a vertical drag scrolls instead of swiping", async ({ page, seed }) => {
-    await seed.link({ url: "https://alpha.example", title: "Alpha" });
+    // Enough rows to scroll (seeded oldest first; "Row 01" is on top).
+    for (let index = 30; index >= 1; index--) {
+      const name = `Row ${String(index).padStart(2, "0")}`;
+      await seed.link({ url: `https://row${index}.example`, title: name });
+    }
     await openHome(page);
-    await swipe(page, row(page, "Alpha"), 8, -60);
+    // The list scrolls inside <main>, not the document.
+    const scrolled = () =>
+      page.evaluate(() => document.querySelector("main")?.scrollTop ?? 0);
+    expect(await scrolled()).toBe(0);
+
+    // Mostly upward, a little sideways: a scroll, not a swipe.
+    await swipe(page, row(page, "Row 03"), 8, -300);
+    await expect.poll(scrolled).toBeGreaterThan(100);
     await page.waitForTimeout(300);
     await expect(page.getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
-    await expectRead(page, "Alpha", false);
+    const offset = await row(page, "Row 03").evaluate(
+      (el) => new DOMMatrix(getComputedStyle(el.parentElement!).transform).m41,
+    );
+    expect(offset).toBe(0);
   });
 
   test("the row menu opens its folders right under Move to folder", async ({ page, seed }, testInfo) => {
@@ -223,5 +237,30 @@ test.describe("Link row swipe", () => {
       (el) => new DOMMatrix(getComputedStyle(el.parentElement!).transform).m41,
     );
     expect(offset).toBe(0);
+  });
+
+  test("a touch that interrupts the spring back still lets the row reach rest", async ({ page, seed }) => {
+    await seed.link({ url: "https://alpha.example", title: "Alpha" });
+    await openHome(page);
+    const offset = () =>
+      row(page, "Alpha").evaluate(
+        (el) => new DOMMatrix(getComputedStyle(el.parentElement!).transform).m41,
+      );
+
+    // Open, then swipe it closed: it springs back toward 0...
+    await swipe(page, row(page, "Alpha"), -140);
+    await page.waitForTimeout(400);
+    await swipe(page, row(page, "Alpha"), 60);
+    // ...and a finger lands mid-way, then scrolls (not a swipe).
+    const box = (await row(page, "Alpha").boundingBox())!;
+    const cdp = await page.context().newCDPSession(page);
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x, y }] });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x, y: y - 20 }] });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await cdp.detach();
+
+    await expect.poll(offset).toBe(0);
   });
 });
