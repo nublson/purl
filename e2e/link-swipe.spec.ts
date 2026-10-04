@@ -69,6 +69,17 @@ test.describe("Link row swipe", () => {
 
     await swipe(page, row(page, "Alpha"), 110);
     await expectRead(page, "Alpha", true);
+    // The indicator leaves as soon as the finger lifts, not under the
+    // returning row's title.
+    await expect
+      .poll(
+        () =>
+          page
+            .locator("[data-swipe-indicator]")
+            .evaluateAll((els) => els.map((el) => getComputedStyle(el).opacity)),
+        { timeout: 250, intervals: [50] },
+      )
+      .not.toContain("1");
     await swipe(page, row(page, "Alpha"), 110);
     await expectRead(page, "Alpha", false);
     expect(popups).toHaveLength(0);

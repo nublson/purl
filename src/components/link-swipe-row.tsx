@@ -34,7 +34,9 @@ import {
 } from "./ui/dropdown-menu";
 
 /**
- * A swipe button showing (it has room) or not: from half size and clear,
+ * A swipe button showing (it has room, and the row is held or open) or
+ * not, so closing fades them out at once instead of under the returning
+ * row: from half size and clear,
  * a transition so a quick back-and-forth retargets instead of restarting.
  */
 const buttonReveal = (shown: boolean) =>
@@ -101,7 +103,9 @@ export function LinkSwipeRow({
   const swipedRef = React.useRef(false);
   const moveOpenRef = React.useRef(false);
 
-  useMotionValueEvent(x, "change", (value) => {
+  useMotionValueEvent(x, "change", (raw) => {
+    // The spring's last fraction of a pixel counts as rest.
+    const value = Math.abs(raw) < 0.5 ? 0 : raw;
     // Back at rest (and no finger on it): nothing to clip or show.
     if (value === 0 && !gestureRef.current) setAway(false);
     setSide(value > 0 ? "read" : value < 0 ? "actions" : null);
@@ -267,7 +271,14 @@ export function LinkSwipeRow({
           {side === "read" ? (
             <div
               aria-hidden
-              className="absolute inset-y-0 left-2 flex items-center"
+              data-swipe-indicator
+              // Gone the moment the finger lifts: the row springs back
+              // over it with its fill already fading, so it would show
+              // through the title on the way.
+              className={cn(
+                "absolute inset-y-0 left-2 flex items-center transition-opacity duration-100 ease-out-strong",
+                !isOpen && "opacity-0",
+              )}
             >
               <div
                 className={cn(
@@ -290,7 +301,7 @@ export function LinkSwipeRow({
             className="absolute inset-y-0 right-2 flex items-center gap-1"
           >
               {away ? (
-                <div className={buttonReveal(side === "actions" && revealed >= 2)}>
+                <div className={buttonReveal(isOpen && side === "actions" && revealed >= 2)}>
                   <DropdownMenu
                     open={moveOpen}
                     onOpenChange={(open) => {
@@ -316,7 +327,7 @@ export function LinkSwipeRow({
                 </div>
               ) : null}
               {away ? (
-                <div className={buttonReveal(side === "actions" && revealed >= 1)}>
+                <div className={buttonReveal(isOpen && side === "actions" && revealed >= 1)}>
                   <Button
                     variant="ghost"
                     size="icon-sm"
