@@ -30,9 +30,11 @@ interface LinkMenuProps {
    * `LinkItem`). `byKeyboard`: chosen with Enter/Space rather than a click.
    */
   onDelete: (opts: { byKeyboard: boolean }) => void;
+  /** The menu opened or closed (e.g. to keep its trigger shown meanwhile). */
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function LinkMenu({ link, onDelete }: LinkMenuProps) {
+export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
   const read = useIsLinkRead(link);
   const isPhone = useIsPhone();
 
@@ -52,6 +54,7 @@ export function LinkMenu({ link, onDelete }: LinkMenuProps) {
 
   return (
     <DropdownWrapper
+      onOpenChange={onOpenChange}
       trigger={
         <Button
           aria-label="Open link menu"

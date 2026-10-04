@@ -1,3 +1,4 @@
+import { LinkViewFrame } from "@/components/link-view-frame";
 import { HomeSkeleton } from "@/components/skeletons/home";
 import { CurrentFolderProvider } from "@/contexts/current-folder-context";
 import { getFolderBySlug, type FolderSummary } from "@/lib/folders";
@@ -43,7 +44,7 @@ export default async function FolderPage({
   }
 
   return (
-    <div className="wrapper-private flex flex-1 flex-col gap-8 pt-24 pb-36">
+    <LinkViewFrame>
       {/* Folder header / empty-state slot: the user's header (rename/delete,
           switcher) and empty state are wired in here in a follow-up pass.
           Until then, this heading only covers accessibility/SEO. */}
@@ -57,6 +58,6 @@ export default async function FolderPage({
           <FolderShellLoader folderId={folder.id} />
         </Suspense>
       </CurrentFolderProvider>
-    </div>
+    </LinkViewFrame>
   );
 }

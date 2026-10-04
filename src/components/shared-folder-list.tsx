@@ -1,5 +1,6 @@
 "use client";
 
+import { LINK_GRID_FRAME } from "@/lib/link-view";
 import { coolPreviews } from "@/lib/link-preview-warmth";
 import type { PublicLink } from "@/lib/public-folders";
 import type { Link } from "@/utils/links";
@@ -8,11 +9,9 @@ import { BouncingDots } from "loading-dev";
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
-  type ReactNode,
 } from "react";
 import { ARRIVE } from "@/lib/motion";
 import { SHARED_GRID_COLUMNS } from "@/lib/shared-folder-view";
@@ -42,6 +41,7 @@ const CARD_ARRIVE = cn(
   "fill-mode-backwards [animation-delay:var(--arrive-delay)] motion-reduce:[animation-delay:0ms]",
 );
 import { useSharedFolderView } from "./shared-folder-view";
+import { MasonryItem, useMasonry } from "./masonry";
 import { SharedLinkItem } from "./shared-link-item";
 import { Typography } from "./typography";
 import { Button } from "./ui/button";
@@ -102,13 +102,8 @@ export function SharedFolderList({
     const timer = setTimeout(() => setArrivingIds(new Set()), ARRIVAL_WINDOW_MS);
     return () => clearTimeout(timer);
   }, [arrivingIds]);
-  // Masonry needs measured cards, which only exist in the browser: the
-  // server's HTML (and the first paint before hydration) shows the cards in
-  // plain rows, and the grid switches to masonry before the next paint.
-  const [masonry, setMasonry] = useState(false);
-  useLayoutEffect(() => {
-    if (view === "grid") setMasonry(true);
-  }, [view]);
+  // Masonry needs measured cards (see useMasonry).
+  const masonry = useMasonry(view === "grid");
 
   // A failed page stops loading by scroll: retrying on its own would
   // re-request while the sentinel stays in view (and spend the visitor's
@@ -172,7 +167,7 @@ export function SharedFolderList({
   const frame = cn(
     // pb-28: the last links scroll clear of the fixed footer.
     "flex flex-1 flex-col pt-24 pb-28",
-    view === "grid" ? "mx-auto w-full max-w-[960px]" : "wrapper-private",
+    view === "grid" ? LINK_GRID_FRAME : "wrapper-private",
   );
 
   const descriptionLine = (
@@ -319,58 +314,5 @@ export function SharedFolderList({
         ) : null}
       </div>
     </div>
-  );
-}
-
-/**
- * A grid cell that spans as many 1px rows as its card is tall, plus the
- * vertical gutter (its bottom padding, the same as the column gap: 16px,
- * 40px from md). Measured before paint and again whenever the card
- * resizes (fonts, a title rewrapping). Before `masonry` is on, the cell is
- * a plain grid row (its padding is still the gutter).
- */
-function MasonryItem({
-  masonry,
-  className,
-  style,
-  children,
-}: {
-  masonry: boolean;
-  /** For the card's box (e.g. its arrival animation). */
-  className?: string;
-  style?: CSSProperties;
-  children: ReactNode;
-}) {
-  const [span, setSpan] = useState<number | null>(null);
-  const boxRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const box = boxRef.current;
-    if (!box) return;
-    // Nearest pixel: fractional card heights (16:10 thumbnails) round to
-    // within half a pixel of the gutter, either way.
-    const measure = () =>
-      setSpan(Math.round(box.getBoundingClientRect().height));
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(box);
-    return () => observer.disconnect();
-  }, []);
-  return (
-    <li
-      // In masonry, hidden until measured so cards never paint stacked on
-      // each other (a card added later is measured before its first paint).
-      className={masonry && span === null ? "invisible" : undefined}
-      style={
-        masonry && span !== null ? { gridRowEnd: `span ${span}` } : undefined
-      }
-    >
-      <div
-        ref={boxRef}
-        className={cn("pb-4 md:pb-10", className)}
-        style={style}
-      >
-        {children}
-      </div>
-    </li>
   );
 }

@@ -1,7 +1,9 @@
 import Header from "@/components/header";
 import { FoldersProvider } from "@/contexts/folders-context";
+import { LinkViewProvider } from "@/contexts/link-view-context";
 import { LinksSyncProvider } from "@/contexts/links-sync-context";
 import { listFoldersForUser } from "@/lib/folders";
+import { getLinkViewForUser } from "@/lib/link-view-store";
 import { getSessionUser } from "@/lib/session";
 import { getUsageSummaryForUser } from "@/lib/usage-summary";
 
@@ -18,12 +20,13 @@ export default async function AppShellLayout({
   // `useCurrentFolder()` is correct on the very first render instead of
   // racing the provider's own client-side fetch (see folders-context.tsx).
   const user = await getSessionUser();
-  const [initialFolders, usageSummary] = user
+  const [initialFolders, usageSummary, linkView] = user
     ? await Promise.all([
         listFoldersForUser(user.id),
         getUsageSummaryForUser(user.id),
+        getLinkViewForUser(user.id),
       ])
-    : [[], null];
+    : [[], null, "list" as const];
 
   // Wraps header and page: the folder selector's counts and the usage meter
   // follow link changes made in the list, and vice versa.
@@ -33,10 +36,14 @@ export default async function AppShellLayout({
         initialFolders={initialFolders}
         initialTotalLinks={usageSummary?.saves.used ?? null}
       >
-        <Header />
-        <main className="flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-4 md:px-0">
-          {children}
-        </main>
+        {/* The list view (rows or grid), saved on the account: the user
+            menu switches it, the pages render in it. */}
+        <LinkViewProvider initialView={linkView}>
+          <Header />
+          <main className="flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-4 md:px-0">
+            {children}
+          </main>
+        </LinkViewProvider>
       </FoldersProvider>
     </LinksSyncProvider>
   );

@@ -1,3 +1,4 @@
+import { LINK_GRID_FRAME } from "@/lib/link-view";
 import {
   SHARED_GRID_COLUMNS,
   type SharedFolderView,
@@ -50,7 +51,7 @@ export function SharedFolderSkeleton({
       aria-busy
       className={cn(
         "flex flex-1 flex-col pt-24 pb-28",
-        view === "grid" ? "mx-auto w-full max-w-[960px]" : "wrapper-private",
+        view === "grid" ? LINK_GRID_FRAME : "wrapper-private",
       )}
     >
       <Typography component="span" className="sr-only" role="status">

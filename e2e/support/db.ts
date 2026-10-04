@@ -36,6 +36,8 @@ export async function resetTestUserData(userId: string): Promise<void> {
   await pool.query(`DELETE FROM "links" WHERE "userId" = $1`, [userId]);
   await pool.query(`DELETE FROM "folders" WHERE "userId" = $1`, [userId]);
   await pool.query(`DELETE FROM "username_redirects" WHERE "userId" = $1`, [userId]);
+  // The list view is saved on the account: every test starts in the list.
+  await pool.query(`UPDATE "users" SET "linkView" = 'LIST' WHERE "id" = $1`, [userId]);
 }
 
 /** Deletes the user; links, folders, sessions and accounts cascade. */

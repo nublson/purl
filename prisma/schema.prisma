@@ -19,6 +19,11 @@ enum ContentType {
   AUDIO
 }
 
+enum LinkView {
+  LIST
+  GRID
+}
+
 model User {
   id            String    @id
   name          String
@@ -34,6 +39,8 @@ model User {
   folders       Folder[]
   /// Usernames this user had before: shared /@username URLs redirect.
   usernameRedirects UsernameRedirect[]
+  /// How the user's lists show links (Home, folders): rows or a grid of cards.
+  linkView      LinkView  @default(LIST)
 
   @@unique([email])
   @@map("users")
