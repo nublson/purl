@@ -1,3 +1,4 @@
+import { LinkViewFrame } from "@/components/link-view-frame";
 import { HomeSkeleton } from "@/components/skeletons/home";
 
 /**
@@ -8,8 +9,8 @@ import { HomeSkeleton } from "@/components/skeletons/home";
  */
 export default function FolderLoading() {
   return (
-    <div className="wrapper-private flex flex-1 flex-col gap-8 pt-24 pb-36">
+    <LinkViewFrame>
       <HomeSkeleton />
-    </div>
+    </LinkViewFrame>
   );
 }

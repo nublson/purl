@@ -1,10 +1,16 @@
 "use client";
 
+import { useLinkView } from "@/contexts/link-view-context";
 import { useLeavingLinks } from "@/lib/leaving-links";
+import { LINK_GRID_COLUMNS } from "@/lib/link-view";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
+import { cn } from "@/lib/utils";
 import { Link } from "@/utils/links";
-import type { ReactNode } from "react";
+import { LinkCard } from "./link-card";
 import { LinkItem } from "./link-item";
+import { MasonryItem, useMasonry } from "./masonry";
+import { LinkItemSkeleton } from "./skeletons";
+import { SharedLinkCardSkeleton } from "./skeletons/shared-folder";
 import { ItemGroup } from "./ui/item";
 
 interface LinkGroupProps {
@@ -12,18 +18,26 @@ interface LinkGroupProps {
   links: Link[];
   /** The link just saved: its row plays the arrival (see `LinkItem`). */
   newLinkId?: string | null;
-  prependItems?: ReactNode;
-  /** How many of the first rows load their favicons eagerly. */
+  /** A URL being saved here: its placeholder comes first. */
+  pendingUrl?: string | null;
+  /** How many of the first links load their favicons (or thumbnails) eagerly. */
   eagerFavicons?: number;
 }
 
+/**
+ * One day of links under its heading, in the owner's view: rows, or the
+ * shared folder's grid of cards (same columns and masonry), with the
+ * heading lined up with the grid's first column.
+ */
 export const LinkGroup = ({
   label,
   links,
   newLinkId,
-  prependItems,
+  pendingUrl,
   eagerFavicons = 0,
 }: LinkGroupProps) => {
+  const { view } = useLinkView();
+  const masonry = useMasonry(view === "grid");
   const headingId = `link-group-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   // Links deleted but still undoable are hidden here, and a day whose links
   // are all hidden drops its heading too.
@@ -35,7 +49,49 @@ export const LinkGroup = ({
       pendingDeletes.get(link.id) !== "hidden" &&
       leaving.get(link.id)?.phase !== "hidden",
   );
-  if (visibleLinks.length === 0 && !prependItems) return null;
+  if (visibleLinks.length === 0 && !pendingUrl) return null;
+
+  if (view === "grid") {
+    return (
+      <section
+        aria-labelledby={headingId}
+        className="flex w-full flex-col items-start justify-start gap-4"
+      >
+        {/* In the grid's columns, so it starts where the first card does. */}
+        <div className={cn("grid w-full", LINK_GRID_COLUMNS)}>
+          <h2
+            id={headingId}
+            className="col-span-full text-xs font-medium text-muted-foreground"
+          >
+            {label}
+          </h2>
+        </div>
+        <ul
+          aria-labelledby={headingId}
+          className={cn(
+            "grid w-full",
+            masonry ? "auto-rows-[1px]" : "items-start",
+            LINK_GRID_COLUMNS,
+          )}
+        >
+          {pendingUrl ? (
+            <MasonryItem masonry={masonry}>
+              <SharedLinkCardSkeleton />
+            </MasonryItem>
+          ) : null}
+          {visibleLinks.map((link, index) => (
+            <MasonryItem key={link.id} masonry={masonry}>
+              <LinkCard
+                link={link}
+                eagerThumbnail={index < eagerFavicons}
+                arriving={link.id === newLinkId}
+              />
+            </MasonryItem>
+          ))}
+        </ul>
+      </section>
+    );
+  }
 
   return (
     <section
@@ -46,7 +102,7 @@ export const LinkGroup = ({
         {label}
       </h2>
       <ItemGroup aria-labelledby={headingId} className="w-full gap-0">
-        {prependItems}
+        {pendingUrl ? <LinkItemSkeleton url={pendingUrl} animateIn /> : null}
         {visibleLinks.map((link, index) => (
           // content-visibility skips layout/paint for off-screen rows; the
           // intrinsic size (one row) keeps the scrollbar stable. Adjacent

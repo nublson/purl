@@ -9,7 +9,6 @@ import {
   OmniboxSearchAllRow,
 } from "@/components/omnibox-rows";
 import { PasteHandler } from "@/components/paste-handler";
-import { LinkItemSkeleton } from "@/components/skeletons";
 import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
 import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
@@ -465,11 +464,7 @@ export function HomeShell({
         // link-preview-warmth); gaps between date groups don't.
         <div className="flex flex-col gap-8" onMouseLeave={coolPreviews}>
           {showSyntheticToday && (
-            <LinkGroup
-              label="Today"
-              links={[]}
-              prependItems={<LinkItemSkeleton url={skeletonUrl} animateIn />}
-            />
+            <LinkGroup label="Today" links={[]} pendingUrl={skeletonUrl} />
           )}
           {groups.map((group, groupIndex) => (
             <LinkGroup
@@ -477,10 +472,8 @@ export function HomeShell({
               label={group.label}
               links={group.links}
               newLinkId={arrivingId}
-              prependItems={
-                group.label === "Today" && showSkeleton ? (
-                  <LinkItemSkeleton url={skeletonUrl} animateIn />
-                ) : undefined
+              pendingUrl={
+                group.label === "Today" && showSkeleton ? skeletonUrl : null
               }
               eagerFavicons={eagerFaviconsByGroup[groupIndex]}
             />

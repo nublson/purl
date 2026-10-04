@@ -11,16 +11,14 @@ import {
   useIsLinkSelected,
   useIsSelectionActive,
 } from "@/lib/link-selection";
-import {
-  deleteLinkWithUndo,
-  LINK_DELETE_FADE_MS,
-  usePendingLinkDeletes,
-} from "@/lib/pending-link-deletes";
+import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
+import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
+import { FolderTag, useFolderTag } from "./folder-tag";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
 import { LinkSwipeRow } from "./link-swipe-row";
@@ -87,6 +85,7 @@ export const LinkItem = React.forwardRef<
   const isPhone = useIsPhone();
   // Read links stay in the list, faded back: opening one marks it read.
   const read = useIsLinkRead(link);
+  const folderTag = useFolderTag(link);
   const markOpened = () => {
     if (!read) void setLinksRead([link.id], true);
   };
@@ -167,29 +166,14 @@ export const LinkItem = React.forwardRef<
     });
   }, [previewOpen]);
 
-  const deleteRow = ({ byKeyboard }: { byKeyboard: boolean }) => {
-    const rows = Array.from(
-      document.querySelectorAll<HTMLElement>('[data-cy="link-item"] > a[href]'),
-    );
-    const index = rows.indexOf(anchorRef.current as HTMLElement);
-    const target =
-      index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
-    deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
-    // The row (and its menu trigger) unmounts once hidden; then move
-    // focus to the neighboring row only if focus fell to the body.
-    // Its focus ring shows only for a keyboard delete: after a click
-    // the user isn't navigating by keyboard.
-    setTimeout(() => {
-      requestAnimationFrame(() => {
-        const active = document.activeElement;
-        if (target?.isConnected && (!active || active === document.body)) {
-          // `focusVisible` isn't in TS's DOM types yet; browsers
-          // without it ignore the option.
-          target.focus({ focusVisible: byKeyboard } as FocusOptions);
-        }
-      });
-    }, LINK_DELETE_FADE_MS);
-  };
+  const deleteRow = ({ byKeyboard }: { byKeyboard: boolean }) =>
+    deleteLinkKeepingFocus({
+      linkId: link.id,
+      anchor: anchorRef.current,
+      siblingsSelector: '[data-cy="link-item"] > a[href]',
+      byKeyboard,
+      onDeleted: notifyLinksChanged,
+    });
 
   const content = (
     <Item
@@ -380,6 +364,9 @@ export const LinkItem = React.forwardRef<
           >
             {formatDomain(link.domain)}
           </Typography>
+          {/* Home, with folder tags on: the link's folder, after the domain
+              (after the title on phones, which hide the domain). */}
+          {folderTag ? <FolderTag folder={folderTag} /> : null}
         </ItemTitle>
       </ItemContent>
       {/* Stays in the layout while selecting (hidden and inert): its 32px
