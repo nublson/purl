@@ -44,7 +44,8 @@ export function LinkFolderSubmenu({ link }: { link: LinkType }) {
           <ChevronDown
             aria-hidden="true"
             className={cn(
-              "ms-auto transition-transform duration-150 ease-out-strong",
+              // Reduced motion: it flips without turning.
+              "ms-auto transition-transform duration-150 ease-out-strong motion-reduce:transition-none",
               expanded && "rotate-180",
             )}
           />

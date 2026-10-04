@@ -262,7 +262,7 @@ export function LinkSwipeRow({
         <div
           ref={actionsRef}
           className={cn(
-            "absolute inset-0 transition-opacity duration-200",
+            "absolute inset-0 transition-opacity duration-200 ease-out-strong",
             leaving && "opacity-0",
           )}
         >
