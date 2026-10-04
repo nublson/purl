@@ -6,6 +6,7 @@ vi.mock("@/lib/safe-outbound-fetch", () => ({
 
 import { fetchImageAsDataUrl, OG_REMOTE_IMAGE_MAX_BYTES } from "@/lib/og-images";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
+import sharp from "sharp";
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
 
@@ -27,9 +28,42 @@ describe("fetchImageAsDataUrl", () => {
     );
   });
 
-  it("skips formats the renderer can't draw, errors and failures", async () => {
+  it("converts WebP to a PNG the renderer can draw, scaled down", async () => {
+    const webp = await sharp({
+      create: { width: 1200, height: 750, channels: 3, background: "#336699" },
+    })
+      .webp()
+      .toBuffer();
+    vi.mocked(safeFetch).mockResolvedValue(image("image/webp", new Uint8Array(webp)));
+    const result = await fetchImageAsDataUrl("https://a.example/og.webp");
+    expect(result).toMatch(/^data:image\/png;base64,/);
+    const png = Buffer.from(result!.split(",")[1], "base64");
+    const { width, format } = await sharp(png).metadata();
+    expect(format).toBe("png");
+    expect(width).toBe(480);
+  });
+
+  it("scales a large JPEG down and keeps it a JPEG", async () => {
+    const jpeg = await sharp({
+      create: { width: 3000, height: 1875, channels: 3, background: "#996633" },
+    })
+      .jpeg({ quality: 100 })
+      .toBuffer();
+    // Padded past the resize threshold (sharp ignores trailing bytes).
+    const padded = new Uint8Array(400 * 1024);
+    padded.set(jpeg);
+    vi.mocked(safeFetch).mockResolvedValue(image("image/jpeg", padded));
+    const result = await fetchImageAsDataUrl("https://a.example/cover.jpg");
+    expect(result).toMatch(/^data:image\/jpeg;base64,/);
+    const { width } = await sharp(Buffer.from(result!.split(",")[1], "base64")).metadata();
+    expect(width).toBe(480);
+  });
+
+  it("skips what it can't convert or draw, errors and failures", async () => {
     vi.mocked(safeFetch).mockResolvedValueOnce(image("image/webp"));
-    expect(await fetchImageAsDataUrl("https://a.example/a.webp")).toBeNull();
+    expect(await fetchImageAsDataUrl("https://a.example/broken.webp")).toBeNull();
+    vi.mocked(safeFetch).mockResolvedValueOnce(image("image/svg+xml"));
+    expect(await fetchImageAsDataUrl("https://a.example/a.svg")).toBeNull();
     vi.mocked(safeFetch).mockResolvedValueOnce(image("text/html"));
     expect(await fetchImageAsDataUrl("https://a.example/page")).toBeNull();
     vi.mocked(safeFetch).mockResolvedValueOnce(image("image/png", PNG, 404));
