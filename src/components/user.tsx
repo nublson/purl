@@ -16,6 +16,7 @@ import { Button } from "./ui/button";
 import {
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import { UserItem } from "./user-item";
@@ -101,7 +102,17 @@ export function User() {
             }}
           />
           <DropdownMenuSeparator />
+        </DropdownMenuGroup>
+        {/* Layout: how the lists look (its own group, apart from the
+            account's actions below). */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+            Layout
+          </DropdownMenuLabel>
           <ViewModeMenu />
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuGroup>
           <FeedbackDialog>
             <DropdownMenuItem
               onSelect={(event) => {

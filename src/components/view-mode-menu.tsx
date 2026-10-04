@@ -10,7 +10,6 @@ import {
   DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -67,14 +66,12 @@ export function ViewModeMenu() {
             )}
           />
         </DropdownMenuItem>
+        {/* Same entrance as the row menu's folders. The Layout group's
+            separator follows, so none here. */}
         {expanded ? (
-          <>
-            {/* Same entrance as the row menu's folders. */}
-            <div className="transition-[opacity,translate] duration-150 ease-out-strong starting:-translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0">
-              {choices}
-            </div>
-            <DropdownMenuSeparator />
-          </>
+          <div className="transition-[opacity,translate] duration-150 ease-out-strong starting:-translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0">
+            {choices}
+          </div>
         ) : null}
       </>
     );
