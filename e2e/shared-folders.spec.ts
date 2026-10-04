@@ -309,6 +309,15 @@ test.describe("Shared folders, managed by the owner", () => {
       expect(share.status()).toBe(200);
       expect((await share.json()).isPublic).toBe(true);
       expect((await visit(`/@${testUser.username}/design`)).status()).toBe(200);
+      // The preview image's URL, as an app would have stored it when the
+      // link was first shared.
+      const sharedPage = await visitor.newPage();
+      await sharedPage.goto(`/@${testUser.username}/design`);
+      const imageUrl = new URL(
+        (await sharedPage.locator('meta[property="og:image"]').getAttribute("content"))!,
+      );
+      const oldImage = imageUrl.pathname + imageUrl.search;
+      await sharedPage.close();
 
       // Rename: the slug changes, and the old URL redirects to the new one.
       const rename = await page.request.patch(`/api/folders/${id}`, {
@@ -318,11 +327,16 @@ test.describe("Shared folders, managed by the owner", () => {
       const old = await visit(`/@${testUser.username}/design`);
       expect(old.status()).toBe(308);
       expect(old.headers().location).toContain(`/@${testUser.username}/design-engineering`);
+      // The old preview image still draws (the folder as it is now).
+      const image = await visit(oldImage);
+      expect(image.status()).toBe(200);
+      expect(image.headers()["content-type"]).toBe("image/png");
 
-      // Private again: both URLs 404.
+      // Private again: both URLs 404, and so does the old preview image.
       await page.request.patch(`/api/folders/${id}`, { data: { isPublic: false } });
       expect((await visit(`/@${testUser.username}/design-engineering`)).status()).toBe(404);
       expect((await visit(`/@${testUser.username}/design`)).status()).toBe(404);
+      expect((await visit(oldImage)).status()).toBe(404);
     } finally {
       await visitor.close();
     }

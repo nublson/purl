@@ -15,8 +15,8 @@ import { notFound } from "next/navigation";
  * its most recent links on the right as the grid view's cards (thumbnail,
  * favicon, title, domain) in a two-column masonry that runs off the bottom,
  * so the folder reads as continuing. An empty folder gets the left side
- * only. Private, missing and renamed folders get no image (404), like the
- * page. Remote images are fetched through `safeFetch` and inlined
+ * only. Private and missing folders get no image (404), like the page; an
+ * old name (after a rename) draws the current folder. Remote images are fetched through `safeFetch` and inlined
  * (`src/lib/og-images.ts`); the renderer never contacts other sites.
  */
 
@@ -98,6 +98,19 @@ function truncate(text: string, max: number) {
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
 
+/**
+ * The public folder an image URL points at, following a rename: an image
+ * URL with an old username or slug (from a preview posted before the
+ * rename, which some apps fetch again later) draws the folder as it is
+ * now, instead of 404ing like before.
+ */
+async function resolveForImage(username: string, slug: string) {
+  const resolved = await resolvePublicFolder(username, slug);
+  if (resolved?.kind !== "redirect") return resolved;
+  const current = await resolvePublicFolder(resolved.username, resolved.slug);
+  return current?.kind === "folder" ? current : null;
+}
+
 function linkCountLabel(count: number) {
   if (count === 0) return "No links yet";
   return count === 1 ? "1 link" : `${count} links`;
@@ -118,7 +131,7 @@ export async function generateImageMetadata({
   // asks; awaiting covers both.
   const { username, slug } = (await params) ?? {};
   if (!username || !slug) return [];
-  const resolved = await resolvePublicFolder(username, slug);
+  const resolved = await resolveForImage(username, slug);
   if (!resolved || resolved.kind !== "folder") return [];
   const count = await countPublicFolderLinks(resolved.ids);
   const links = count === 0 ? "no links yet" : linkCountLabel(count);
@@ -221,7 +234,7 @@ export default async function Image({
   params: Promise<{ username: string; slug: string }>;
 }) {
   const { username, slug } = await params;
-  const resolved = await resolvePublicFolder(username, slug);
+  const resolved = await resolveForImage(username, slug);
   if (!resolved || resolved.kind !== "folder") notFound();
   const { owner, folder, ids } = resolved;
 
