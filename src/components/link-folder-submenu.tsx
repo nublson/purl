@@ -90,8 +90,8 @@ export const LINK_FOLDER_LIST =
 
 /**
  * The folders to move `link` into (its current one checked and disabled),
- * then "Remove from …" when it's in one. Menu items, for any dropdown: the
- * row menu's submenu, or the swipe's Move button.
+ * then "Remove from …" when it's in one. Menu items, for the row menu's
+ * submenu (or in place under it on phones).
  */
 export function LinkFolderItems({ link }: { link: LinkType }) {
   const { folders } = useFolders();

@@ -106,8 +106,7 @@ export const LinkGroup = ({
         {visibleLinks.map((link, index) => (
           // content-visibility skips layout/paint for off-screen rows; the
           // intrinsic size (one row) keeps the scrollbar stable. Adjacent
-          // selected rows join into one shape: square the corners they share
-          // (the row sits inside its swipe wrapper, so not a direct child).
+          // selected rows join into one shape: square the corners they share.
           <div
             key={link.id}
             role="listitem"
