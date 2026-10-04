@@ -1,6 +1,5 @@
 "use client";
 
-import { useIsPhone } from "@/hooks/use-is-phone";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { useLeavingLinks } from "@/lib/leaving-links";
 import { ARRIVE, ARRIVE_ICON, ARRIVE_LATE } from "@/lib/motion";
@@ -21,7 +20,6 @@ import * as React from "react";
 import { FolderTag, useFolderTag } from "./folder-tag";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
-import { LinkSwipeRow } from "./link-swipe-row";
 import { Typography } from "./typography";
 import { Checkbox } from "./ui/checkbox";
 import {
@@ -82,7 +80,6 @@ export const LinkItem = React.forwardRef<
   // every action goes through the selection bar.
   const selecting = useIsSelectionActive();
   const selected = useIsLinkSelected(link.id);
-  const isPhone = useIsPhone();
   // Read links stay in the list, faded back: opening one marks it read.
   const read = useIsLinkRead(link);
   const folderTag = useFolderTag(link);
@@ -393,33 +390,23 @@ export const LinkItem = React.forwardRef<
   );
 
   return (
-    <LinkSwipeRow
+    <LinkPreview
       link={link}
-      read={read}
-      // Phones only, and not while picking rows (a drag there is a scroll).
-      enabled={isPhone && !selecting}
-      leaving={deletePhase === "fading" || leaving}
-      onDelete={() => deleteRow({ byKeyboard: false })}
-      onSwipeStart={cancelLongPress}
+      eagerThumbnail={Boolean(eagerFavicon)}
+      open={previewOpen}
+      onOpenChange={() => {
+        // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.
+      }}
+      onPreviewMouseEnter={() => {
+        hoveringPreviewRef.current = true;
+        clearCloseTimer();
+      }}
+      onPreviewMouseLeave={() => {
+        hoveringPreviewRef.current = false;
+        scheduleClose();
+      }}
     >
-      <LinkPreview
-        link={link}
-        eagerThumbnail={Boolean(eagerFavicon)}
-        open={previewOpen}
-        onOpenChange={() => {
-          // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.
-        }}
-        onPreviewMouseEnter={() => {
-          hoveringPreviewRef.current = true;
-          clearCloseTimer();
-        }}
-        onPreviewMouseLeave={() => {
-          hoveringPreviewRef.current = false;
-          scheduleClose();
-        }}
-      >
-        {content}
-      </LinkPreview>
-    </LinkSwipeRow>
+      {content}
+    </LinkPreview>
   );
 });
