@@ -126,10 +126,15 @@ export function LinkSwipeRow({
     if (!isOpen && !gestureRef.current && x.get() < 0) settle(0);
   }, [isOpen, settle, x]);
 
-  // Selection mode (or a desktop-sized window) turns swiping off.
+  // Selection mode (or a desktop-sized window) turns swiping off, even
+  // mid-gesture: a long-press that selects the row ends the swipe, so a
+  // selected row is never also dragged.
   React.useEffect(() => {
-    if (!enabled) closeSwipeRow(link.id);
-  }, [enabled, link.id]);
+    if (enabled) return;
+    gestureRef.current = null;
+    closeSwipeRow(link.id);
+    if (x.get() !== 0) settle(0);
+  }, [enabled, link.id, settle, x]);
 
   React.useEffect(() => () => closeSwipeRow(link.id), [link.id]);
 
@@ -200,6 +205,10 @@ export function LinkSwipeRow({
       onPointerMove={(event) => {
         const gesture = gestureRef.current;
         if (!gesture || event.pointerId !== gesture.pointerId) return;
+        if (!enabled) {
+          gestureRef.current = null;
+          return;
+        }
         const dx = event.clientX - gesture.startX;
         const dy = event.clientY - gesture.startY;
         if (gesture.axis === null) {
@@ -279,9 +288,9 @@ export function LinkSwipeRow({
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
-                        size="icon"
+                        size="icon-sm"
                         aria-label="Move to folder"
-                        className="size-10 rounded-full bg-accent"
+                        className="bg-accent"
                       >
                         <FolderInput />
                       </Button>
@@ -296,9 +305,9 @@ export function LinkSwipeRow({
                 <motion.div key="delete" {...BUTTON_IN}>
                   <Button
                     variant="ghost"
-                    size="icon"
+                    size="icon-sm"
                     aria-label="Delete"
-                    className="size-10 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive dark:bg-destructive/20"
+                    className="bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive dark:bg-destructive/20"
                     onClick={onDelete}
                   >
                     <Trash />
@@ -309,7 +318,17 @@ export function LinkSwipeRow({
           </div>
         </div>
       ) : null}
-      <motion.div style={{ transform }}>{children}</motion.div>
+      {/* Off its resting place, the row is visibly held: the hover fill
+          and a hairline edge (inset; the wrapper clips while away). */}
+      <motion.div
+        style={{ transform }}
+        className={cn(
+          "rounded-md transition-[background-color,box-shadow] duration-150 ease-out-strong",
+          away && "bg-accent/40 ring-1 ring-border ring-inset",
+        )}
+      >
+        {children}
+      </motion.div>
     </div>
   );
 }

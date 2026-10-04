@@ -146,4 +146,38 @@ test.describe("Link row swipe", () => {
     );
     expect(userSelect).toBe("none");
   });
+
+  test("a long-press that selects the row ends the swipe", async ({ page, seed }, testInfo) => {
+    await seed.link({ url: "https://alpha.example", title: "Alpha" });
+    await openHome(page);
+    const box = (await row(page, "Alpha").boundingBox())!;
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    const cdp = await page.context().newCDPSession(page);
+    const touch = (
+      type: "touchStart" | "touchMove" | "touchEnd",
+      points: { x: number; y: number }[],
+    ) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: points });
+
+    // A plain swipe in progress: the row is visibly held.
+    await touch("touchStart", [{ x, y }]);
+    for (let step = 1; step <= 6; step++) await touch("touchMove", [{ x: x - step * 8, y }]);
+    await page.screenshot({ path: testInfo.outputPath("swipe-held.png") });
+    await touch("touchEnd", []);
+    await page.waitForTimeout(400);
+
+    // Hold until the long-press selects the row, then drag sideways.
+    await touch("touchStart", [{ x, y }]);
+    await page.waitForTimeout(700);
+    for (let step = 1; step <= 12; step++) await touch("touchMove", [{ x: x - step * 12, y }]);
+    await touch("touchEnd", []);
+    await cdp.detach();
+
+    await expect(page.getByRole("toolbar", { name: "Selected links" })).toContainText("1 selected");
+    await expect(page.getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
+    const offset = await row(page, "Alpha").evaluate(
+      (el) => new DOMMatrix(getComputedStyle(el.parentElement!.parentElement!).transform).m41,
+    );
+    expect(offset).toBe(0);
+  });
 });

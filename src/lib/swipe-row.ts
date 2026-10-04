@@ -16,13 +16,16 @@ export const SWIPE_READ_AT = 72;
 /** Past this, a right swipe moves at `SWIPE_RIGHT_RESISTANCE` of the finger. */
 const SWIPE_RIGHT_MAX = 120;
 const SWIPE_RIGHT_RESISTANCE = 0.2;
-/** Where a row rests open: room for the two 40px buttons and their gaps. */
-export const SWIPE_OPEN_X = -100;
+/**
+ * Where a row rests open: the two 32px buttons (the row menu's size), the
+ * 4px between them and 8px on either side.
+ */
+export const SWIPE_OPEN_X = -84;
 /** Past the open stop, a left swipe barely moves (a hint of an edge). */
 const SWIPE_LEFT_RESISTANCE = 0.05;
-/** Swiped left this far (px), the first (outer) button shows, then the second. */
-export const SWIPE_REVEAL_FIRST = 44;
-export const SWIPE_REVEAL_SECOND = 88;
+/** Swiped left this far (px), the first (outer) button has room, then the second. */
+export const SWIPE_REVEAL_FIRST = 40;
+export const SWIPE_REVEAL_SECOND = 76;
 
 /**
  * The axis a gesture locks to once it has moved `SWIPE_LOCK_DISTANCE`, or

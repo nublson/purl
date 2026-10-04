@@ -48,10 +48,11 @@ describe("swipeRelease", () => {
 });
 
 describe("swipeRevealed", () => {
-  it("shows the outer button at 44px and the second at 88px", () => {
-    expect(swipeRevealed(-43)).toBe(0);
-    expect(swipeRevealed(-44)).toBe(1);
-    expect(swipeRevealed(-88)).toBe(2);
+  it("shows the outer button at 40px and the second at 76px, both when open", () => {
+    expect(swipeRevealed(-39)).toBe(0);
+    expect(swipeRevealed(-40)).toBe(1);
+    expect(swipeRevealed(-76)).toBe(2);
+    expect(swipeRevealed(SWIPE_OPEN_X)).toBe(2);
     expect(swipeRevealed(30)).toBe(0);
   });
 });
