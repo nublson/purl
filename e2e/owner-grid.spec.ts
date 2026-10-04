@@ -186,5 +186,24 @@ test.describe("Folder tags on phones", () => {
     });
     expect(Math.abs(offset)).toBeLessThan(0.5);
   });
+
+  test("a card's menu closes on one tap outside, with Move to folder open", async ({ page, seed }) => {
+    const folder = await seed.folder({ name: "Design Engineer", slug: "design", emoji: "🧑‍🎨" });
+    await seed.link({ url: "https://alpha.example", title: "Alpha", folderId: folder });
+    await page.goto("/home");
+    await waitForHydration(page, '[data-cy="link-item"]');
+    await page.getByRole("button", { name: "Account menu" }).tap();
+    await page.getByRole("menuitem", { name: "View mode" }).tap();
+    await page.getByRole("menuitemradio", { name: "Grid" }).tap();
+    await waitForHydration(page, '[data-cy="link-card"]');
+
+    await card(page, "Alpha").getByRole("button", { name: "Open link menu" }).tap();
+    await page.getByRole("menuitem", { name: "Move to folder" }).tap();
+    await expect(page.getByRole("menuitem", { name: /Design Engineer/ }).first()).toBeVisible();
+    // The press inside the menu used to be stopped on its way up, so
+    // Radix took the next outside tap for an inside one.
+    await page.touchscreen.tap(195, 780);
+    await expect(page.getByRole("menu")).toHaveCount(0);
+  });
 });
 

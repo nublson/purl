@@ -76,6 +76,20 @@ export function LinkCard({
           "animate-in fade-in-0 zoom-in-95 duration-200 ease-out-strong",
       )}
       {...longPress}
+      onPointerDown={(event) => {
+        // A press on the menu button, or inside a portal (the open menu,
+        // whose React events bubble through here), isn't a long-press on
+        // the card. Not stopPropagation: Radix's menu needs that event to
+        // reach the document, or its next outside tap counts as inside.
+        const target = event.target as Element;
+        if (
+          !event.currentTarget.contains(target) ||
+          target.closest("[data-card-menu]")
+        ) {
+          return;
+        }
+        longPress.onPointerDown(event);
+      }}
     >
       <a
         href={link.url}
@@ -140,7 +154,7 @@ export function LinkCard({
               ? "opacity-100"
               : "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/card:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/card:opacity-100",
         )}
-        onPointerDown={(event) => event.stopPropagation()}
+        data-card-menu
       >
         <LinkMenu
           link={link}
