@@ -1,4 +1,5 @@
 import { expect, test, waitForHydration } from "./fixtures";
+import { setFolderPublic } from "./support/db";
 
 // Public folders at /@username/slug: readable by anyone (no session),
 // never indexed, 404 when private, and old URLs redirect after a rename.
@@ -219,6 +220,31 @@ test.describe("Shared folders, visited signed out", () => {
     await retry.click();
     await expect(page.locator('[data-cy="link-item"]')).toHaveCount(51);
     await expect(retry).toHaveCount(0);
+  });
+
+  test("the preview image renders for a public folder, and 404s once private", async ({
+    page,
+    seed,
+    testUser,
+  }) => {
+    const design = await seed.folder({ name: "Design", slug: "design", emoji: "🎨", isPublic: true });
+    await seed.link({ url: "https://a.example", title: "Alpha", folderId: design });
+    await page.goto(`/@${testUser.username}/design`);
+    const imageUrl = await page.locator('meta[property="og:image"]').getAttribute("content");
+    expect(imageUrl).toContain(`/u/${testUser.username}/design/opengraph-image`);
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+      "content",
+      "summary_large_image",
+    );
+
+    const path = new URL(imageUrl!).pathname + new URL(imageUrl!).search;
+    const image = await page.request.get(path);
+    expect(image.status()).toBe(200);
+    expect(image.headers()["content-type"]).toBe("image/png");
+    expect((await image.body()).byteLength).toBeGreaterThan(1000);
+
+    await setFolderPublic(design, false);
+    expect((await page.request.get(path)).status()).toBe(404);
   });
 
   test("a private or missing folder is a 404, and so is an unknown user", async ({

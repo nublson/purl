@@ -211,7 +211,11 @@ describe("rateLimitApiRequest", () => {
   });
 
   describe("shared folders", () => {
-    it.each(["/@nublson/design", "/api/public/folders/nublson/design"])(
+    it.each([
+      "/@nublson/design",
+      "/api/public/folders/nublson/design",
+      "/u/nublson/design/opengraph-image-1a2b3c",
+    ])(
       "limits GET %s by IP",
       async (path) => {
         vi.mocked(getPublicFolderRateLimiter).mockReturnValue(mockLimiter() as never);

@@ -96,3 +96,8 @@ export async function seedFolder(
   );
   return id;
 }
+
+/** Shares or unshares a folder directly (for signed-out tests). */
+export async function setFolderPublic(folderId: string, isPublic: boolean): Promise<void> {
+  await pool.query(`UPDATE "folders" SET "isPublic" = $2 WHERE "id" = $1`, [folderId, isPublic]);
+}
