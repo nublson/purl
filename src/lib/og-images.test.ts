@@ -4,11 +4,7 @@ vi.mock("@/lib/safe-outbound-fetch", () => ({
   safeFetch: vi.fn(),
 }));
 
-import {
-  fetchImageAsDataUrl,
-  firstDrawableImages,
-  OG_REMOTE_IMAGE_MAX_BYTES,
-} from "@/lib/og-images";
+import { fetchImageAsDataUrl, OG_REMOTE_IMAGE_MAX_BYTES } from "@/lib/og-images";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
@@ -48,19 +44,5 @@ describe("fetchImageAsDataUrl", () => {
       image("image/jpeg", new Uint8Array(OG_REMOTE_IMAGE_MAX_BYTES + 1)),
     );
     expect(await fetchImageAsDataUrl("https://a.example/huge.jpg")).toBeNull();
-  });
-});
-
-describe("firstDrawableImages", () => {
-  it("keeps the first ones that load, in order", async () => {
-    vi.mocked(safeFetch).mockImplementation(async (url) =>
-      String(url).includes("bad") ? image("image/webp") : image("image/png"),
-    );
-    const result = await firstDrawableImages(
-      ["https://a/bad", null, "https://a/1", "https://a/2", "https://a/3"],
-      2,
-    );
-    expect(result).toHaveLength(2);
-    expect(result.every((src) => src.startsWith("data:image/png;base64,"))).toBe(true);
   });
 });

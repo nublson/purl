@@ -51,15 +51,3 @@ export async function fetchImageAsDataUrl(
     return null;
   }
 }
-
-/**
- * The first `count` of `urls` that load (in order), fetched together.
- * Used for the collage: the most recent links' thumbnails.
- */
-export async function firstDrawableImages(
-  urls: (string | null | undefined)[],
-  count: number,
-): Promise<string[]> {
-  const results = await Promise.all(urls.map(fetchImageAsDataUrl));
-  return results.filter((data): data is string => data !== null).slice(0, count);
-}
