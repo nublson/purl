@@ -184,3 +184,13 @@ export async function getPublicFolderPage(
     nextCursor,
   };
 }
+
+/** How many links a resolved public folder holds (for its preview image). */
+export async function countPublicFolderLinks(ids: {
+  userId: string;
+  folderId: string;
+}): Promise<number> {
+  return prisma.link.count({
+    where: { userId: ids.userId, folderId: ids.folderId },
+  });
+}

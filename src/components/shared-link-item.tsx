@@ -96,7 +96,9 @@ export function SharedLinkItem({
       ) : null}
       <ItemMedia
         variant="image"
-        className="mt-1.5 size-5 self-start overflow-visible rounded"
+        // mt-2: on the middle of the title's lowercase letters, like
+        // LinkItem's favicon.
+        className="mt-2 size-5 self-start overflow-visible rounded"
       >
         <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
       </ItemMedia>

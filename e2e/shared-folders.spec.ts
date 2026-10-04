@@ -1,4 +1,5 @@
 import { expect, test, waitForHydration } from "./fixtures";
+import { setFolderPublic } from "./support/db";
 
 // Public folders at /@username/slug: readable by anyone (no session),
 // never indexed, 404 when private, and old URLs redirect after a rename.
@@ -15,6 +16,7 @@ test.describe("Shared folders, visited signed out", () => {
       name: "Design",
       slug: "design",
       emoji: "🎨",
+      description: "Things I keep coming back to",
       isPublic: true,
     });
     await seed.link({ url: "https://a.example", title: "Alpha article", folderId: design });
@@ -37,7 +39,15 @@ test.describe("Shared folders, visited signed out", () => {
       "content",
       /noindex/,
     );
-    await expect(page.getByRole("link", { name: "Purl" })).toHaveAttribute("href", "/");
+    await expect(page.getByText("Things I keep coming back to")).toBeVisible();
+    // Footer: who shared it, and Made with Purl (links home).
+    const footer = page.locator("footer");
+    await expect(footer).toContainText("Shared by");
+    await expect(footer).toContainText(`@${testUser.username}`);
+    await expect(footer.getByRole("link", { name: "Purl", exact: true })).toHaveAttribute(
+      "href",
+      "/",
+    );
   });
 
   test("the view toggle switches between the list and a grid of cards", async ({
@@ -212,6 +222,35 @@ test.describe("Shared folders, visited signed out", () => {
     await expect(retry).toHaveCount(0);
   });
 
+  test("the preview image renders for a public folder, and 404s once private", async ({
+    page,
+    seed,
+    testUser,
+  }) => {
+    const design = await seed.folder({ name: "Design", slug: "design", emoji: "🎨", isPublic: true });
+    await seed.link({ url: "https://a.example", title: "Alpha", folderId: design });
+    await page.goto(`/@${testUser.username}/design`);
+    const imageUrl = await page.locator('meta[property="og:image"]').getAttribute("content");
+    expect(imageUrl).toContain(`/u/${testUser.username}/design/opengraph-image`);
+    await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute(
+      "content",
+      `Design: 1 link, shared by @${testUser.username} on Purl`,
+    );
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
+      "content",
+      "summary_large_image",
+    );
+
+    const path = new URL(imageUrl!).pathname + new URL(imageUrl!).search;
+    const image = await page.request.get(path);
+    expect(image.status()).toBe(200);
+    expect(image.headers()["content-type"]).toBe("image/png");
+    expect((await image.body()).byteLength).toBeGreaterThan(1000);
+
+    await setFolderPublic(design, false);
+    expect((await page.request.get(path)).status()).toBe(404);
+  });
+
   test("a private or missing folder is a 404, and so is an unknown user", async ({
     page,
     seed,
@@ -270,6 +309,15 @@ test.describe("Shared folders, managed by the owner", () => {
       expect(share.status()).toBe(200);
       expect((await share.json()).isPublic).toBe(true);
       expect((await visit(`/@${testUser.username}/design`)).status()).toBe(200);
+      // The preview image's URL, as an app would have stored it when the
+      // link was first shared.
+      const sharedPage = await visitor.newPage();
+      await sharedPage.goto(`/@${testUser.username}/design`);
+      const imageUrl = new URL(
+        (await sharedPage.locator('meta[property="og:image"]').getAttribute("content"))!,
+      );
+      const oldImage = imageUrl.pathname + imageUrl.search;
+      await sharedPage.close();
 
       // Rename: the slug changes, and the old URL redirects to the new one.
       const rename = await page.request.patch(`/api/folders/${id}`, {
@@ -279,11 +327,16 @@ test.describe("Shared folders, managed by the owner", () => {
       const old = await visit(`/@${testUser.username}/design`);
       expect(old.status()).toBe(308);
       expect(old.headers().location).toContain(`/@${testUser.username}/design-engineering`);
+      // The old preview image still draws (the folder as it is now).
+      const image = await visit(oldImage);
+      expect(image.status()).toBe(200);
+      expect(image.headers()["content-type"]).toBe("image/png");
 
-      // Private again: both URLs 404.
+      // Private again: both URLs 404, and so does the old preview image.
       await page.request.patch(`/api/folders/${id}`, { data: { isPublic: false } });
       expect((await visit(`/@${testUser.username}/design-engineering`)).status()).toBe(404);
       expect((await visit(`/@${testUser.username}/design`)).status()).toBe(404);
+      expect((await visit(oldImage)).status()).toBe(404);
     } finally {
       await visitor.close();
     }

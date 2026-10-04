@@ -34,6 +34,7 @@ type TestFixtures = {
       name: string;
       slug: string;
       emoji?: string;
+      description?: string;
       isPublic?: boolean;
     }) => Promise<string>;
   };

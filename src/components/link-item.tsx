@@ -259,7 +259,10 @@ export const LinkItem = React.forwardRef<
       ) : null}
       <ItemMedia
         variant="image"
-        className="group/media relative mt-1.5 size-5 self-start overflow-visible rounded"
+        // mt-2: centers the favicon (and the checkbox over it) on the
+        // middle of the title's lowercase letters, where the eye reads the
+        // line (geometric centering on the line box sits ~1.7px high).
+        className="group/media relative mt-2 size-5 self-start overflow-visible rounded"
       >
         {/* The favicon gives way to the checkbox on hover (pointer devices)
             or keyboard focus, and on every row while selecting. */}

@@ -37,7 +37,9 @@ export function LinkItemSkeleton({
     >
       <ItemMedia
         variant="image"
-        className="size-5 rounded text-muted-foreground animate-pulse"
+        // 2px below center: where LinkItem's favicon sits (on the middle of
+        // the title's lowercase letters), so it doesn't jump on arrival.
+        className="size-5 translate-y-0.5 rounded text-muted-foreground animate-pulse"
       >
         {icon || <Spinner />}
       </ItemMedia>

@@ -78,14 +78,26 @@ export async function seedFolder(
     name,
     slug,
     emoji,
+    description,
     isPublic = false,
-  }: { name: string; slug: string; emoji?: string; isPublic?: boolean },
+  }: {
+    name: string;
+    slug: string;
+    emoji?: string;
+    description?: string;
+    isPublic?: boolean;
+  },
 ): Promise<string> {
   const id = randomUUID();
   await pool.query(
-    `INSERT INTO "folders" ("id", "name", "slug", "emoji", "isPublic", "userId", "updatedAt")
-     VALUES ($1, $2, $3, $4, $5, $6, now())`,
-    [id, name, slug, emoji ?? null, isPublic, userId],
+    `INSERT INTO "folders" ("id", "name", "slug", "emoji", "description", "isPublic", "userId", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, now())`,
+    [id, name, slug, emoji ?? null, description ?? null, isPublic, userId],
   );
   return id;
+}
+
+/** Shares or unshares a folder directly (for signed-out tests). */
+export async function setFolderPublic(folderId: string, isPublic: boolean): Promise<void> {
+  await pool.query(`UPDATE "folders" SET "isPublic" = $2 WHERE "id" = $1`, [folderId, isPublic]);
 }

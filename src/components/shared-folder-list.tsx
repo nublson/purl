@@ -15,11 +15,10 @@ import {
   type ReactNode,
 } from "react";
 import { ARRIVE } from "@/lib/motion";
+import { SHARED_GRID_COLUMNS } from "@/lib/shared-folder-view";
 import { cn } from "@/lib/utils";
-import {
-  SHARED_GRID_COLUMNS,
-  SharedLinkCardSkeleton,
-} from "./skeletons/shared-folder";
+import { SharedLinkCardSkeleton } from "./skeletons/shared-folder";
+import { SharedFolderDescription } from "./shared-folder-description";
 import { SharedLinkCard } from "./shared-link-card";
 
 /** Placeholder cards while the next page loads: one row at four columns. */
@@ -62,10 +61,13 @@ export function SharedFolderList({
   initialLinks,
   initialNextCursor,
   apiPath,
+  description,
 }: {
   initialLinks: PublicLink[];
   initialNextCursor: string | null;
   apiPath: string;
+  /** The folder's description: one line above the links, when set. */
+  description: string | null;
 }) {
   const [links, setLinks] = useState(() => initialLinks.map(toLink));
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
@@ -156,13 +158,19 @@ export function SharedFolderList({
 
   // Grid: room for four 210px cards and their 40px gaps (4×210 + 3×40).
   const frame = cn(
-    "flex flex-1 flex-col pt-24 pb-12",
+    // pb-28: the last links scroll clear of the fixed footer.
+    "flex flex-1 flex-col pt-24 pb-28",
     view === "grid" ? "mx-auto w-full max-w-[960px]" : "wrapper-private",
+  );
+
+  const descriptionLine = (
+    <SharedFolderDescription description={description} view={view} />
   );
 
   if (links.length === 0) {
     return (
       <div className={frame}>
+        {descriptionLine}
         <Empty data-cy="link-group-empty">
           <EmptyHeader>
             <EmptyMedia variant="icon">
@@ -180,6 +188,7 @@ export function SharedFolderList({
 
   return (
     <div className={frame} onMouseLeave={coolPreviews}>
+      {descriptionLine}
       {/* Keyed by view: switching remounts it, and after a switch (not on
           page load) the new layout fades in, opacity only, 150ms. */}
       <div

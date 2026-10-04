@@ -1,4 +1,13 @@
 /**
+ * The band of page background behind something pinned to the bottom (the
+ * search field, a shared folder's footer), so content scrolling underneath
+ * doesn't show below or around it: solid exactly up to a 44px bar's top
+ * (1rem + 44px + the safe area), then a 1.75rem fade.
+ */
+export const BOTTOM_BAR_BAND =
+  "pointer-events-none fixed inset-x-0 bottom-0 z-20 h-[calc(5.5rem+env(safe-area-inset-bottom))] bg-[linear-gradient(to_top,var(--background)_calc(3.75rem+env(safe-area-inset-bottom)),transparent)]";
+
+/**
  * The search field's surface (pinned to the bottom, raised, layered
  * shadow), shared by `LinkOmnibox` and the page skeleton so the field
  * doesn't jump when the page loads. Plain module: server components can

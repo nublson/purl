@@ -7,6 +7,7 @@ import {
 } from "@/components/shared-folder-view";
 import { Typography } from "@/components/typography";
 import { Separator } from "@/components/ui/separator";
+import { SharedFolderFooter } from "@/components/shared-folder-footer";
 import { SharedFolderSkeleton } from "@/components/skeletons/shared-folder";
 import {
   listPublicFolderLinks,
@@ -111,12 +112,17 @@ export default async function SharedFolderPage({
           <SharedFolderViewToggle />
         </div>
       </header>
-      <Suspense fallback={<SharedFolderSkeleton view={initialView} />}>
+      <Suspense fallback={<SharedFolderSkeleton
+            view={initialView}
+            description={folder.description}
+          />}>
         <SharedFolderLinks
           ids={page.ids}
           apiPath={`/api/public/folders/${owner.username}/${folder.slug}`}
+          description={folder.description}
         />
       </Suspense>
+      <SharedFolderFooter owner={owner} />
     </SharedFolderViewProvider>
   );
 }
@@ -124,17 +130,18 @@ export default async function SharedFolderPage({
 /** The first page of links, streamed in behind the skeleton. */
 async function SharedFolderLinks({
   ids,
-  apiPath,
+  ...rest
 }: {
   ids: { userId: string; folderId: string };
   apiPath: string;
+  description: string | null;
 }) {
   const { links, nextCursor } = await listPublicFolderLinks(ids);
   return (
     <SharedFolderList
       initialLinks={links}
       initialNextCursor={nextCursor}
-      apiPath={apiPath}
+      {...rest}
     />
   );
 }

@@ -60,7 +60,8 @@ function tooManyRequests(reset: number) {
  * For `/api/auth/*`, returns `NextResponse.next()` when allowed so the rest of the proxy can skip session work.
  * Also limits POST `/api/feedback`, the username availability check, link
  * previews (`/api/links/preview`, which fetch the page) and shared folder
- * pages (`/@username/slug` and `/api/public/folders/...`).
+ * pages (`/@username/slug`, `/api/public/folders/...` and their preview
+ * images).
  * Username changes are limited per user in their route, after the session
  * check.
  */
@@ -108,10 +109,14 @@ export async function rateLimitApiRequest(
     return null;
   }
 
-  // Shared folders: the page (/@username/slug) and its "load more" API.
+  // Shared folders: the page (/@username/slug), its "load more" API and
+  // its preview image (/u/username/slug/opengraph-image…, which fetches
+  // remote thumbnails to draw).
   if (
     request.method === "GET" &&
-    (pathname.startsWith("/@") || pathname.startsWith("/api/public/folders/"))
+    (pathname.startsWith("/@") ||
+      pathname.startsWith("/api/public/folders/") ||
+      (pathname.startsWith("/u/") && pathname.includes("/opengraph-image")))
   ) {
     const limiter = getPublicFolderRateLimiter();
     if (limiter) {

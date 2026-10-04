@@ -5,7 +5,7 @@ import { isApplePlatform } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { Search, X } from "lucide-react";
 import * as React from "react";
-import { OMNIBOX_SHELL } from "./omnibox-shell";
+import { BOTTOM_BAR_BAND, OMNIBOX_SHELL } from "./omnibox-shell";
 import { Kbd } from "./ui/kbd";
 
 /** Keys that focus the field from anywhere on the page. */
@@ -59,12 +59,7 @@ export function LinkOmnibox({
       {/* Rows scroll under the field: a band of page background (solid up to
           the field, then fading out above it, like the header's at the top)
           keeps them from showing below and around it. */}
-      <div
-        aria-hidden
-        // Solid exactly up to the field's top (1rem + 44px + the safe
-        // area), then a 1.75rem fade, whatever the device's inset.
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-20 h-[calc(5.5rem+env(safe-area-inset-bottom))] bg-[linear-gradient(to_top,var(--background)_calc(3.75rem+env(safe-area-inset-bottom)),transparent)]"
-      />
+      <div aria-hidden className={BOTTOM_BAR_BAND} />
       <form
         role="search"
         className={cn(
