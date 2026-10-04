@@ -141,3 +141,50 @@ test.describe("Owner grid view", () => {
     await expect(tags).toHaveCount(0);
   });
 });
+
+test.describe("Folder tags on phones", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("only the folder's icon, its name in a tooltip on tap", async ({ page, seed }, testInfo) => {
+    const folder = await seed.folder({ name: "Design Engineer", slug: "design", emoji: "🧑‍🎨" });
+    await seed.link({ url: "https://alpha.example", title: "Alpha", folderId: folder });
+    await page.goto("/home");
+    await waitForHydration(page, '[data-cy="link-item"]');
+    await page.getByRole("button", { name: "Account menu" }).tap();
+    await page.getByRole("menuitemcheckbox", { name: "Folder tags" }).tap();
+    await page.keyboard.press("Escape");
+
+    const popups: unknown[] = [];
+    page.on("popup", (popup) => popups.push(popup));
+    for (const view of ["list", "grid"] as const) {
+      if (view === "grid") {
+        await page.getByRole("button", { name: "Account menu" }).tap();
+        await page.getByRole("menuitem", { name: "View mode" }).tap();
+        await page.getByRole("menuitemradio", { name: "Grid" }).tap();
+        await waitForHydration(page, '[data-cy="link-card"]');
+      }
+      const tag = page.getByRole("button", { name: "Folder: Design Engineer" });
+      await expect(tag).toBeVisible();
+      // The icon only: the name isn't drawn next to it.
+      await expect(tag).not.toContainText("Design Engineer");
+      await tag.tap();
+      await expect(page.getByRole("tooltip")).toContainText("Design Engineer");
+      await page.screenshot({ path: testInfo.outputPath(`tag-${view}.png`) });
+      await page.touchscreen.tap(195, 700);
+      await expect(page.getByRole("tooltip")).toHaveCount(0);
+    }
+    // The taps never opened the link (or selected it).
+    expect(popups).toHaveLength(0);
+    await expect(page.getByRole("toolbar", { name: "Selected links" })).toHaveCount(0);
+
+    // In a card, the icon sits centered under the favicon.
+    const offset = await card(page, "Alpha").evaluate((el) => {
+      const tag = el.querySelector('[data-cy="folder-tag"]')!.getBoundingClientRect();
+      const info = el.querySelector('[data-cy="folder-tag"]')!.closest("span.grid")!;
+      const fav = info.firstElementChild!.firstElementChild!.getBoundingClientRect();
+      return tag.left + tag.width / 2 - (fav.left + fav.width / 2);
+    });
+    expect(Math.abs(offset)).toBeLessThan(0.5);
+  });
+});
+

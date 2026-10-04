@@ -5,8 +5,11 @@ import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
 import type { FolderSummary } from "@/lib/folders";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
+import { useIsPhone } from "@/hooks/use-is-phone";
+import * as React from "react";
 import { FolderEmoji } from "./folder-emoji";
 import { Typography } from "./typography";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 /**
  * The folder to tag `link` with, or null: only with folder tags on (the
@@ -24,7 +27,8 @@ export function useFolderTag(link: Pick<Link, "folderId">): FolderSummary | null
 /**
  * A link's folder, as a small muted chip: the folder's emoji and name
  * (a long name truncates). Decorative next to the row's own text; the
- * name is in the accessibility tree as plain text.
+ * name is in the accessibility tree as plain text. On phones, just the
+ * emoji, with the name in a tooltip (`FolderTagIcon`).
  */
 export function FolderTag({
   folder,
@@ -40,6 +44,8 @@ export function FolderTag({
   inCard?: boolean;
   className?: string;
 }) {
+  const isPhone = useIsPhone();
+  if (isPhone) return <FolderTagIcon folder={folder} inCard={inCard} />;
   return (
     <Typography
       component="span"
@@ -59,5 +65,51 @@ export function FolderTag({
         {folder.name}
       </Typography>
     </Typography>
+  );
+}
+
+/**
+ * Phones: the tag is only the folder's emoji (a square chip), and a tap
+ * shows the folder's name in a tooltip (there's no hover). It's a button
+ * of its own, above the row's link, so the tap doesn't open the link; a
+ * 28px hit area around the 20px chip. Named "Folder: …" for screen
+ * readers.
+ */
+function FolderTagIcon({
+  folder,
+  inCard,
+}: {
+  folder: FolderSummary;
+  inCard: boolean;
+}) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <Tooltip open={open} onOpenChange={setOpen}>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          data-cy="folder-tag"
+          aria-label={`Folder: ${folder.name}`}
+          className={cn(
+            "pointer-events-auto relative z-10 flex size-5 shrink-0 items-center justify-center rounded-md bg-muted outline-none after:absolute after:-inset-1 focus-visible:ring-2 focus-visible:ring-ring",
+            // A card: centered under the 16px favicon (the chip is 20px).
+            inCard && "-ms-0.5",
+          )}
+          onClick={(event) => {
+            // Not the row's (or card's) link underneath. Opens (Radix
+            // closes it on the trigger's own press, so no toggle); a tap
+            // anywhere else closes it.
+            event.preventDefault();
+            event.stopPropagation();
+            setOpen(true);
+          }}
+        >
+          <FolderEmoji emoji={folder.emoji} className="size-3 text-xs" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" sideOffset={6}>
+        {folder.name}
+      </TooltipContent>
+    </Tooltip>
   );
 }
