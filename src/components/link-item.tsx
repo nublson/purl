@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsPhone } from "@/hooks/use-is-phone";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { useLeavingLinks } from "@/lib/leaving-links";
 import { ARRIVE, ARRIVE_ICON, ARRIVE_LATE } from "@/lib/motion";
@@ -22,6 +23,7 @@ import dynamic from "next/dynamic";
 import * as React from "react";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
+import { LinkSwipeRow } from "./link-swipe-row";
 import { Typography } from "./typography";
 import { Checkbox } from "./ui/checkbox";
 import {
@@ -82,6 +84,7 @@ export const LinkItem = React.forwardRef<
   // every action goes through the selection bar.
   const selecting = useIsSelectionActive();
   const selected = useIsLinkSelected(link.id);
+  const isPhone = useIsPhone();
   // Read links stay in the list, faded back: opening one marks it read.
   const read = useIsLinkRead(link);
   const markOpened = () => {
@@ -164,6 +167,30 @@ export const LinkItem = React.forwardRef<
     });
   }, [previewOpen]);
 
+  const deleteRow = ({ byKeyboard }: { byKeyboard: boolean }) => {
+    const rows = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-cy="link-item"] > a[href]'),
+    );
+    const index = rows.indexOf(anchorRef.current as HTMLElement);
+    const target =
+      index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
+    deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
+    // The row (and its menu trigger) unmounts once hidden; then move
+    // focus to the neighboring row only if focus fell to the body.
+    // Its focus ring shows only for a keyboard delete: after a click
+    // the user isn't navigating by keyboard.
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        const active = document.activeElement;
+        if (target?.isConnected && (!active || active === document.body)) {
+          // `focusVisible` isn't in TS's DOM types yet; browsers
+          // without it ignore the option.
+          target.focus({ focusVisible: byKeyboard } as FocusOptions);
+        }
+      });
+    }, LINK_DELETE_FADE_MS);
+  };
+
   const content = (
     <Item
       ref={ref}
@@ -173,6 +200,9 @@ export const LinkItem = React.forwardRef<
         // border-0: Item's 1px border is for its outline variant and its own
         // focus ring; this row uses neither (the link draws the focus ring).
         "w-full border-0 p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
+        // Touch: a long-press selects the row, so it must not also start a
+        // text selection (which then spreads to the headings around it).
+        "[@media(pointer:coarse)]:select-none",
         selected && "bg-accent/60 hover:bg-accent/60",
         (deletePhase === "fading" || leaving) &&
           "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
@@ -272,53 +302,57 @@ export const LinkItem = React.forwardRef<
       ) : null}
       <ItemMedia
         variant="image"
-        // mt-2: centers the favicon (and the checkbox over it) on the
-        // middle of the title's lowercase letters, where the eye reads the
-        // line (geometric centering on the line box sits ~1.7px high).
-        className="group/media relative mt-2 size-5 self-start overflow-visible rounded"
+        // A slot exactly one title line tall (h-lh, in the title's type),
+        // starting where the title does (pt-1.5): the favicon centers on
+        // the title's first line, however many lines follow. The middle of
+        // the line box reads as the middle of a title in mixed case; the
+        // middle of the lowercase letters sat ~1.5px low beside capitals.
+        className="mt-1.5 h-lh w-5 self-start overflow-visible text-sm leading-normal"
       >
-        {/* The favicon gives way to the checkbox on hover (pointer devices)
-            or keyboard focus, and on every row while selecting. */}
-        <div
-          className={cn(
-            // Cross-fades with the checkbox: a fast opacity swap, no movement.
-            "contents *:transition-opacity *:duration-150 *:ease-out-strong",
-            selecting
-              ? "*:opacity-0"
-              : // Keyboard focus only: a mouse click leaves focus on the
-                // checkbox, and the favicon must come back once you move away.
-                "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-has-[:focus-visible]/media:*:opacity-0",
-            // Read: the favicon loses its color and steps back with the title.
-            read && !selecting && "*:opacity-50 *:grayscale",
-          )}
-        >
-          {arriving ? (
-            <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
+        <div className="group/media relative size-5 rounded">
+          {/* The favicon gives way to the checkbox on hover (pointer devices)
+              or keyboard focus, and on every row while selecting. */}
+          <div
+            className={cn(
+              // Cross-fades with the checkbox: a fast opacity swap, no movement.
+              "contents *:transition-opacity *:duration-150 *:ease-out-strong",
+              selecting
+                ? "*:opacity-0"
+                : // Keyboard focus only: a mouse click leaves focus on the
+                  // checkbox, and the favicon must come back once you move away.
+                  "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-has-[:focus-visible]/media:*:opacity-0",
+              // Read: the favicon loses its color and steps back with the title.
+              read && !selecting && "*:opacity-50 *:grayscale",
+            )}
+          >
+            {arriving ? (
+              <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
+                <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
+              </Typography>
+            ) : (
               <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
-            </Typography>
-          ) : (
-            <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
-          )}
+            )}
+          </div>
+          <Checkbox
+            checked={selected}
+            aria-label={`Select ${link.title}`}
+            className={cn(
+              "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background transition-[opacity,box-shadow] duration-150 ease-out-strong",
+              selecting
+                ? "opacity-100"
+                : "opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:group-hover/item:opacity-100",
+            )}
+            onClick={(event) => {
+              event.preventDefault();
+              // A long-press started here already toggled the row.
+              if (longPressedRef.current) {
+                longPressedRef.current = false;
+                return;
+              }
+              linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+            }}
+          />
         </div>
-        <Checkbox
-          checked={selected}
-          aria-label={`Select ${link.title}`}
-          className={cn(
-            "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background transition-[opacity,box-shadow] duration-150 ease-out-strong",
-            selecting
-              ? "opacity-100"
-              : "opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:group-hover/item:opacity-100",
-          )}
-          onClick={(event) => {
-            event.preventDefault();
-            // A long-press started here already toggled the row.
-            if (longPressedRef.current) {
-              longPressedRef.current = false;
-              return;
-            }
-            linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-          }}
-        />
       </ItemMedia>
       <ItemContent className="self-start pt-1.5">
         <ItemTitle>
@@ -366,59 +400,39 @@ export const LinkItem = React.forwardRef<
           scheduleOpen();
         }}
       >
-        <LinkMenu
-          link={link}
-          onDelete={({ byKeyboard }) => {
-            const rows = Array.from(
-              document.querySelectorAll<HTMLElement>(
-                '[data-cy="link-item"] > a[href]',
-              ),
-            );
-            const index = rows.indexOf(anchorRef.current as HTMLElement);
-            const target =
-              index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
-            deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
-            // The row (and its menu trigger) unmounts once hidden; then move
-            // focus to the neighboring row only if focus fell to the body.
-            // Its focus ring shows only for a keyboard delete: after a click
-            // the user isn't navigating by keyboard.
-            setTimeout(() => {
-              requestAnimationFrame(() => {
-                const active = document.activeElement;
-                if (
-                  target?.isConnected &&
-                  (!active || active === document.body)
-                ) {
-                  // `focusVisible` isn't in TS's DOM types yet; browsers
-                  // without it ignore the option.
-                  target.focus({ focusVisible: byKeyboard } as FocusOptions);
-                }
-              });
-            }, LINK_DELETE_FADE_MS);
-          }}
-        />
+        <LinkMenu link={link} onDelete={deleteRow} />
       </ItemActions>
     </Item>
   );
 
   return (
-    <LinkPreview
+    <LinkSwipeRow
       link={link}
-      eagerThumbnail={Boolean(eagerFavicon)}
-      open={previewOpen}
-      onOpenChange={() => {
-        // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.
-      }}
-      onPreviewMouseEnter={() => {
-        hoveringPreviewRef.current = true;
-        clearCloseTimer();
-      }}
-      onPreviewMouseLeave={() => {
-        hoveringPreviewRef.current = false;
-        scheduleClose();
-      }}
+      read={read}
+      // Phones only, and not while picking rows (a drag there is a scroll).
+      enabled={isPhone && !selecting}
+      leaving={deletePhase === "fading" || leaving}
+      onDelete={() => deleteRow({ byKeyboard: false })}
+      onSwipeStart={cancelLongPress}
     >
-      {content}
-    </LinkPreview>
+      <LinkPreview
+        link={link}
+        eagerThumbnail={Boolean(eagerFavicon)}
+        open={previewOpen}
+        onOpenChange={() => {
+          // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.
+        }}
+        onPreviewMouseEnter={() => {
+          hoveringPreviewRef.current = true;
+          clearCloseTimer();
+        }}
+        onPreviewMouseLeave={() => {
+          hoveringPreviewRef.current = false;
+          scheduleClose();
+        }}
+      >
+        {content}
+      </LinkPreview>
+    </LinkSwipeRow>
   );
 });

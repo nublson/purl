@@ -1,11 +1,10 @@
 "use client";
 
+import { useIsPhone } from "@/hooks/use-is-phone";
 import { copyToClipboard } from "@/lib/clipboard";
 import { setLinksRead, useIsLinkRead } from "@/lib/link-read-state";
 import type { Link as LinkType } from "@/utils/links";
 import {
-  Circle,
-  CircleCheck,
   Ellipsis,
   ExternalLink,
   Link,
@@ -16,6 +15,7 @@ import { toast } from "sonner";
 import { EditDialog } from "./dialog-edit-link";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { LinkFolderSubmenu } from "./link-folder-submenu";
+import { ReadToggleIcon } from "./read-toggle-icon";
 import { Button } from "./ui/button";
 import {
   DropdownMenuGroup,
@@ -34,6 +34,7 @@ interface LinkMenuProps {
 
 export function LinkMenu({ link, onDelete }: LinkMenuProps) {
   const read = useIsLinkRead(link);
+  const isPhone = useIsPhone();
 
   async function handleOpenInNewTab() {
     window.open(link.url, "_blank");
@@ -62,7 +63,9 @@ export function LinkMenu({ link, onDelete }: LinkMenuProps) {
         </Button>
       }
       align="end"
-      className="w-full"
+      // Phones: one fixed width (the widest it gets, with folders open
+      // in place), so opening "Move to folder" doesn't resize the menu.
+      className={isPhone ? "w-60" : "w-full"}
     >
       <DropdownMenuGroup>
         <DropdownMenuItem
@@ -85,15 +88,8 @@ export function LinkMenu({ link, onDelete }: LinkMenuProps) {
             void setLinksRead([link.id], !read);
           }}
         >
-          {read ? (
-            <>
-              <Circle /> Mark as unread
-            </>
-          ) : (
-            <>
-              <CircleCheck /> Mark as read
-            </>
-          )}
+          <ReadToggleIcon read={read} />
+          {read ? "Mark as unread" : "Mark as read"}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <LinkFolderSubmenu link={link} />
