@@ -1,8 +1,11 @@
 "use client";
 
 import { copyToClipboard } from "@/lib/clipboard";
+import { setLinksRead, useIsLinkRead } from "@/lib/link-read-state";
 import type { Link as LinkType } from "@/utils/links";
 import {
+  Circle,
+  CircleCheck,
   Ellipsis,
   ExternalLink,
   Link,
@@ -30,8 +33,11 @@ interface LinkMenuProps {
 }
 
 export function LinkMenu({ link, onDelete }: LinkMenuProps) {
+  const read = useIsLinkRead(link);
+
   async function handleOpenInNewTab() {
     window.open(link.url, "_blank");
+    if (!read) void setLinksRead([link.id], true);
   }
 
   async function handleCopyLink() {
@@ -72,6 +78,22 @@ export function LinkMenu({ link, onDelete }: LinkMenuProps) {
           }}
         >
           <Link /> Copy link
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          data-cy="toggle-read-menu-item"
+          onSelect={() => {
+            void setLinksRead([link.id], !read);
+          }}
+        >
+          {read ? (
+            <>
+              <Circle /> Mark as unread
+            </>
+          ) : (
+            <>
+              <CircleCheck /> Mark as read
+            </>
+          )}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <LinkFolderSubmenu link={link} />

@@ -29,6 +29,7 @@ type TestFixtures = {
       title?: string;
       description?: string;
       folderId?: string;
+      read?: boolean;
     }) => Promise<string>;
     folder: (folder: {
       name: string;

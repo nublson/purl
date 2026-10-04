@@ -24,6 +24,7 @@ import {
   type LinksMovedDetail,
 } from "@/lib/leaving-links";
 import { coolPreviews } from "@/lib/link-preview-warmth";
+import { settleLinkReadOverrides } from "@/lib/link-read-state";
 import { linkSelection, setSelectableLinks } from "@/lib/link-selection";
 import { isSameLinkUrl, omniboxSaveUrl } from "@/lib/omnibox";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
@@ -152,6 +153,8 @@ export function HomeShell({
       // The list now says where every row is: rows faded out by a move
       // before this reload began are gone (or back, after Undo).
       settleLeavingLinks(startedAt);
+      // Read changes the server had confirmed are in this list too.
+      settleLinkReadOverrides(startedAt);
       if (page.timeZone) setGroupsTimeZone(page.timeZone);
       if (typeof page.total === "number") setLinksTotal(page.total);
     } catch {
@@ -406,20 +409,25 @@ export function HomeShell({
     );
   }, [groups, pendingDeletes, leavingLinks]);
 
-  // Each loaded link's folder, for the selection bar's "Remove from folders".
-  const folderById = useMemo(
+  // Each loaded link, for the selection bar: its folder ("Remove from
+  // folders") and reading state (Mark read / unread).
+  const linkById = useMemo(
     () =>
       new Map(
         groups.flatMap((group) =>
-          group.links.map((link) => [link.id, link.folderId ?? null] as const),
+          group.links.map((link) => [link.id, link] as const),
         ),
       ),
     [groups],
   );
   const folderOf = useCallback(
-    (linkId: string) => folderById.get(linkId),
-    [folderById],
+    (linkId: string) => {
+      const link = linkById.get(linkId);
+      return link ? (link.folderId ?? null) : undefined;
+    },
+    [linkById],
   );
+  const linkOf = useCallback((linkId: string) => linkById.get(linkId), [linkById]);
 
   // A selection belongs to one list: switching folders or leaving drops it.
   useEffect(() => () => linkSelection.clear(), [folderId]);
@@ -510,7 +518,7 @@ export function HomeShell({
       ) : null}
       {/* Pinned to the bottom, so they come last in the page too: keyboard
           order follows the screen (list, selection bar, search field). */}
-      <LinkSelectionBar folderOf={folderOf} />
+      <LinkSelectionBar folderOf={folderOf} linkOf={linkOf} />
       <LinkOmnibox
         value={query}
         onChange={setQuery}
