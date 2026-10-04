@@ -13,7 +13,8 @@ interface LinkGroupProps {
   /** The link just saved: its row plays the arrival (see `LinkItem`). */
   newLinkId?: string | null;
   prependItems?: ReactNode;
-  eagerFirstLinkFavicon?: boolean;
+  /** How many of the first rows load their favicons eagerly. */
+  eagerFavicons?: number;
 }
 
 export const LinkGroup = ({
@@ -21,7 +22,7 @@ export const LinkGroup = ({
   links,
   newLinkId,
   prependItems,
-  eagerFirstLinkFavicon = false,
+  eagerFavicons = 0,
 }: LinkGroupProps) => {
   const headingId = `link-group-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   // Links deleted but still undoable are hidden here, and a day whose links
@@ -57,7 +58,7 @@ export const LinkGroup = ({
           >
             <LinkItem
               link={link}
-              eagerFavicon={eagerFirstLinkFavicon && index === 0}
+              eagerFavicon={index < eagerFavicons}
               arriving={link.id === newLinkId}
             />
           </div>

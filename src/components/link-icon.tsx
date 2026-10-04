@@ -1,7 +1,10 @@
+"use client";
+
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
 import { FileMusic, FileText, Globe } from "lucide-react";
+import * as React from "react";
 
 interface LinkIconProps {
   link: Link;
@@ -9,57 +12,104 @@ interface LinkIconProps {
   eagerFavicon?: boolean;
 }
 
+/** Box classes per size: the icon's and the favicon's (12 / 16 / 20px). */
+const SIZES = {
+  mini: { icon: "size-3", box: "size-3", px: 12 },
+  small: { icon: "size-4", box: "size-4", px: 16 },
+  default: { icon: "size-5", box: "size-5", px: 20 },
+} as const;
+
 export function LinkIcon({
   link,
   size = "mini",
   eagerFavicon = false,
 }: LinkIconProps) {
-  const sizeMap = {
-    mini: {
-      iconSize: 3,
-      imgSize: 12,
-    },
-    small: {
-      iconSize: 4,
-      imgSize: 16,
-    },
+  const { icon, box, px } = SIZES[size];
+
+  switch (link.contentType) {
+    case "PDF":
+      return <FileText className={icon} />;
+    case "AUDIO":
+      return <FileMusic className={icon} />;
     default: {
-      iconSize: 5,
-      imgSize: 20,
-    },
-  };
-  const { iconSize, imgSize } = sizeMap[size];
-
-  const media = (() => {
-    switch (link.contentType) {
-      case "PDF":
-        return <FileText className={cn(`size-${iconSize}`)} />;
-      case "AUDIO":
-        return <FileMusic className={cn(`size-${iconSize}`)} />;
-      default: {
-        const faviconSrc = safeRemoteImgSrc(link.favicon);
-        return faviconSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element -- user-controlled favicon URLs; avoid next/image optimizer SSRF
-          <img
-            src={faviconSrc}
-            alt=""
-            width={imgSize}
-            height={imgSize}
-            sizes={`${imgSize}px`}
-            referrerPolicy="no-referrer"
-            className={cn(`aspect-square object-contain size-${imgSize}`)}
-            loading={eagerFavicon ? "eager" : "lazy"}
-            decoding="async"
-          />
-        ) : (
-          <Globe
-            className={cn(`size-${iconSize} text-muted-foreground`)}
-            aria-hidden
-          />
-        );
-      }
+      const faviconSrc = safeRemoteImgSrc(link.favicon);
+      return faviconSrc ? (
+        <RemoteFavicon
+          key={faviconSrc}
+          src={faviconSrc}
+          px={px}
+          box={box}
+          icon={icon}
+          eager={eagerFavicon}
+        />
+      ) : (
+        <Globe className={cn(icon, "text-muted-foreground")} aria-hidden />
+      );
     }
-  })();
+  }
+}
 
-  return media;
+/**
+ * A favicon from another site, which can take a moment: a muted square
+ * holds its place, then it fades in (150ms, opacity only) instead of
+ * popping into an empty gap. A favicon that fails shows the globe.
+ */
+function RemoteFavicon({
+  src,
+  px,
+  box,
+  icon,
+  eager,
+}: {
+  src: string;
+  px: number;
+  box: string;
+  icon: string;
+  eager: boolean;
+}) {
+  const [state, setState] = React.useState<"loading" | "loaded" | "failed">(
+    "loading",
+  );
+  const imgRef = React.useRef<HTMLImageElement>(null);
+
+  // Server-rendered images can finish (or fail) before React hydrates and
+  // attaches onLoad / onError: read where they ended up.
+  React.useEffect(() => {
+    const img = imgRef.current;
+    if (!img?.complete) return;
+    setState(img.naturalWidth > 0 ? "loaded" : "failed");
+  }, []);
+
+  if (state === "failed") {
+    return <Globe className={cn(icon, "text-muted-foreground")} aria-hidden />;
+  }
+
+  return (
+    <span
+      className={cn(
+        "relative flex shrink-0 overflow-hidden rounded-[3px]",
+        box,
+        state === "loading" && "bg-muted",
+      )}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- user-controlled favicon URLs; avoid next/image optimizer SSRF */}
+      <img
+        ref={imgRef}
+        src={src}
+        alt=""
+        width={px}
+        height={px}
+        referrerPolicy="no-referrer"
+        className={cn(
+          "aspect-square object-contain transition-opacity duration-150 ease-out",
+          box,
+          state === "loaded" ? "opacity-100" : "opacity-0",
+        )}
+        loading={eager ? "eager" : "lazy"}
+        decoding="async"
+        onLoad={() => setState("loaded")}
+        onError={() => setState("failed")}
+      />
+    </span>
+  );
 }

@@ -21,6 +21,12 @@ import { SharedLinkCardSkeleton } from "./skeletons/shared-folder";
 import { SharedFolderDescription } from "./shared-folder-description";
 import { SharedLinkCard } from "./shared-link-card";
 
+/**
+ * The first screenful loads its images right away instead of lazily: about
+ * two phone screens of rows, two rows of cards at four columns.
+ */
+const EAGER_ROWS = 15;
+const EAGER_CARDS = 8;
 /** Placeholder cards while the next page loads: one row at four columns. */
 const LOAD_MORE_CARDS = 4;
 /** Cards staggered on first load (40ms apart); later ones start with the last. */
@@ -232,7 +238,7 @@ export function SharedFolderList({
                       : undefined
                   }
                 >
-                  <SharedLinkCard link={link} eagerThumbnail={index < 4} />
+                  <SharedLinkCard link={link} eagerThumbnail={index < EAGER_CARDS} />
                 </MasonryItem>
               );
             })}
@@ -258,7 +264,7 @@ export function SharedFolderList({
                 role="listitem"
                 className="[content-visibility:auto] [contain-intrinsic-size:auto_48px]"
               >
-                <SharedLinkItem link={link} eagerFavicon={index === 0} />
+                <SharedLinkItem link={link} eagerFavicon={index < EAGER_ROWS} />
               </div>
             ))}
           </ItemGroup>
