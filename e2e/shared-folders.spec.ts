@@ -232,6 +232,10 @@ test.describe("Shared folders, visited signed out", () => {
     await page.goto(`/@${testUser.username}/design`);
     const imageUrl = await page.locator('meta[property="og:image"]').getAttribute("content");
     expect(imageUrl).toContain(`/u/${testUser.username}/design/opengraph-image`);
+    await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute(
+      "content",
+      `Design: 1 link, shared by @${testUser.username} on Purl`,
+    );
     await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute(
       "content",
       "summary_large_image",

@@ -13,16 +13,15 @@ import { notFound } from "next/navigation";
  * A shared folder's link preview (Slack, X, iMessage…): the folder's emoji,
  * name, owner and link count on the left, the Purl mark at the bottom, and
  * its most recent links on the right as the grid view's cards (thumbnail,
- * favicon, title, domain) in a two-column masonry that runs off the edge,
+ * favicon, title, domain) in a two-column masonry that runs off the bottom,
  * so the folder reads as continuing. An empty folder gets the left side
  * only. Private, missing and renamed folders get no image (404), like the
  * page. Remote images are fetched through `safeFetch` and inlined
  * (`src/lib/og-images.ts`); the renderer never contacts other sites.
  */
 
-export const alt = "A shared folder on Purl";
-export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+const SIZE = { width: 1200, height: 630 };
 
 /** Cards drawn: three per column, newest first, left to right. */
 const CARD_COUNT = 6;
@@ -33,14 +32,16 @@ const COLUMNS = 2;
  */
 const CACHE_CONTROL = "public, max-age=300, s-maxage=300";
 
-// Layout: the folder in a 500px column on the left (72px padding around
-// it), then two 236px card columns from x = 668, 36px from the right edge.
+// Layout: 72px margins all round. The folder in a 500px column on the
+// left, then two 230px card columns (24px apart) ending 72px from the
+// right edge. The first column's top lines up with the folder's emoji; the
+// second starts lower, so the cards don't line up in rows.
 const PADDING = 72;
 const LEFT_WIDTH = 500;
-const CARD_WIDTH = 236;
 const GUTTER = 24;
-/** The second column starts lower, so the cards don't line up in rows. */
-const COLUMN_OFFSETS = [44, 132];
+const CARD_WIDTH =
+  (SIZE.width - (LEFT_WIDTH + PADDING * 2) - GUTTER - PADDING) / COLUMNS;
+const COLUMN_OFFSETS = [PADDING, 160];
 
 // The app's palette (dark), as plain values for the renderer.
 const BACKGROUND = "#0a0a0a";
@@ -63,13 +64,18 @@ const LOGO_SVG = `data:image/svg+xml;base64,${Buffer.from(
   '<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="16" cy="16" r="16" fill="url(#p)"/><defs><radialGradient id="p" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(6) scale(28.5 26.4348)"><stop offset="0.457935" stop-color="white"/><stop offset="1" stop-color="#EAE0C8"/></radialGradient></defs></svg>',
 ).toString("base64")}`;
 
-/** Inter, like the app; loaded once per server. Falls back to the default. */
+type FontWeight = 400 | 500 | 600;
+
+/**
+ * Inter, like the app (400 text, 500 card titles as in `SharedLinkCard`,
+ * 600 the folder name); loaded once per server. Falls back to the default.
+ */
 let interFonts: Promise<
-  { name: string; data: ArrayBuffer; weight: 400 | 600; style: "normal" }[]
+  { name: string; data: ArrayBuffer; weight: FontWeight; style: "normal" }[]
 > | null = null;
 function loadInter() {
   interFonts ??= Promise.all(
-    ([400, 600] as const).map(async (weight) => {
+    ([400, 500, 600] as const).map(async (weight) => {
       const response = await fetch(
         `https://cdn.jsdelivr.net/npm/@fontsource/inter@5/files/inter-latin-${weight}-normal.woff`,
       );
@@ -92,6 +98,40 @@ function truncate(text: string, max: number) {
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
 
+function linkCountLabel(count: number) {
+  if (count === 0) return "No links yet";
+  return count === 1 ? "1 link" : `${count} links`;
+}
+
+/**
+ * The image's alt text, per folder: what it shows, for people who can't
+ * see it (X and Slack read it to screen readers).
+ */
+export async function generateImageMetadata({
+  params,
+}: {
+  params:
+    | { username: string; slug: string }
+    | Promise<{ username: string; slug: string }>;
+}) {
+  // Plain for the page's metadata, a Promise when the image route itself
+  // asks; awaiting covers both.
+  const { username, slug } = (await params) ?? {};
+  if (!username || !slug) return [];
+  const resolved = await resolvePublicFolder(username, slug);
+  if (!resolved || resolved.kind !== "folder") return [];
+  const count = await countPublicFolderLinks(resolved.ids);
+  const links = count === 0 ? "no links yet" : linkCountLabel(count);
+  return [
+    {
+      id: "preview",
+      alt: `${resolved.folder.name}: ${links}, shared by @${resolved.owner.username} on Purl`,
+      size: SIZE,
+      contentType,
+    },
+  ];
+}
+
 type CardData = {
   link: PublicLink;
   thumbnail: string | null;
@@ -99,9 +139,9 @@ type CardData = {
 };
 
 /**
- * One grid-view card (`SharedLinkCard`), drawn at 236px: the thumbnail at
- * 16:10 (or the favicon on a tint when there's none), then the favicon,
- * the title (two lines at most) and the domain.
+ * One grid-view card (`SharedLinkCard`), drawn at 230px: the thumbnail at
+ * 16:10 (or the favicon, else a globe, on a tint), then the favicon, the
+ * title (two lines at most, with an ellipsis) and the domain.
  */
 function LinkCard({ link, thumbnail, favicon }: CardData) {
   const mediaHeight = Math.round((CARD_WIDTH * 10) / 16);
@@ -128,7 +168,6 @@ function LinkCard({ link, thumbnail, favicon }: CardData) {
         }}
       >
         {thumbnail ? (
-           
           <img
             src={thumbnail}
             width={CARD_WIDTH}
@@ -138,13 +177,13 @@ function LinkCard({ link, thumbnail, favicon }: CardData) {
           />
         ) : (
           // No thumbnail: the favicon on the tint, like the grid's fallback.
-           
           <img src={favicon ?? GLOBE_SVG} width={48} height={48} alt="" />
         )}
       </div>
       <div style={{ display: "flex", gap: 10, padding: "14px 16px 16px" }}>
-        <div style={{ display: "flex", width: 16, height: 22, alignItems: "center" }}>
-          { }
+        <div
+          style={{ display: "flex", width: 16, height: 22, alignItems: "center" }}
+        >
           <img src={favicon ?? GLOBE_SVG} width={16} height={16} alt="" />
         </div>
         <div
@@ -157,16 +196,15 @@ function LinkCard({ link, thumbnail, favicon }: CardData) {
         >
           <div
             style={{
-              display: "flex",
+              display: "block",
+              lineClamp: 2,
               fontSize: 16,
-              fontWeight: 600,
+              fontWeight: 500,
               lineHeight: 1.35,
               color: FOREGROUND,
-              maxHeight: 44,
-              overflow: "hidden",
             }}
           >
-            {truncate(link.title, 52)}
+            {link.title}
           </div>
           <div style={{ display: "flex", fontSize: 15, color: MUTED }}>
             {truncate(formatDomain(link.domain), 26)}
@@ -215,7 +253,6 @@ export default async function Image({
           width: "100%",
           height: "100%",
           display: "flex",
-          position: "relative",
           background: BACKGROUND,
           color: FOREGROUND,
           fontFamily: "Inter",
@@ -237,53 +274,55 @@ export default async function Image({
             </div>
             <div
               style={{
-                display: "flex",
+                display: "block",
+                // Two lines at most. No textWrap balance: it balances the
+                // whole name, then the clamp cuts it, leaving a short first
+                // line and fewer words in view.
+                lineClamp: 2,
                 fontSize: 64,
                 fontWeight: 600,
                 lineHeight: 1.1,
                 letterSpacing: "-0.02em",
               }}
             >
-              {truncate(folder.name, withCards ? 40 : 60)}
+              {folder.name}
             </div>
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 14,
-                fontSize: 30,
+                fontSize: 34,
                 color: MUTED,
               }}
             >
               by
               {avatar ? (
-                 
                 <img
                   src={avatar}
-                  width={36}
-                  height={36}
+                  width={40}
+                  height={40}
                   alt=""
-                  style={{ borderRadius: 18 }}
+                  style={{ borderRadius: 20 }}
                 />
               ) : null}
               <span style={{ color: FOREGROUND }}>
-                @{truncate(owner.username, 28)}
+                @{truncate(owner.username, 26)}
               </span>
             </div>
-            <div style={{ display: "flex", fontSize: 26, color: MUTED }}>
-              {linkCount === 1 ? "1 link" : `${linkCount} links`}
+            <div style={{ display: "flex", fontSize: 30, color: MUTED }}>
+              {linkCountLabel(linkCount)}
             </div>
           </div>
           <div
             style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 30 }}
           >
-            { }
             <img src={LOGO_SVG} width={40} height={40} alt="" />
             Purl
           </div>
         </div>
         {withCards ? (
-          <div style={{ display: "flex", gap: GUTTER, paddingLeft: GUTTER }}>
+          <div style={{ display: "flex", gap: GUTTER }}>
             {columns.map((column, index) => (
               <div
                 key={index}
@@ -304,7 +343,7 @@ export default async function Image({
       </div>
     ),
     {
-      ...size,
+      ...SIZE,
       fonts: fonts.length ? fonts : undefined,
       headers: { "Cache-Control": CACHE_CONTROL },
     },
