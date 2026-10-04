@@ -7,12 +7,12 @@ import {
 } from "@/components/shared-folder-view";
 import { Typography } from "@/components/typography";
 import { Separator } from "@/components/ui/separator";
+import { SharedFolderFooter } from "@/components/shared-folder-footer";
 import { SharedFolderSkeleton } from "@/components/skeletons/shared-folder";
 import {
   listPublicFolderLinks,
   publicFolderPath,
   resolvePublicFolder,
-  type PublicOwner,
 } from "@/lib/public-folders";
 import {
   parseSharedFolderView,
@@ -117,9 +117,9 @@ export default async function SharedFolderPage({
           ids={page.ids}
           apiPath={`/api/public/folders/${owner.username}/${folder.slug}`}
           description={folder.description}
-          owner={owner}
         />
       </Suspense>
+      <SharedFolderFooter owner={owner} />
     </SharedFolderViewProvider>
   );
 }
@@ -132,7 +132,6 @@ async function SharedFolderLinks({
   ids: { userId: string; folderId: string };
   apiPath: string;
   description: string | null;
-  owner: PublicOwner;
 }) {
   const { links, nextCursor } = await listPublicFolderLinks(ids);
   return (

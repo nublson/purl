@@ -41,7 +41,7 @@ export function SharedFolderSkeleton({ view }: { view: SharedFolderView }) {
     <div
       aria-busy
       className={cn(
-        "flex flex-1 flex-col pt-24 pb-12",
+        "flex flex-1 flex-col pt-24 pb-28",
         view === "grid" ? "mx-auto w-full max-w-[960px]" : "wrapper-private",
       )}
     >

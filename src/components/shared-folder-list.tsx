@@ -1,7 +1,7 @@
 "use client";
 
 import { coolPreviews } from "@/lib/link-preview-warmth";
-import type { PublicLink, PublicOwner } from "@/lib/public-folders";
+import type { PublicLink } from "@/lib/public-folders";
 import type { Link } from "@/utils/links";
 import { PackageOpen } from "lucide-react";
 import { BouncingDots } from "loading-dev";
@@ -20,7 +20,6 @@ import {
   SHARED_GRID_COLUMNS,
   SharedLinkCardSkeleton,
 } from "./skeletons/shared-folder";
-import { SharedFolderFooter } from "./shared-folder-footer";
 import { SharedLinkCard } from "./shared-link-card";
 
 /** Placeholder cards while the next page loads: one row at four columns. */
@@ -64,15 +63,12 @@ export function SharedFolderList({
   initialNextCursor,
   apiPath,
   description,
-  owner,
 }: {
   initialLinks: PublicLink[];
   initialNextCursor: string | null;
   apiPath: string;
   /** The folder's description: one line above the links, when set. */
   description: string | null;
-  /** Who shared it, for the footer. */
-  owner: PublicOwner;
 }) {
   const [links, setLinks] = useState(() => initialLinks.map(toLink));
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
@@ -163,7 +159,8 @@ export function SharedFolderList({
 
   // Grid: room for four 210px cards and their 40px gaps (4×210 + 3×40).
   const frame = cn(
-    "flex flex-1 flex-col pt-24 pb-12",
+    // pb-28: the last links scroll clear of the fixed footer.
+    "flex flex-1 flex-col pt-24 pb-28",
     view === "grid" ? "mx-auto w-full max-w-[960px]" : "wrapper-private",
   );
 
@@ -198,7 +195,6 @@ export function SharedFolderList({
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
-        <SharedFolderFooter owner={owner} />
       </div>
     );
   }
@@ -323,7 +319,6 @@ export function SharedFolderList({
           </span>
         ) : null}
       </div>
-      <SharedFolderFooter owner={owner} />
     </div>
   );
 }
