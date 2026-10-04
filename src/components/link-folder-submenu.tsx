@@ -52,10 +52,12 @@ export function LinkFolderSubmenu({ link }: { link: LinkType }) {
         </DropdownMenuItem>
         {expanded ? (
           <>
-            {/* Lined up with the other items (no indent). Arrives from
-                just above (opacity and a 4px drop, no JS); it collapses at
-                once. Reduced motion: the fade only. */}
-            <DropdownMenuGroup className="max-h-[11.5rem] overflow-y-auto overscroll-y-contain transition-[opacity,translate] duration-150 ease-out-strong starting:-translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0">
+            {/* Lined up with the other items (no indent), and not a scroll
+                box of its own: the menu scrolls when it's too tall (a
+                nested one made iOS flash its scrollbar as it appeared).
+                Arrives from just above (opacity and a 4px drop, no JS); it
+                collapses at once. Reduced motion: the fade only. */}
+            <DropdownMenuGroup className="transition-[opacity,translate] duration-150 ease-out-strong starting:-translate-y-1 starting:opacity-0 motion-reduce:starting:translate-y-0">
               <LinkFolderItems link={link} />
             </DropdownMenuGroup>
             {/* The folders end here; the menu's own items (Edit, Delete)
