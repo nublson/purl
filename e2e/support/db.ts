@@ -51,13 +51,20 @@ export async function seedLink(
     title,
     description,
     folderId,
-  }: { url: string; title?: string; description?: string; folderId?: string },
+    read,
+  }: {
+    url: string;
+    title?: string;
+    description?: string;
+    folderId?: string;
+    read?: boolean;
+  },
 ): Promise<string> {
   const domain = new URL(url).hostname;
   const id = randomUUID();
   await pool.query(
-    `INSERT INTO "links" ("id", "url", "title", "description", "favicon", "domain", "userId", "folderId")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    `INSERT INTO "links" ("id", "url", "title", "description", "favicon", "domain", "userId", "folderId", "readAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
     [
       id,
       url,
@@ -67,6 +74,7 @@ export async function seedLink(
       domain,
       userId,
       folderId ?? null,
+      read ? new Date() : null,
     ],
   );
   return id;

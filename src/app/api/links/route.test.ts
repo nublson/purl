@@ -310,6 +310,7 @@ describe("POST /api/links", () => {
         contentType: "WEB",
         createdAt: CREATED_AT.toISOString(),
         folderId: null,
+        readAt: null,
         moved: false,
       });
     });

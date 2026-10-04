@@ -106,6 +106,7 @@ describe("registerPurlTools", () => {
       "delete_folder",
       "move_link",
       "move_links",
+      "mark_links_read",
     ]);
   });
 

@@ -53,6 +53,8 @@ model Link {
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   folderId    String?
   folder      Folder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  /// When the link was read (opened or marked read); null = unread.
+  readAt      DateTime?
 
   @@index([userId, createdAt])
   @@index([userId, folderId, createdAt])

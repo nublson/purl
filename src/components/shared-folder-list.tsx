@@ -55,7 +55,13 @@ import {
 import { ItemGroup } from "./ui/item";
 
 function toLink(link: PublicLink): Link {
-  return { ...link, createdAt: new Date(link.createdAt), folderId: null };
+  return {
+    ...link,
+    createdAt: new Date(link.createdAt),
+    folderId: null,
+    // Visitors never see the owner's reading state.
+    readAt: null,
+  };
 }
 
 /**

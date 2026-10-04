@@ -28,7 +28,7 @@ export function groupByPreviousFolder(
 export type BulkBodyError = {
   ok: false;
   error: string;
-  code: "INVALID_IDS" | "TOO_MANY_IDS" | "INVALID_FOLDER";
+  code: "INVALID_IDS" | "TOO_MANY_IDS" | "INVALID_FOLDER" | "INVALID_READ";
 };
 
 /**
@@ -91,4 +91,30 @@ export function parseBulkDeleteBody(
 ): { ok: true; ids: string[] } | BulkBodyError {
   const record = body !== null && typeof body === "object" ? body : {};
   return parseLinkIds((record as { ids?: unknown }).ids);
+}
+
+/** Whether a bulk `PATCH` body marks links read/unread (`read`) rather than moving them. */
+export function isBulkReadBody(body: unknown): boolean {
+  return body !== null && typeof body === "object" && "read" in body;
+}
+
+/**
+ * Body of a bulk read change: `{ ids, read }`. `read: true` marks the links
+ * read, `false` unread. A body can't also move the links (`folderId`).
+ */
+export function parseBulkReadBody(
+  body: unknown,
+): { ok: true; ids: string[]; read: boolean } | BulkBodyError {
+  const record = body !== null && typeof body === "object" ? body : {};
+  const ids = parseLinkIds((record as { ids?: unknown }).ids);
+  if (!ids.ok) return ids;
+  const read = (record as { read?: unknown }).read;
+  if (typeof read !== "boolean" || "folderId" in record) {
+    return {
+      ok: false,
+      error: "read must be true or false, and can't be combined with folderId",
+      code: "INVALID_READ",
+    };
+  }
+  return { ok: true, ids: ids.ids, read };
 }

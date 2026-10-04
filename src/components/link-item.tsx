@@ -4,6 +4,7 @@ import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { useLeavingLinks } from "@/lib/leaving-links";
 import { ARRIVE, ARRIVE_ICON, ARRIVE_LATE } from "@/lib/motion";
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
+import { setLinksRead, useIsLinkRead } from "@/lib/link-read-state";
 import {
   linkSelection,
   useIsLinkSelected,
@@ -81,6 +82,11 @@ export const LinkItem = React.forwardRef<
   // every action goes through the selection bar.
   const selecting = useIsSelectionActive();
   const selected = useIsLinkSelected(link.id);
+  // Read links stay in the list, faded back: opening one marks it read.
+  const read = useIsLinkRead(link);
+  const markOpened = () => {
+    if (!read) void setLinksRead([link.id], true);
+  };
   const longPressRef = React.useRef<{
     timer: ReturnType<typeof setTimeout>;
     x: number;
@@ -220,7 +226,7 @@ export const LinkItem = React.forwardRef<
       <a
         ref={anchorRef}
         href={link.url}
-        aria-label={`${link.title} (opens in new tab)`}
+        aria-label={`${link.title} (${read ? "read, " : ""}opens in new tab)`}
         aria-describedby={link.description ? descriptionId : undefined}
         target="_blank"
         rel="noopener noreferrer"
@@ -237,9 +243,16 @@ export const LinkItem = React.forwardRef<
             event.preventDefault();
             return;
           }
-          if (!selecting) return;
+          if (!selecting) {
+            markOpened();
+            return;
+          }
           event.preventDefault();
           linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+        }}
+        onAuxClick={(event) => {
+          // Middle-click opens it in a background tab, selecting or not.
+          if (event.button === 1) markOpened();
         }}
         onFocus={(event) => {
           // Keyboard users get the same preview mouse users get on hover.
@@ -275,6 +288,8 @@ export const LinkItem = React.forwardRef<
               : // Keyboard focus only: a mouse click leaves focus on the
                 // checkbox, and the favicon must come back once you move away.
                 "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-has-[:focus-visible]/media:*:opacity-0",
+            // Read: the favicon loses its color and steps back with the title.
+            read && !selecting && "*:opacity-50 *:grayscale",
           )}
         >
           {arriving ? (
@@ -310,7 +325,12 @@ export const LinkItem = React.forwardRef<
           <Typography
             size="small"
             className={cn(
-              "text-accent-foreground font-medium line-clamp-2 wrap-anywhere md:line-clamp-1",
+              "line-clamp-2 wrap-anywhere md:line-clamp-1",
+              // Read steps back in weight too, not just color: a cue that
+              // survives low contrast and color-blindness (unread mail's bold).
+              read
+                ? "font-normal text-muted-foreground"
+                : "font-medium text-accent-foreground",
               arriving && ARRIVE,
             )}
           >

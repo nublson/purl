@@ -1,5 +1,5 @@
 /** What a key press does while links are selected (see `matchSelectionShortcut`). */
-export type SelectionShortcut = "clear" | "selectAll" | "delete" | "move";
+export type SelectionShortcut = "clear" | "selectAll" | "delete" | "move" | "read";
 
 type KeyEventLike = Pick<
   KeyboardEvent,
@@ -9,7 +9,7 @@ type KeyEventLike = Pick<
 /**
  * The selection bar's shortcuts, active only while links are selected:
  * Esc clears, ⌘A / Ctrl+A selects all, Delete or Backspace deletes, M opens
- * Move. Returns null for any other key (and for M/Delete with modifiers, so
+ * Move, R marks read (or unread, when all are read). Returns null for any other key (and for M/Delete with modifiers, so
  * browser and OS shortcuts keep working).
  */
 export function matchSelectionShortcut(
@@ -26,6 +26,7 @@ export function matchSelectionShortcut(
   if (anyModifier) return null;
   if (event.key === "Delete" || event.key === "Backspace") return "delete";
   if (event.key.toLowerCase() === "m") return "move";
+  if (event.key.toLowerCase() === "r") return "read";
   return null;
 }
 
@@ -44,5 +45,7 @@ export function selectionShortcutLabel(
       return apple ? "⌫" : "Del";
     case "move":
       return "M";
+    case "read":
+      return "R";
   }
 }

@@ -16,9 +16,11 @@ vi.mock("@/lib/realtime-broadcast", () => ({
 
 const mockMoveLinksToFolder = vi.fn();
 const mockDeleteLinksForUser = vi.fn();
+const mockMarkLinksReadForUser = vi.fn();
 vi.mock("@/lib/links", () => ({
   moveLinksToFolder: mockMoveLinksToFolder,
   deleteLinksForUser: mockDeleteLinksForUser,
+  markLinksReadForUser: mockMarkLinksReadForUser,
 }));
 
 class MockFolderNotFoundError extends Error {}
@@ -76,6 +78,39 @@ describe("PATCH /api/links/bulk", () => {
     const missing = await route.PATCH(request("PATCH", { ids: ["l1"], folderId: "nope" }));
     expect(missing.status).toBe(404);
     expect(mockBroadcast).not.toHaveBeenCalled();
+  });
+});
+
+describe("PATCH /api/links/bulk – read", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetSessionUser.mockResolvedValue({ id: "user-1" });
+  });
+
+  it("marks the links read, broadcasts, and returns how many changed", async () => {
+    mockMarkLinksReadForUser.mockResolvedValue(2);
+    const res = await route.PATCH(request("PATCH", { ids: ["l1", "l2"], read: true }));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ updated: 2 });
+    expect(mockMarkLinksReadForUser).toHaveBeenCalledWith("user-1", ["l1", "l2"], true);
+    expect(mockMoveLinksToFolder).not.toHaveBeenCalled();
+    expect(mockBroadcast).toHaveBeenCalled();
+  });
+
+  it("does not broadcast when nothing changed", async () => {
+    mockMarkLinksReadForUser.mockResolvedValue(0);
+    const res = await route.PATCH(request("PATCH", { ids: ["l1"], read: false }));
+    expect(await res.json()).toEqual({ updated: 0 });
+    expect(mockBroadcast).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for a bad read value and 401 without a session", async () => {
+    const bad = await route.PATCH(request("PATCH", { ids: ["l1"], read: "yes" }));
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({ code: "INVALID_READ" });
+    mockGetSessionUser.mockResolvedValue(null);
+    const unauthorized = await route.PATCH(request("PATCH", { ids: ["l1"], read: true }));
+    expect(unauthorized.status).toBe(401);
   });
 });
 
