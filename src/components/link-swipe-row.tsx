@@ -283,7 +283,9 @@ export function LinkSwipeRow({
             >
               <div
                 className={cn(
-                  "flex size-8 items-center justify-center rounded-full transition-[background-color,color,scale] duration-150 ease-out-strong [&_svg]:size-4",
+                  // The swipe buttons' shape (the row menu's 32px icon button),
+                  // so both sides of the gesture read as one family.
+                  "flex size-8 items-center justify-center rounded-[min(var(--radius-md),10px)] transition-[background-color,color,scale] duration-150 ease-out-strong [&_svg]:size-4",
                   armed
                     ? "scale-100 bg-primary text-primary-foreground"
                     : "scale-75 bg-muted text-muted-foreground",
