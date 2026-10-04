@@ -34,7 +34,9 @@ export function KeyboardInset() {
         const zoomed = viewport.scale > 1.01;
         // The keyboard is everything the visible area lost. Not minus
         // offsetTop: iOS pans by the keyboard's full height (as a window
-        // scroll), so that would cancel it out.
+        // scroll), so that would cancel it out. The root's clientHeight is
+        // the layout viewport's height, not <html>'s own box, so shrinking
+        // <html> below doesn't feed back into this measurement.
         const gap = Math.round(root.clientHeight - viewport.height);
         const keyboard = !zoomed && gap > MIN_KEYBOARD_HEIGHT ? gap : 0;
         root.style.setProperty("--keyboard-inset", `${keyboard}px`);

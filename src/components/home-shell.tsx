@@ -363,14 +363,6 @@ export function HomeShell({
   }, []);
 
   const todayGroup = groups.find((g) => g.label === "Today");
-  // The first screenful of favicons loads right away (not lazily), so the
-  // rows people see first don't wait on the scroll observer: each group
-  // gets what's left of the budget after the groups above it.
-  const eagerFaviconsByGroup = groups.reduce<number[]>((counts, group, index) => {
-    const used = counts.reduce((sum, count) => sum + count, 0);
-    counts[index] = Math.min(group.links.length, EAGER_FAVICONS - used);
-    return counts;
-  }, []);
 
   // Optimistic row only for a URL this tab is saving.
   const showSkeleton = pendingUrl !== null;
@@ -383,6 +375,16 @@ export function HomeShell({
   const isHidden = (id: string) =>
     pendingDeletes.get(id) === "hidden" ||
     leavingLinks.get(id)?.phase === "hidden";
+  // The first screenful of favicons loads right away (not lazily), so the
+  // rows people see first don't wait on the scroll observer: each group
+  // gets what's left of the budget after the groups above it. Hidden rows
+  // (deleted, moved out) don't render, so they don't spend it.
+  const eagerFaviconsByGroup = groups.reduce<number[]>((counts, group, index) => {
+    const used = counts.reduce((sum, count) => sum + count, 0);
+    const visible = group.links.filter((link) => !isHidden(link.id)).length;
+    counts[index] = Math.min(visible, EAGER_FAVICONS - used);
+    return counts;
+  }, []);
   const allLinksHidden =
     !nextCursor &&
     groups.every((group) => group.links.every((link) => isHidden(link.id)));
