@@ -117,6 +117,12 @@ export function HomeShell({
     setGroupsTimeZone(timeZone);
   }
 
+  // Fresh server data (first render or navigation back here) already has
+  // every read change confirmed before now; other tabs' changes show again.
+  useEffect(() => {
+    settleLinkReadOverrides(Date.now());
+  }, [initialGroups]);
+
   const groupsRef = useRef(groups);
   useEffect(() => {
     groupsRef.current = groups;

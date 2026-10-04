@@ -1235,20 +1235,30 @@ describe("updateLinkForUser – read", () => {
     vi.mocked(prisma.link.findFirst).mockResolvedValue(makeRow() as never);
     vi.mocked(prisma.link.update).mockResolvedValue(makeRow() as never);
     await updateLinkForUser("user-123", "link-1", { read: true });
+    expect(prisma.link.updateMany).toHaveBeenCalledWith({
+      where: { id: "link-1", readAt: null },
+      data: { readAt: expect.any(Date) },
+    });
     expect(prisma.link.update).toHaveBeenCalledWith({
       where: { id: "link-1" },
-      data: { readAt: expect.any(Date) },
+      data: {},
     });
   });
 
-  it("keeps the first read time when a read link is opened again", async () => {
+  it("only sets readAt where it's still unset, so a read time is kept and a newer unread isn't undone", async () => {
     const readAt = new Date("2025-07-01T00:00:00Z");
     vi.mocked(prisma.link.findFirst).mockResolvedValue({ ...makeRow(), readAt } as never);
     vi.mocked(prisma.link.update).mockResolvedValue(makeRow() as never);
-    await updateLinkForUser("user-123", "link-1", { read: true });
+    await updateLinkForUser("user-123", "link-1", { read: true, title: "New" });
+    // The condition is checked by the database at write time, not against
+    // the readAt fetched above.
+    expect(prisma.link.updateMany).toHaveBeenCalledWith({
+      where: { id: "link-1", readAt: null },
+      data: { readAt: expect.any(Date) },
+    });
     expect(prisma.link.update).toHaveBeenCalledWith({
       where: { id: "link-1" },
-      data: { readAt },
+      data: { title: "New" },
     });
   });
 

@@ -251,8 +251,8 @@ export const LinkItem = React.forwardRef<
           linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
         }}
         onAuxClick={(event) => {
-          // Middle-click opens it in a background tab.
-          if (event.button === 1 && !selecting) markOpened();
+          // Middle-click opens it in a background tab, selecting or not.
+          if (event.button === 1) markOpened();
         }}
         onFocus={(event) => {
           // Keyboard users get the same preview mouse users get on hover.

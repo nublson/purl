@@ -16,6 +16,12 @@ type ReadOverride = { read: boolean; settledAt: number | null };
 let overrides: ReadonlyMap<string, ReadOverride> = new Map();
 const listeners = new Set<() => void>();
 const EMPTY: ReadonlyMap<string, ReadOverride> = new Map();
+/**
+ * What the server last confirmed for each link changed on this tab, and
+ * when: a failed request falls back to this, never to another request's
+ * unconfirmed state.
+ */
+const confirmed = new Map<string, { read: boolean; at: number }>();
 /** Settles when the last queued request has finished (see `setLinksRead`). */
 let queue: Promise<void> = Promise.resolve();
 
@@ -60,7 +66,6 @@ export async function setLinksRead(
   read: boolean,
 ): Promise<boolean> {
   if (ids.length === 0) return true;
-  const previous = new Map(ids.map((id) => [id, overrides.get(id)]));
   const next = new Map(overrides);
   for (const id of ids) next.set(id, { read, settledAt: null });
   commit(next);
@@ -92,15 +97,18 @@ export async function setLinksRead(
     done();
   }
 
+  const now = Date.now();
+  if (ok) for (const id of ids) confirmed.set(id, { read, at: now });
+
   // Only the entries this call wrote: a later change to the same link wins.
   const after = new Map(overrides);
   let changed = false;
   for (const id of ids) {
     const entry = after.get(id);
     if (entry?.read !== read || entry.settledAt !== null) continue;
-    const before = previous.get(id);
-    if (ok) after.set(id, { read, settledAt: Date.now() });
-    else if (before) after.set(id, before);
+    // Failed: back to what the server last confirmed, else to the list.
+    const fallback = ok ? { read, at: now } : confirmed.get(id);
+    if (fallback) after.set(id, { read: fallback.read, settledAt: fallback.at });
     else after.delete(id);
     changed = true;
   }
@@ -119,6 +127,9 @@ export async function setLinksRead(
  * (and changes from other devices show again).
  */
 export function settleLinkReadOverrides(reloadStartedAt: number) {
+  for (const [id, entry] of confirmed) {
+    if (entry.at <= reloadStartedAt) confirmed.delete(id);
+  }
   const next = new Map(overrides);
   let changed = false;
   for (const [id, entry] of next) {

@@ -568,6 +568,9 @@ export type UpdateLinkForUserData = UpdateLinkData & {
  * changed url re-scrapes metadata, exactly as `updateLink`) and, when
  * `data.folderId` is present, its folder — in a SINGLE `prisma.link.update`,
  * so a combined edit + move either fully lands or doesn't land at all.
+ * `data.read: true` sets `readAt` only where it's still unset, in the same
+ * transaction as that update, so it never restores a timestamp that another
+ * request cleared meanwhile; `false` clears it.
  *
  * Returns null when the link isn't found or isn't owned by `userId`. Callers
  * should check folder ownership (`assertFolderOwned`) before calling; a folder
@@ -613,16 +616,26 @@ export async function updateLinkForUser(
     updatePayload.folderId = data.folderId;
   }
 
-  if (data.read !== undefined) {
-    updatePayload.readAt = data.read ? (existing.readAt ?? new Date()) : null;
-  }
+  const markRead = data.read === true;
+  if (data.read === false) updatePayload.readAt = null;
 
-  if (Object.keys(updatePayload).length === 0) return existing;
+  if (Object.keys(updatePayload).length === 0 && !markRead) return existing;
 
   try {
-    return await prisma.link.update({
-      where: { id },
-      data: updatePayload,
+    if (!markRead) {
+      return await prisma.link.update({
+        where: { id },
+        data: updatePayload,
+      });
+    }
+    return await prisma.$transaction(async (tx) => {
+      // Conditional on the row as it is now, not as read above: an earlier
+      // read time is kept, and nothing written here can undo a newer change.
+      await tx.link.updateMany({
+        where: { id, readAt: null },
+        data: { readAt: new Date() },
+      });
+      return tx.link.update({ where: { id }, data: updatePayload });
     });
   } catch (error) {
     if (isForeignKeyConstraintError(error)) {
