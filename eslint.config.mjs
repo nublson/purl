@@ -39,6 +39,8 @@ const eslintConfig = defineConfig([
     // Playwright output
     "test-results/**",
     "playwright-report/**",
+    // Claude Code worktrees: other checkouts, with their own .next output
+    ".claude/**",
   ]),
 ]);
 
