@@ -110,7 +110,7 @@ export function LinkCard({
           link={link}
           eagerThumbnail={eagerThumbnail}
           read={read}
-          tag={folderTag ? <FolderTag folder={folderTag} /> : null}
+          tag={folderTag ? <FolderTag folder={folderTag} inCard /> : null}
         />
       </div>
       <Checkbox

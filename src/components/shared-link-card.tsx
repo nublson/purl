@@ -104,7 +104,8 @@ export function LinkCardContent({
         >
           {formatDomain(link.domain)}
         </Typography>
-        {tag ? <span className="col-start-2 mt-1 flex">{tag}</span> : null}
+        {/* Both columns: the tag lines its own icon up with the favicon. */}
+        {tag ? <span className="col-span-2 mt-1 flex min-w-0">{tag}</span> : null}
       </span>
     </>
   );

@@ -28,9 +28,16 @@ export function useFolderTag(link: Pick<Link, "folderId">): FolderSummary | null
  */
 export function FolderTag({
   folder,
+  inCard = false,
   className,
 }: {
   folder: FolderSummary;
+  /**
+   * In a grid card: the emoji sits in the favicon's column (a 16px box,
+   * the chip pulled left by its own padding) and the name starts where
+   * the title does (the card's column gap), so the icons stack.
+   */
+  inCard?: boolean;
   className?: string;
 }) {
   return (
@@ -39,11 +46,15 @@ export function FolderTag({
       size="mini"
       data-cy="folder-tag"
       className={cn(
-        "inline-flex h-5 max-w-40 min-w-0 shrink-0 items-center gap-1 rounded-md bg-muted px-1.5 font-normal",
+        "inline-flex h-5 min-w-0 shrink-0 items-center rounded-md bg-muted px-1.5 font-normal",
+        inCard ? "-ms-1.5 max-w-full gap-2 md:gap-3" : "max-w-40 gap-1",
         className,
       )}
     >
-      <FolderEmoji emoji={folder.emoji} className="size-3 text-xs" />
+      <FolderEmoji
+        emoji={folder.emoji}
+        className={inCard ? "size-4 text-xs" : "size-3 text-xs"}
+      />
       <Typography component="span" size="mini" className="truncate">
         {folder.name}
       </Typography>
