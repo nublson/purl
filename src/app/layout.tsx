@@ -1,3 +1,4 @@
+import { KeyboardInset } from "@/components/keyboard-inset";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Analytics } from "@vercel/analytics/next";
@@ -54,6 +55,12 @@ export const viewport: Viewport = {
   ],
 };
 
+/**
+ * Toasts sit above the search field pinned to the bottom (1rem + 44px field
+ * + a 12px gap = 72px), and above the keyboard while it's open.
+ */
+const TOAST_BOTTOM = "calc(72px + var(--keyboard-inset, 0px))";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -77,9 +84,13 @@ export default function RootLayout({
 
             {/* Above the search field pinned to the bottom of the app's lists
                 (1rem + 44px field + a 12px gap). */}
-            <Toaster offset={{ bottom: 72 }} mobileOffset={{ bottom: 72 }} />
+            <Toaster
+              offset={{ bottom: TOAST_BOTTOM }}
+              mobileOffset={{ bottom: TOAST_BOTTOM }}
+            />
           </TooltipProvider>
         </ThemeProvider>
+        <KeyboardInset />
         <SpeedInsights />
         <Analytics />
       </body>

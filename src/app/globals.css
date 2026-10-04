@@ -132,6 +132,22 @@ body {
   * {
     @apply border-border outline-ring;
   }
+  /*
+   * Room under things pinned to the bottom: the home indicator's safe area,
+   * or the on-screen keyboard while it's open (`--keyboard-inset`, set by
+   * KeyboardInset), whichever is taller.
+   */
+  :root {
+    --bottom-inset: max(env(safe-area-inset-bottom), var(--keyboard-inset, 0px));
+  }
+  /* Keyboard open: the page fits the visible area (see KeyboardInset), so
+     the list ends above the keyboard and nothing pans off the top. */
+  /* !important: <html> carries the `h-full` utility, which outranks the
+     base layer. */
+  html[data-keyboard-open] {
+    height: var(--visual-height) !important;
+    overflow: hidden;
+  }
   body {
     @apply bg-background text-foreground;
   }
