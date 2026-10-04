@@ -302,53 +302,57 @@ export const LinkItem = React.forwardRef<
       ) : null}
       <ItemMedia
         variant="image"
-        // mt-2: centers the favicon (and the checkbox over it) on the
-        // middle of the title's lowercase letters, where the eye reads the
-        // line (geometric centering on the line box sits ~1.7px high).
-        className="group/media relative mt-2 size-5 self-start overflow-visible rounded"
+        // A slot exactly one title line tall (h-lh, in the title's type),
+        // starting where the title does (pt-1.5): the favicon centers on
+        // the title's first line, however many lines follow. The middle of
+        // the line box reads as the middle of a title in mixed case; the
+        // middle of the lowercase letters sat ~1.5px low beside capitals.
+        className="mt-1.5 h-lh w-5 self-start overflow-visible text-sm leading-normal"
       >
-        {/* The favicon gives way to the checkbox on hover (pointer devices)
-            or keyboard focus, and on every row while selecting. */}
-        <div
-          className={cn(
-            // Cross-fades with the checkbox: a fast opacity swap, no movement.
-            "contents *:transition-opacity *:duration-150 *:ease-out-strong",
-            selecting
-              ? "*:opacity-0"
-              : // Keyboard focus only: a mouse click leaves focus on the
-                // checkbox, and the favicon must come back once you move away.
-                "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-has-[:focus-visible]/media:*:opacity-0",
-            // Read: the favicon loses its color and steps back with the title.
-            read && !selecting && "*:opacity-50 *:grayscale",
-          )}
-        >
-          {arriving ? (
-            <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
+        <div className="group/media relative size-5 rounded">
+          {/* The favicon gives way to the checkbox on hover (pointer devices)
+              or keyboard focus, and on every row while selecting. */}
+          <div
+            className={cn(
+              // Cross-fades with the checkbox: a fast opacity swap, no movement.
+              "contents *:transition-opacity *:duration-150 *:ease-out-strong",
+              selecting
+                ? "*:opacity-0"
+                : // Keyboard focus only: a mouse click leaves focus on the
+                  // checkbox, and the favicon must come back once you move away.
+                  "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-has-[:focus-visible]/media:*:opacity-0",
+              // Read: the favicon loses its color and steps back with the title.
+              read && !selecting && "*:opacity-50 *:grayscale",
+            )}
+          >
+            {arriving ? (
+              <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
+                <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
+              </Typography>
+            ) : (
               <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
-            </Typography>
-          ) : (
-            <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
-          )}
+            )}
+          </div>
+          <Checkbox
+            checked={selected}
+            aria-label={`Select ${link.title}`}
+            className={cn(
+              "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background transition-[opacity,box-shadow] duration-150 ease-out-strong",
+              selecting
+                ? "opacity-100"
+                : "opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:group-hover/item:opacity-100",
+            )}
+            onClick={(event) => {
+              event.preventDefault();
+              // A long-press started here already toggled the row.
+              if (longPressedRef.current) {
+                longPressedRef.current = false;
+                return;
+              }
+              linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+            }}
+          />
         </div>
-        <Checkbox
-          checked={selected}
-          aria-label={`Select ${link.title}`}
-          className={cn(
-            "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background transition-[opacity,box-shadow] duration-150 ease-out-strong",
-            selecting
-              ? "opacity-100"
-              : "opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:group-hover/item:opacity-100",
-          )}
-          onClick={(event) => {
-            event.preventDefault();
-            // A long-press started here already toggled the row.
-            if (longPressedRef.current) {
-              longPressedRef.current = false;
-              return;
-            }
-            linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-          }}
-        />
       </ItemMedia>
       <ItemContent className="self-start pt-1.5">
         <ItemTitle>
