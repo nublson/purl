@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 /**
  * A shared folder's footer, fixed at the bottom so it's in view however
- * long the list: "Shared by [avatar] @username · Made with [logo] Purl",
+ * long the list: "by [avatar] @username · Made with [logo] Purl",
  * over the search field's band of page background, so links fade away
  * underneath. Each mark sits inline
  * before its name, sized to the text; a long username truncates.
@@ -26,7 +26,7 @@ export function SharedFolderFooter({ owner }: { owner: PublicOwner }) {
           size="mini"
           className="flex min-w-0 items-center gap-x-1.5 whitespace-nowrap"
         >
-          Shared by
+          by
           <Typography
             component="span"
             size="mini"
