@@ -142,6 +142,61 @@ test.describe("Owner grid view", () => {
   });
 });
 
+test.describe("Layout saves", () => {
+  test("a quick on-then-off saves in order, so the account ends on off", async ({ page, seed }) => {
+    await seed.link({ url: "https://alpha.example", title: "Alpha" });
+    await openHome(page);
+    // The first save is slow: it would land after the second if both were
+    // sent at once.
+    const sent: unknown[] = [];
+    let first = true;
+    await page.route("**/api/user/layout", async (route) => {
+      sent.push(route.request().postDataJSON().folderTags);
+      if (first) {
+        first = false;
+        await new Promise((resolve) => setTimeout(resolve, 600));
+      }
+      await route.continue();
+    });
+
+    await page.getByRole("button", { name: "Account menu" }).click();
+    const toggle = page.getByRole("menuitemcheckbox", { name: "Folder tags" });
+    await toggle.click();
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    // One at a time: the second waits for the first.
+    await expect.poll(() => sent).toEqual([true, false]);
+    await page.waitForLoadState("networkidle");
+    await page.unroute("**/api/user/layout");
+
+    await page.reload();
+    await waitForHydration(page, '[data-cy="link-item"]');
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await expect(
+      page.getByRole("menuitemcheckbox", { name: "Folder tags" }),
+    ).toHaveAttribute("aria-checked", "false");
+  });
+
+  test("deleting a card from the keyboard moves focus to the next card", async ({ page, seed }) => {
+    await seed.link({ url: "https://alpha.example", title: "Alpha" });
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    await seed.link({ url: "https://bravo.example", title: "Bravo" });
+    await openHome(page);
+    await chooseView(page, "Grid");
+
+    // Bravo (newest) first: delete it, by keyboard, from its menu.
+    await card(page, "Bravo").hover();
+    await card(page, "Bravo").getByRole("button", { name: "Open link menu" }).focus();
+    await page.keyboard.press("Enter");
+    await page.getByRole("menuitem", { name: "Delete" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(card(page, "Bravo")).toHaveCount(0);
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.getAttribute("aria-label")))
+      .toBe("Alpha (opens in new tab)");
+  });
+});
+
 test.describe("Folder tags on phones", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 

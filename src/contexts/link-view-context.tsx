@@ -29,6 +29,64 @@ async function saveLayout(change: Partial<LayoutPrefs>) {
 }
 
 /**
+ * One layout setting, shown at once and saved in the background. Saves go
+ * one at a time, always the latest choice: a quick back-and-forth can't
+ * leave an older value on the account (two requests landing out of
+ * order). A failed save goes back to what the account last confirmed.
+ */
+function useSavedSetting<K extends keyof LayoutPrefs>(
+  key: K,
+  initial: LayoutPrefs[K],
+  failMessage: (value: LayoutPrefs[K]) => string,
+) {
+  const [value, setValue] = React.useState(initial);
+  const latest = React.useRef(initial);
+  const confirmed = React.useRef(initial);
+  const saving = React.useRef(false);
+
+  const flush = React.useCallback(async () => {
+    if (saving.current) return;
+    saving.current = true;
+    try {
+      while (latest.current !== confirmed.current) {
+        const target = latest.current;
+        try {
+          await saveLayout({ [key]: target } as Partial<LayoutPrefs>);
+          confirmed.current = target;
+        } catch {
+          // Back to what the account has; say which change didn't stick.
+          latest.current = confirmed.current;
+          setValue(confirmed.current);
+          toast.error(failMessage(target));
+          return;
+        }
+      }
+    } finally {
+      saving.current = false;
+    }
+  }, [key, failMessage]);
+
+  const set = React.useCallback(
+    (next: LayoutPrefs[K]) => {
+      if (next === latest.current) return false;
+      latest.current = next;
+      setValue(next);
+      void flush();
+      return true;
+    },
+    [flush],
+  );
+
+  return [value, set] as const;
+}
+
+const viewFailed = () => "Unable to change the view. Try again.";
+const tagsFailed = (on: boolean) =>
+  on
+    ? "Unable to show folder tags. Try again."
+    : "Unable to hide folder tags. Try again.";
+
+/**
  * The owner's layout settings (the view, rows or a grid of cards, and
  * Home's folder tags), seeded by the server from the account so the page
  * renders with them, no flash.
@@ -40,45 +98,20 @@ export function LinkViewProvider({
   initialLayout: LayoutPrefs;
   children: React.ReactNode;
 }) {
-  const [view, setViewState] = React.useState(initialLayout.view);
-  const [folderTags, setFolderTagsState] = React.useState(
+  const [view, saveView] = useSavedSetting("view", initialLayout.view, viewFailed);
+  const [folderTags, setFolderTags] = useSavedSetting(
+    "folderTags",
     initialLayout.folderTags,
+    tagsFailed,
   );
   const [switched, setSwitched] = React.useState(false);
-  // The last value asked for: a slow failure must not undo a newer choice.
-  const latestView = React.useRef(initialLayout.view);
-  const latestTags = React.useRef(initialLayout.folderTags);
 
-  const setView = React.useCallback((next: LinkView) => {
-    const previous = latestView.current;
-    if (next === previous) return;
-    latestView.current = next;
-    setViewState(next);
-    setSwitched(true);
-    saveLayout({ view: next }).catch(() => {
-      if (latestView.current !== next) return;
-      latestView.current = previous;
-      setViewState(previous);
-      toast.error("Unable to change the view. Try again.");
-    });
-  }, []);
-
-  const setFolderTags = React.useCallback((next: boolean) => {
-    const previous = latestTags.current;
-    if (next === previous) return;
-    latestTags.current = next;
-    setFolderTagsState(next);
-    saveLayout({ folderTags: next }).catch(() => {
-      if (latestTags.current !== next) return;
-      latestTags.current = previous;
-      setFolderTagsState(previous);
-      toast.error(
-        next
-          ? "Unable to show folder tags. Try again."
-          : "Unable to hide folder tags. Try again.",
-      );
-    });
-  }, []);
+  const setView = React.useCallback(
+    (next: LinkView) => {
+      if (saveView(next)) setSwitched(true);
+    },
+    [saveView],
+  );
 
   const value = React.useMemo(
     () => ({ view, setView, switched, folderTags, setFolderTags }),

@@ -10,10 +10,8 @@ import {
   useIsSelectionActive,
 } from "@/lib/link-selection";
 import { ARRIVE } from "@/lib/motion";
-import {
-  deleteLinkWithUndo,
-  usePendingLinkDeletes,
-} from "@/lib/pending-link-deletes";
+import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
+import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
@@ -56,6 +54,7 @@ export function LinkCard({
   const read = useIsLinkRead(link);
   const folderTag = useFolderTag(link);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const anchorRef = React.useRef<HTMLAnchorElement>(null);
   const { handlers: longPress, consumeLongPress } = useLongPress(() =>
     linkSelection.toggle(link.id),
   );
@@ -92,6 +91,7 @@ export function LinkCard({
       }}
     >
       <a
+        ref={anchorRef}
         href={link.url}
         target="_blank"
         rel="noopener noreferrer"
@@ -159,8 +159,15 @@ export function LinkCard({
         <LinkMenu
           link={link}
           onOpenChange={setMenuOpen}
-          onDelete={() =>
-            deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged })
+          onDelete={({ byKeyboard }) =>
+            // Keyboard users land on the next card, not the page.
+            deleteLinkKeepingFocus({
+              linkId: link.id,
+              anchor: anchorRef.current,
+              siblingsSelector: '[data-cy="link-card"] > a[href]',
+              byKeyboard,
+              onDeleted: notifyLinksChanged,
+            })
           }
         />
       </div>

@@ -11,11 +11,8 @@ import {
   useIsLinkSelected,
   useIsSelectionActive,
 } from "@/lib/link-selection";
-import {
-  deleteLinkWithUndo,
-  LINK_DELETE_FADE_MS,
-  usePendingLinkDeletes,
-} from "@/lib/pending-link-deletes";
+import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
+import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
@@ -169,29 +166,14 @@ export const LinkItem = React.forwardRef<
     });
   }, [previewOpen]);
 
-  const deleteRow = ({ byKeyboard }: { byKeyboard: boolean }) => {
-    const rows = Array.from(
-      document.querySelectorAll<HTMLElement>('[data-cy="link-item"] > a[href]'),
-    );
-    const index = rows.indexOf(anchorRef.current as HTMLElement);
-    const target =
-      index >= 0 ? (rows[index + 1] ?? rows[index - 1] ?? null) : null;
-    deleteLinkWithUndo(link.id, { onDeleted: notifyLinksChanged });
-    // The row (and its menu trigger) unmounts once hidden; then move
-    // focus to the neighboring row only if focus fell to the body.
-    // Its focus ring shows only for a keyboard delete: after a click
-    // the user isn't navigating by keyboard.
-    setTimeout(() => {
-      requestAnimationFrame(() => {
-        const active = document.activeElement;
-        if (target?.isConnected && (!active || active === document.body)) {
-          // `focusVisible` isn't in TS's DOM types yet; browsers
-          // without it ignore the option.
-          target.focus({ focusVisible: byKeyboard } as FocusOptions);
-        }
-      });
-    }, LINK_DELETE_FADE_MS);
-  };
+  const deleteRow = ({ byKeyboard }: { byKeyboard: boolean }) =>
+    deleteLinkKeepingFocus({
+      linkId: link.id,
+      anchor: anchorRef.current,
+      siblingsSelector: '[data-cy="link-item"] > a[href]',
+      byKeyboard,
+      onDeleted: notifyLinksChanged,
+    });
 
   const content = (
     <Item
