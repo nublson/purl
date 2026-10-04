@@ -119,7 +119,7 @@ export function OmniboxSaveRow({
   const saved = preview ? preview.saved : alreadySaved;
   const shown = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
   const link: Link | null = preview
-    ? { ...preview, id: "preview", createdAt: new Date(0), folderId: null }
+    ? { ...preview, id: "preview", createdAt: new Date(0), folderId: null, readAt: null }
     : null;
 
   const label = `Save ${link?.title ?? shown}${saved ? " (already saved)" : ""}`;

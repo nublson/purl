@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   groupByPreviousFolder,
+  isBulkReadBody,
   parseBulkDeleteBody,
   parseBulkMoveBody,
+  parseBulkReadBody,
   parseLinkIds,
 } from "./bulk-links";
 import { MAX_BULK_LINK_IDS } from "./limits";
@@ -62,6 +64,40 @@ describe("parseBulkDeleteBody", () => {
   it("accepts ids and rejects anything else", () => {
     expect(parseBulkDeleteBody({ ids: ["a", "a"] })).toEqual({ ok: true, ids: ["a"] });
     expect(parseBulkDeleteBody([])).toMatchObject({ ok: false, code: "INVALID_IDS" });
+  });
+});
+
+describe("parseBulkReadBody", () => {
+  it("accepts read true or false", () => {
+    expect(parseBulkReadBody({ ids: ["a"], read: true })).toEqual({
+      ok: true,
+      ids: ["a"],
+      read: true,
+    });
+    expect(parseBulkReadBody({ ids: ["a"], read: false })).toMatchObject({
+      ok: true,
+      read: false,
+    });
+  });
+
+  it("rejects a non-boolean read, or read combined with a move", () => {
+    expect(parseBulkReadBody({ ids: ["a"], read: "yes" })).toMatchObject({
+      ok: false,
+      code: "INVALID_READ",
+    });
+    expect(
+      parseBulkReadBody({ ids: ["a"], read: true, folderId: null }),
+    ).toMatchObject({ ok: false, code: "INVALID_READ" });
+    expect(parseBulkReadBody({ ids: [], read: true })).toMatchObject({
+      ok: false,
+      code: "INVALID_IDS",
+    });
+  });
+
+  it("is chosen by the presence of read", () => {
+    expect(isBulkReadBody({ ids: ["a"], read: true })).toBe(true);
+    expect(isBulkReadBody({ ids: ["a"], folderId: null })).toBe(false);
+    expect(isBulkReadBody(null)).toBe(false);
   });
 });
 

@@ -201,6 +201,7 @@ type LinkRow = {
   thumbnail: string | null;
   createdAt: Date;
   folderId?: string | null;
+  readAt?: Date | null;
 };
 
 function mapRowToLink(row: LinkRow): Link {
@@ -215,6 +216,7 @@ function mapRowToLink(row: LinkRow): Link {
     contentType: row.contentType,
     createdAt: row.createdAt,
     folderId: row.folderId ?? null,
+    readAt: row.readAt ?? null,
   };
 }
 
@@ -416,6 +418,8 @@ async function refreshExistingLink(
       domain: resolved.domain,
       contentType: resolved.contentType,
       createdAt: new Date(),
+      // Saving it again puts it back on the reading list.
+      readAt: null,
       ...(folderId !== undefined ? { folderId } : {}),
     },
   });
@@ -539,6 +543,8 @@ export type UpdateLinkData = {
   url?: string;
   title?: string;
   description?: string | null;
+  /** true marks it read (keeping an earlier read time), false unread. */
+  read?: boolean;
 };
 
 export type UpdateLinkResult = Awaited<ReturnType<typeof prisma.link.update>>;
@@ -605,6 +611,10 @@ export async function updateLinkForUser(
 
   if (data.folderId !== undefined) {
     updatePayload.folderId = data.folderId;
+  }
+
+  if (data.read !== undefined) {
+    updatePayload.readAt = data.read ? (existing.readAt ?? new Date()) : null;
   }
 
   if (Object.keys(updatePayload).length === 0) return existing;
@@ -729,6 +739,27 @@ export async function moveLinksToFolder(
     notFound: linkIds.filter((id) => !previousById.has(id)),
   };
 }
+/**
+ * Marks every link in `linkIds` owned by `userId` read (`read: true`; links
+ * already read keep their first read time) or unread, in one write. Ids
+ * that aren't the user's are ignored. Returns how many links changed.
+ */
+export async function markLinksReadForUser(
+  userId: string,
+  linkIds: string[],
+  read: boolean,
+): Promise<number> {
+  const { count } = await prisma.link.updateMany({
+    where: {
+      id: { in: linkIds },
+      userId,
+      readAt: read ? null : { not: null },
+    },
+    data: { readAt: read ? new Date() : null },
+  });
+  return count;
+}
+
 /**
  * Deletes every link in `linkIds` owned by `userId` in one write; ids that
  * aren't the user's are ignored. Returns how many links were deleted.

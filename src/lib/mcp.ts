@@ -18,6 +18,7 @@ import {
 import {
   createLinkForUser,
   listLinksForUser,
+  markLinksReadForUser,
   moveLinkToFolder,
   moveLinksToFolder,
   readLinkForUser,
@@ -252,6 +253,18 @@ export async function moveLinksTool(
   }
 }
 
+export async function markLinksReadTool(
+  userId: string,
+  linkIds: string[],
+  read: boolean,
+): Promise<ToolResult> {
+  const ids = parseLinkIds(linkIds);
+  if (!ids.ok) return errorContent(ids.error);
+  const updated = await markLinksReadForUser(userId, ids.ids, read);
+  if (updated > 0) broadcastLinksChanged(userId);
+  return jsonContent({ updated });
+}
+
 export async function getLinkTool(
   userId: string,
   id: string,
@@ -404,6 +417,18 @@ export function registerPurlTools(server: McpServer): void {
     { destructiveHint: false, idempotentHint: true },
     async ({ linkIds, folderId }, extra) =>
       moveLinksTool(getUserId(extra), linkIds, folderId),
+  );
+
+  server.tool(
+    "mark_links_read",
+    `Mark saved links read or unread (up to ${MAX_BULK_LINK_IDS} per call). Each link's readAt is when it was read, or null while unread. Returns how many links changed.`,
+    {
+      linkIds: z.array(z.string()).describe("The link ids"),
+      read: z.boolean().describe("true marks them read, false unread"),
+    },
+    { destructiveHint: false, idempotentHint: true },
+    async ({ linkIds, read }, extra) =>
+      markLinksReadTool(getUserId(extra), linkIds, read),
   );
 }
 
