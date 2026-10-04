@@ -100,6 +100,8 @@ test.describe("Link row swipe", () => {
     await moveButton.tap();
     await page.getByRole("menuitem", { name: /Later/ }).tap();
     await expect(page.getByText(/Moved to .*Later/)).toBeVisible();
+    // Choosing a folder closes the row.
+    await expect(deleteButton).toHaveCount(0);
 
     // Delete: the row leaves with the usual Undo toast.
     await swipe(page, row(page, "Bravo"), -140);

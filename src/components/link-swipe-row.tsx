@@ -18,7 +18,6 @@ import type { Link as LinkType } from "@/utils/links";
 import { Check, CircleDot, FolderInput, Trash } from "lucide-react";
 import {
   animate,
-  AnimatePresence,
   motion,
   useMotionValue,
   useMotionValueEvent,
@@ -34,13 +33,15 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-/** A swipe button's entrance: from half size and clear, no bounce. */
-const BUTTON_IN = {
-  initial: { opacity: 0, transform: "scale(0.5)" },
-  animate: { opacity: 1, transform: "scale(1)" },
-  exit: { opacity: 0, transform: "scale(0.5)" },
-  transition: { type: "spring", duration: 0.3, bounce: 0 },
-} as const;
+/**
+ * A swipe button showing (it has room) or not: from half size and clear,
+ * a transition so a quick back-and-forth retargets instead of restarting.
+ */
+const buttonReveal = (shown: boolean) =>
+  cn(
+    "transition-[opacity,scale] duration-200 ease-out-strong",
+    shown ? "scale-100 opacity-100" : "pointer-events-none scale-50 opacity-0",
+  );
 
 /**
  * A link row's swipe actions, on phones (`enabled`). The row follows the
@@ -99,6 +100,8 @@ export function LinkSwipeRow({
   const moveOpenRef = React.useRef(false);
 
   useMotionValueEvent(x, "change", (value) => {
+    // Back at rest (and no finger on it): nothing to clip or show.
+    if (value === 0 && !gestureRef.current) setAway(false);
     setSide(value > 0 ? "read" : value < 0 ? "actions" : null);
     setRevealed(swipeRevealed(value));
     setArmed(value >= SWIPE_READ_AT);
@@ -106,16 +109,13 @@ export function LinkSwipeRow({
 
   const settle = React.useCallback(
     (target: number) => {
-      const controls = animate(
+      animate(
         x,
         target,
         reduceMotion
           ? { duration: 0.15, ease: EASE_OUT_STRONG }
           : { type: "spring", duration: 0.35, bounce: 0 },
       );
-      void controls.then(() => {
-        if (x.get() === 0) setAway(false);
-      });
     },
     [x, reduceMotion],
   );
@@ -188,7 +188,14 @@ export function LinkSwipeRow({
       ref={rootRef}
       // pan-y: vertical drags stay the browser's (scrolling); sideways ones
       // reach the handlers below.
-      className={cn("relative", enabled && "touch-pan-y", away && "overflow-hidden")}
+      className={cn(
+        "relative rounded-md",
+        enabled && "touch-pan-y",
+        // Held: the whole row (the buttons too) gets a hairline edge, drawn
+        // above the sliding content so its fill can't cover it.
+        away &&
+          "overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-20 after:rounded-md after:ring-1 after:ring-border after:ring-inset",
+      )}
       onPointerDown={(event) => {
         swipedRef.current = false;
         if (!enabled || event.pointerType !== "touch") return;
@@ -274,9 +281,8 @@ export function LinkSwipeRow({
             inert={!isOpen}
             className="absolute inset-y-0 right-2 flex items-center gap-1"
           >
-            <AnimatePresence initial={false}>
-              {side === "actions" && revealed >= 2 ? (
-                <motion.div key="move" {...BUTTON_IN}>
+              {away ? (
+                <div className={buttonReveal(side === "actions" && revealed >= 2)}>
                   <DropdownMenu
                     open={moveOpen}
                     onOpenChange={(open) => {
@@ -299,10 +305,10 @@ export function LinkSwipeRow({
                       <LinkFolderItems link={link} />
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </motion.div>
+                </div>
               ) : null}
-              {side === "actions" && revealed >= 1 ? (
-                <motion.div key="delete" {...BUTTON_IN}>
+              {away ? (
+                <div className={buttonReveal(side === "actions" && revealed >= 1)}>
                   <Button
                     variant="ghost"
                     size="icon-sm"
@@ -312,19 +318,18 @@ export function LinkSwipeRow({
                   >
                     <Trash />
                   </Button>
-                </motion.div>
+                </div>
               ) : null}
-            </AnimatePresence>
           </div>
         </div>
       ) : null}
       {/* Off its resting place, the row is visibly held: the hover fill
-          and a hairline edge (inset; the wrapper clips while away). */}
+          (the edge is the wrapper's, around the buttons too). */}
       <motion.div
         style={{ transform }}
         className={cn(
-          "rounded-md transition-[background-color,box-shadow] duration-150 ease-out-strong",
-          away && "bg-accent/40 ring-1 ring-border ring-inset",
+          "rounded-md transition-[background-color] duration-150 ease-out-strong",
+          away && "bg-accent/40",
         )}
       >
         {children}
