@@ -90,9 +90,19 @@ test.describe("Link row swipe", () => {
     await page.waitForTimeout(400);
     await page.screenshot({ path: testInfo.outputPath("swipe-open.png") });
 
-    // A tap on the row closes it instead of opening the link.
+    // Held: the edge around the whole component shows while it's open.
+    const edgeOpacity = () =>
+      row(page, "Alpha").evaluate((el) =>
+        // The row, its sliding layer, then the swipe wrapper that draws it.
+        Number(getComputedStyle(el.parentElement!.parentElement!, "::after").opacity),
+      );
+    await expect.poll(edgeOpacity).toBe(1);
+
+    // A tap on the row closes it instead of opening the link, and the edge
+    // fades away with it.
     await page.touchscreen.tap(30, (await row(page, "Alpha").boundingBox())!.y + 24);
     await expect(deleteButton).toHaveCount(0);
+    await expect.poll(edgeOpacity).toBe(0);
     expect(popups).toHaveLength(0);
 
     // Move: the folder list, then the toast.
@@ -131,8 +141,11 @@ test.describe("Link row swipe", () => {
     await expect(folder).toBeVisible();
     // Below its trigger, inside the same menu (not a side submenu).
     const triggerBox = (await trigger.boundingBox())!;
+    // Once its 4px entrance has settled.
+    await expect
+      .poll(async () => (await folder.boundingBox())!.y)
+      .toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height - 1);
     const folderBox = (await folder.boundingBox())!;
-    expect(folderBox.y).toBeGreaterThanOrEqual(triggerBox.y + triggerBox.height - 1);
     expect(folderBox.x + folderBox.width).toBeLessThanOrEqual(390);
     await page.screenshot({ path: testInfo.outputPath("folders-inline.png") });
 
@@ -178,7 +191,8 @@ test.describe("Link row swipe", () => {
     await expect(page.getByRole("toolbar", { name: "Selected links" })).toContainText("1 selected");
     await expect(page.getByRole("button", { name: "Delete", exact: true })).toHaveCount(0);
     const offset = await row(page, "Alpha").evaluate(
-      (el) => new DOMMatrix(getComputedStyle(el.parentElement!.parentElement!).transform).m41,
+      // The sliding layer, right around the row.
+      (el) => new DOMMatrix(getComputedStyle(el.parentElement!).transform).m41,
     );
     expect(offset).toBe(0);
   });

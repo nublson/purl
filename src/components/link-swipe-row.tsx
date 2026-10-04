@@ -41,6 +41,8 @@ const buttonReveal = (shown: boolean) =>
   cn(
     "transition-[opacity,scale] duration-200 ease-out-strong",
     shown ? "scale-100 opacity-100" : "pointer-events-none scale-50 opacity-0",
+    // Reduced motion: they fade, without growing.
+    "motion-reduce:scale-100",
   );
 
 /**
@@ -190,11 +192,15 @@ export function LinkSwipeRow({
       // reach the handlers below.
       className={cn(
         "relative rounded-md",
-        enabled && "touch-pan-y",
-        // Held: one hairline edge around the whole component (row and
-        // buttons), drawn above the sliding row so it stays continuous.
-        away &&
-          "overflow-hidden after:pointer-events-none after:absolute after:inset-0 after:z-20 after:rounded-md after:ring-1 after:ring-border after:ring-inset",
+        // Held (a finger on it, or resting open): one hairline edge around
+        // the whole component, row and buttons, drawn above the sliding
+        // row so it stays continuous. It fades with the row's fill, so the
+        // two leave together during the spring back instead of the edge
+        // cutting off when the row arrives.
+        enabled &&
+          "touch-pan-y after:pointer-events-none after:absolute after:inset-0 after:z-20 after:rounded-md after:opacity-0 after:ring-1 after:ring-border after:transition-opacity after:duration-150 after:ease-out-strong after:ring-inset",
+        enabled && isOpen && "after:opacity-100",
+        away && "overflow-hidden",
       )}
       onPointerDown={(event) => {
         swipedRef.current = false;
@@ -269,6 +275,8 @@ export function LinkSwipeRow({
                   armed
                     ? "scale-100 bg-primary text-primary-foreground"
                     : "scale-75 bg-muted text-muted-foreground",
+                  // Reduced motion: only its color says it's armed.
+                  "motion-reduce:scale-100",
                 )}
               >
                 {read ? <CircleDot /> : <Check />}
@@ -330,7 +338,7 @@ export function LinkSwipeRow({
         style={{ transform }}
         className={cn(
           "relative rounded-md transition-[background-color] duration-150 ease-out-strong",
-          away && "bg-[color-mix(in_oklab,var(--accent)_40%,var(--background))]",
+          isOpen && "bg-[color-mix(in_oklab,var(--accent)_40%,var(--background))]",
         )}
       >
         {children}
