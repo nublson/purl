@@ -1,8 +1,9 @@
 /**
  * `Cache-Control` for OAuth discovery metadata (`/.well-known/oauth-*`):
  * fresh on the Vercel CDN for an hour, then served stale for up to a day
- * while it refreshes in the background. The CDN keys by host, so each
- * domain keeps its own copy (the metadata names the request's host).
+ * while it refreshes in the background. Safe because Better Auth builds
+ * the metadata from the configured base URL (BETTER_AUTH_URL), not the
+ * request: every caller on every domain gets the same document.
  */
 export const DISCOVERY_CACHE_CONTROL =
   "public, s-maxage=3600, stale-while-revalidate=86400";
