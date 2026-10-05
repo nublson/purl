@@ -17,7 +17,6 @@ import type { Link } from "@/utils/links";
 import { isPdfUrl } from "@/utils/pdf";
 import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
 import { isYouTubeUrl } from "@/utils/youtube";
-import ogs from "open-graph-scraper";
 import { cache } from "react";
 
 /** Metadata HTML fetch budget (head-only read; allow slower proxy egress). */
@@ -257,6 +256,10 @@ export async function scrapeLinkMetadata(url: string): Promise<{
 
     const html = await readHtmlForOpenGraph(pageResponse);
 
+    // Loaded here, not at the top: this module also serves every page that
+    // lists links (Home, folders), and the scraper and its HTML parser are
+    // ~50ms of module loading that each cold start would pay for nothing.
+    const { default: ogs } = await import("open-graph-scraper");
     const { error, result } = await ogs({
       html,
       timeout: 8,

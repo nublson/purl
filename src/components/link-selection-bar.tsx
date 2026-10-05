@@ -35,7 +35,7 @@ import {
   Trash,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, LazyMotion, m, useReducedMotion } from "motion/react";
 import * as React from "react";
 import { toast } from "sonner";
 import { DialogFolderForm } from "./dialog-folder-form";
@@ -53,6 +53,9 @@ import {
 } from "./ui/dropdown-menu";
 import { Kbd } from "./ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+
+const loadMotionFeatures = () =>
+  import("@/lib/motion-features").then((mod) => mod.default);
 
 /**
  * Floating bar for the selected links (Home or a folder page): the count
@@ -203,145 +206,148 @@ export function LinkSelectionBar({
           void moveTo(folder.id, newFolderLinks.current, folder);
         }}
       />
-      <AnimatePresence initial={false}>
-        {count > 0 ? (
-          <motion.div
-            key="link-selection-bar"
-            ref={toolbarRef}
-            role="toolbar"
-            aria-label="Selected links"
-            onKeyDown={onToolbarKeyDown}
-            // Rises from where it's anchored (the bottom edge). Full
-            // transform strings stay on the GPU; `x`/`y` shorthands don't.
-            initial={{
-              opacity: 0,
-              transform: reduceMotion ? "translateY(0px)" : "translateY(8px)",
-            }}
-            animate={{ opacity: 1, transform: "translateY(0px)" }}
-            // Out the way it came, shorter and quicker than the entrance.
-            exit={{
-              opacity: 0,
-              transform: reduceMotion ? "translateY(0px)" : "translateY(4px)",
-              transition: { duration: 0.15, ease: EASE_OUT_STRONG },
-            }}
-            transition={{ duration: 0.2, ease: EASE_OUT_STRONG }}
-            className={cn(
-              // Stacked on the search field: its 1rem + 44px + an 8px gap.
-              "fixed inset-x-0 bottom-[calc(4.25rem+var(--bottom-inset))] z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-1 rounded-xl bg-popover p-1 text-popover-foreground",
-              // Elevation from layered shadows; the 1px ring is the edge.
-              "shadow-[0_0_0_1px_var(--border),0_2px_4px_-1px_oklch(0_0_0/0.12),0_8px_24px_-4px_oklch(0_0_0/0.24)]",
-            )}
-          >
-            <ShortcutTooltip
-              label="Clear selection"
-              shortcut="clear"
-              apple={apple}
+      {/* `m` + LazyMotion: the animation code loads in its own chunk. */}
+      <LazyMotion features={loadMotionFeatures} strict>
+        <AnimatePresence initial={false}>
+          {count > 0 ? (
+            <m.div
+              key="link-selection-bar"
+              ref={toolbarRef}
+              role="toolbar"
+              aria-label="Selected links"
+              onKeyDown={onToolbarKeyDown}
+              // Rises from where it's anchored (the bottom edge). Full
+              // transform strings stay on the GPU; `x`/`y` shorthands don't.
+              initial={{
+                opacity: 0,
+                transform: reduceMotion ? "translateY(0px)" : "translateY(8px)",
+              }}
+              animate={{ opacity: 1, transform: "translateY(0px)" }}
+              // Out the way it came, shorter and quicker than the entrance.
+              exit={{
+                opacity: 0,
+                transform: reduceMotion ? "translateY(0px)" : "translateY(4px)",
+                transition: { duration: 0.15, ease: EASE_OUT_STRONG },
+              }}
+              transition={{ duration: 0.2, ease: EASE_OUT_STRONG }}
+              className={cn(
+                // Stacked on the search field: its 1rem + 44px + an 8px gap.
+                "fixed inset-x-0 bottom-[calc(4.25rem+var(--bottom-inset))] z-40 mx-auto flex w-fit max-w-[calc(100%-2rem)] items-center gap-1 rounded-xl bg-popover p-1 text-popover-foreground",
+                // Elevation from layered shadows; the 1px ring is the edge.
+                "shadow-[0_0_0_1px_var(--border),0_2px_4px_-1px_oklch(0_0_0/0.12),0_8px_24px_-4px_oklch(0_0_0/0.24)]",
+              )}
             >
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={`Clear selection (${formatLinkCount(shownCount)} selected)`}
-                className="h-7 gap-1.5 rounded-lg bg-accent px-2 text-xs tabular-nums hover:bg-accent/70"
-                onClick={() => linkSelection.clear()}
+              <ShortcutTooltip
+                label="Clear selection"
+                shortcut="clear"
+                apple={apple}
               >
-                {shownCount} selected
-                <X data-icon="inline-end" className="size-3.5" />
-              </Button>
-            </ShortcutTooltip>
-            <BarSeparator />
-            <ShortcutTooltip
-              label={allSelected ? "Deselect all" : "Select all"}
-              shortcut={allSelected ? undefined : "selectAll"}
-              apple={apple}
-            >
-              {/* The list's master checkbox: partly checked (some selected)
-                  or checked (all), drawn like the rows' checkboxes. */}
-              <Button
-                variant="ghost"
-                size="sm"
-                role="checkbox"
-                aria-checked={allSelected ? true : "mixed"}
-                aria-label="Select all"
-                // Icon-only on phones, where the full bar wouldn't fit.
-                className="rounded-lg text-muted-foreground hover:text-foreground max-sm:w-8 max-sm:px-0"
-                onClick={toggleAll}
-              >
-                <MasterCheckbox checked={allSelected} />
-                {/* Both labels share one grid cell, so the button keeps the
-                    longer one's width and the bar never jumps. */}
-                <Typography
-                  component="span"
-                  aria-hidden
-                  className="grid max-sm:hidden"
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Clear selection (${formatLinkCount(shownCount)} selected)`}
+                  className="h-7 gap-1.5 rounded-lg bg-accent px-2 text-xs tabular-nums hover:bg-accent/70"
+                  onClick={() => linkSelection.clear()}
                 >
+                  {shownCount} selected
+                  <X data-icon="inline-end" className="size-3.5" />
+                </Button>
+              </ShortcutTooltip>
+              <BarSeparator />
+              <ShortcutTooltip
+                label={allSelected ? "Deselect all" : "Select all"}
+                shortcut={allSelected ? undefined : "selectAll"}
+                apple={apple}
+              >
+                {/* The list's master checkbox: partly checked (some selected)
+                    or checked (all), drawn like the rows' checkboxes. */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  role="checkbox"
+                  aria-checked={allSelected ? true : "mixed"}
+                  aria-label="Select all"
+                  // Icon-only on phones, where the full bar wouldn't fit.
+                  className="rounded-lg text-muted-foreground hover:text-foreground max-sm:w-8 max-sm:px-0"
+                  onClick={toggleAll}
+                >
+                  <MasterCheckbox checked={allSelected} />
+                  {/* Both labels share one grid cell, so the button keeps the
+                      longer one's width and the bar never jumps. */}
                   <Typography
                     component="span"
-                    size="small"
-                    className="invisible col-start-1 row-start-1 font-medium"
+                    aria-hidden
+                    className="grid max-sm:hidden"
                   >
-                    Deselect all
+                    <Typography
+                      component="span"
+                      size="small"
+                      className="invisible col-start-1 row-start-1 font-medium"
+                    >
+                      Deselect all
+                    </Typography>
+                    <Typography
+                      component="span"
+                      size="small"
+                      className="col-start-1 row-start-1 font-medium text-current"
+                    >
+                      {allSelected ? "Deselect all" : "Select all"}
+                    </Typography>
                   </Typography>
-                  <Typography
-                    component="span"
-                    size="small"
-                    className="col-start-1 row-start-1 font-medium text-current"
-                  >
-                    {allSelected ? "Deselect all" : "Select all"}
-                  </Typography>
-                </Typography>
-              </Button>
-            </ShortcutTooltip>
-            <BarSeparator />
-            <MoveMenu
-              open={moveOpen}
-              onOpenChange={setMoveOpen}
-              apple={apple}
-              folderOf={folderOf}
-              onMove={(folderId) => void moveTo(folderId)}
-              onNewFolder={() => {
-                newFolderLinks.current = linkSelection.selectedIds();
-                pendingNewFolder.current = true;
-              }}
-              onCloseAutoFocus={(event) => {
-                if (!pendingNewFolder.current) return;
-                pendingNewFolder.current = false;
-                event.preventDefault();
-                setNewFolderOpen(true);
-              }}
-            />
-            <ShortcutTooltip
-              label={allRead ? "Mark as unread" : "Mark as read"}
-              shortcut="read"
-              apple={apple}
-            >
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                data-cy="selection-toggle-read"
-                aria-label={`Mark ${formatLinkCount(shownCount)} as ${allRead ? "unread" : "read"}`}
-                className="rounded-lg"
-                onClick={toggleReadSelected}
+                </Button>
+              </ShortcutTooltip>
+              <BarSeparator />
+              <MoveMenu
+                open={moveOpen}
+                onOpenChange={setMoveOpen}
+                apple={apple}
+                folderOf={folderOf}
+                onMove={(folderId) => void moveTo(folderId)}
+                onNewFolder={() => {
+                  newFolderLinks.current = linkSelection.selectedIds();
+                  pendingNewFolder.current = true;
+                }}
+                onCloseAutoFocus={(event) => {
+                  if (!pendingNewFolder.current) return;
+                  pendingNewFolder.current = false;
+                  event.preventDefault();
+                  setNewFolderOpen(true);
+                }}
+              />
+              <ShortcutTooltip
+                label={allRead ? "Mark as unread" : "Mark as read"}
+                shortcut="read"
+                apple={apple}
               >
-                <ReadToggleIcon read={allRead} />
-              </Button>
-            </ShortcutTooltip>
-            <BarSeparator />
-            <ShortcutTooltip label="Delete" shortcut="delete" apple={apple}>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={`Delete ${formatLinkCount(shownCount)}`}
-                // Muted at rest so it doesn't outweigh Move; the destructive
-                // variant's colors only on hover or focus, right before a click.
-                className="rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:border-destructive/40 focus-visible:bg-destructive/10 focus-visible:text-destructive focus-visible:ring-destructive dark:hover:bg-destructive/20 dark:focus-visible:bg-destructive/20"
-                onClick={deleteSelected}
-              >
-                <Trash />
-              </Button>
-            </ShortcutTooltip>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  data-cy="selection-toggle-read"
+                  aria-label={`Mark ${formatLinkCount(shownCount)} as ${allRead ? "unread" : "read"}`}
+                  className="rounded-lg"
+                  onClick={toggleReadSelected}
+                >
+                  <ReadToggleIcon read={allRead} />
+                </Button>
+              </ShortcutTooltip>
+              <BarSeparator />
+              <ShortcutTooltip label="Delete" shortcut="delete" apple={apple}>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Delete ${formatLinkCount(shownCount)}`}
+                  // Muted at rest so it doesn't outweigh Move; the destructive
+                  // variant's colors only on hover or focus, right before a click.
+                  className="rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:border-destructive/40 focus-visible:bg-destructive/10 focus-visible:text-destructive focus-visible:ring-destructive dark:hover:bg-destructive/20 dark:focus-visible:bg-destructive/20"
+                  onClick={deleteSelected}
+                >
+                  <Trash />
+                </Button>
+              </ShortcutTooltip>
+            </m.div>
+          ) : null}
+        </AnimatePresence>
+      </LazyMotion>
     </>
   );
 }

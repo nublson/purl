@@ -2,12 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
-import {
-  EmojiPicker,
-  EmojiPickerContent,
-  EmojiPickerFooter,
-  EmojiPickerSearch,
-} from "@/components/ui/emoji-picker";
 import { Field, FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,9 +17,20 @@ import {
 } from "@/lib/folder-display";
 import { suggestFolderEmoji } from "@/lib/emoji-suggestion";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
 import * as React from "react";
 import { DialogWrapper } from "./dialog-wrapper";
 import { Typography } from "./typography";
+
+// The emoji picker (Frimousse and its search) is the bulk of this dialog's
+// code: it loads when a folder dialog opens (`preloadEmojiPicker`), not
+// with the page. The placeholder keeps the popover at the picker's size.
+const loadEmojiPicker = () => import("./folder-emoji-picker-panel");
+const preloadEmojiPicker = () => void loadEmojiPicker();
+const FolderEmojiPickerPanel = dynamic(loadEmojiPicker, {
+  ssr: false,
+  loading: () => <div className="h-80 w-72" aria-hidden />,
+});
 
 /** Mirrors the server's folder-name cap in `src/lib/folders.ts` ("Keep the name to 60 characters or fewer."). */
 const MAX_NAME_LENGTH = 60;
@@ -297,6 +302,9 @@ function FolderEmojiPicker({
   onChange: (emoji: string) => void;
 }) {
   const [open, setOpen] = React.useState(false);
+  // Mounted with the open dialog: fetch the picker now, so it's there by
+  // the time the button is pressed.
+  React.useEffect(preloadEmojiPicker, []);
   const shown = value ?? suggested ?? DEFAULT_FOLDER_EMOJI;
   const isSuggestion = value === null && Boolean(suggested);
 
@@ -338,17 +346,12 @@ function FolderEmojiPicker({
         // Above the dialog (`DialogWrapper` raises it to z-51).
         className="z-52 w-auto gap-0 rounded-lg p-0"
       >
-        <EmojiPicker
-          className="h-80"
-          onEmojiSelect={({ emoji }) => {
+        <FolderEmojiPickerPanel
+          onSelect={(emoji) => {
             onChange(emoji);
             setOpen(false);
           }}
-        >
-          <EmojiPickerSearch />
-          <EmojiPickerContent />
-          <EmojiPickerFooter />
-        </EmojiPicker>
+        />
       </PopoverContent>
     </Popover>
   );
