@@ -1,6 +1,8 @@
 import { OAuthConsentActions } from "@/components/oauth-consent-actions";
 import { Typography } from "@/components/typography";
 import prisma from "@/lib/prisma";
+import { getSessionUser } from "@/lib/session";
+import { redirect } from "next/navigation";
 
 export default async function OAuthConsentPage({
   searchParams,
@@ -11,6 +13,9 @@ export default async function OAuthConsentPage({
     scope?: string;
   }>;
 }) {
+  // Signed in only: the proxy just looks for a session cookie.
+  if (!(await getSessionUser())) redirect("/");
+
   const {
     consent_code: consentCode,
     client_id: clientId,

@@ -3,10 +3,10 @@ import { FoldersProvider } from "@/contexts/folders-context";
 import { LinkViewProvider } from "@/contexts/link-view-context";
 import { LinksSyncProvider } from "@/contexts/links-sync-context";
 import { listFoldersForUser } from "@/lib/folders";
-import { DEFAULT_LAYOUT } from "@/lib/link-view";
 import { getLayoutForUser } from "@/lib/link-view-store";
 import { getSessionUser } from "@/lib/session";
 import { getUsageSummaryForUser } from "@/lib/usage-summary";
+import { redirect } from "next/navigation";
 
 export default async function AppShellLayout({
   children,
@@ -21,13 +21,15 @@ export default async function AppShellLayout({
   // `useCurrentFolder()` is correct on the very first render instead of
   // racing the provider's own client-side fetch (see folders-context.tsx).
   const user = await getSessionUser();
-  const [initialFolders, usageSummary, layout] = user
-    ? await Promise.all([
-        listFoldersForUser(user.id),
-        getUsageSummaryForUser(user.id),
-        getLayoutForUser(user.id),
-      ])
-    : [[], null, DEFAULT_LAYOUT];
+  // The sign-in check for every app page: the proxy only looks for a
+  // session cookie (an optimistic check), so an expired or forged one
+  // lands here and goes back to the landing page.
+  if (!user) redirect("/");
+  const [initialFolders, usageSummary, layout] = await Promise.all([
+    listFoldersForUser(user.id),
+    getUsageSummaryForUser(user.id),
+    getLayoutForUser(user.id),
+  ]);
 
   // Wraps header and page: the folder selector's counts and the usage meter
   // follow link changes made in the list, and vice versa.
@@ -35,7 +37,7 @@ export default async function AppShellLayout({
     <LinksSyncProvider>
       <FoldersProvider
         initialFolders={initialFolders}
-        initialTotalLinks={usageSummary?.saves.used ?? null}
+        initialTotalLinks={usageSummary.saves.used}
       >
         {/* The layout (rows or grid, folder tags), saved on the account:
             the user menu changes it, the pages render with it. */}

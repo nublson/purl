@@ -86,8 +86,8 @@ Saving is fully **synchronous**; there is no background processing:
 ### Authentication & routing
 
 - **Better Auth** (`src/lib/auth.ts`) — sign-in is Google/GitHub OAuth only (Apple is enabled when its env vars exist), sessions stored in Postgres
-- **`src/proxy.ts`** — Next.js middleware that gates private routes and applies rate limiting
-- Session is resolved server-side in API routes: `auth.api.getSession({ headers: request.headers })`
+- **`src/proxy.ts`** — Next.js middleware: rate limiting, and an **optimistic** sign-in check (a Better Auth session cookie is present; no database work, as Next.js and Better Auth recommend). Without the cookie, private pages redirect to `/`. Only `/` (which sends signed-in users to `/home`) validates the session there, so a stale cookie can't loop `/` ↔ `/home`; `@/lib/auth` is imported dynamically for that (and for API-key rate limiting), keeping Better Auth and Prisma out of the proxy's cold start (it was ~1.2s p75 cold). API routes (`/api/*`) pass through to their handlers.
+- **The real checks are server-side, where the data is:** the `(app)` layout and `/oauth/consent` `redirect("/")` without `getSessionUser()`, and every API route checks its own session or key (`getSessionUser`, `getBrowserSessionUserId`, `auth.api.getSession`, MCP/v1 auth) and answers 401. A new private page or API route must do the same: the proxy no longer guards it. e2e: `e2e/auth-gate.spec.ts`.
 - Every user has a unique `username` (rules in `src/lib/usernames.ts`), changed only via `PATCH /api/user/username`
 
 ### Components (`src/components/`)
