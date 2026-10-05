@@ -61,8 +61,6 @@ export const LinkItem = React.forwardRef<
   {
     link,
     className,
-    onMouseEnter,
-    onMouseLeave,
     eagerFavicon,
     arriving = false,
     ...rest
@@ -222,13 +220,18 @@ export const LinkItem = React.forwardRef<
         // The long-press selected the row; no browser menu on top of it.
         if (longPressedRef.current) event.preventDefault();
       }}
-      onMouseEnter={(event) => {
-        onMouseEnter?.(event);
+      // Previews follow a real mouse only. A tap sends iOS Safari's
+      // emulated mouseover first, and it holds the tap's click until any
+      // short timer started then has run (it waits to see whether the page
+      // reacts to the "hover"): the preview's timers delayed every row tap
+      // by up to their 400ms. Pointer events report the actual pointer.
+      onPointerEnter={(event) => {
+        if (event.pointerType !== "mouse") return;
         hoveringActionsRef.current = false;
         scheduleOpen();
       }}
-      onMouseLeave={(event) => {
-        onMouseLeave?.(event);
+      onPointerLeave={(event) => {
+        if (event.pointerType !== "mouse") return;
         hoveringActionsRef.current = false;
         scheduleClose();
       }}
@@ -386,12 +389,14 @@ export const LinkItem = React.forwardRef<
           selecting && "invisible",
           "z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100",
         )}
-        onMouseEnter={() => {
+        onPointerEnter={(event) => {
+          if (event.pointerType !== "mouse") return;
           hoveringActionsRef.current = true;
           clearOpenTimer();
           clearCloseTimer();
         }}
-        onMouseLeave={() => {
+        onPointerLeave={(event) => {
+          if (event.pointerType !== "mouse") return;
           hoveringActionsRef.current = false;
           scheduleOpen();
         }}
