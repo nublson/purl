@@ -3,6 +3,14 @@
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
+/* Phones: a touch screen narrower than md, the same query as `useIsPhone`
+   (src/hooks/use-is-phone.ts). In CSS it holds from the first paint, while
+   the hook only knows after hydration. */
+@custom-variant phone {
+  @media (pointer: coarse) and (max-width: 767px) {
+    @slot;
+  }
+}
 
 @theme inline {
   /* Strong ease-out for UI that enters or swaps (`ease-out-strong`); the

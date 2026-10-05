@@ -1,8 +1,13 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockSafeFetch } = vi.hoisted(() => ({
+const { mockSafeFetch, mockSessionUserId } = vi.hoisted(() => ({
   mockSafeFetch: vi.fn(),
+  mockSessionUserId: vi.fn(),
+}));
+
+vi.mock("@/lib/require-browser-session", () => ({
+  getBrowserSessionUserId: mockSessionUserId,
 }));
 
 vi.mock("@/lib/safe-outbound-fetch", async (importOriginal) => {
@@ -20,13 +25,26 @@ function getRequest(url: string): NextRequest {
   return new NextRequest(url, { method: "GET" });
 }
 
-// Authentication is enforced by src/proxy.ts (Next.js middleware), which
-// redirects unauthenticated requests before they reach this handler — this
-// route is not publicly exempted there, so the handler itself intentionally
-// has no in-handler session check for these tests to cover.
 describe("GET /api/pdf-proxy", () => {
   beforeEach(() => {
     mockSafeFetch.mockReset();
+    mockSessionUserId.mockReset();
+    mockSessionUserId.mockResolvedValue("user-1");
+  });
+
+  // The proxy only checks for a session cookie; this route checks the
+  // session itself, since it fetches any URL it's given.
+  it("returns 401 without a signed-in browser session", async () => {
+    mockSessionUserId.mockResolvedValue(null);
+    const { GET } = await import("./route");
+    const res = await GET(
+      getRequest(
+        "http://localhost/api/pdf-proxy?url=" +
+          encodeURIComponent("https://example.com/a.pdf"),
+      ),
+    );
+    expect(res.status).toBe(401);
+    expect(mockSafeFetch).not.toHaveBeenCalled();
   });
 
   it("returns 400 when url query param is missing", async () => {

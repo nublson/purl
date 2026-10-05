@@ -1,4 +1,3 @@
-import { auth } from "@/lib/auth";
 import { rateLimitApiRequest } from "@/lib/proxy-rate-limit";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -43,6 +42,27 @@ const publicRoutes: PublicRoute[] = [
   { path: "/api/public", match: "prefix", whenAuthenticated: "next" },
 ];
 
+/**
+ * Better Auth's session cookie (default prefix; `__Secure-` over HTTPS).
+ * Read by name rather than with `better-auth/cookies`, whose import alone
+ * pulls in its JWT and crypto code.
+ */
+const SESSION_COOKIE = "better-auth.session_token";
+
+/**
+ * Whether the request carries a session cookie. Only that: the proxy's
+ * check is optimistic (Next.js and Better Auth both recommend no database
+ * work here, since it runs before every page). Whether the session is
+ * real is decided where the data is: the `(app)` layout and the consent
+ * page redirect without a user, and every API route checks its own.
+ */
+function hasSessionCookie(request: NextRequest): boolean {
+  return Boolean(
+    request.cookies.get(`__Secure-${SESSION_COOKIE}`)?.value ||
+      request.cookies.get(SESSION_COOKIE)?.value,
+  );
+}
+
 const REDIRECT_WHEN_NOT_AUTHENTICATED = "/";
 const DEFAULT_PAGE = "/home";
 
@@ -80,39 +100,42 @@ export async function proxy(request: NextRequest) {
   }
 
   const publicRoute = isPublicRoute(currentPath);
-  // Public "next" routes render the same with or without a session, so only
-  // routes that redirect signed-in users (e.g. /) need the lookup.
+  // Public "next" routes render the same with or without a session.
   if (publicRoute?.whenAuthenticated === "next") {
     return NextResponse.next();
   }
 
-  // Better Auth's apiKey plugin throws (rather than returning null) when the
-  // Authorization header carries an invalid/expired/malformed API key. Treat
-  // that the same as "no session" instead of letting it crash the whole
-  // middleware with an unhandled 500 for what's just a bad Bearer token on a
-  // normal page.
-  let session: Awaited<ReturnType<typeof auth.api.getSession>> = null;
-  try {
-    session = await auth.api.getSession({ headers: request.headers });
-  } catch (err) {
-    console.error("proxy: getSession threw, treating as unauthenticated:", err);
-  }
-
-  if (publicRoute && !session) {
+  // API routes answer for themselves (401 without a session, or their API
+  // key / OAuth check); a redirect to the landing page means nothing to a
+  // fetch.
+  if (currentPath.startsWith("/api/")) {
     return NextResponse.next();
   }
 
-  if (publicRoute && session && publicRoute.whenAuthenticated === "redirect") {
+  const signedIn = hasSessionCookie(request);
+
+  // The landing page sends signed-in users to Home, so here the session
+  // must be real: a stale cookie would otherwise bounce between / and
+  // /home (whose layout sends it back). Auth loads only for this page, so
+  // the rest of the app's requests don't pay for it on a cold start.
+  if (publicRoute) {
+    if (!signedIn) return NextResponse.next();
+    let session = null;
+    try {
+      const { auth } = await import("@/lib/auth");
+      session = await auth.api.getSession({ headers: request.headers });
+    } catch (err) {
+      // An invalid Bearer API key makes the apiKey plugin throw: that's
+      // just "no session" for a page.
+      console.error("proxy: getSession threw, treating as unauthenticated:", err);
+    }
+    if (!session) return NextResponse.next();
     const url = request.nextUrl.clone();
     url.pathname = DEFAULT_PAGE;
     return NextResponse.redirect(url);
   }
 
-  if (publicRoute && session) {
-    return NextResponse.next();
-  }
-
-  if (!publicRoute && !session) {
+  if (!signedIn) {
     const url = request.nextUrl.clone();
     url.pathname = REDIRECT_WHEN_NOT_AUTHENTICATED;
     return NextResponse.redirect(url);

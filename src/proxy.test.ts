@@ -22,6 +22,16 @@ function createRequest(pathname: string, method = "GET"): NextRequest {
   return new NextRequest(`http://localhost${pathname}`, { method });
 }
 
+/** A request carrying Better Auth's session cookie (`__Secure-` on HTTPS). */
+function withSessionCookie(
+  pathname: string,
+  name = "better-auth.session_token",
+): NextRequest {
+  return new NextRequest(`http://localhost${pathname}`, {
+    headers: { cookie: `${name}=token.signature` },
+  });
+}
+
 describe("proxy", () => {
   beforeEach(() => {
     vi.mocked(auth.auth.api.getSession).mockReset();
@@ -77,10 +87,16 @@ describe("proxy", () => {
       user: {},
       session: {},
     } as never);
-    const req = createRequest("/");
-    const res = await proxy(req);
+    const res = await proxy(withSessionCookie("/"));
     expect(res.status).toBe(307);
     expect(res.headers.get("location")).toContain("/home");
+  });
+
+  it("shows the landing page for a stale cookie (no / ↔ /home loop)", async () => {
+    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
+    const res = await proxy(withSessionCookie("/"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
   });
 
   it.each(["/privacy", "/terms", "/docs", "/docs/mcp", "/docs/api"])(
@@ -126,16 +142,35 @@ describe("proxy", () => {
   );
 
   it("still gates look-alike private paths", async () => {
-    vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
     const res = await proxy(createRequest("/upload"));
-    expect(res.headers.get("location")).toContain("/");
-    expect(auth.auth.api.getSession).toHaveBeenCalled();
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get("location") as string).pathname).toBe("/");
   });
 
-  it("looks up the session on / to redirect signed-in users", async () => {
+  it("looks up the session on / only when a session cookie is there", async () => {
     vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
     await proxy(createRequest("/"));
+    expect(auth.auth.api.getSession).not.toHaveBeenCalled();
+    await proxy(withSessionCookie("/"));
     expect(auth.auth.api.getSession).toHaveBeenCalledTimes(1);
+  });
+
+  // Optimistic: the cookie is enough here; the (app) layout and each API
+  // route check the session itself.
+  it("lets private pages through on the cookie alone, with no session lookup", async () => {
+    for (const name of ["better-auth.session_token", "__Secure-better-auth.session_token"]) {
+      const res = await proxy(withSessionCookie("/home", name));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+    }
+    expect(auth.auth.api.getSession).not.toHaveBeenCalled();
+  });
+
+  it("leaves signed-out API requests to the route (a 401, not a redirect)", async () => {
+    const res = await proxy(createRequest("/api/links"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("location")).toBeNull();
+    expect(auth.auth.api.getSession).not.toHaveBeenCalled();
   });
 
   it("returns next for /api/auth without session lookup (Better Auth handles its own cookies)", async () => {
@@ -186,7 +221,7 @@ describe("proxy", () => {
       user: {},
       session: {},
     } as never);
-    const res = await proxy(createRequest("/oauth/consent"));
+    const res = await proxy(withSessionCookie("/oauth/consent"));
     expect(res.status).toBe(200);
     expect(res.headers.get("location")).toBeNull();
   });
@@ -196,7 +231,7 @@ describe("proxy", () => {
       user: {},
       session: {},
     } as never);
-    const req = createRequest("/home");
+    const req = withSessionCookie("/home");
     const res = await proxy(req);
     expect(res.status).toBe(200);
     expect(res.headers.get("location")).toBeNull();
@@ -218,7 +253,7 @@ describe("proxy", () => {
         user: {},
         session: {},
       } as never);
-      const req = createRequest("/folders/books");
+      const req = withSessionCookie("/folders/books");
       const res = await proxy(req);
       expect(res.status).toBe(200);
       expect(res.headers.get("location")).toBeNull();
@@ -315,7 +350,7 @@ describe("proxy", () => {
         user: {},
         session: {},
       } as never);
-      const res = await proxy(createRequest("/oauth/consent"));
+      const res = await proxy(withSessionCookie("/oauth/consent"));
       expect(res.status).toBe(200);
       expect(res.headers.get("location")).toBeNull();
     });

@@ -2,7 +2,11 @@
 
 import { useSyncExternalStore } from "react";
 
-/** A touch screen narrower than `md`: phones, not tablets or desktops. */
+/**
+ * A touch screen narrower than `md`: phones, not tablets or desktops. Same
+ * query as the `phone:` CSS variant (globals.css); prefer that for what
+ * shows on first paint, since this is false until hydration.
+ */
 const PHONE_QUERY = "(pointer: coarse) and (max-width: 767px)";
 
 function subscribe(onChange: () => void) {

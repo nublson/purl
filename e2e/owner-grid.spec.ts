@@ -106,7 +106,7 @@ test.describe("Owner grid view", () => {
     await seed.link({ url: "https://alpha.example", title: "Alpha", folderId: reading });
     await seed.link({ url: "https://bravo.example", title: "Bravo" });
     await openHome(page);
-    const tags = page.locator('[data-cy="folder-tag"]');
+    const tags = page.locator('[data-cy="folder-tag"]:visible');
     await expect(tags).toHaveCount(0);
 
     // On: the menu stays open, and the filed link gets its folder's tag.
@@ -130,7 +130,7 @@ test.describe("Owner grid view", () => {
     await waitForHydration(page, '[data-cy="link-item"]');
     await expect(tags).toHaveCount(1);
     await chooseView(page, "Grid");
-    await expect(card(page, "Alpha").locator('[data-cy="folder-tag"]')).toHaveCount(1);
+    await expect(card(page, "Alpha").locator('[data-cy="folder-tag"]:visible')).toHaveCount(1);
     await page.mouse.move(0, 0);
     await page.waitForTimeout(400);
     await page.screenshot({ path: testInfo.outputPath("tags-grid.png") });
@@ -234,12 +234,29 @@ test.describe("Folder tags on phones", () => {
 
     // In a card, the icon sits centered under the favicon.
     const offset = await card(page, "Alpha").evaluate((el) => {
-      const tag = el.querySelector('[data-cy="folder-tag"]')!.getBoundingClientRect();
-      const info = el.querySelector('[data-cy="folder-tag"]')!.closest("span.grid")!;
+      const tag = el.querySelector('button[data-cy="folder-tag"]')!.getBoundingClientRect();
+      const info = el.querySelector('button[data-cy="folder-tag"]')!.closest("span.grid")!;
       const fav = info.firstElementChild!.firstElementChild!.getBoundingClientRect();
       return tag.left + tag.width / 2 - (fav.left + fav.width / 2);
     });
     expect(Math.abs(offset)).toBeLessThan(0.5);
+  });
+
+  test("the server's HTML already shows only the icon, before any script runs", async ({ page, seed }) => {
+    const folder = await seed.folder({ name: "Design Engineer", slug: "design", emoji: "🧑‍🎨" });
+    await seed.link({ url: "https://alpha.example", title: "Alpha", folderId: folder });
+    const saved = await page.request.patch("/api/user/layout", { data: { folderTags: true } });
+    expect(saved.ok()).toBe(true);
+    // No app scripts: what shows is the server's HTML and the CSS alone (the
+    // tag used to be chosen after hydration, so phones first drew the full
+    // chip, then swapped it for the icon).
+    await page.route("**/*", (route) =>
+      route.request().resourceType() === "script" ? route.abort() : route.continue(),
+    );
+    await page.goto("/home");
+    const row = page.locator('[data-cy="link-item"]').filter({ hasText: "Alpha" });
+    await expect(row.getByRole("button", { name: "Folder: Design Engineer" })).toBeVisible();
+    await expect(row.locator('span[data-cy="folder-tag"]')).toBeHidden();
   });
 
   test("a card's menu closes on one tap outside, with Move to folder open", async ({ page, seed }) => {

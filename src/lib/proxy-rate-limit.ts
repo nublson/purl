@@ -1,4 +1,3 @@
-import { auth } from "@/lib/auth";
 import {
   getAuthRateLimiter,
   getFeedbackPostRateLimiter,
@@ -37,6 +36,9 @@ async function resolveBearerRateLimitKey(
   if (!authHeader?.startsWith("Bearer ") || authHeader.length <= 7) {
     return ip;
   }
+  // Loaded only here (API-key requests): page requests through the proxy
+  // never pay for Better Auth on a cold start.
+  const { auth } = await import("@/lib/auth");
   const session = await auth.api.getSession({ headers: request.headers });
   return session?.user?.id ?? authHeader.slice(7);
 }

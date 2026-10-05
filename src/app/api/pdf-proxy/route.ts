@@ -4,9 +4,16 @@ import {
   limitReadableStreamByBytes,
   safeFetch,
 } from "@/lib/safe-outbound-fetch";
+import { getBrowserSessionUserId } from "@/lib/require-browser-session";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
+  // Signed-in browsers only (the PDF thumbnails): it fetches any URL it's
+  // given, so it must not be open to anyone, or to an API key alone.
+  if (!(await getBrowserSessionUserId())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const sourceUrl = request.nextUrl.searchParams.get("url")?.trim() ?? "";
   if (!sourceUrl) {
     return NextResponse.json({ error: "Missing url query param" }, { status: 400 });

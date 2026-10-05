@@ -5,7 +5,6 @@ import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
 import type { FolderSummary } from "@/lib/folders";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
-import { useIsPhone } from "@/hooks/use-is-phone";
 import * as React from "react";
 import { FolderEmoji } from "./folder-emoji";
 import { Typography } from "./typography";
@@ -32,14 +31,26 @@ export function useFolderTag(link: Pick<Link, "folderId">): FolderSummary | null
  * the right, so it looked shifted left), centered in the chip. Checked in
  * iOS Safari: every emoji's drawn shape within a pixel of the chip's
  * center (what's left is each emoji's own artwork).
+ *
+ * WebKit (Safari on Mac and iPhone, every iOS browser) draws Apple Color
+ * Emoji ~1.25x larger than Chromium at the same size: ~15px of artwork at
+ * 12px, nearly filling the 20px chip. There it's 0.6rem (9.6px), which
+ * draws ~12px like Chromium's 12px. `font: -apple-system-body` is a
+ * WebKit-only keyword, so the query picks WebKit and nothing else.
  */
-const EMOJI_IN_CHIP = "size-auto min-w-[1.25em] text-xs leading-none";
+const EMOJI_IN_CHIP =
+  "size-auto min-w-[1.25em] text-xs leading-none supports-[font:-apple-system-body]:text-[0.6rem]";
 
 /**
  * A link's folder, as a small muted chip: the folder's emoji and name
  * (a long name truncates). Decorative next to the row's own text; the
  * name is in the accessibility tree as plain text. On phones, just the
  * emoji, with the name in a tooltip (`FolderTagIcon`).
+ *
+ * Both are rendered and CSS picks one (the `phone:` variant), so the
+ * server's HTML is already right: deciding in JS (`useIsPhone`, false until
+ * hydration) drew the full chip on phones for the first moments, then
+ * swapped it for the emoji.
  */
 export function FolderTag({
   folder,
@@ -55,30 +66,29 @@ export function FolderTag({
   inCard?: boolean;
   className?: string;
 }) {
-  const isPhone = useIsPhone();
-  if (isPhone) {
-    return <FolderTagIcon folder={folder} inCard={inCard} className={className} />;
-  }
   return (
-    <Typography
-      component="span"
-      size="mini"
-      data-cy="folder-tag"
-      className={cn(
-        "inline-flex h-5 min-w-0 shrink-0 items-center rounded-md bg-muted px-1.5 font-normal",
-        inCard ? "-ms-1.5 max-w-full gap-2 md:gap-3" : "max-w-40 gap-1",
-        className,
-      )}
-    >
-      <FolderEmoji
-        emoji={folder.emoji}
-        className={cn(EMOJI_IN_CHIP, inCard ? "w-4" : "w-3")}
-      />
-      {/* A long name truncates; the native tooltip shows it whole. */}
-      <Typography component="span" size="mini" className="truncate" title={folder.name}>
-        {folder.name}
+    <>
+      <Typography
+        component="span"
+        size="mini"
+        data-cy="folder-tag"
+        className={cn(
+          "inline-flex h-5 min-w-0 shrink-0 items-center rounded-md bg-muted px-1.5 font-normal phone:hidden",
+          inCard ? "-ms-1.5 max-w-full gap-2 md:gap-3" : "max-w-40 gap-1",
+          className,
+        )}
+      >
+        <FolderEmoji
+          emoji={folder.emoji}
+          className={cn(EMOJI_IN_CHIP, inCard ? "w-4" : "w-3")}
+        />
+        {/* A long name truncates; the native tooltip shows it whole. */}
+        <Typography component="span" size="mini" className="truncate" title={folder.name}>
+          {folder.name}
+        </Typography>
       </Typography>
-    </Typography>
+      <FolderTagIcon folder={folder} inCard={inCard} className={className} />
+    </>
   );
 }
 
@@ -107,10 +117,12 @@ function FolderTagIcon({
           data-cy="folder-tag"
           aria-label={`Folder: ${folder.name}`}
           className={cn(
-            "pointer-events-auto relative z-10 flex size-5 shrink-0 items-center justify-center rounded-md bg-muted outline-none after:absolute after:-inset-1 focus-visible:ring-2 focus-visible:ring-ring",
+            "pointer-events-auto relative z-10 hidden size-5 shrink-0 items-center justify-center rounded-md bg-muted outline-none after:absolute after:-inset-1 focus-visible:ring-2 focus-visible:ring-ring",
             // A card: centered under the 16px favicon (the chip is 20px).
             inCard && "-ms-0.5",
             className,
+            // Only on phones (after `className`, so it can't be overridden).
+            "phone:flex",
           )}
           onClick={(event) => {
             // Not the row's (or card's) link underneath. Opens (Radix
