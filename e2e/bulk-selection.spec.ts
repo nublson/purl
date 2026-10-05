@@ -54,7 +54,7 @@ test.describe("Link selection", () => {
     await expect(page.getByRole("button", { name: "Open link menu" }).first()).toBeAttached();
   });
 
-  test("Shift-click selects a range; Select all toggles to Deselect all", async ({ page, seed }) => {
+  test("Shift-click selects a range; Select all checks and unchecks the list", async ({ page, seed }) => {
     await seedLinks(seed, ["Alpha", "Bravo", "Charlie", "Delta"]);
     await openHome(page);
 
@@ -69,11 +69,69 @@ test.describe("Link selection", () => {
     await selectAll.click();
     await expect(bar(page)).toContainText("4 selected");
     await expect(selectAll).toHaveAttribute("aria-checked", "true");
-    await expect(selectAll).toContainText("Deselect all");
-    // Same width for both labels: the bar doesn't jump.
+    // The label stays "Select all" (it's the visible name voice control
+    // users say); the checked box shows the state, and the bar doesn't jump.
+    await expect(selectAll).toContainText("Select all");
     expect((await selectAll.boundingBox())!.width).toBe(width);
     await selectAll.click();
     await expect(bar(page)).toHaveCount(0);
+  });
+
+  test("the bar is one Tab stop; arrows, Home and End move inside it", async ({ page, seed }) => {
+    await seedLinks(seed, ["Alpha", "Bravo"]);
+    await openHome(page);
+    await rows(page).first().hover();
+    await checkbox(page, "Alpha").click();
+    const count = bar(page).getByRole("button", { name: "1 selected, clear selection" });
+    await expect(count).toBeVisible();
+
+    const tabStops = () =>
+      bar(page).evaluate((el) =>
+        [...el.querySelectorAll("button")].filter((b) => b.tabIndex === 0).length,
+      );
+    expect(await tabStops()).toBe(1);
+    await expect(count).toHaveAttribute("tabindex", "0");
+
+    await count.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(bar(page).getByRole("checkbox", { name: "Select all" })).toBeFocused();
+    await page.keyboard.press("End");
+    const del = bar(page).getByRole("button", { name: "Delete 1 link" });
+    await expect(del).toBeFocused();
+    // The last button used is the bar's Tab stop now.
+    await expect(del).toHaveAttribute("tabindex", "0");
+    expect(await tabStops()).toBe(1);
+    await page.keyboard.press("Home");
+    await expect(count).toBeFocused();
+    await page.keyboard.press("ArrowLeft");
+    await expect(del).toBeFocused();
+  });
+
+  test("Tab leaves the bar in one press and comes back to the last button used", async ({ page, seed, browserName }) => {
+    // WebKit skips buttons on Tab (Safari's default), so it can't reach the bar.
+    test.skip(browserName === "webkit", "Tab skips buttons in WebKit");
+    await seedLinks(seed, ["Alpha", "Bravo"]);
+    await openHome(page);
+    await rows(page).first().hover();
+    await checkbox(page, "Alpha").click();
+    const count = bar(page).getByRole("button", { name: "1 selected, clear selection" });
+    const inBar = () =>
+      bar(page).evaluate((el) => el.contains(document.activeElement));
+
+    await count.focus();
+    await page.keyboard.press("Tab");
+    expect(await inBar()).toBe(false);
+    await page.keyboard.press("Shift+Tab");
+    await expect(count).toBeFocused();
+
+    // Move the stop with the arrows: Tab out, then back in, lands on Delete.
+    await page.keyboard.press("End");
+    const del = bar(page).getByRole("button", { name: "Delete 1 link" });
+    await expect(del).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    expect(await inBar()).toBe(false);
+    await page.keyboard.press("Tab");
+    await expect(del).toBeFocused();
   });
 
   test("Move files the selection into a folder, with one Undo toast", async ({ page, seed }, testInfo) => {
@@ -209,5 +267,49 @@ test.describe("Link selection, row size", () => {
     await checkbox(page, "Bravo").click();
     await expect(bar(page)).toBeVisible();
     expect(await heights()).toEqual(before);
+  });
+});
+
+test.describe("Selection bar on touch screens", () => {
+  test.use({ viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true });
+
+  test("tablet: every control is finger-sized (40px, 44px hit area)", async ({ page, seed }) => {
+    await seedLinks(seed, ["Alpha", "Bravo"]);
+    await page.goto("/home");
+    await waitForHydration(page, '[data-cy="link-item"]');
+    await page.getByRole("checkbox", { name: /Select Alpha/ }).tap();
+    await expect(bar(page)).toBeVisible();
+    const sizes = await bar(page).evaluate((el) =>
+      [...el.querySelectorAll("button")].map((b) => {
+        const box = b.getBoundingClientRect();
+        const hit = getComputedStyle(b, "::after");
+        return { h: box.height, inset: hit.top };
+      }),
+    );
+    for (const size of sizes) {
+      expect(size.h).toBe(40);
+      expect(size.inset).toBe("-2px");
+    }
+    // Labels stay at tablet width.
+    await expect(bar(page)).toContainText("Select all");
+    await expect(bar(page)).toContainText("Move");
+  });
+
+  test("the narrowest phones (320px): the bar fits, with the count and ✕ only", async ({ page, seed }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await seedLinks(seed, ["Alpha", "Bravo"]);
+    await page.goto("/home");
+    await waitForHydration(page, '[data-cy="link-item"]');
+    await page.getByRole("checkbox", { name: /Select Alpha/ }).tap();
+    await expect(bar(page)).toBeVisible();
+    const box = (await bar(page).boundingBox())!;
+    // Inside the page's 16px margins, Delete included.
+    expect(box.x).toBeGreaterThanOrEqual(16);
+    expect(box.x + box.width).toBeLessThanOrEqual(320 - 16);
+    const del = (await bar(page).getByRole("button", { name: "Delete 1 link" }).boundingBox())!;
+    expect(del.x + del.width).toBeLessThanOrEqual(box.x + box.width);
+    const count = bar(page).getByRole("button", { name: "1 selected, clear selection" });
+    // What's drawn (innerText skips the hidden word); the name keeps it.
+    expect((await count.innerText()).trim()).toBe("1");
   });
 });

@@ -58,6 +58,17 @@ const loadMotionFeatures = () =>
   import("@/lib/motion-features").then((mod) => mod.default);
 
 /**
+ * Touch screens (tablets, phones) get finger-sized controls: 40px instead
+ * of the mouse's 32px, plus 2px of invisible hit area all round (`after:`),
+ * so each target is 44px. The bar's 4px gaps keep neighbors' extensions
+ * from overlapping. Mouse and trackpad keep the compact bar.
+ */
+const TOUCH_TARGET =
+  "relative after:absolute after:-inset-0.5 pointer-coarse:h-10";
+const TOUCH_ICON_TARGET =
+  "relative after:absolute after:-inset-0.5 pointer-coarse:size-10";
+
+/**
  * Floating bar for the selected links (Home or a folder page): the count
  * (which clears the selection), Select all / Deselect all, Move (folders,
  * "Remove from …", "New folder…") and Delete, each with its shortcut in the
@@ -173,19 +184,34 @@ export function LinkSelectionBar({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [count, deleteSelected, toggleReadSelected]);
 
-  // Arrow keys move between the bar's buttons (toolbar pattern).
+  // Toolbar pattern: the bar is one Tab stop (the last button used, the
+  // count at first), and arrow keys, Home and End move between its buttons
+  // (roving tabindex, set on the elements: none of them take a tabIndex
+  // prop, so React leaves it alone).
+  const barShown = count > 0;
+  React.useEffect(() => {
+    if (!barShown) return;
+    const toolbar = toolbarRef.current;
+    setTabStop(toolbar, toolbarButtons(toolbar)[0]);
+  }, [barShown]);
   const onToolbarKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-    const buttons = Array.from(
-      toolbarRef.current?.querySelectorAll<HTMLButtonElement>(
-        "button:not(:disabled)",
-      ) ?? [],
-    );
+    const buttons = toolbarButtons(toolbarRef.current);
     const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
     if (index === -1) return;
+    const last = buttons.length - 1;
+    const next =
+      event.key === "ArrowRight"
+        ? (index + 1) % buttons.length
+        : event.key === "ArrowLeft"
+          ? (index - 1 + buttons.length) % buttons.length
+          : event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? last
+              : null;
+    if (next === null) return;
     event.preventDefault();
-    const step = event.key === "ArrowRight" ? 1 : -1;
-    buttons[(index + step + buttons.length) % buttons.length]?.focus();
+    buttons[next]?.focus();
   };
 
   // The count while the bar animates out (the selection is already empty).
@@ -216,6 +242,13 @@ export function LinkSelectionBar({
               role="toolbar"
               aria-label="Selected links"
               onKeyDown={onToolbarKeyDown}
+              // Whichever button gets focus (Tab, arrows, a click) becomes
+              // the bar's Tab stop.
+              onFocus={(event) => {
+                if (event.target instanceof HTMLButtonElement) {
+                  setTabStop(toolbarRef.current, event.target);
+                }
+              }}
               // Rises from where it's anchored (the bottom edge). Full
               // transform strings stay on the GPU; `x`/`y` shorthands don't.
               initial={{
@@ -245,12 +278,38 @@ export function LinkSelectionBar({
                 <Button
                   variant="ghost"
                   size="sm"
-                  aria-label={`Clear selection (${formatLinkCount(shownCount)} selected)`}
-                  className="h-7 gap-1.5 rounded-lg bg-accent px-2 text-xs tabular-nums hover:bg-accent/70"
+                  // Starts with what it shows, so voice control's "tap 2
+                  // selected" finds it.
+                  aria-label={`${shownCount} selected, clear selection`}
+                  className={cn(
+                    "h-7 gap-1.5 rounded-lg bg-accent px-2 text-xs tabular-nums hover:bg-accent/70",
+                    // Touch: the bar's readout at its buttons' size and type.
+                    "pointer-coarse:px-3 pointer-coarse:text-sm",
+                    TOUCH_TARGET,
+                  )}
                   onClick={() => linkSelection.clear()}
                 >
-                  {shownCount} selected
-                  <X data-icon="inline-end" className="size-3.5" />
+                  {/* One inline run, so "3 selected" keeps its real space.
+                      The narrowest touch phones (under 23rem, e.g. 320px)
+                      can't fit the word beside the bar's 40px controls:
+                      the count and ✕ alone; the name still starts with it. */}
+                  <Typography
+                    component="span"
+                    size="small"
+                    // The chip's own type: 12px, 14px on touch.
+                    className="text-xs leading-[inherit] text-current pointer-coarse:text-sm"
+                  >
+                    {shownCount}
+                    <Typography
+                      component="span"
+                      size="small"
+                      className="text-[length:inherit] leading-[inherit] text-current max-[23rem]:pointer-coarse:hidden"
+                    >
+                      {" "}
+                      selected
+                    </Typography>
+                  </Typography>
+                  <X data-icon="inline-end" className="size-3.5 pointer-coarse:size-4" />
                 </Button>
               </ShortcutTooltip>
               <BarSeparator />
@@ -260,7 +319,10 @@ export function LinkSelectionBar({
                 apple={apple}
               >
                 {/* The list's master checkbox: partly checked (some selected)
-                    or checked (all), drawn like the rows' checkboxes. */}
+                    or checked (all), drawn like the rows' checkboxes. Its
+                    label stays "Select all" (the box shows the state, and
+                    pressing a checked box clears it, like any checkbox), so
+                    the visible label always matches its name. */}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -268,31 +330,20 @@ export function LinkSelectionBar({
                   aria-checked={allSelected ? true : "mixed"}
                   aria-label="Select all"
                   // Icon-only on phones, where the full bar wouldn't fit.
-                  className="rounded-lg text-muted-foreground hover:text-foreground max-sm:w-8 max-sm:px-0"
+                  className={cn(
+                    "rounded-lg text-muted-foreground hover:text-foreground max-sm:w-8 max-sm:px-0 max-sm:pointer-coarse:w-10",
+                    TOUCH_TARGET,
+                  )}
                   onClick={toggleAll}
                 >
                   <MasterCheckbox checked={allSelected} />
-                  {/* Both labels share one grid cell, so the button keeps the
-                      longer one's width and the bar never jumps. */}
                   <Typography
                     component="span"
+                    size="small"
                     aria-hidden
-                    className="grid max-sm:hidden"
+                    className="font-medium text-current max-sm:hidden"
                   >
-                    <Typography
-                      component="span"
-                      size="small"
-                      className="invisible col-start-1 row-start-1 font-medium"
-                    >
-                      Deselect all
-                    </Typography>
-                    <Typography
-                      component="span"
-                      size="small"
-                      className="col-start-1 row-start-1 font-medium text-current"
-                    >
-                      {allSelected ? "Deselect all" : "Select all"}
-                    </Typography>
+                    Select all
                   </Typography>
                 </Button>
               </ShortcutTooltip>
@@ -324,7 +375,7 @@ export function LinkSelectionBar({
                   size="icon-sm"
                   data-cy="selection-toggle-read"
                   aria-label={`Mark ${formatLinkCount(shownCount)} as ${allRead ? "unread" : "read"}`}
-                  className="rounded-lg"
+                  className={cn("rounded-lg", TOUCH_ICON_TARGET)}
                   onClick={toggleReadSelected}
                 >
                   <ReadToggleIcon read={allRead} />
@@ -338,7 +389,7 @@ export function LinkSelectionBar({
                   aria-label={`Delete ${formatLinkCount(shownCount)}`}
                   // Muted at rest so it doesn't outweigh Move; the destructive
                   // variant's colors only on hover or focus, right before a click.
-                  className="rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:border-destructive/40 focus-visible:bg-destructive/10 focus-visible:text-destructive focus-visible:ring-destructive dark:hover:bg-destructive/20 dark:focus-visible:bg-destructive/20"
+                  className={cn(TOUCH_ICON_TARGET, "rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:border-destructive/40 focus-visible:bg-destructive/10 focus-visible:text-destructive focus-visible:ring-destructive dark:hover:bg-destructive/20 dark:focus-visible:bg-destructive/20")}
                   onClick={deleteSelected}
                 >
                   <Trash />
@@ -350,6 +401,23 @@ export function LinkSelectionBar({
       </LazyMotion>
     </>
   );
+}
+
+/** The toolbar's enabled buttons, in order. */
+function toolbarButtons(toolbar: HTMLElement | null): HTMLButtonElement[] {
+  return Array.from(
+    toolbar?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [],
+  );
+}
+
+/** Makes `active` the toolbar's one Tab stop (roving tabindex). */
+function setTabStop(
+  toolbar: HTMLElement | null,
+  active: HTMLButtonElement | undefined,
+) {
+  for (const button of toolbarButtons(toolbar)) {
+    button.tabIndex = button === active ? 0 : -1;
+  }
 }
 
 /**
@@ -443,20 +511,25 @@ function MoveMenu({
             size="sm"
             aria-label="Move"
             // Icon-only below 23rem, where the full bar (330px) no longer
-            // fits beside the margins and Delete would be pushed off.
-            className="rounded-lg max-[23rem]:w-8 max-[23rem]:px-0"
+            // fits beside the margins and Delete would be pushed off; on
+            // touch phones too, where the bar's bigger controls need the
+            // room.
+            className={cn(
+              "rounded-lg max-[23rem]:w-8 max-[23rem]:px-0 max-[23rem]:pointer-coarse:w-10 max-sm:pointer-coarse:w-10 max-sm:pointer-coarse:px-0",
+              TOUCH_TARGET,
+            )}
           >
             <FolderInput data-icon="inline-start" />
             <Typography
               component="span"
               size="small"
-              className="font-medium text-current max-[23rem]:hidden"
+              className="font-medium text-current max-[23rem]:hidden max-sm:pointer-coarse:hidden"
             >
               Move
             </Typography>
             <ChevronUp
               data-icon="inline-end"
-              className="text-muted-foreground max-[23rem]:hidden"
+              className="text-muted-foreground max-[23rem]:hidden max-sm:pointer-coarse:hidden"
             />
           </Button>
         </DropdownMenuTrigger>
