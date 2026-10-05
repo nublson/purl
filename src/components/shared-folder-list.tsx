@@ -263,7 +263,7 @@ export function SharedFolderList({
               <div
                 key={link.id}
                 role="listitem"
-                className="[content-visibility:auto] [contain-intrinsic-size:auto_48px]"
+                className="[content-visibility:auto] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px]"
               >
                 <SharedLinkItem link={link} eagerFavicon={index < EAGER_ROWS} />
               </div>

@@ -43,6 +43,23 @@ describe("saveLink", () => {
     expect(errorMock).toHaveBeenCalledWith("Boom");
   });
 
+  it("curls the API message's apostrophes for display only", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: "You've reached the 1,000-link limit.",
+          code: "LIMIT_REACHED",
+        }),
+        { status: 403 },
+      ),
+    );
+
+    const result = await saveLink("https://example.com");
+
+    expect(errorMock).toHaveBeenCalledWith("You’ve reached the 1,000-link limit.");
+    expect(result).toEqual({ error: "You’ve reached the 1,000-link limit.", limit: true });
+  });
+
   it("returns error with limit flag on 402", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ error: "Cap", code: "LIMIT_REACHED" }), {

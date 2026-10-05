@@ -44,7 +44,11 @@ export async function saveLink(
       moved?: boolean;
     };
     if (!res.ok) {
-      const msg = data?.error ?? "Unable to save the link. Try again.";
+      // The API's message is machine-facing (plain apostrophes, matched
+      // by integrations); curl them only for display.
+      const msg = data?.error
+        ? data.error.replace(/(\w)'(\w)/g, "$1’$2")
+        : "Unable to save the link. Try again.";
       toast.error(msg);
       const hitLimit = data?.code === "LIMIT_REACHED";
       return hitLimit ? { error: msg, limit: true } : { error: msg };

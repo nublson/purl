@@ -11,7 +11,7 @@ export class SaveLimitError extends Error {
 
 function limitError(): SaveLimitError {
   return new SaveLimitError(
-    `You’ve reached the ${MAX_SAVED_LINKS.toLocaleString("en-US")}-link limit. Delete links you no longer need to save new ones.`,
+    `You've reached the ${MAX_SAVED_LINKS.toLocaleString("en-US")}-link limit. Delete links you no longer need to save new ones.`,
   );
 }
 
