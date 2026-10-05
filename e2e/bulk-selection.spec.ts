@@ -107,6 +107,33 @@ test.describe("Link selection", () => {
     await expect(del).toBeFocused();
   });
 
+  test("Tab leaves the bar in one press and comes back to the last button used", async ({ page, seed, browserName }) => {
+    // WebKit skips buttons on Tab (Safari's default), so it can't reach the bar.
+    test.skip(browserName === "webkit", "Tab skips buttons in WebKit");
+    await seedLinks(seed, ["Alpha", "Bravo"]);
+    await openHome(page);
+    await rows(page).first().hover();
+    await checkbox(page, "Alpha").click();
+    const count = bar(page).getByRole("button", { name: "1 selected, clear selection" });
+    const inBar = () =>
+      bar(page).evaluate((el) => el.contains(document.activeElement));
+
+    await count.focus();
+    await page.keyboard.press("Tab");
+    expect(await inBar()).toBe(false);
+    await page.keyboard.press("Shift+Tab");
+    await expect(count).toBeFocused();
+
+    // Move the stop with the arrows: Tab out, then back in, lands on Delete.
+    await page.keyboard.press("End");
+    const del = bar(page).getByRole("button", { name: "Delete 1 link" });
+    await expect(del).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
+    expect(await inBar()).toBe(false);
+    await page.keyboard.press("Tab");
+    await expect(del).toBeFocused();
+  });
+
   test("Move files the selection into a folder, with one Undo toast", async ({ page, seed }, testInfo) => {
     await seed.folder({ name: "Reading", slug: "reading", emoji: "📚" });
     await seedLinks(seed, ["Alpha", "Bravo"]);
@@ -266,5 +293,23 @@ test.describe("Selection bar on touch screens", () => {
     // Labels stay at tablet width.
     await expect(bar(page)).toContainText("Select all");
     await expect(bar(page)).toContainText("Move");
+  });
+
+  test("the narrowest phones (320px): the bar fits, with the count and ✕ only", async ({ page, seed }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await seedLinks(seed, ["Alpha", "Bravo"]);
+    await page.goto("/home");
+    await waitForHydration(page, '[data-cy="link-item"]');
+    await page.getByRole("checkbox", { name: /Select Alpha/ }).tap();
+    await expect(bar(page)).toBeVisible();
+    const box = (await bar(page).boundingBox())!;
+    // Inside the page's 16px margins, Delete included.
+    expect(box.x).toBeGreaterThanOrEqual(16);
+    expect(box.x + box.width).toBeLessThanOrEqual(320 - 16);
+    const del = (await bar(page).getByRole("button", { name: "Delete 1 link" }).boundingBox())!;
+    expect(del.x + del.width).toBeLessThanOrEqual(box.x + box.width);
+    const count = bar(page).getByRole("button", { name: "1 selected, clear selection" });
+    // What's drawn (innerText skips the hidden word); the name keeps it.
+    expect((await count.innerText()).trim()).toBe("1");
   });
 });

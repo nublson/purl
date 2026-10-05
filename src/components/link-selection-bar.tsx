@@ -289,7 +289,26 @@ export function LinkSelectionBar({
                   )}
                   onClick={() => linkSelection.clear()}
                 >
-                  {shownCount} selected
+                  {/* One inline run, so "3 selected" keeps its real space.
+                      The narrowest touch phones (under 23rem, e.g. 320px)
+                      can't fit the word beside the bar's 40px controls:
+                      the count and ✕ alone; the name still starts with it. */}
+                  <Typography
+                    component="span"
+                    size="small"
+                    // The chip's own type: 12px, 14px on touch.
+                    className="text-xs leading-[inherit] text-current pointer-coarse:text-sm"
+                  >
+                    {shownCount}
+                    <Typography
+                      component="span"
+                      size="small"
+                      className="text-[length:inherit] leading-[inherit] text-current max-[23rem]:pointer-coarse:hidden"
+                    >
+                      {" "}
+                      selected
+                    </Typography>
+                  </Typography>
                   <X data-icon="inline-end" className="size-3.5 pointer-coarse:size-4" />
                 </Button>
               </ShortcutTooltip>
