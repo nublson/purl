@@ -41,7 +41,8 @@ export function AddLinksPopover({
 }) {
   const open = useAddLinksPopoverAnchor() === placement;
   const anchorRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => void loadPicker(), []);
+  // A failed prefetch is fine: opening the popover loads it again.
+  React.useEffect(() => void loadPicker().catch(() => {}), []);
 
   // Its anchor going away closes it (the store outlives the page), but only
   // if it's open on that anchor: the empty state disappearing must not close

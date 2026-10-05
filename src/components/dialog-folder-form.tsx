@@ -26,7 +26,8 @@ import { Typography } from "./typography";
 // code: it loads when a folder dialog opens (`preloadEmojiPicker`), not
 // with the page. The placeholder keeps the popover at the picker's size.
 const loadEmojiPicker = () => import("./folder-emoji-picker-panel");
-const preloadEmojiPicker = () => void loadEmojiPicker();
+// A failed prefetch is fine: opening the picker loads it again.
+const preloadEmojiPicker = () => void loadEmojiPicker().catch(() => {});
 const FolderEmojiPickerPanel = dynamic(loadEmojiPicker, {
   ssr: false,
   loading: () => <div className="h-80 w-72" aria-hidden />,

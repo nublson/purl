@@ -67,13 +67,13 @@ export function SharedLinkItem({
       data-cy="link-item"
       // min-h-12: the owner's row gets its 48px from the menu button.
       className="relative grid min-h-12 w-full grid-cols-[20px_1fr] gap-4 border-0 p-2 transition-none hover:bg-accent/40 max-md:min-h-14 max-md:grid-cols-[24px_1fr] max-md:py-3"
-      // A real mouse only: iOS holds a tap's click while timers started by
-      // its emulated mouseover run (see `LinkItem`).
+      // Not on touch: iOS holds a tap's click while timers started by its
+      // emulated mouseover run (see `LinkItem`). A mouse or pen previews.
       onPointerEnter={(event) => {
-        if (hasPreview && event.pointerType === "mouse") scheduleOpen();
+        if (hasPreview && event.pointerType !== "touch") scheduleOpen();
       }}
       onPointerLeave={(event) => {
-        if (hasPreview && event.pointerType === "mouse") scheduleClose();
+        if (hasPreview && event.pointerType !== "touch") scheduleClose();
       }}
     >
       <a

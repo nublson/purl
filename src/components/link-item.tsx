@@ -224,14 +224,15 @@ export const LinkItem = React.forwardRef<
       // emulated mouseover first, and it holds the tap's click until any
       // short timer started then has run (it waits to see whether the page
       // reacts to the "hover"): the preview's timers delayed every row tap
-      // by up to their 400ms. Pointer events report the actual pointer.
+      // by up to their 400ms. Pointer events report the actual pointer, so
+      // touch is skipped while a mouse or a hovering pen still previews.
       onPointerEnter={(event) => {
-        if (event.pointerType !== "mouse") return;
+        if (event.pointerType === "touch") return;
         hoveringActionsRef.current = false;
         scheduleOpen();
       }}
       onPointerLeave={(event) => {
-        if (event.pointerType !== "mouse") return;
+        if (event.pointerType === "touch") return;
         hoveringActionsRef.current = false;
         scheduleClose();
       }}
@@ -390,13 +391,13 @@ export const LinkItem = React.forwardRef<
           "z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100",
         )}
         onPointerEnter={(event) => {
-          if (event.pointerType !== "mouse") return;
+          if (event.pointerType === "touch") return;
           hoveringActionsRef.current = true;
           clearOpenTimer();
           clearCloseTimer();
         }}
         onPointerLeave={(event) => {
-          if (event.pointerType !== "mouse") return;
+          if (event.pointerType === "touch") return;
           hoveringActionsRef.current = false;
           scheduleOpen();
         }}
