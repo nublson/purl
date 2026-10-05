@@ -31,8 +31,15 @@ export function useFolderTag(link: Pick<Link, "folderId">): FolderSummary | null
  * the right, so it looked shifted left), centered in the chip. Checked in
  * iOS Safari: every emoji's drawn shape within a pixel of the chip's
  * center (what's left is each emoji's own artwork).
+ *
+ * WebKit (Safari on Mac and iPhone, every iOS browser) draws Apple Color
+ * Emoji ~1.25x larger than Chromium at the same size: ~15px of artwork at
+ * 12px, nearly filling the 20px chip. There it's 0.6rem (9.6px), which
+ * draws ~12px like Chromium's 12px. `font: -apple-system-body` is a
+ * WebKit-only keyword, so the query picks WebKit and nothing else.
  */
-const EMOJI_IN_CHIP = "size-auto min-w-[1.25em] text-xs leading-none";
+const EMOJI_IN_CHIP =
+  "size-auto min-w-[1.25em] text-xs leading-none supports-[font:-apple-system-body]:text-[0.6rem]";
 
 /**
  * A link's folder, as a small muted chip: the folder's emoji and name
