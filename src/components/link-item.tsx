@@ -83,6 +83,38 @@ export const LinkItem = React.forwardRef<
   // Read links stay in the list, faded back: opening one marks it read.
   const read = useIsLinkRead(link);
   const folderTag = useFolderTag(link);
+  // Phones show the tag at the end of the title's text (a wrapped title's
+  // box spans the row, so a tag beside it lands far from the last word).
+  // If it doesn't fit in the two clamped lines, it goes beside the title,
+  // whose lines are then full anyway.
+  const titleRowRef = React.useRef<HTMLDivElement>(null);
+  const [tagFitsInline, setTagFitsInline] = React.useState(true);
+  const inlineTag = isPhone && tagFitsInline ? folderTag : null;
+  const sideTag = folderTag && !inlineTag ? folderTag : null;
+  React.useLayoutEffect(() => {
+    const row = titleRowRef.current;
+    if (!row || !isPhone || !folderTag) return;
+    const check = () => {
+      const title = row.querySelector("p");
+      const tag = title?.querySelector('[data-cy="folder-tag"]');
+      if (!title || !tag) return;
+      // Clipped by the two-line clamp: below the title's box.
+      if (tag.getBoundingClientRect().bottom > title.getBoundingClientRect().bottom + 0.5) {
+        setTagFitsInline(false);
+      }
+    };
+    check();
+    // A new width can make room again: try inline, then measure.
+    let width = row.parentElement?.clientWidth ?? 0;
+    const observer = new ResizeObserver(() => {
+      const next = row.parentElement?.clientWidth ?? 0;
+      if (next === width) return;
+      width = next;
+      setTagFitsInline(true);
+    });
+    if (row.parentElement) observer.observe(row.parentElement);
+    return () => observer.disconnect();
+  }, [isPhone, folderTag, tagFitsInline, link.title]);
   const markOpened = () => {
     if (!read) void setLinksRead([link.id], true);
   };
@@ -335,12 +367,20 @@ export const LinkItem = React.forwardRef<
           />
         </div>
       </ItemMedia>
-      <ItemContent className="self-start pt-1.5">
-        <ItemTitle>
+      {/* min-w-0: the grid's 1fr column can then shrink below a one-line
+          title's full width (truncate can't wrap), so it ends in an
+          ellipsis instead of widening the row. */}
+      <ItemContent className="min-w-0 self-start pt-1.5">
+        {/* Capped at the column, so the title shrinks to an ellipsis and
+            the domain and tag stay in view. */}
+        <ItemTitle ref={titleRowRef} className="max-w-full">
           <Typography
             size="small"
             className={cn(
-              "line-clamp-2 wrap-anywhere md:line-clamp-1",
+              // One line from md with a character-level ellipsis (truncate,
+              // not line-clamp, which cuts at a word and leaves a gap
+              // before the domain and tag).
+              "line-clamp-2 wrap-anywhere md:block md:truncate",
               // Read steps back in weight too, not just color: a cue that
               // survives low contrast and color-blindness (unread mail's bold).
               read
@@ -350,6 +390,12 @@ export const LinkItem = React.forwardRef<
             )}
           >
             {link.title}
+            {inlineTag ? (
+              <FolderTag
+                folder={inlineTag}
+                className="ms-1.5 inline-flex align-middle"
+              />
+            ) : null}
           </Typography>
           <Typography
             component="span"
@@ -363,7 +409,7 @@ export const LinkItem = React.forwardRef<
           </Typography>
           {/* Home, with folder tags on: the link's folder, after the domain
               (after the title on phones, which hide the domain). */}
-          {folderTag ? <FolderTag folder={folderTag} /> : null}
+          {sideTag ? <FolderTag folder={sideTag} /> : null}
         </ItemTitle>
       </ItemContent>
       {/* Stays in the layout while selecting (hidden and inert): its 32px

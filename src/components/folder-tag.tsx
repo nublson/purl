@@ -45,7 +45,9 @@ export function FolderTag({
   className?: string;
 }) {
   const isPhone = useIsPhone();
-  if (isPhone) return <FolderTagIcon folder={folder} inCard={inCard} />;
+  if (isPhone) {
+    return <FolderTagIcon folder={folder} inCard={inCard} className={className} />;
+  }
   return (
     <Typography
       component="span"
@@ -78,9 +80,11 @@ export function FolderTag({
 function FolderTagIcon({
   folder,
   inCard,
+  className,
 }: {
   folder: FolderSummary;
   inCard: boolean;
+  className?: string;
 }) {
   const [open, setOpen] = React.useState(false);
   return (
@@ -94,6 +98,7 @@ function FolderTagIcon({
             "pointer-events-auto relative z-10 flex size-5 shrink-0 items-center justify-center rounded-md bg-muted outline-none after:absolute after:-inset-1 focus-visible:ring-2 focus-visible:ring-ring",
             // A card: centered under the 16px favicon (the chip is 20px).
             inCard && "-ms-0.5",
+            className,
           )}
           onClick={(event) => {
             // Not the row's (or card's) link underneath. Opens (Radix
