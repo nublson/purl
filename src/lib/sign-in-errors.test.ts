@@ -14,7 +14,7 @@ describe("signInErrorMessage", () => {
 
   it("falls back for unknown codes", () =>
     expect(signInErrorMessage("weird_code")).toBe(
-      "We couldn't sign you in. Try again.",
+      "We couldn’t sign you in. Try again.",
     ));
 
   it("returns null without a code", () =>
@@ -29,7 +29,7 @@ describe("connectErrorMessage", () => {
 
   it("maps unable_to_link_account", () =>
     expect(connectErrorMessage("unable_to_link_account")).toBe(
-      "We couldn't connect that account. Make sure its email is verified.",
+      "We couldn’t connect that account. Make sure its email is verified.",
     ));
 
   it("maps access_denied", () =>
@@ -39,7 +39,7 @@ describe("connectErrorMessage", () => {
 
   it("falls back for unknown codes", () =>
     expect(connectErrorMessage("invalid_code")).toBe(
-      "We couldn't connect that account. Try again.",
+      "We couldn’t connect that account. Try again.",
     ));
 
   it("returns null without a code", () =>

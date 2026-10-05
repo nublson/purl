@@ -74,7 +74,8 @@ export function FolderTag({
         emoji={folder.emoji}
         className={cn(EMOJI_IN_CHIP, inCard ? "w-4" : "w-3")}
       />
-      <Typography component="span" size="mini" className="truncate">
+      {/* A long name truncates; the native tooltip shows it whole. */}
+      <Typography component="span" size="mini" className="truncate" title={folder.name}>
         {folder.name}
       </Typography>
     </Typography>
