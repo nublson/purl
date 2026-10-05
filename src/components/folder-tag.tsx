@@ -25,6 +25,17 @@ export function useFolderTag(link: Pick<Link, "folderId">): FolderSummary | null
 }
 
 /**
+ * A folder emoji in a tag's chip: 12px, on a one-em line (`leading-none`
+ * after `text-xs`, whose own 16px line height would set the glyph off its
+ * middle), in a box as tall as the glyph and wide enough for its advance
+ * (an emoji draws ~15px wide at 12px: squeezed into 12px it overflowed to
+ * the right, so it looked shifted left), centered in the chip. Checked in
+ * iOS Safari: every emoji's drawn shape within a pixel of the chip's
+ * center (what's left is each emoji's own artwork).
+ */
+const EMOJI_IN_CHIP = "size-auto min-w-[1.25em] text-xs leading-none";
+
+/**
  * A link's folder, as a small muted chip: the folder's emoji and name
  * (a long name truncates). Decorative next to the row's own text; the
  * name is in the accessibility tree as plain text. On phones, just the
@@ -61,7 +72,7 @@ export function FolderTag({
     >
       <FolderEmoji
         emoji={folder.emoji}
-        className={inCard ? "size-4 text-xs" : "size-3 text-xs"}
+        className={cn(EMOJI_IN_CHIP, inCard ? "w-4" : "w-3")}
       />
       <Typography component="span" size="mini" className="truncate">
         {folder.name}
@@ -109,7 +120,7 @@ function FolderTagIcon({
             setOpen(true);
           }}
         >
-          <FolderEmoji emoji={folder.emoji} className="size-3 text-xs" />
+          <FolderEmoji emoji={folder.emoji} className={EMOJI_IN_CHIP} />
         </button>
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={6}>
