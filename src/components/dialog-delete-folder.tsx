@@ -78,7 +78,7 @@ export function DialogDeleteFolder({
           </AlertDialogTitle>
           <AlertDialogDescription>
             {hasLinks
-              ? `Its ${formatLinkCount(folder.linkCount)} stay saved unless you delete them too. Deleted links can't be recovered.`
+              ? `Its ${formatLinkCount(folder.linkCount)} stay saved unless you delete them too. Deleted links can’t be recovered.`
               : "This folder is empty."}
           </AlertDialogDescription>
         </AlertDialogHeader>

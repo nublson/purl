@@ -28,7 +28,7 @@ export function useAuth() {
       toast.error(
         signInErrorMessage(code ?? null) ??
           res.error.message ??
-          "We couldn't sign you in. Try again.",
+          "We couldn’t sign you in. Try again.",
       );
     }
   }

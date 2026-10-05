@@ -69,9 +69,9 @@ export function SharedFolderSkeleton({
           {ROW_TITLE_WIDTHS.map((width, index) => (
             <div
               key={index}
-              className="grid h-12 grid-cols-[20px_1fr] items-center gap-4 p-2"
+              className="grid h-12 grid-cols-[20px_1fr] items-center gap-4 p-2 max-md:h-14 max-md:grid-cols-[24px_1fr]"
             >
-              <Skeleton className="size-5 rounded" />
+              <Skeleton className="size-5 rounded max-md:size-6" />
               <Skeleton className={`h-3.5 ${width}`} />
             </div>
           ))}

@@ -66,7 +66,7 @@ export function SharedLinkItem({
     <Item
       data-cy="link-item"
       // min-h-12: the owner's row gets its 48px from the menu button.
-      className="relative grid min-h-12 w-full grid-cols-[20px_1fr] gap-4 border-0 p-2 transition-none hover:bg-accent/40"
+      className="relative grid min-h-12 w-full grid-cols-[20px_1fr] gap-4 border-0 p-2 transition-none hover:bg-accent/40 max-md:min-h-14 max-md:grid-cols-[24px_1fr] max-md:py-3"
       onMouseEnter={hasPreview ? scheduleOpen : undefined}
       onMouseLeave={hasPreview ? scheduleClose : undefined}
     >
@@ -98,15 +98,17 @@ export function SharedLinkItem({
         variant="image"
         // One title line tall, from the title's top: the favicon centers
         // on its first line, like LinkItem's.
-        className="mt-1.5 h-lh w-5 self-start overflow-visible text-sm leading-normal"
+        className="mt-1.5 h-lh w-5 self-start overflow-visible text-sm leading-normal max-md:mt-1 max-md:w-6 max-md:text-base max-md:leading-6"
       >
-        <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
+        <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
       </ItemMedia>
-      <ItemContent className="self-start pt-1.5">
-        <ItemTitle>
+      {/* min-w-0 / max-w-full: a one-line title shrinks to an ellipsis
+          instead of widening the row (as in LinkItem). */}
+      <ItemContent className="min-w-0 self-start pt-1.5 max-md:pt-1">
+        <ItemTitle className="max-w-full">
           <Typography
             size="small"
-            className="line-clamp-2 font-medium wrap-anywhere text-accent-foreground md:line-clamp-1"
+            className="block truncate font-medium text-accent-foreground max-md:text-base max-md:leading-6"
           >
             {link.title}
           </Typography>

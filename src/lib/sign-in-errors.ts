@@ -12,7 +12,7 @@ export function signInErrorMessage(code: string | null): string | null {
     case "access_denied":
       return "Sign-in was cancelled.";
     default:
-      return "We couldn't sign you in. Try again.";
+      return "We couldn’t sign you in. Try again.";
   }
 }
 
@@ -28,10 +28,10 @@ export function connectErrorMessage(code: string | null): string | null {
     case "account_already_linked_to_different_user":
       return "That account is already used by another Purl account.";
     case "unable_to_link_account":
-      return "We couldn't connect that account. Make sure its email is verified.";
+      return "We couldn’t connect that account. Make sure its email is verified.";
     case "access_denied":
       return "Connection was cancelled.";
     default:
-      return "We couldn't connect that account. Try again.";
+      return "We couldn’t connect that account. Try again.";
   }
 }

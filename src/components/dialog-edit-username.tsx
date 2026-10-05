@@ -18,7 +18,7 @@ const RESERVED_MESSAGE = "That username is reserved";
 const TAKEN_MESSAGE = "That username is taken";
 const AVAILABILITY_DEBOUNCE_MS = 300;
 
-const AVAILABILITY_CHECK_ERROR_MESSAGE = "Couldn't check availability. Try again.";
+const AVAILABILITY_CHECK_ERROR_MESSAGE = "Couldn’t check availability. Try again.";
 const RATE_LIMITED_MESSAGE = "Too many username changes. Try again in a while.";
 
 type FieldStatus =

@@ -180,7 +180,7 @@ export const LinkItem = React.forwardRef<
       className={cn(
         // border-0: Item's 1px border is for its outline variant and its own
         // focus ring; this row uses neither (the link draws the focus ring).
-        "w-full border-0 p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
+        "w-full border-0 p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative max-md:grid-cols-[24px_1fr_auto] max-md:py-3 transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
         // Touch: a long-press selects the row, so it must not also start a
         // text selection (which then spreads to the headings around it).
         "[@media(pointer:coarse)]:select-none",
@@ -288,9 +288,10 @@ export const LinkItem = React.forwardRef<
         // the title's first line, however many lines follow. The middle of
         // the line box reads as the middle of a title in mixed case; the
         // middle of the lowercase letters sat ~1.5px low beside capitals.
-        className="mt-1.5 h-lh w-5 self-start overflow-visible text-sm leading-normal"
+        // Phones: a 16px title on a 24px line, so a 24px favicon, 4px down.
+        className="mt-1.5 h-lh w-5 self-start overflow-visible text-sm leading-normal max-md:mt-1 max-md:w-6 max-md:text-base max-md:leading-6"
       >
-        <div className="group/media relative size-5 rounded">
+        <div className="group/media relative size-5 rounded max-md:size-6">
           {/* The favicon gives way to the checkbox on hover (pointer devices)
               or keyboard focus, and on every row while selecting. */}
           <div
@@ -308,17 +309,17 @@ export const LinkItem = React.forwardRef<
           >
             {arriving ? (
               <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
-                <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
+                <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
               </Typography>
             ) : (
-              <LinkIcon link={link} size="default" eagerFavicon={eagerFavicon} />
+              <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
             )}
           </div>
           <Checkbox
             checked={selected}
             aria-label={`Select ${link.title}`}
             className={cn(
-              "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background transition-[opacity,box-shadow] duration-150 ease-out-strong",
+              "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background max-md:size-5 transition-[opacity,box-shadow] duration-150 ease-out-strong",
               selecting
                 ? "opacity-100"
                 : "opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:group-hover/item:opacity-100",
@@ -335,12 +336,23 @@ export const LinkItem = React.forwardRef<
           />
         </div>
       </ItemMedia>
-      <ItemContent className="self-start pt-1.5">
-        <ItemTitle>
+      {/* min-w-0: the grid's 1fr column can then shrink below a one-line
+          title's full width (truncate can't wrap), so it ends in an
+          ellipsis instead of widening the row. */}
+      <ItemContent className="min-w-0 self-start pt-1.5 max-md:pt-1">
+        {/* Capped at the column, so the title shrinks to an ellipsis and
+            the domain and tag stay in view. */}
+        <ItemTitle className="max-w-full">
           <Typography
             size="small"
             className={cn(
-              "line-clamp-2 wrap-anywhere md:line-clamp-1",
+              // One line at every size, with a character-level ellipsis
+              // (truncate, not line-clamp, which cuts at a word and leaves a
+              // gap before the domain and tag).
+              "block truncate",
+              // Phones: the page's reading size (16px), like the search
+              // field's, not desktop's 14px density.
+              "max-md:text-base max-md:leading-6",
               // Read steps back in weight too, not just color: a cue that
               // survives low contrast and color-blindness (unread mail's bold).
               read
@@ -361,8 +373,8 @@ export const LinkItem = React.forwardRef<
           >
             {formatDomain(link.domain)}
           </Typography>
-          {/* Home, with folder tags on: the link's folder, after the domain
-              (after the title on phones, which hide the domain). */}
+          {/* Home, with folder tags on: the link's folder, right after the
+              domain (after the title on phones, which hide the domain). */}
           {folderTag ? <FolderTag folder={folderTag} /> : null}
         </ItemTitle>
       </ItemContent>

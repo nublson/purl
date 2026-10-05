@@ -60,7 +60,8 @@ export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
           aria-label="Open link menu"
           variant="ghost"
           size="icon-sm"
-          className="cursor-pointer text-muted-foreground"
+          // A 44px hit area around the 32px button (fits the row's padding).
+          className="relative cursor-pointer text-muted-foreground after:absolute after:-inset-1.5"
         >
           <Ellipsis />
         </Button>

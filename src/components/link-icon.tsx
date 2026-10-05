@@ -8,15 +8,19 @@ import * as React from "react";
 
 interface LinkIconProps {
   link: Link;
-  size?: "mini" | "small" | "default";
+  size?: "mini" | "small" | "default" | "row";
   eagerFavicon?: boolean;
 }
 
-/** Box classes per size: the icon's and the favicon's (12 / 16 / 20px). */
+/**
+ * Box classes per size: the icon's and the favicon's (12 / 16 / 20px;
+ * `row` is a list row's: 20px, 24px on phones beside the larger title).
+ */
 const SIZES = {
   mini: { icon: "size-3", box: "size-3", px: 12 },
   small: { icon: "size-4", box: "size-4", px: 16 },
   default: { icon: "size-5", box: "size-5", px: 20 },
+  row: { icon: "size-5 max-md:size-6", box: "size-5 max-md:size-6", px: 24 },
 } as const;
 
 export function LinkIcon({
