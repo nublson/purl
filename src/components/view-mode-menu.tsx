@@ -4,7 +4,7 @@ import { useLinkView } from "@/contexts/link-view-context";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { parseLinkView } from "@/lib/link-view";
 import { cn } from "@/lib/utils";
-import { ChevronDown, LayoutGrid, List, Tag } from "lucide-react";
+import { ChevronDown, Grid, List3, Tag5 } from "reicon-react";
 import * as React from "react";
 import {
   DropdownMenuCheckboxItem,
@@ -26,7 +26,7 @@ export function ViewModeMenu() {
   const { view, setView } = useLinkView();
   const isPhone = useIsPhone();
   const [expanded, setExpanded] = React.useState(false);
-  const Icon = view === "grid" ? LayoutGrid : List;
+  const Icon = view === "grid" ? Grid : List3;
 
   const choices = (
     <DropdownMenuRadioGroup
@@ -37,11 +37,11 @@ export function ViewModeMenu() {
       }}
     >
       <DropdownMenuRadioItem value="list" data-cy="link-view-list">
-        <List />
+        <List3 />
         List
       </DropdownMenuRadioItem>
       <DropdownMenuRadioItem value="grid" data-cy="link-view-grid">
-        <LayoutGrid />
+        <Grid />
         Grid
       </DropdownMenuRadioItem>
     </DropdownMenuRadioGroup>
@@ -62,10 +62,7 @@ export function ViewModeMenu() {
           <ChevronDown
             aria-hidden="true"
             className={cn(
-              // -me-0.5: the chevron's ink ends ~3px inside its box;
-              // pulled into the padding, its right edge mirrors the
-              // leading icon's left.
-              "ms-auto -me-0.5 transition-transform duration-150 ease-out-strong motion-reduce:transition-none",
+              "ms-auto transition-transform duration-150 ease-out-strong motion-reduce:transition-none",
               expanded && "rotate-180",
             )}
           />
@@ -108,7 +105,7 @@ export function FolderTagsMenuItem() {
       onSelect={(event) => event.preventDefault()}
       onCheckedChange={(checked) => setFolderTags(checked === true)}
     >
-      <Tag />
+      <Tag5 />
       Folder tags
       <SwitchIndicator on={folderTags} />
     </DropdownMenuCheckboxItem>

@@ -4,7 +4,7 @@ import { ARRIVE, ARRIVE_ICON, ARRIVE_LATE } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import type { Link } from "@/utils/links";
-import { ArrowUpRight, Plus } from "lucide-react";
+import { ArrowUpRight, Plus } from "reicon-react";
 import * as React from "react";
 import { LinkIcon } from "./link-icon";
 import { Typography } from "./typography";

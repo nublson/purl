@@ -4,7 +4,7 @@ import { LINK_GRID_FRAME } from "@/lib/link-view";
 import { coolPreviews } from "@/lib/link-preview-warmth";
 import type { PublicLink } from "@/lib/public-folders";
 import type { Link } from "@/utils/links";
-import { PackageOpen } from "lucide-react";
+import { Box } from "reicon-react";
 import { BouncingDots } from "loading-dev";
 import {
   useCallback,
@@ -181,7 +181,7 @@ export function SharedFolderList({
         <Empty data-cy="link-group-empty">
           <EmptyHeader>
             <EmptyMedia variant="icon">
-              <PackageOpen />
+              <Box />
             </EmptyMedia>
             <EmptyTitle>No links yet</EmptyTitle>
             <EmptyDescription>

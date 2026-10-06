@@ -4,7 +4,7 @@ import * as React from "react"
 import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
-import { CheckIcon, ChevronRightIcon } from "lucide-react"
+import { Check, ChevronRight } from "reicon-react"
 
 function DropdownMenu({
   ...props
@@ -106,7 +106,7 @@ function DropdownMenuCheckboxItem({
         data-slot="dropdown-menu-checkbox-item-indicator"
       >
         <DropdownMenuPrimitive.ItemIndicator>
-          <CheckIcon
+          <Check
           />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
@@ -149,7 +149,7 @@ function DropdownMenuRadioItem({
         data-slot="dropdown-menu-radio-item-indicator"
       >
         <DropdownMenuPrimitive.ItemIndicator>
-          <CheckIcon
+          <Check
           />
         </DropdownMenuPrimitive.ItemIndicator>
       </span>
@@ -232,10 +232,10 @@ function DropdownMenuSubTrigger({
       {...props}
     >
       {children}
-      {/* -me-1: the chevron is drawn in the middle of its box, leaving ~5px of
+      {/* -me-1: the chevron is drawn in the middle of its box, leaving ~4px of
           air on its right; pulled into the padding, its ink ends as far from
           the edge as a leading icon's starts. */}
-      <ChevronRightIcon className="ml-auto -me-1" />
+      <ChevronRight className="ml-auto -me-1" />
     </DropdownMenuPrimitive.SubTrigger>
   )
 }
