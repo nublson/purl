@@ -1,6 +1,7 @@
 "use client";
 
-import { LinkGroup } from "@/components/link-group";
+import { LinkGrid, LinkGroup } from "@/components/link-group";
+import { useLinkView } from "@/contexts/link-view-context";
 import { LinkSelectionBar } from "@/components/link-selection-bar";
 import { LinkOmnibox } from "@/components/link-omnibox";
 import {
@@ -370,6 +371,7 @@ export function HomeShell({
     setPendingUrl(null);
   }, []);
 
+  const { view } = useLinkView();
   const todayGroup = groups.find((g) => g.label === "Today");
 
   // Optimistic row only for a URL this tab is saving.
@@ -463,10 +465,27 @@ export function HomeShell({
         // Leaving the list resets the preview hover delay (see
         // link-preview-warmth); gaps between date groups don't.
         <div className="flex flex-col gap-8" onMouseLeave={coolPreviews}>
-          {showSyntheticToday && (
+          {view === "grid" ? (
+            <LinkGrid
+              newLinkId={arrivingId}
+              groups={[
+                ...(showSyntheticToday
+                  ? [{ label: "Today", links: [], pendingUrl: skeletonUrl }]
+                  : []),
+                ...groups.map((group, groupIndex) => ({
+                  label: group.label,
+                  links: group.links,
+                  pendingUrl:
+                    group.label === "Today" && showSkeleton ? skeletonUrl : null,
+                  eagerFavicons: eagerFaviconsByGroup[groupIndex],
+                })),
+              ]}
+            />
+          ) : null}
+          {view !== "grid" && showSyntheticToday && (
             <LinkGroup label="Today" links={[]} pendingUrl={skeletonUrl} />
           )}
-          {groups.map((group, groupIndex) => (
+          {view !== "grid" && groups.map((group, groupIndex) => (
             <LinkGroup
               key={group.label}
               label={group.label}

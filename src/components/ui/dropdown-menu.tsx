@@ -232,7 +232,10 @@ function DropdownMenuSubTrigger({
       {...props}
     >
       {children}
-      <ChevronRight className="ml-auto" />
+      {/* -me-1: the chevron is drawn in the middle of its box, leaving ~4px of
+          air on its right; pulled into the padding, its ink ends as far from
+          the edge as a leading icon's starts. */}
+      <ChevronRight className="ml-auto -me-1" />
     </DropdownMenuPrimitive.SubTrigger>
   )
 }

@@ -24,22 +24,26 @@ export function useFolderTag(link: Pick<Link, "folderId">): FolderSummary | null
 }
 
 /**
- * A folder emoji in a tag's chip: 12px, on a one-em line (`leading-none`
+ * A folder emoji in a tag's chip: 12px on a one-em line (`leading-none`
  * after `text-xs`, whose own 16px line height would set the glyph off its
- * middle), in a box as tall as the glyph and wide enough for its advance
- * (an emoji draws ~15px wide at 12px: squeezed into 12px it overflowed to
- * the right, so it looked shifted left), centered in the chip. Checked in
- * iOS Safari: every emoji's drawn shape within a pixel of the chip's
- * center (what's left is each emoji's own artwork).
+ * middle), in a box exactly as wide as the drawn emoji, not its advance.
+ *
+ * Optical, not geometric: Chromium draws Apple Color Emoji ~10.5px wide at
+ * 12px but advances 15px, all of the extra air on the right. Centering that
+ * advance in a 15px box (as before) set the ink 1.5px left of the box's
+ * middle and left ~8px of empty space before the name, wider than the
+ * chip's own padding, so the emoji read as detached from its label. Here
+ * the box is 12px and the glyph starts at its left edge (`justify-start`):
+ * the ink is centered in it and the air spills under the gap instead.
  *
  * WebKit (Safari on Mac and iPhone, every iOS browser) draws Apple Color
  * Emoji ~1.25x larger than Chromium at the same size: ~15px of artwork at
  * 12px, nearly filling the 20px chip. There it's 0.6rem (9.6px), which
- * draws ~12px like Chromium's 12px. `font: -apple-system-body` is a
+ * draws ~12px, filling the same 12px box. `font: -apple-system-body` is a
  * WebKit-only keyword, so the query picks WebKit and nothing else.
  */
 const EMOJI_IN_CHIP =
-  "size-auto min-w-[1.25em] text-xs leading-none supports-[font:-apple-system-body]:text-[0.6rem]";
+  "size-auto w-3 justify-start text-xs leading-none supports-[font:-apple-system-body]:text-[0.6rem]";
 
 /**
  * A link's folder, as a small muted chip: the folder's emoji and name
@@ -59,7 +63,7 @@ export function FolderTag({
 }: {
   folder: FolderSummary;
   /**
-   * In a grid card: the emoji sits in the favicon's column (a 16px box,
+   * In a grid card: the emoji sits in the favicon's column (a 16px slot,
    * the chip pulled left by its own padding) and the name starts where
    * the title does (the card's column gap), so the icons stack.
    */
@@ -73,14 +77,23 @@ export function FolderTag({
         size="mini"
         data-cy="folder-tag"
         className={cn(
-          "inline-flex h-5 min-w-0 shrink-0 items-center rounded-md bg-muted px-1.5 font-normal phone:hidden",
-          inCard ? "-ms-1.5 max-w-full gap-2 md:gap-3" : "max-w-40 gap-1",
+          // The emoji's side gets 1px less padding than the name's: a solid
+          // color shape weighs more than the text's light edge, so equal
+          // padding reads heavier on the emoji's side.
+          "inline-flex h-5 min-w-0 shrink-0 items-center rounded-md bg-muted ps-[5px] pe-1.5 font-normal phone:hidden",
+          inCard
+            ? "-ms-[5px] max-w-full gap-2 md:gap-3"
+            : // In a row, next to the title and domain: 1px down puts the
+              // chip's smaller text on their baseline (centered on their
+              // line box it sat 0.7–1.5px higher).
+              "max-w-40 translate-y-px gap-[3px]",
           className,
         )}
       >
         <FolderEmoji
           emoji={folder.emoji}
-          className={cn(EMOJI_IN_CHIP, inCard ? "w-4" : "w-3")}
+          // A card: the 12px emoji centered in the favicon's 16px column.
+          className={cn(EMOJI_IN_CHIP, inCard && "mx-0.5")}
         />
         {/* A long name truncates; the native tooltip shows it whole. */}
         <Typography component="span" size="mini" className="truncate" title={folder.name}>
