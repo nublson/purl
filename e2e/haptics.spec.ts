@@ -97,6 +97,31 @@ test.describe("Haptics: switches", () => {
   });
 });
 
+test.describe("Haptics: folder tags", () => {
+  test.use(phone);
+  test.beforeEach(async ({ page }) => installProbes(page));
+
+  test("Folder tags ticks, vibrates once and saves", async ({ page, seed }) => {
+    await seed.link({ url: "https://alpha.example", title: "Alpha" });
+    await page.goto("/home");
+    await waitForHydration(page, '[data-cy="link-item"]');
+    const saves = countRequests(page, "PATCH", /^\/api\/user\/layout$/);
+    await page.getByRole("button", { name: "Account menu" }).tap();
+    const item = page.getByRole("menuitemcheckbox", { name: "Folder tags" });
+    await expect(item).toBeVisible();
+
+    await tapOn(page, item);
+
+    await expect(item).toHaveAttribute("aria-checked", "true");
+    await expect.poll(() => ticks(page)).toBe(1);
+    expect(await vibrations(page)).toEqual([[10]]);
+    await expect.poll(() => saves.length).toBe(1);
+    expect(JSON.parse(saves[0])).toEqual({ folderTags: true });
+    // The item keeps the menu open.
+    await expect(item).toBeVisible();
+  });
+});
+
 test.describe("Haptics: desktop", () => {
   test.beforeEach(async ({ page }) => installProbes(page));
 

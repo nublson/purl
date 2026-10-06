@@ -3,6 +3,7 @@
 import { useLinkView } from "@/contexts/link-view-context";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { parseLinkView } from "@/lib/link-view";
+import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Grid, List3, Tag5 } from "reicon-react";
 import * as React from "react";
@@ -15,6 +16,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from "./ui/dropdown-menu";
+import { HapticTarget } from "./haptic-target";
 
 /**
  * "View mode" in the user menu: how Home and folders show links (List or
@@ -103,11 +105,15 @@ export function FolderTagsMenuItem() {
       // The switch is the indicator: no check mark, no room kept for one.
       className="pr-2 [&>[data-slot=dropdown-menu-checkbox-item-indicator]]:hidden"
       onSelect={(event) => event.preventDefault()}
-      onCheckedChange={(checked) => setFolderTags(checked === true)}
+      onCheckedChange={(checked) => {
+        haptic("selection");
+        setFolderTags(checked === true);
+      }}
     >
       <Tag5 />
       Folder tags
       <SwitchIndicator on={folderTags} />
+      <HapticTarget />
     </DropdownMenuCheckboxItem>
   );
 }
