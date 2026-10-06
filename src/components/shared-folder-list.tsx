@@ -103,7 +103,7 @@ export function SharedFolderList({
     return () => clearTimeout(timer);
   }, [arrivingIds]);
   // Masonry needs measured cards (see useMasonry).
-  const masonry = useMasonry(view === "grid");
+  const { masonry, listRef } = useMasonry(view === "grid");
 
   // A failed page stops loading by scroll: retrying on its own would
   // re-request while the sentinel stays in view (and spend the visitor's
@@ -207,10 +207,11 @@ export function SharedFolderList({
       >
         {view === "grid" ? (
           <ul
+            ref={listRef}
             aria-label="Links"
             // Masonry: 2 columns on phones, 3 on tablets, 4 on desktop; cards
             // up to 210px, centered, gutters 16 → 40px. 1px rows with no row
-            // gap: each card spans its own height (see MasonryItem), so a
+            // gap: each card spans its own height (see useMasonry), so a
             // short card sits right under the one above it. DOM order stays
             // newest first, left to right, for keyboard and screen readers.
             className={cn(
@@ -227,7 +228,6 @@ export function SharedFolderList({
               return (
                 <MasonryItem
                   key={link.id}
-                  masonry={masonry}
                   className={
                     arriving
                       ? CARD_ARRIVE
@@ -247,7 +247,7 @@ export function SharedFolderList({
                 the new cards will land. */}
             {loadingMore
               ? Array.from({ length: LOAD_MORE_CARDS }, (_, index) => (
-                  <MasonryItem key={`loading-${index}`} masonry={masonry}>
+                  <MasonryItem key={`loading-${index}`}>
                     <SharedLinkCardSkeleton />
                   </MasonryItem>
                 ))
