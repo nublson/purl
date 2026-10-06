@@ -65,6 +65,35 @@ test.describe("Owner grid view", () => {
     await expect(cards(page)).toHaveCount(0);
   });
 
+  test("the grid follows the window's width without a reload", async ({ page, seed }) => {
+    for (const title of ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"]) {
+      await seed.link({ url: `https://${title.toLowerCase()}.example`, title });
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openHome(page);
+    await chooseView(page, "Grid");
+    await expect(cards(page)).toHaveCount(6);
+    const columns = async () =>
+      new Set(
+        await cards(page).evaluateAll((all) =>
+          all.map((el) => Math.round(el.getBoundingClientRect().left)),
+        ),
+      ).size;
+    await expect.poll(columns).toBe(4);
+
+    // Narrower than md: two columns, every card on screen.
+    await page.setViewportSize({ width: 500, height: 900 });
+    await expect.poll(columns).toBe(2);
+    const rights = await cards(page).evaluateAll((all) =>
+      all.map((el) => el.getBoundingClientRect().right),
+    );
+    expect(Math.max(...rights)).toBeLessThanOrEqual(500);
+
+    // And back.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect.poll(columns).toBe(4);
+  });
+
   test("a card opens its link (marking it read), selects, and has the row menu", async ({ page, seed }) => {
     await seed.link({ url: "https://alpha.example", title: "Alpha" });
     await seed.link({ url: "https://bravo.example", title: "Bravo" });

@@ -99,13 +99,19 @@ export function chooseMasonryColumn(bottoms: number[], previous: number): number
 }
 
 function placeCards(list: HTMLElement) {
+  const items = Array.from(list.children) as HTMLElement[];
+  // Count the template's columns with no card placed: a card left in
+  // column 4 after the grid narrows to 2 makes implicit columns, which the
+  // computed template includes, so the count would stay 4 and the cards
+  // would never come back to 2 columns until a reload.
+  for (const item of items) clearPlacement(item);
   const columns = getComputedStyle(list)
     .gridTemplateColumns.split(" ")
     .filter(Boolean).length;
   if (columns === 0) return;
   const bottoms = new Array<number>(columns).fill(0);
   let previous = -1;
-  for (const item of Array.from(list.children) as HTMLElement[]) {
+  for (const item of items) {
     const box = item.firstElementChild;
     if (!(box instanceof HTMLElement)) continue;
     // Layout height, whole pixels (fractional 16:10 thumbnails round to
