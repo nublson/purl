@@ -2,11 +2,13 @@
 
 import { useFolderActions, useFolders } from "@/hooks/use-folders";
 import { useIsPhone } from "@/hooks/use-is-phone";
+import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
 import { Check, ChevronDown, FolderMinus, FolderMove } from "reicon-react";
 import * as React from "react";
 import { FolderEmoji } from "./folder-emoji";
+import { HapticTarget } from "./haptic-target";
 import { Typography } from "./typography";
 import {
   DropdownMenuGroup,
@@ -110,6 +112,7 @@ export function LinkFolderItems({ link }: { link: LinkType }) {
               key={folder.id}
               disabled={active}
               onSelect={() => {
+                haptic("success");
                 void moveLink(link.id, folder.id, { from: link.folderId });
               }}
             >
@@ -122,6 +125,7 @@ export function LinkFolderItems({ link }: { link: LinkType }) {
                 {folder.name}
               </Typography>
               {active ? <Check aria-hidden="true" /> : null}
+              <HapticTarget />
             </DropdownMenuItem>
           );
         })
@@ -131,6 +135,7 @@ export function LinkFolderItems({ link }: { link: LinkType }) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onSelect={() => {
+              haptic("success");
               void moveLink(link.id, null, { from: link.folderId });
             }}
           >
@@ -142,6 +147,7 @@ export function LinkFolderItems({ link }: { link: LinkType }) {
             >
               Remove from {currentFolder.name}
             </Typography>
+            <HapticTarget />
           </DropdownMenuItem>
         </>
       ) : null}

@@ -391,6 +391,95 @@ test.describe("Haptics: selection bar", () => {
   });
 });
 
+test.describe("Haptics: row menu and Copy link", () => {
+  test.use(phone);
+  test.beforeEach(async ({ page }) => installProbes(page));
+
+  async function openMenu(page: Page, title: string, path = "/home") {
+    await page.goto(path);
+    await waitForHydration(page, '[data-cy="link-item"]');
+    await row(page, title).getByRole("button", { name: "Open link menu" }).tap();
+    await expect(page.getByRole("menu")).toBeVisible();
+  }
+
+  for (const reducedMotion of ["no-preference", "reduce"] as const) {
+    test(`Mark as read ticks once (${reducedMotion} motion)`, async ({ page, seed }) => {
+      await page.emulateMedia({ reducedMotion });
+      await seedRows(seed);
+      await openMenu(page, "Link 1");
+      const marks = countRequests(page, "PATCH", /^\/api\/links\/[^/]+$/);
+      await tapOn(page, page.getByRole("menuitem", { name: "Mark as read" }));
+      await expect.poll(() => marks.length).toBe(1);
+      expect(JSON.parse(marks[0])).toMatchObject({ read: true });
+      await expect.poll(() => ticks(page)).toBe(1);
+      expect(await vibrations(page)).toEqual([[10, 60, 10]]);
+    });
+  }
+
+  test("Delete ticks once with a warning", async ({ page, seed }) => {
+    await seedRows(seed);
+    await openMenu(page, "Link 1");
+    await tapOn(page, page.getByRole("menuitem", { name: "Delete" }));
+    await expect(page.getByRole("button", { name: "Undo" })).toHaveCount(1);
+    await expect.poll(() => ticks(page)).toBe(1);
+    expect(await vibrations(page)).toEqual([[25, 60, 25]]);
+  });
+
+  test("Move to folder ticks on the folder, not on expanding", async ({ page, seed }) => {
+    await seed.folder({ name: "Design", slug: "design" });
+    await seedRows(seed);
+    await openMenu(page, "Link 1");
+    const moves = countRequests(page, "PATCH", /^\/api\/links\/[^/]+$/);
+    await tapOn(page, page.getByRole("menuitem", { name: "Move to folder" }));
+    await expect(page.getByRole("menuitem", { name: /Design/ })).toBeVisible();
+    expect(await ticks(page)).toBe(0);
+    expect(await vibrations(page)).toEqual([]);
+
+    await tapOn(page, page.getByRole("menuitem", { name: /Design/ }));
+    await expect.poll(() => moves.length).toBe(1);
+    await expect.poll(() => ticks(page)).toBe(1);
+    expect(await vibrations(page)).toEqual([[10, 60, 10]]);
+  });
+
+  test("the current folder doesn't tick", async ({ page, seed }) => {
+    const design = await seed.folder({ name: "Design", slug: "design" });
+    await seed.link({ url: "https://link1.example", title: "Link 1", folderId: design });
+    await openMenu(page, "Link 1", "/folders/design");
+    await tapOn(page, page.getByRole("menuitem", { name: "Move to folder" }));
+    const current = page.getByRole("menuitem", { name: "Design", exact: true });
+    await expect(current).toHaveAttribute("data-disabled", "");
+    await tapOn(page, current);
+    await page.waitForTimeout(300);
+    expect(await ticks(page)).toBe(0);
+    expect(await vibrations(page)).toEqual([]);
+  });
+
+  test("Copy link ticks once it's public; not while private", async ({ page, seed }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: () => Promise.resolve() },
+      });
+    });
+    await seed.folder({ name: "Design", slug: "design" });
+    await openShare(page);
+    const copy = page.getByRole("button", { name: "Copy link" });
+    await expect(copy).toBeDisabled();
+    await tapOn(page, copy);
+    await page.waitForTimeout(300);
+    expect(await ticks(page)).toBe(0);
+    expect(await vibrations(page)).toEqual([]);
+
+    await tapOn(page, page.getByRole("switch", { name: "Public" }));
+    await expect(copy).toBeEnabled();
+    await resetProbes(page);
+    await tapOn(page, copy);
+    await expect(page.getByRole("button", { name: "Link copied" })).toBeVisible();
+    await expect.poll(() => ticks(page)).toBe(1);
+    expect(await vibrations(page)).toEqual([[10, 60, 10]]);
+  });
+});
+
 test.describe("Haptics: desktop", () => {
   test.beforeEach(async ({ page }) => installProbes(page));
 

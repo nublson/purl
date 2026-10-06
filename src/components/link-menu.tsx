@@ -2,6 +2,7 @@
 
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { copyToClipboard } from "@/lib/clipboard";
+import { haptic } from "@/lib/haptics";
 import { setLinksRead, useIsLinkRead } from "@/lib/link-read-state";
 import type { Link as LinkType } from "@/utils/links";
 import {
@@ -14,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { EditDialog } from "./dialog-edit-link";
 import { DropdownWrapper } from "./dropdown-wrapper";
+import { HapticTarget } from "./haptic-target";
 import { LinkFolderSubmenu } from "./link-folder-submenu";
 import { ReadToggleIcon } from "./read-toggle-icon";
 import { Button } from "./ui/button";
@@ -89,11 +91,13 @@ export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
         <DropdownMenuItem
           data-cy="toggle-read-menu-item"
           onSelect={() => {
+            haptic("success");
             void setLinksRead([link.id], !read);
           }}
         >
           <ReadToggleIcon read={read} />
           {read ? "Mark as unread" : "Mark as read"}
+          <HapticTarget />
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <LinkFolderSubmenu link={link} />
@@ -111,9 +115,14 @@ export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
           data-cy="delete-link-menu-item"
           variant="destructive"
           // A click from the keyboard (Enter/Space) has no pointer: detail 0.
-          onClick={(event) => onDelete({ byKeyboard: event.detail === 0 })}
+          onClick={(event) => {
+            const byKeyboard = event.detail === 0;
+            if (!byKeyboard) haptic("warning");
+            onDelete({ byKeyboard });
+          }}
         >
           <Trash2 /> Delete
+          <HapticTarget />
         </DropdownMenuItem>
       </DropdownMenuGroup>
     </DropdownWrapper>

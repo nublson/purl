@@ -2,11 +2,13 @@
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCurrentFolder, useFolderActions } from "@/hooks/use-folders";
+import { haptic } from "@/lib/haptics";
 import { publicFolderPath } from "@/lib/public-folder-path";
 import { cn } from "@/lib/utils";
 import { Check, Copy3, Globe, Lock } from "reicon-react";
 import * as React from "react";
 import { toast } from "sonner";
+import { HapticTarget } from "./haptic-target";
 import { Typography } from "./typography";
 import { Button } from "./ui/button";
 import {
@@ -163,7 +165,10 @@ export function FolderSharePopover() {
               // the link works only after the server confirms.
               disabled={!folder.isPublic || saving}
               aria-label={copied ? "Link copied" : "Copy link"}
-              onClick={() => void copyLink()}
+              onClick={() => {
+                haptic("success");
+                void copyLink();
+              }}
               // Concentric with the field: its radius minus the 4px inset.
               className="relative cursor-pointer rounded-[calc(var(--radius-md)-4px)] text-muted-foreground"
             >
@@ -176,6 +181,7 @@ export function FolderSharePopover() {
                 aria-hidden
                 className={cn("absolute", ICON_SWAP, copied ? ICON_IN : ICON_OUT)}
               />
+              <HapticTarget />
             </Button>
           </div>
           <span aria-live="polite" className="sr-only">
