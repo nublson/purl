@@ -8,6 +8,7 @@ import {
 } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { formatFolderLabel, formatLinkCount } from "@/lib/folder-display";
+import { haptic } from "@/lib/haptics";
 import {
   linkSelection,
   useSelectableLinkCount,
@@ -40,6 +41,7 @@ import * as React from "react";
 import { toast } from "sonner";
 import { DialogFolderForm } from "./dialog-folder-form";
 import { FolderEmoji } from "./folder-emoji";
+import { HapticTarget } from "./haptic-target";
 import { ReadToggleIcon } from "./read-toggle-icon";
 import { Typography } from "./typography";
 import { Button } from "./ui/button";
@@ -334,7 +336,11 @@ export function LinkSelectionBar({
                     "rounded-lg text-muted-foreground hover:text-foreground max-sm:w-8 max-sm:px-0 max-sm:pointer-coarse:w-10",
                     TOUCH_TARGET,
                   )}
-                  onClick={toggleAll}
+                  // Taps tick; the A shortcut shares toggleAll without one.
+                  onClick={() => {
+                    haptic("selection");
+                    toggleAll();
+                  }}
                 >
                   <MasterCheckbox checked={allSelected} />
                   <Typography
@@ -345,6 +351,7 @@ export function LinkSelectionBar({
                   >
                     Select all
                   </Typography>
+                  <HapticTarget className="-inset-0.5" />
                 </Button>
               </ShortcutTooltip>
               <BarSeparator />
@@ -376,9 +383,13 @@ export function LinkSelectionBar({
                   data-cy="selection-toggle-read"
                   aria-label={`Mark ${formatLinkCount(shownCount)} as ${allRead ? "unread" : "read"}`}
                   className={cn("rounded-lg", TOUCH_ICON_TARGET)}
-                  onClick={toggleReadSelected}
+                  onClick={() => {
+                    haptic("success");
+                    toggleReadSelected();
+                  }}
                 >
                   <ReadToggleIcon read={allRead} />
+                  <HapticTarget className="-inset-0.5" />
                 </Button>
               </ShortcutTooltip>
               <BarSeparator />
@@ -390,9 +401,13 @@ export function LinkSelectionBar({
                   // Muted at rest so it doesn't outweigh Move; the destructive
                   // variant's colors only on hover or focus, right before a click.
                   className={cn(TOUCH_ICON_TARGET, "rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:border-destructive/40 focus-visible:bg-destructive/10 focus-visible:text-destructive focus-visible:ring-destructive dark:hover:bg-destructive/20 dark:focus-visible:bg-destructive/20")}
-                  onClick={deleteSelected}
+                  onClick={() => {
+                    haptic("warning");
+                    deleteSelected();
+                  }}
                 >
                   <Trash2 />
+                  <HapticTarget className="-inset-0.5" />
                 </Button>
               </ShortcutTooltip>
             </m.div>
@@ -558,7 +573,12 @@ function MoveMenu({
         {folders.length > 0 ? <DropdownMenuSeparator /> : null}
         <DropdownMenuGroup>
           {anyFiled ? (
-            <DropdownMenuItem onSelect={() => onMove(null)}>
+            <DropdownMenuItem
+              onSelect={() => {
+                haptic("success");
+                onMove(null);
+              }}
+            >
               <FolderMinus />
               <Typography
                 component="span"
@@ -569,9 +589,16 @@ function MoveMenu({
                   ? `Remove from ${currentFolder.name}`
                   : "Remove from folders"}
               </Typography>
+              <HapticTarget />
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem disabled={atCap} onSelect={onNewFolder}>
+          <DropdownMenuItem
+            disabled={atCap}
+            onSelect={() => {
+              haptic("success");
+              onNewFolder();
+            }}
+          >
             <FolderPlus />
             <Typography
               component="span"
@@ -580,6 +607,7 @@ function MoveMenu({
             >
               {atCap ? `Folder limit reached (${max})` : "New folder…"}
             </Typography>
+            <HapticTarget />
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>
@@ -597,7 +625,13 @@ function FolderRow({
   onSelect: () => void;
 }) {
   return (
-    <DropdownMenuItem disabled={current} onSelect={onSelect}>
+    <DropdownMenuItem
+      disabled={current}
+      onSelect={() => {
+        haptic("success");
+        onSelect();
+      }}
+    >
       <FolderEmoji emoji={folder.emoji} />
       <Typography
         component="span"
@@ -607,6 +641,7 @@ function FolderRow({
         {folder.name}
       </Typography>
       {current ? <Check aria-hidden="true" /> : null}
+      <HapticTarget />
     </DropdownMenuItem>
   );
 }

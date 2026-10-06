@@ -287,6 +287,87 @@ test.describe("Haptics: cards", () => {
   });
 });
 
+test.describe("Haptics: selection bar", () => {
+  test.use(phone);
+  test.beforeEach(async ({ page }) => installProbes(page));
+
+  const bar = (page: Page) => page.getByRole("toolbar", { name: "Selected links" });
+
+  /** Home with `title` selected by its checkbox, probes reset. */
+  async function selectFirst(page: Page, title = "Link 1") {
+    await page.goto("/home");
+    await waitForHydration(page, '[data-cy="link-item"]');
+    await tapOn(page, row(page, title).getByRole("checkbox"));
+    await expect(bar(page)).toBeVisible();
+    await expect.poll(() => ticks(page)).toBe(1);
+    await resetProbes(page);
+  }
+
+  test("Select all ticks", async ({ page, seed }) => {
+    await seedRows(seed);
+    await selectFirst(page);
+    await tapOn(page, bar(page).getByRole("checkbox", { name: "Select all" }));
+    await expect(bar(page)).toContainText("3");
+    await expect.poll(() => ticks(page)).toBe(1);
+    expect(await vibrations(page)).toEqual([[10]]);
+  });
+
+  test("Mark as read ticks once", async ({ page, seed }) => {
+    await seedRows(seed);
+    await selectFirst(page);
+    // One link: PATCH /api/links/[id] (several go through /bulk).
+    const marks = countRequests(page, "PATCH", /^\/api\/links\/[^/]+$/);
+    await tapOn(page, bar(page).getByRole("button", { name: /^Mark 1 link as read$/ }));
+    await expect.poll(() => marks.length).toBe(1);
+    expect(JSON.parse(marks[0])).toMatchObject({ read: true });
+    await expect.poll(() => ticks(page)).toBe(1);
+    expect(await vibrations(page)).toEqual([[10, 60, 10]]);
+    await page.waitForTimeout(300);
+    expect(marks).toHaveLength(1);
+  });
+
+  test("Delete ticks once with a warning", async ({ page, seed }) => {
+    await seedRows(seed);
+    await selectFirst(page);
+    await tapOn(page, bar(page).getByRole("button", { name: /^Delete 1 link$/ }));
+    await expect(page.getByRole("button", { name: "Undo" })).toHaveCount(1);
+    await expect.poll(() => ticks(page)).toBe(1);
+    expect(await vibrations(page)).toEqual([[25, 60, 25]]);
+  });
+
+  test("Move into a folder, out of one, or into a new one ticks once each", async ({ page, seed }) => {
+    const design = await seed.folder({ name: "Design", slug: "design" });
+    await seed.link({ url: "https://link3.example", title: "Link 3", folderId: design });
+    await seed.link({ url: "https://link2.example", title: "Link 2" });
+    await seed.link({ url: "https://link1.example", title: "Link 1" });
+    await selectFirst(page);
+    const moves = countRequests(page, "PATCH", /^\/api\/links\/bulk$/);
+
+    await tapOn(page, bar(page).getByRole("button", { name: "Move" }));
+    await tapOn(page, page.getByRole("menuitem", { name: /Design/ }));
+    await expect.poll(() => moves.length).toBe(1);
+    expect(JSON.parse(moves[0])).toMatchObject({ folderId: design });
+    await expect.poll(() => ticks(page)).toBe(1);
+    expect(await vibrations(page)).toEqual([[10, 60, 10]]);
+
+    // A move ends the selection: select a filed link for "Remove from folders".
+    await selectFirst(page, "Link 3");
+    await tapOn(page, bar(page).getByRole("button", { name: "Move" }));
+    await tapOn(page, page.getByRole("menuitem", { name: /Remove from/ }));
+    await expect.poll(() => moves.length).toBe(2);
+    expect(JSON.parse(moves[1])).toMatchObject({ folderId: null });
+    await expect.poll(() => ticks(page)).toBe(1);
+    expect(await vibrations(page)).toEqual([[10, 60, 10]]);
+
+    await selectFirst(page, "Link 2");
+    await tapOn(page, bar(page).getByRole("button", { name: "Move" }));
+    await tapOn(page, page.getByRole("menuitem", { name: "New folder…" }));
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect.poll(() => ticks(page)).toBe(1);
+    expect(await vibrations(page)).toEqual([[10, 60, 10]]);
+  });
+});
+
 test.describe("Haptics: desktop", () => {
   test.beforeEach(async ({ page }) => installProbes(page));
 
