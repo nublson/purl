@@ -122,6 +122,107 @@ test.describe("Haptics: folder tags", () => {
   });
 });
 
+const rows = (page: Page) => page.locator('[data-cy="link-item"]');
+const row = (page: Page, title: string) =>
+  rows(page).filter({ has: page.getByRole("checkbox", { name: `Select ${title}`, exact: true }) });
+
+/** A finger held on `target` for 700ms, then lifted (Chromium: raw touch events). */
+async function longPress(page: Page, target: Locator) {
+  const box = (await target.boundingBox())!;
+  const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [point] });
+  await page.waitForTimeout(700);
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+}
+
+async function seedRows(seed: { link: (link: { url: string; title?: string }) => Promise<string> }, count = 3) {
+  for (let i = count; i >= 1; i--) {
+    await seed.link({ url: `https://link${i}.example`, title: `Link ${i}` });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+test.describe("Haptics: rows", () => {
+  test.use(phone);
+  test.beforeEach(async ({ page }) => installProbes(page));
+
+  async function openHome(page: Page) {
+    await page.goto("/home");
+    await waitForHydration(page, '[data-cy="link-item"]');
+  }
+  const selectedCount = (page: Page) => page.locator('[data-cy="link-item"][data-selected]').count();
+
+  test("a long-press selects the row and vibrates", async ({ page, seed, browserName }) => {
+    test.skip(browserName !== "chromium", "raw touch events are Chromium-only");
+    await seedRows(seed);
+    await openHome(page);
+    await longPress(page, row(page, "Link 1"));
+    await expect(row(page, "Link 1")).toHaveAttribute("data-selected", "true");
+    expect(await vibrations(page)).toEqual([[10]]);
+    // The lift lands on the overlay that selecting mounted: a tick, and the
+    // row stays selected (the long-press already toggled it).
+    await expect.poll(() => ticks(page)).toBe(1);
+    expect(await selectedCount(page)).toBe(1);
+  });
+
+  test("the checkbox ticks; while selecting, a tap toggles a row and ticks", async ({ page, seed, context }) => {
+    await seedRows(seed);
+    await openHome(page);
+    const popups: unknown[] = [];
+    context.on("page", (popup) => popups.push(popup));
+
+    await tapOn(page, row(page, "Link 1").getByRole("checkbox"));
+    await expect(row(page, "Link 1")).toHaveAttribute("data-selected", "true");
+    await expect.poll(() => ticks(page)).toBe(1);
+
+    await tapOn(page, row(page, "Link 2").getByText("Link 2", { exact: true }));
+    await expect(row(page, "Link 2")).toHaveAttribute("data-selected", "true");
+    await expect.poll(() => ticks(page)).toBe(2);
+    expect(await vibrations(page)).toEqual([[10], [10]]);
+    expect(await selectedCount(page)).toBe(2);
+
+    // Deselecting the last ones ends selection (unmounting the overlays):
+    // still a tick each.
+    await tapOn(page, row(page, "Link 2").getByText("Link 2", { exact: true }));
+    await tapOn(page, row(page, "Link 1").getByText("Link 1", { exact: true }));
+    await expect.poll(() => selectedCount(page)).toBe(0);
+    await expect.poll(() => ticks(page)).toBe(4);
+    expect(popups).toHaveLength(0);
+  });
+
+  test("not selecting, a tap opens the link and nothing ticks", async ({ page, seed, context }) => {
+    await seedRows(seed);
+    await openHome(page);
+    const target = row(page, "Link 1");
+    // Only the checkbox's overlay: none over the row's link.
+    await expect(target.locator("[data-haptic-target]")).toHaveCount(1);
+    const popup = context.waitForEvent("page");
+    await tapOn(page, target.getByText("Link 1", { exact: true }));
+    await popup;
+    expect(await ticks(page)).toBe(0);
+    expect(await vibrations(page)).toEqual([]);
+  });
+
+  test("a drag that starts on a selecting row scrolls", async ({ page, seed, browserName }) => {
+    test.skip(browserName !== "chromium", "touch scroll gestures are Chromium-only");
+    await seedRows(seed, 30);
+    await openHome(page);
+    await tapOn(page, row(page, "Link 1").getByRole("checkbox"));
+    await expect(row(page, "Link 1")).toHaveAttribute("data-selected", "true");
+    const fifth = row(page, "Link 5");
+    const before = (await fifth.boundingBox())!.y;
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Input.synthesizeScrollGesture", {
+      x: 195,
+      y: before + 20,
+      yDistance: -300,
+      gestureSourceType: "touch",
+    });
+    await expect.poll(async () => (await fifth.boundingBox())!.y).toBeLessThan(before - 100);
+  });
+});
+
 test.describe("Haptics: desktop", () => {
   test.beforeEach(async ({ page }) => installProbes(page));
 

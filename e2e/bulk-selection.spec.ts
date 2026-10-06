@@ -277,7 +277,9 @@ test.describe("Selection bar on touch screens", () => {
     await seedLinks(seed, ["Alpha", "Bravo"]);
     await page.goto("/home");
     await waitForHydration(page, '[data-cy="link-item"]');
-    await page.getByRole("checkbox", { name: /Select Alpha/ }).tap();
+    // force: on touch screens the checkbox's haptic label (HapticTarget)
+    // lies over it and takes the tap, which Playwright reads as covered.
+    await page.getByRole("checkbox", { name: /Select Alpha/ }).tap({ force: true });
     await expect(bar(page)).toBeVisible();
     const sizes = await bar(page).evaluate((el) =>
       [...el.querySelectorAll("button")].map((b) => {
@@ -300,7 +302,9 @@ test.describe("Selection bar on touch screens", () => {
     await seedLinks(seed, ["Alpha", "Bravo"]);
     await page.goto("/home");
     await waitForHydration(page, '[data-cy="link-item"]');
-    await page.getByRole("checkbox", { name: /Select Alpha/ }).tap();
+    // force: on touch screens the checkbox's haptic label (HapticTarget)
+    // lies over it and takes the tap, which Playwright reads as covered.
+    await page.getByRole("checkbox", { name: /Select Alpha/ }).tap({ force: true });
     await expect(bar(page)).toBeVisible();
     const box = (await bar(page).boundingBox())!;
     // Inside the page's 16px margins, Delete included.
