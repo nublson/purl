@@ -102,6 +102,44 @@ test.describe("Shared folders, visited signed out", () => {
     await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
   });
 
+  test("the grid has 2 columns on phones and 3 on small tablets, every card on screen", async ({
+    page,
+    seed,
+    testUser,
+  }) => {
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    for (const title of ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"]) {
+      await seed.link({ url: `https://${title.toLowerCase()}.example`, title, folderId: design });
+    }
+    await page.setViewportSize({ width: 744, height: 1000 });
+    await page.goto(`/@${testUser.username}/design`);
+    await waitForHydration(page, 'button[aria-label="Grid view"]');
+    await page.getByRole("button", { name: "Grid view" }).click();
+    const cards = page.locator('[data-cy="link-card"]');
+    await expect(cards).toHaveCount(6);
+    const layout = async () => {
+      const boxes = await cards.evaluateAll((all) =>
+        all.map((el) => el.getBoundingClientRect()),
+      );
+      return {
+        columns: new Set(boxes.map((box) => Math.round(box.left))).size,
+        right: Math.max(...boxes.map((box) => box.right)),
+      };
+    };
+
+    // Small tablets (an iPad mini's 744px portrait, and down to 640px).
+    for (const width of [744, 640]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await expect.poll(async () => (await layout()).columns).toBe(3);
+      expect((await layout()).right).toBeLessThanOrEqual(width);
+    }
+
+    // Phones: two.
+    await page.setViewportSize({ width: 500, height: 900 });
+    await expect.poll(async () => (await layout()).columns).toBe(2);
+    expect((await layout()).right).toBeLessThanOrEqual(500);
+  });
+
   test("loading more in the grid shows placeholder cards, then the next page", async ({
     page,
     seed,
