@@ -3,7 +3,7 @@
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
-import { FileMusic, FileText, Globe } from "lucide-react";
+import { FileText, Globe, MusicNote } from "reicon-react";
 import * as React from "react";
 
 interface LinkIconProps {
@@ -34,7 +34,7 @@ export function LinkIcon({
     case "PDF":
       return <FileText className={icon} />;
     case "AUDIO":
-      return <FileMusic className={icon} />;
+      return <MusicNote className={icon} />;
     default: {
       const faviconSrc = safeRemoteImgSrc(link.favicon);
       return faviconSrc ? (

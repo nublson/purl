@@ -11,9 +11,9 @@ const eslintConfig = defineConfig([
         "error",
         {
           selector:
-            "ImportDeclaration[source.value='lucide-react'] ImportNamespaceSpecifier",
+            "ImportDeclaration[source.value='reicon-react'] ImportNamespaceSpecifier",
           message:
-            "Use named per-icon imports from lucide-react instead of namespace imports.",
+            "Use named per-icon imports from reicon-react instead of namespace imports.",
         },
         {
           selector:

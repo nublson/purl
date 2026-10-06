@@ -2,7 +2,7 @@
 
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { LogOut, MessageCircleHeart, SettingsIcon } from "lucide-react";
+import { ChatRoundLike, Logout4, Setting2 } from "reicon-react";
 import * as React from "react";
 import {
   SettingsDeepLink,
@@ -120,7 +120,7 @@ export function User() {
                 event.preventDefault();
               }}
             >
-              <MessageCircleHeart />
+              <ChatRoundLike />
               Share feedback
             </DropdownMenuItem>
           </FeedbackDialog>
@@ -131,7 +131,7 @@ export function User() {
               openSettingsAfterMenuClose.current = true;
             }}
           >
-            <SettingsIcon />
+            <Setting2 />
             Settings
           </DropdownMenuItem>
         </DropdownMenuGroup>
@@ -140,7 +140,7 @@ export function User() {
           data-cy="sign-out-menu-item"
           onClick={() => signOut()}
         >
-          <LogOut />
+          <Logout4 />
           Log out
         </DropdownMenuItem>
       </DropdownWrapper>

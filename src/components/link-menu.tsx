@@ -5,12 +5,12 @@ import { copyToClipboard } from "@/lib/clipboard";
 import { setLinksRead, useIsLinkRead } from "@/lib/link-read-state";
 import type { Link as LinkType } from "@/utils/links";
 import {
-  Ellipsis,
-  ExternalLink,
+  Export5,
   Link,
-  Pencil,
-  Trash,
-} from "lucide-react";
+  MoreH,
+  Pen,
+  Trash2,
+} from "reicon-react";
 import { toast } from "sonner";
 import { EditDialog } from "./dialog-edit-link";
 import { DropdownWrapper } from "./dropdown-wrapper";
@@ -63,7 +63,7 @@ export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
           // A 44px hit area around the 32px button (fits the row's padding).
           className="relative cursor-pointer text-muted-foreground after:absolute after:-inset-1.5"
         >
-          <Ellipsis />
+          <MoreH />
         </Button>
       }
       align="end"
@@ -77,7 +77,7 @@ export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
             void handleOpenInNewTab();
           }}
         >
-          <ExternalLink /> Open in new tab
+          <Export5 /> Open in new tab
         </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() => {
@@ -104,7 +104,7 @@ export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
               event.preventDefault();
             }}
           >
-            <Pencil /> Edit
+            <Pen /> Edit
           </DropdownMenuItem>
         </EditDialog>
         <DropdownMenuItem
@@ -113,7 +113,7 @@ export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
           // A click from the keyboard (Enter/Space) has no pointer: detail 0.
           onClick={(event) => onDelete({ byKeyboard: event.detail === 0 })}
         >
-          <Trash /> Delete
+          <Trash2 /> Delete
         </DropdownMenuItem>
       </DropdownMenuGroup>
     </DropdownWrapper>

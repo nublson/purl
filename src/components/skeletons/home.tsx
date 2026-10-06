@@ -3,7 +3,7 @@
 import { useLinkView } from "@/contexts/link-view-context";
 import { LINK_GRID_COLUMNS } from "@/lib/link-view";
 import { cn } from "@/lib/utils";
-import { Search } from "lucide-react";
+import { Search } from "reicon-react";
 import { OMNIBOX_SHELL } from "../omnibox-shell";
 import { Typography } from "../typography";
 import { Skeleton } from "../ui/skeleton";

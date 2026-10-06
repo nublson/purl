@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGrid, List } from "lucide-react";
+import { Grid, List3 } from "reicon-react";
 import * as React from "react";
 import {
   SHARED_FOLDER_VIEW_COOKIE,
@@ -53,8 +53,8 @@ export function useSharedFolderView() {
 export function SharedFolderViewToggle() {
   const { view, setView } = React.useContext(ViewContext);
   const options = [
-    { value: "list", label: "List view", Icon: List },
-    { value: "grid", label: "Grid view", Icon: LayoutGrid },
+    { value: "list", label: "List view", Icon: List3 },
+    { value: "grid", label: "Grid view", Icon: Grid },
   ] as const;
   return (
     <div role="group" aria-label="View" className="flex shrink-0 items-center gap-1">

@@ -8,7 +8,7 @@ import {
   type SkinTone,
   useSkinTone,
 } from "frimousse";
-import { LoaderIcon, SearchIcon } from "lucide-react";
+import { Loader, Search } from "reicon-react";
 import * as React from "react";
 
 import { Typography } from "@/components/typography";
@@ -76,7 +76,7 @@ function EmojiPickerSearch({
   return (
     <div className="p-1" data-slot="emoji-picker-search-wrapper">
       <div className="relative">
-        <SearchIcon
+        <Search
           aria-hidden="true"
           className="pointer-events-none absolute top-1/2 start-2.5 size-4 -translate-y-1/2 text-muted-foreground"
         />
@@ -153,7 +153,7 @@ function EmojiPickerContent({
         className="absolute inset-0 flex items-center justify-center text-muted-foreground"
         data-slot="emoji-picker-loading"
       >
-        <LoaderIcon aria-label="Loading emoji" className="size-4 animate-spin" />
+        <Loader aria-label="Loading emoji" className="size-4 animate-spin" />
       </EmojiPickerPrimitive.Loading>
       <EmojiPickerPrimitive.Empty
         className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground"

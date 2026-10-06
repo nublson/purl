@@ -5,7 +5,7 @@ import {
   useFolders,
   type FolderSummary,
 } from "@/hooks/use-folders";
-import { Check, ChevronDown, Pencil, Plus, Trash } from "lucide-react";
+import { Check, ChevronDown, Pen, Plus, Trash2 } from "reicon-react";
 import {
   folderShortcutKey,
   HOME_SHORTCUT,
@@ -235,7 +235,7 @@ export function FolderSelectDropdown() {
                   };
                 }}
               >
-                <Pencil />
+                <Pen />
                 Edit folder
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -247,7 +247,7 @@ export function FolderSelectDropdown() {
                   };
                 }}
               >
-                <Trash />
+                <Trash2 />
                 Delete folder
               </DropdownMenuItem>
             </>
