@@ -11,12 +11,14 @@ import {
 } from "@/lib/link-selection";
 import { ARRIVE } from "@/lib/motion";
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
+import { haptic } from "@/lib/haptics";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
 import { FolderTag, useFolderTag } from "./folder-tag";
+import { HapticTarget } from "./haptic-target";
 import { LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
 import { Checkbox } from "./ui/checkbox";
 
@@ -61,9 +63,18 @@ export function LinkCard({
   const folderTag = useFolderTag(link);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const anchorRef = React.useRef<HTMLAnchorElement>(null);
-  const { handlers: longPress, consumeLongPress } = useLongPress(() =>
-    linkSelection.toggle(link.id),
-  );
+  const { handlers: longPress, consumeLongPress } = useLongPress(() => {
+    linkSelection.toggle(link.id);
+    haptic("selection");
+  });
+  // A touch tap that selects (the checkbox, or the card while selecting):
+  // the lift after a long-press only ticks, since the long-press already
+  // toggled the card.
+  const tapToSelect = ({ shiftKey }: { shiftKey: boolean }) => {
+    if (consumeLongPress()) return;
+    haptic("selection");
+    linkSelection.toggle(link.id, { shiftKey });
+  };
 
   return (
     <div
@@ -149,6 +160,12 @@ export function LinkCard({
           linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
         }}
       />
+      {/* Touch: the checkbox's tap, with a tick, over its hit area (its
+          after: extension included: 40×32 around the 16px box at 8, 8). */}
+      <HapticTarget
+        className="inset-auto top-0 -left-1 z-[11] h-8 w-10"
+        onTap={tapToSelect}
+      />
       {/* Hidden (and inert) while selecting: every action goes through the
           selection bar then. */}
       <div
@@ -178,6 +195,10 @@ export function LinkCard({
           }
         />
       </div>
+      {/* While selecting, a tap anywhere on the card toggles it, with a
+          tick (touch); also where a long-press's lift lands. Above the
+          link, under the checkbox. */}
+      {selecting ? <HapticTarget className="z-[5]" onTap={tapToSelect} /> : null}
     </div>
   );
 }

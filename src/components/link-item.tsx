@@ -11,6 +11,7 @@ import {
   useIsSelectionActive,
 } from "@/lib/link-selection";
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
+import { haptic } from "@/lib/haptics";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
@@ -18,6 +19,7 @@ import { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
 import { FolderTag, useFolderTag } from "./folder-tag";
+import { HapticTarget } from "./haptic-target";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
 import { Typography } from "./typography";
@@ -91,6 +93,17 @@ export const LinkItem = React.forwardRef<
   } | null>(null);
   // Set when a long-press selected the row: swallows the click that follows.
   const longPressedRef = React.useRef(false);
+  // A touch tap that selects (the checkbox, or the row while selecting):
+  // the lift after a long-press only ticks, since the long-press already
+  // toggled the row.
+  const tapToSelect = ({ shiftKey }: { shiftKey: boolean }) => {
+    if (longPressedRef.current) {
+      longPressedRef.current = false;
+      return;
+    }
+    haptic("selection");
+    linkSelection.toggle(link.id, { shiftKey });
+  };
   const [previewOpen, setPreviewOpen] = React.useState(false);
   // Whether the current preview was opened by hover (vs keyboard focus).
   const openedByPointerRef = React.useRef(false);
@@ -201,6 +214,7 @@ export const LinkItem = React.forwardRef<
             longPressRef.current = null;
             longPressedRef.current = true;
             linkSelection.toggle(link.id);
+            haptic("selection");
           }, LONG_PRESS_MS),
         };
       }}
@@ -338,6 +352,10 @@ export const LinkItem = React.forwardRef<
               linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
             }}
           />
+          {/* Touch: the checkbox's tap, with a tick. Over its hit area (its
+              after: extension included); the checkbox's own onClick stays
+              for the mouse and keyboard. */}
+          <HapticTarget className="-inset-x-2.5 -inset-y-1.5 z-[11]" onTap={tapToSelect} />
         </div>
       </ItemMedia>
       {/* min-w-0: the grid's 1fr column can then shrink below a one-line
@@ -406,6 +424,10 @@ export const LinkItem = React.forwardRef<
       >
         <LinkMenu link={link} onDelete={deleteRow} />
       </ItemActions>
+      {/* While selecting, a tap anywhere on the row toggles it, with a
+          tick (touch). Also where a long-press's lift lands, once it has
+          started selecting. Above the link, under the checkbox. */}
+      {selecting ? <HapticTarget className="z-[5]" onTap={tapToSelect} /> : null}
     </Item>
   );
 
