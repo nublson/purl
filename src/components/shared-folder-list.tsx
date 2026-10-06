@@ -209,7 +209,7 @@ export function SharedFolderList({
           <ul
             ref={listRef}
             aria-label="Links"
-            // Masonry: 2 columns on phones, 3 on tablets, 4 on desktop; cards
+            // Masonry: 2 columns on phones, 3 from 640px, 4 on desktop; cards
             // up to 210px, centered, gutters 16 → 40px. 1px rows with no row
             // gap: each card spans its own height (see useMasonry), so a
             // short card sits right under the one above it. DOM order stays
