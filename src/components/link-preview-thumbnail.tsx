@@ -3,7 +3,7 @@
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
-import { Globe } from "lucide-react";
+import { Globe } from "reicon-react";
 import * as React from "react";
 
 export type LinkPreviewThumbnailProps = {

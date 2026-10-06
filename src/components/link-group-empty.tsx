@@ -2,7 +2,7 @@
 
 import { useCurrentFolder } from "@/hooks/use-folders";
 import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
-import { ListPlus, PackageOpen, SearchX } from "lucide-react";
+import { Additem, Box, SearchMinus } from "reicon-react";
 
 import {
   Empty,
@@ -34,7 +34,7 @@ export function LinkGroupEmpty({
       <Empty data-cy="link-group-empty">
         <EmptyHeader>
           <EmptyMedia variant="icon">
-            <SearchX />
+            <SearchMinus />
           </EmptyMedia>
           <EmptyTitle>No links match “{query}”</EmptyTitle>
           <EmptyDescription>
@@ -48,7 +48,7 @@ export function LinkGroupEmpty({
     <Empty data-cy="link-group-empty">
       <EmptyHeader>
         <EmptyMedia variant="icon">
-          <PackageOpen />
+          <Box />
         </EmptyMedia>
         <EmptyTitle>{inFolder ? "No links in this folder yet" : "No links yet"}</EmptyTitle>
         <EmptyDescription>
@@ -67,7 +67,7 @@ export function LinkGroupEmpty({
               aria-keyshortcuts={ADD_LINKS_SHORTCUT}
               onClick={() => addLinksPopover.open("empty")}
             >
-              <ListPlus data-icon="inline-start" />
+              <Additem data-icon="inline-start" />
               Add links
               <Kbd aria-hidden="true">{ADD_LINKS_SHORTCUT}</Kbd>
             </Button>

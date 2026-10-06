@@ -4,7 +4,7 @@ import { useFolderActions, useFolders } from "@/hooks/use-folders";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
-import { Check, ChevronDown, FolderInput, FolderMinus } from "lucide-react";
+import { Check, ChevronDown, FolderMinus, FolderMove } from "reicon-react";
 import * as React from "react";
 import { FolderEmoji } from "./folder-emoji";
 import { Typography } from "./typography";
@@ -39,7 +39,7 @@ export function LinkFolderSubmenu({ link }: { link: LinkType }) {
             setExpanded((open) => !open);
           }}
         >
-          <FolderInput />
+          <FolderMove />
           Move to folder
           <ChevronDown
             aria-hidden="true"
@@ -72,7 +72,7 @@ export function LinkFolderSubmenu({ link }: { link: LinkType }) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>
-        <FolderInput />
+        <FolderMove />
         Move to folder
       </DropdownMenuSubTrigger>
       {/* Only this list scrolls when there are many folders; 7.5 rows tall so

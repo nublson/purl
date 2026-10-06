@@ -7,13 +7,21 @@ const eslintConfig = defineConfig([
   ...nextTs,
   {
     rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          name: "lucide-react",
+          message:
+            "Icons come from reicon-react. shadcn components still generate lucide-react imports: swap them for the Reicon equivalents (see CLAUDE.md).",
+        },
+      ],
       "no-restricted-syntax": [
         "error",
         {
           selector:
-            "ImportDeclaration[source.value='lucide-react'] ImportNamespaceSpecifier",
+            "ImportDeclaration[source.value='reicon-react'] ImportNamespaceSpecifier",
           message:
-            "Use named per-icon imports from lucide-react instead of namespace imports.",
+            "Use named per-icon imports from reicon-react instead of namespace imports.",
         },
         {
           selector:

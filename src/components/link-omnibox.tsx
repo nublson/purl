@@ -3,7 +3,7 @@
 import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { isApplePlatform } from "@/lib/platform";
 import { cn } from "@/lib/utils";
-import { Search, X } from "lucide-react";
+import { Search, X } from "reicon-react";
 import * as React from "react";
 import { BOTTOM_BAR_BAND, OMNIBOX_SHELL } from "./omnibox-shell";
 import { Kbd } from "./ui/kbd";

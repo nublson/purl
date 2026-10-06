@@ -4,7 +4,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCurrentFolder, useFolderActions } from "@/hooks/use-folders";
 import { publicFolderPath } from "@/lib/public-folder-path";
 import { cn } from "@/lib/utils";
-import { Check, Copy, Globe, Lock } from "lucide-react";
+import { Check, Copy3, Globe, Lock } from "reicon-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { Typography } from "./typography";
@@ -168,7 +168,7 @@ export function FolderSharePopover() {
               className="relative cursor-pointer rounded-[calc(var(--radius-md)-4px)] text-muted-foreground"
             >
               {/* Cross-fade: both icons stay mounted. */}
-              <Copy
+              <Copy3
                 aria-hidden
                 className={cn(ICON_SWAP, copied ? ICON_OUT : ICON_IN)}
               />

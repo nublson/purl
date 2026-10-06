@@ -28,13 +28,13 @@ import { cn } from "@/lib/utils";
 import {
   Check,
   ChevronUp,
-  FolderInput,
   FolderMinus,
+  FolderMove,
   FolderPlus,
   Minus,
-  Trash,
+  Trash2,
   X,
-} from "lucide-react";
+} from "reicon-react";
 import { AnimatePresence, LazyMotion, m, useReducedMotion } from "motion/react";
 import * as React from "react";
 import { toast } from "sonner";
@@ -392,7 +392,7 @@ export function LinkSelectionBar({
                   className={cn(TOUCH_ICON_TARGET, "rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:border-destructive/40 focus-visible:bg-destructive/10 focus-visible:text-destructive focus-visible:ring-destructive dark:hover:bg-destructive/20 dark:focus-visible:bg-destructive/20")}
                   onClick={deleteSelected}
                 >
-                  <Trash />
+                  <Trash2 />
                 </Button>
               </ShortcutTooltip>
             </m.div>
@@ -519,7 +519,7 @@ function MoveMenu({
               TOUCH_TARGET,
             )}
           >
-            <FolderInput data-icon="inline-start" />
+            <FolderMove data-icon="inline-start" />
             <Typography
               component="span"
               size="small"

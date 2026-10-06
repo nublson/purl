@@ -39,6 +39,11 @@ const nextConfig: NextConfig = {
   // Next's default, set explicitly: production builds don't emit browser
   // source maps, so the client code structure isn't published.
   productionBrowserSourceMaps: false,
+  experimental: {
+    // reicon-react's barrel re-exports ~2,700 icons; import only the ones used
+    // (lucide-react, which it replaced, is on Next's built-in list).
+    optimizePackageImports: ["reicon-react"],
+  },
   async redirects() {
     // The in-app AI chat was removed; keep old bookmarks and PWA shortcuts working.
     return [

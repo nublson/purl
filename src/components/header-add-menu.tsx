@@ -6,7 +6,7 @@ import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
 import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { isApplePlatform } from "@/lib/platform";
 import { requestSaveUrl, saveLink } from "@/lib/save-link";
-import { Chromium, ClipboardPaste, ExternalLink, ListPlus, Plus } from "lucide-react";
+import { Additem, Chrome, ClipboardImport, Export5, Plus } from "reicon-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef } from "react";
 import { AddLinksPopover } from "./add-links-popover";
@@ -154,7 +154,7 @@ export function HeaderAddMenu() {
             void handlePasteLink();
           }}
         >
-          <ClipboardPaste />
+          <ClipboardImport />
           Paste link
         </DropdownMenuItem>
         {/* Folder pages only: pick links you've already saved. */}
@@ -165,7 +165,7 @@ export function HeaderAddMenu() {
               pendingAddLinks.current = true;
             }}
           >
-            <ListPlus />
+            <Additem />
             Add links
             <Kbd aria-hidden="true" className="ms-auto">
               {ADD_LINKS_SHORTCUT}
@@ -184,10 +184,10 @@ export function HeaderAddMenu() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <Chromium />
+                <Chrome />
                 Chrome
                 <span className="sr-only">(opens in new tab)</span>
-                <ExternalLink className="ml-auto text-muted-foreground" />
+                <Export5 className="ml-auto text-muted-foreground" />
               </a>
             </DropdownMenuItem>
           </DropdownMenuGroup>
