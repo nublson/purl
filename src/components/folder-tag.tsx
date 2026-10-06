@@ -48,10 +48,11 @@ const EMOJI_IN_CHIP =
 /**
  * A link's folder, as a small muted chip: the folder's emoji and name
  * (a long name truncates). Decorative next to the row's own text; the
- * name is in the accessibility tree as plain text. On phones, just the
- * emoji, with the name in a tooltip (`FolderTagIcon`).
+ * name is in the accessibility tree as plain text. In a row on a phone,
+ * just the emoji, with the name in a tooltip (`FolderTagIcon`); a card
+ * always shows the whole chip (it has a line of its own for it).
  *
- * Both are rendered and CSS picks one (the `phone:` variant), so the
+ * In rows both are rendered and CSS picks one (the `phone:` variant), so the
  * server's HTML is already right: deciding in JS (`useIsPhone`, false until
  * hydration) drew the full chip on phones for the first moments, then
  * swapped it for the emoji.
@@ -80,13 +81,14 @@ export function FolderTag({
           // The emoji's side gets 1px less padding than the name's: a solid
           // color shape weighs more than the text's light edge, so equal
           // padding reads heavier on the emoji's side.
-          "inline-flex h-5 min-w-0 shrink-0 items-center rounded-md bg-muted ps-[5px] pe-1.5 font-normal phone:hidden",
+          "inline-flex h-5 min-w-0 shrink-0 items-center rounded-md bg-muted ps-[5px] pe-1.5 font-normal",
           inCard
             ? "-ms-[5px] max-w-full gap-2 md:gap-3"
             : // In a row, next to the title and domain: 1px down puts the
               // chip's smaller text on their baseline (centered on their
-              // line box it sat 0.7–1.5px higher).
-              "max-w-40 translate-y-px gap-[3px]",
+              // line box it sat 0.7–1.5px higher). On a phone, just the
+              // emoji instead (`FolderTagIcon`).
+              "max-w-40 translate-y-px gap-[3px] phone:hidden",
           className,
         )}
       >
@@ -100,25 +102,25 @@ export function FolderTag({
           {folder.name}
         </Typography>
       </Typography>
-      <FolderTagIcon folder={folder} inCard={inCard} className={className} />
+      {/* A card has its own line for the tag, room for the name on every
+          screen; a phone's row doesn't. */}
+      {inCard ? null : <FolderTagIcon folder={folder} className={className} />}
     </>
   );
 }
 
 /**
- * Phones: the tag is only the folder's emoji (a square chip), and a tap
- * shows the folder's name in a tooltip (there's no hover). It's a button
- * of its own, above the row's link, so the tap doesn't open the link; a
+ * A row on a phone: the tag is only the folder's emoji (a square chip), and
+ * a tap shows the folder's name in a tooltip (there's no hover). It's a
+ * button of its own, above the row's link, so the tap doesn't open the link; a
  * 28px hit area around the 20px chip. Named "Folder: …" for screen
  * readers.
  */
 function FolderTagIcon({
   folder,
-  inCard,
   className,
 }: {
   folder: FolderSummary;
-  inCard: boolean;
   className?: string;
 }) {
   const [open, setOpen] = React.useState(false);
@@ -131,8 +133,6 @@ function FolderTagIcon({
           aria-label={`Folder: ${folder.name}`}
           className={cn(
             "pointer-events-auto relative z-10 hidden size-5 shrink-0 items-center justify-center rounded-md bg-muted outline-none after:absolute after:-inset-1 focus-visible:ring-2 focus-visible:ring-ring",
-            // A card: centered under the 16px favicon (the chip is 20px).
-            inCard && "-ms-0.5",
             className,
             // Only on phones (after `className`, so it can't be overridden).
             "phone:flex",
