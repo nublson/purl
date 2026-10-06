@@ -89,6 +89,14 @@ test.describe("Owner grid view", () => {
     );
     expect(Math.max(...rights)).toBeLessThanOrEqual(500);
 
+    // Small tablets (an iPad mini's 744px portrait): three columns, on screen.
+    await page.setViewportSize({ width: 744, height: 1000 });
+    await expect.poll(columns).toBe(3);
+    const tabletRights = await cards(page).evaluateAll((all) =>
+      all.map((el) => el.getBoundingClientRect().right),
+    );
+    expect(Math.max(...tabletRights)).toBeLessThanOrEqual(744);
+
     // And back.
     await page.setViewportSize({ width: 1280, height: 900 });
     await expect.poll(columns).toBe(4);
