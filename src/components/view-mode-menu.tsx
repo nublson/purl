@@ -7,6 +7,7 @@ import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import { ChevronDown, Grid, List3, Tag5 } from "reicon-react";
 import * as React from "react";
+import { HapticTarget } from "./haptic-target";
 import {
   DropdownMenuCheckboxItem,
   DropdownMenuItem,
@@ -16,7 +17,6 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
 } from "./ui/dropdown-menu";
-import { HapticTarget } from "./haptic-target";
 
 /**
  * "View mode" in the user menu: how Home and folders show links (List or

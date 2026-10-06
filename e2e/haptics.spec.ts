@@ -454,6 +454,20 @@ test.describe("Haptics: row menu and Copy link", () => {
     expect(await vibrations(page)).toEqual([]);
   });
 
+  test("a failed copy doesn't vibrate a success", async ({ page, seed }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: () => Promise.reject(new Error("denied")) },
+      });
+    });
+    await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    await openShare(page);
+    await tapOn(page, page.getByRole("button", { name: "Copy link" }));
+    await expect(page.getByText("Unable to copy the link")).toBeVisible();
+    expect(await vibrations(page)).toEqual([]);
+  });
+
   test("Copy link ticks once it's public; not while private", async ({ page, seed }) => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "clipboard", {

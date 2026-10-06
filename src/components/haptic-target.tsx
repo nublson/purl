@@ -2,7 +2,6 @@
 
 import { afterTap } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
-import type * as React from "react";
 
 /**
  * Safari's native switch (`<input type="checkbox" switch>`, iOS 17.4+)
@@ -37,7 +36,8 @@ export function HapticTarget({
   onTap,
   className,
 }: {
-  onTap?: (event: React.MouseEvent<HTMLLabelElement>) => void;
+  /** Gets what the tap's handling needs, copied before the event is done. */
+  onTap?: (tap: { shiftKey: boolean }) => void;
   className?: string;
 }) {
   return (
@@ -55,7 +55,8 @@ export function HapticTarget({
         onTap
           ? (event) => {
               event.stopPropagation();
-              afterTap(() => onTap(event));
+              const { shiftKey } = event;
+              afterTap(() => onTap({ shiftKey }));
             }
           : undefined
       }

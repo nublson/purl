@@ -70,10 +70,10 @@ export function LinkCard({
   // A touch tap that selects (the checkbox, or the card while selecting):
   // the lift after a long-press only ticks, since the long-press already
   // toggled the card.
-  const tapToSelect = (event: React.MouseEvent) => {
+  const tapToSelect = ({ shiftKey }: { shiftKey: boolean }) => {
     if (consumeLongPress()) return;
     haptic("selection");
-    linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+    linkSelection.toggle(link.id, { shiftKey });
   };
 
   return (

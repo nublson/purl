@@ -80,6 +80,8 @@ export function FolderSharePopover() {
       toast.error("Unable to copy the link. Select it and copy it instead.");
       return;
     }
+    // Android: a success only once it's copied (iOS ticks on the tap).
+    haptic("success");
     setCopied(true);
     if (copiedTimer.current) clearTimeout(copiedTimer.current);
     copiedTimer.current = setTimeout(() => setCopied(false), COPIED_MS);
@@ -165,10 +167,7 @@ export function FolderSharePopover() {
               // the link works only after the server confirms.
               disabled={!folder.isPublic || saving}
               aria-label={copied ? "Link copied" : "Copy link"}
-              onClick={() => {
-                haptic("success");
-                void copyLink();
-              }}
+              onClick={() => void copyLink()}
               // Concentric with the field: its radius minus the 4px inset.
               className="relative cursor-pointer rounded-[calc(var(--radius-md)-4px)] text-muted-foreground"
             >

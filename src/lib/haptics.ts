@@ -43,7 +43,8 @@ export function haptic(kind: HapticKind): void {
  * only if the tapped control is still on the page once the tap's events are
  * done, and React applies a tap's updates right away: an action that removes
  * its own control (Delete ending the selection hides the selection bar)
- * would cancel the tick. A task later is imperceptible.
+ * would cancel the tick. A task later is imperceptible. It runs even if the
+ * control has unmounted by then: that's the point (Delete must still delete).
  */
 export function afterTap(action: () => void): void {
   setTimeout(action, 0);

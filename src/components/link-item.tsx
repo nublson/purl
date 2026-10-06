@@ -96,13 +96,13 @@ export const LinkItem = React.forwardRef<
   // A touch tap that selects (the checkbox, or the row while selecting):
   // the lift after a long-press only ticks, since the long-press already
   // toggled the row.
-  const tapToSelect = (event: React.MouseEvent) => {
+  const tapToSelect = ({ shiftKey }: { shiftKey: boolean }) => {
     if (longPressedRef.current) {
       longPressedRef.current = false;
       return;
     }
     haptic("selection");
-    linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+    linkSelection.toggle(link.id, { shiftKey });
   };
   const [previewOpen, setPreviewOpen] = React.useState(false);
   // Whether the current preview was opened by hover (vs keyboard focus).
