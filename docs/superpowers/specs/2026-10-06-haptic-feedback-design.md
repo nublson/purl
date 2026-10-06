@@ -108,9 +108,19 @@ Each moment uses both pieces: `<HapticTarget />` in the element (iOS) and
 long-press starts selecting, which mounts the owner overlay over every row and
 card, so the finger's lift lands on it and ticks. Its `onTap` sees that the
 long-press already selected the row (the existing `longPressedRef` /
-`consumeLongPress`), so it doesn't toggle the row back. Unknown until checked:
-whether iOS sends that lift-click to an overlay mounted mid-press. If it
-doesn't, long-press stays Android-only and nothing else changes.
+`consumeLongPress`), so it doesn't toggle the row back. Probe (Playwright Chromium and
+WebKit with touch emulation; no iOS Simulator on the dev machine): an overlay
+mounted mid-press does receive the lift's click and toggles. iOS's own
+long-press click delivery is confirmed on a real iPhone at sign-off; if it
+fails there, long-press stays Android-only and nothing else changes.
+
+**Unmounting during the tap cancels the tick.** The probe showed that if the
+tapped element is removed synchronously or in a microtask during its click,
+the switch never toggles (both engines); removal in a later task is fine.
+React applies a tap's updates synchronously, so `HapticTarget` runs `onTap`
+in a macrotask (`setTimeout(0)`): e.g. deselecting the last row ends
+selection, which unmounts the owner overlays. Menus that close on select stay
+mounted through Radix's exit animation, so pass-through items keep their tick.
 
 **Left out on purpose:** opening a link, opening menus, switching folders, the
 search field, clearing the selection (✕), keyboard shortcuts (no touch
