@@ -137,6 +137,7 @@ export function LinkGrid({
             link={link}
             eagerThumbnail={index < (group.eagerFavicons ?? 0)}
             arriving={link.id === newLinkId}
+            dayHeadingId={headingId}
           />
         ),
       });

@@ -11,14 +11,16 @@ import {
 } from "react";
 
 /**
- * How much shorter than the others a column must be to take the next card
- * over a column further left. Placing each card in the strictly shortest
- * column breaks reading order: when two columns end a few pixels apart, the
- * next card lands in the right one and the card after it in the left, a
- * hair lower, so the eye (reading left to right) meets them in reverse,
- * e.g. "Last week" before "Yesterday". Within this distance the columns
- * count as level and the leftmost one wins; it also caps how uneven the
- * columns can get.
+ * How far apart two columns' bottoms can be and still count as level.
+ * Placing each card in the strictly shortest column breaks reading order:
+ * when two columns end a few pixels apart, the next card can land in the
+ * right one and the card after it in the left, a hair lower, so the eye
+ * (reading left to right) meets them in reverse, e.g. "Last week" before
+ * "Yesterday". Among level columns, the next card goes in the first one to
+ * the right of the previous card (the same visual row), and only wraps to
+ * the leftmost when none is (a new row). A card can then sit at most this
+ * much higher than the one before it, and only to its right; it also caps
+ * how uneven the columns can get.
  */
 const LEVEL_TOLERANCE_PX = 32;
 
@@ -26,7 +28,8 @@ const LEVEL_TOLERANCE_PX = 32;
  * Masonry for a grid of cards (`LINK_GRID_COLUMNS`): give the grid
  * `auto-rows-[1px]` and `ref={listRef}` once `masonry` is on, and wrap each
  * card in a `MasonryItem`. Each card is placed in order, in the leftmost
- * column that's level with the shortest (`LEVEL_TOLERANCE_PX`), spanning
+ * column that's level with the shortest, continuing the previous card's
+ * row (`chooseMasonryColumn`), spanning
  * as many 1px rows as it is tall. Cards need measuring, which only happens
  * in the browser: the server's HTML (and the first paint before hydration)
  * shows plain rows, and this turns masonry on before the next paint.
@@ -81,12 +84,27 @@ export function useMasonry(active: boolean): {
   return { masonry: masonry && active, listRef };
 }
 
+/**
+ * The column for the next card, given each column's bottom and the
+ * previous card's column (-1 for the first card): the first level column
+ * to the right of the previous card, or else the leftmost level column.
+ */
+export function chooseMasonryColumn(bottoms: number[], previous: number): number {
+  const shortest = Math.min(...bottoms);
+  const level = (bottom: number) => bottom <= shortest + LEVEL_TOLERANCE_PX;
+  const toTheRight = bottoms.findIndex(
+    (bottom, index) => index > previous && level(bottom),
+  );
+  return toTheRight !== -1 ? toTheRight : bottoms.findIndex(level);
+}
+
 function placeCards(list: HTMLElement) {
   const columns = getComputedStyle(list)
     .gridTemplateColumns.split(" ")
     .filter(Boolean).length;
   if (columns === 0) return;
   const bottoms = new Array<number>(columns).fill(0);
+  let previous = -1;
   for (const item of Array.from(list.children) as HTMLElement[]) {
     const box = item.firstElementChild;
     if (!(box instanceof HTMLElement)) continue;
@@ -94,10 +112,8 @@ function placeCards(list: HTMLElement) {
     // within half a pixel of the gutter), ignoring transforms: a card
     // mid-arrival (scaled) still takes its full height.
     const height = box.offsetHeight;
-    const shortest = Math.min(...bottoms);
-    const column = bottoms.findIndex(
-      (bottom) => bottom <= shortest + LEVEL_TOLERANCE_PX,
-    );
+    const column = chooseMasonryColumn(bottoms, previous);
+    previous = column;
     item.style.gridColumn = String(column + 1);
     item.style.gridRow = `${bottoms[column] + 1} / span ${Math.max(height, 1)}`;
     bottoms[column] += height;

@@ -40,11 +40,17 @@ export function LinkCard({
   link,
   eagerThumbnail = false,
   arriving = false,
+  dayHeadingId,
 }: {
   link: LinkType;
   eagerThumbnail?: boolean;
   /** Just saved: it arrives (fades in as a blur clears). */
   arriving?: boolean;
+  /**
+   * The id of its day's heading ("Yesterday"): the grid isn't split into
+   * per-day lists, so the link names its day as its description.
+   */
+  dayHeadingId?: string;
 }) {
   const { notifyLinksChanged } = useLinksSyncActions();
   const deletePhase = usePendingLinkDeletes().get(link.id);
@@ -96,6 +102,7 @@ export function LinkCard({
         target="_blank"
         rel="noopener noreferrer"
         aria-label={`${link.title} (${read ? "read, " : ""}opens in new tab)`}
+        aria-describedby={dayHeadingId}
         // While selecting, the checkbox is the keyboard and screen reader
         // control; a click anywhere on the card toggles it.
         aria-hidden={selecting || undefined}
