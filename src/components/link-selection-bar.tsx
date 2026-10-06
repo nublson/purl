@@ -8,7 +8,7 @@ import {
 } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { formatFolderLabel, formatLinkCount } from "@/lib/folder-display";
-import { haptic } from "@/lib/haptics";
+import { afterTap, haptic } from "@/lib/haptics";
 import {
   linkSelection,
   useSelectableLinkCount,
@@ -337,9 +337,10 @@ export function LinkSelectionBar({
                     TOUCH_TARGET,
                   )}
                   // Taps tick; the A shortcut shares toggleAll without one.
+                  // After the tap: unchecking ends the selection, hiding the bar.
                   onClick={() => {
                     haptic("selection");
-                    toggleAll();
+                    afterTap(toggleAll);
                   }}
                 >
                   <MasterCheckbox checked={allSelected} />
@@ -401,9 +402,10 @@ export function LinkSelectionBar({
                   // Muted at rest so it doesn't outweigh Move; the destructive
                   // variant's colors only on hover or focus, right before a click.
                   className={cn(TOUCH_ICON_TARGET, "rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:border-destructive/40 focus-visible:bg-destructive/10 focus-visible:text-destructive focus-visible:ring-destructive dark:hover:bg-destructive/20 dark:focus-visible:bg-destructive/20")}
+                  // After the tap: it ends the selection, hiding the bar.
                   onClick={() => {
                     haptic("warning");
-                    deleteSelected();
+                    afterTap(deleteSelected);
                   }}
                 >
                   <Trash2 />
@@ -576,7 +578,7 @@ function MoveMenu({
             <DropdownMenuItem
               onSelect={() => {
                 haptic("success");
-                onMove(null);
+                afterTap(() => onMove(null));
               }}
             >
               <FolderMinus />
@@ -629,7 +631,7 @@ function FolderRow({
       disabled={current}
       onSelect={() => {
         haptic("success");
-        onSelect();
+        afterTap(onSelect);
       }}
     >
       <FolderEmoji emoji={folder.emoji} />

@@ -1,5 +1,6 @@
 "use client";
 
+import { afterTap } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
 import type * as React from "react";
 
@@ -54,7 +55,7 @@ export function HapticTarget({
         onTap
           ? (event) => {
               event.stopPropagation();
-              setTimeout(() => onTap(event), 0);
+              afterTap(() => onTap(event));
             }
           : undefined
       }

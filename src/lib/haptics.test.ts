@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { haptic, HAPTIC_PATTERNS, type HapticKind } from "./haptics";
+import { afterTap, haptic, HAPTIC_PATTERNS, type HapticKind } from "./haptics";
 
 function stubDevice({ coarse, vibrate }: { coarse: boolean; vibrate?: (pattern: number[]) => boolean }) {
   vi.stubGlobal("navigator", vibrate ? { vibrate } : {});
@@ -58,5 +58,17 @@ describe("haptic", () => {
       },
     });
     expect(() => haptic("warning")).not.toThrow();
+  });
+});
+
+describe("afterTap", () => {
+  it("runs the action in the next task, not during the tap", () => {
+    vi.useFakeTimers();
+    const action = vi.fn();
+    afterTap(action);
+    expect(action).not.toHaveBeenCalled();
+    vi.runAllTimers();
+    expect(action).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 });

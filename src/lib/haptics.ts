@@ -37,3 +37,14 @@ export function haptic(kind: HapticKind): void {
     // Vibration is a nicety: never let it break the action it decorates.
   }
 }
+
+/**
+ * Runs a tap's action in the next task. iOS's tick (`HapticTarget`) plays
+ * only if the tapped control is still on the page once the tap's events are
+ * done, and React applies a tap's updates right away: an action that removes
+ * its own control (Delete ending the selection hides the selection bar)
+ * would cancel the tick. A task later is imperceptible.
+ */
+export function afterTap(action: () => void): void {
+  setTimeout(action, 0);
+}

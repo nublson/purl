@@ -335,6 +335,29 @@ test.describe("Haptics: selection bar", () => {
     expect(await vibrations(page)).toEqual([[25, 60, 25]]);
   });
 
+  test("Delete ticks even before the bar's animation code has loaded", async ({ page, seed }) => {
+    // Until Motion's lazily loaded features arrive, the bar leaves at once
+    // when the selection ends: Delete's button unmounts during its own tap.
+    let holdScripts = false;
+    await page.route("**/_next/static/chunks/**", async (route) => {
+      if (holdScripts) await new Promise((resolve) => setTimeout(resolve, 8000));
+      await route.continue().catch(() => {});
+    });
+    await seedRows(seed);
+    await page.goto("/home");
+    holdScripts = true;
+    await waitForHydration(page, '[data-cy="link-item"]');
+    await tapOn(page, row(page, "Link 1").getByRole("checkbox"));
+    await expect(bar(page)).toBeVisible();
+    await expect.poll(() => ticks(page)).toBe(1);
+    await resetProbes(page);
+
+    await tapOn(page, bar(page).getByRole("button", { name: /^Delete 1 link$/ }));
+    await expect(page.getByRole("button", { name: "Undo" })).toHaveCount(1);
+    await expect.poll(() => ticks(page)).toBe(1);
+    expect(await vibrations(page)).toEqual([[25, 60, 25]]);
+  });
+
   test("Move into a folder, out of one, or into a new one ticks once each", async ({ page, seed }) => {
     const design = await seed.folder({ name: "Design", slug: "design" });
     await seed.link({ url: "https://link3.example", title: "Link 3", folderId: design });
