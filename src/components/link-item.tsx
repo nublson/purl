@@ -346,7 +346,9 @@ export const LinkItem = React.forwardRef<
       <ItemContent className="min-w-0 self-start pt-1.5 max-md:pt-1">
         {/* Capped at the column, so the title shrinks to an ellipsis and
             the domain and tag stay in view. */}
-        <ItemTitle className="max-w-full">
+        {/* overflow-visible: the folder tag sits on the text's baseline, a
+            hair below the line box (line-clamp's overflow would clip it). */}
+        <ItemTitle className="max-w-full overflow-visible">
           <Typography
             size="small"
             className={cn(
