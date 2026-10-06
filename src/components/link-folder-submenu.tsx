@@ -45,7 +45,10 @@ export function LinkFolderSubmenu({ link }: { link: LinkType }) {
             aria-hidden="true"
             className={cn(
               // Reduced motion: it flips without turning.
-              "ms-auto transition-transform duration-150 ease-out-strong motion-reduce:transition-none",
+              // -me-0.5: the chevron's ink ends ~3px inside its box;
+              // pulled into the padding, its right edge mirrors the
+              // leading icon's left.
+              "ms-auto -me-0.5 transition-transform duration-150 ease-out-strong motion-reduce:transition-none",
               expanded && "rotate-180",
             )}
           />
