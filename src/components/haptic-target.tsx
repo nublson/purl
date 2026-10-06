@@ -44,7 +44,9 @@ export function HapticTarget({
       aria-hidden="true"
       data-haptic-target=""
       className={cn(
-        "absolute inset-0 hidden touch-manipulation [-webkit-tap-highlight-color:transparent] pointer-coarse:block",
+        // z-[1]: above the parent's own `after:` hit-area extension, which
+        // paints over its children and would take the tap instead.
+        "absolute inset-0 z-[1] hidden touch-manipulation [-webkit-tap-highlight-color:transparent] pointer-coarse:block",
         "in-disabled:hidden in-data-disabled:hidden",
         className,
       )}
