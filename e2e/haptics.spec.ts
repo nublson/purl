@@ -223,6 +223,70 @@ test.describe("Haptics: rows", () => {
   });
 });
 
+const card = (page: Page, title: string) =>
+  page
+    .locator('[data-cy="link-card"]')
+    .filter({ has: page.getByRole("checkbox", { name: `Select ${title}`, exact: true }) });
+
+test.describe("Haptics: cards", () => {
+  test.use(phone);
+  test.beforeEach(async ({ page }) => installProbes(page));
+
+  async function openGrid(page: Page) {
+    const saved = await page.request.patch("/api/user/layout", { data: { view: "grid" } });
+    expect(saved.ok()).toBe(true);
+    await page.goto("/home");
+    await waitForHydration(page, '[data-cy="link-card"]');
+  }
+  const isSelected = (target: Locator) =>
+    target.getByRole("checkbox").getAttribute("aria-checked");
+
+  test("a long-press selects the card and vibrates", async ({ page, seed, browserName }) => {
+    test.skip(browserName !== "chromium", "raw touch events are Chromium-only");
+    await seedRows(seed);
+    await openGrid(page);
+    await longPress(page, card(page, "Link 1").getByText("Link 1", { exact: true }));
+    await expect.poll(() => isSelected(card(page, "Link 1"))).toBe("true");
+    expect(await vibrations(page)).toEqual([[10]]);
+    await expect.poll(() => ticks(page)).toBe(1);
+    await expect.poll(() => isSelected(card(page, "Link 1"))).toBe("true");
+  });
+
+  test("the checkbox ticks; while selecting, a tap toggles a card and ticks", async ({ page, seed, context }) => {
+    await seedRows(seed);
+    await openGrid(page);
+    const popups: unknown[] = [];
+    context.on("page", (popup) => popups.push(popup));
+
+    await tapOn(page, card(page, "Link 1").getByRole("checkbox"));
+    await expect.poll(() => isSelected(card(page, "Link 1"))).toBe("true");
+    await expect.poll(() => ticks(page)).toBe(1);
+
+    await tapOn(page, card(page, "Link 2").getByText("Link 2", { exact: true }));
+    await expect.poll(() => isSelected(card(page, "Link 2"))).toBe("true");
+    await expect.poll(() => ticks(page)).toBe(2);
+    expect(await vibrations(page)).toEqual([[10], [10]]);
+
+    await tapOn(page, card(page, "Link 2").getByText("Link 2", { exact: true }));
+    await tapOn(page, card(page, "Link 1").getByText("Link 1", { exact: true }));
+    await expect.poll(() => isSelected(card(page, "Link 1"))).toBe("false");
+    await expect.poll(() => ticks(page)).toBe(4);
+    expect(popups).toHaveLength(0);
+  });
+
+  test("not selecting, a tap opens the link and nothing ticks", async ({ page, seed, context }) => {
+    await seedRows(seed);
+    await openGrid(page);
+    const target = card(page, "Link 1");
+    await expect(target.locator("[data-haptic-target]")).toHaveCount(1);
+    const popup = context.waitForEvent("page");
+    await tapOn(page, target.getByText("Link 1", { exact: true }));
+    await popup;
+    expect(await ticks(page)).toBe(0);
+    expect(await vibrations(page)).toEqual([]);
+  });
+});
+
 test.describe("Haptics: desktop", () => {
   test.beforeEach(async ({ page }) => installProbes(page));
 
