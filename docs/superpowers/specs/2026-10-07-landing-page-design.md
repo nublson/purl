@@ -75,7 +75,7 @@ Played **on a visitor's first visit only**; later visits render the settled page
 - One line, under the product panel: the pearl + "Made by @nublson" (links to github.com/nublson) on the left; **API · MCP · Privacy · Terms · GitHub** on the right (GitHub links to github.com/nublson/purl).
 - In a `<footer>`; links are real `<a>`s; muted text, the app's link styles.
 - On phones it stacks into two short lines.
-- The API, MCP, Privacy and Terms targets come from piece 3; routes are named there (current candidates from `f4cfd0d`: `/docs/api`, `/docs/mcp`, `/privacy`, `/terms`).
+- The API, MCP, Privacy and Terms links point to `/` for now (changed 2026-10-07: the landing page ships before piece 3); piece 3 gives them their pages; routes are named there (current candidates from `f4cfd0d`: `/docs/api`, `/docs/mcp`, `/privacy`, `/terms`).
 
 ## Files
 

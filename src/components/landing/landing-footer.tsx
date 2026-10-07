@@ -4,11 +4,12 @@ import { Typography } from "@/components/typography";
 const LINK =
   "inline-flex min-h-8 items-center rounded-sm transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11";
 
+// API, MCP, Privacy and Terms point home until their pages exist.
 const NAV = [
-  { label: "API", href: "/docs/api", external: false },
-  { label: "MCP", href: "/docs/mcp", external: false },
-  { label: "Privacy", href: "/privacy", external: false },
-  { label: "Terms", href: "/terms", external: false },
+  { label: "API", href: "/", external: false },
+  { label: "MCP", href: "/", external: false },
+  { label: "Privacy", href: "/", external: false },
+  { label: "Terms", href: "/", external: false },
   { label: "GitHub", href: "https://github.com/nublson/purl", external: true },
 ];
 
