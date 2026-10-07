@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import {
   LANDING_SEEN_ATTR,
+  hasSeenLanding,
   markLandingSeen,
 } from "@/lib/landing-intro";
 
@@ -16,6 +17,18 @@ const FALLBACK_MS = 1800;
  * visit, so later loads show the settled page.
  */
 export function LandingIntro() {
+  // Client navigations (e.g. after logging out) don't run the root layout's
+  // script, so settle the page here, before paint.
+  useLayoutEffect(() => {
+    let seen = false;
+    try {
+      seen = hasSeenLanding(window.localStorage);
+    } catch {
+      // Storage access can throw; treat as a first visit.
+    }
+    if (seen) document.documentElement.setAttribute(LANDING_SEEN_ATTR, "true");
+  }, []);
+
   useEffect(() => {
     if (document.documentElement.hasAttribute(LANDING_SEEN_ATTR)) return;
 

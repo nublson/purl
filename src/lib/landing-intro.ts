@@ -31,8 +31,8 @@ export function markLandingSeen(storage: Pick<Storage, "setItem"> | null | undef
 // Inline script to set the landing-seen attribute on initial page load.
 export const LANDING_SEEN_SCRIPT = `(function() {
   try {
-    if (localStorage.getItem("purl:landing-seen")) {
-      document.documentElement.setAttribute("data-landing-seen", "true");
+    if (localStorage.getItem(${JSON.stringify(LANDING_SEEN_KEY)})) {
+      document.documentElement.setAttribute(${JSON.stringify(LANDING_SEEN_ATTR)}, "true");
     }
   } catch {}
 })();`;

@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, test, waitForHydration } from "./fixtures";
 
 // The landing page: content, the first-visit arrival (CSS only, remembered in
 // localStorage so later visits skip it) and the fallbacks that keep the page
@@ -103,6 +103,32 @@ test.describe("Landing page", () => {
       await page.waitForLoadState("networkidle");
       const width = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(width).toBeLessThanOrEqual(320);
+    });
+  });
+
+  test.describe("after logging out", () => {
+    test.use({ signedIn: true });
+
+    test("a returning visitor lands on the settled page, with no script warning", async ({ page }) => {
+      const errors: string[] = [];
+      page.on("console", (msg) => {
+        if (msg.type() === "error") errors.push(msg.text());
+      });
+      await page.addInitScript((key) => window.localStorage.setItem(key, "1"), SEEN_KEY);
+
+      await page.goto("/home");
+      await waitForHydration(page, '[aria-label="Account menu"]');
+      await page.getByRole("button", { name: "Account menu" }).click();
+      await page.getByRole("menuitem", { name: "Log out" }).click();
+
+      // Log out is a client navigation to "/", so no full load runs the head script.
+      await expect(page.getByRole("heading", { level: 1, name: "A home for your pearls" })).toBeVisible();
+      await expect(page.locator("html")).toHaveAttribute("data-landing-seen", /.*/);
+      const running = await page.evaluate((sel) => {
+        return Array.from(document.querySelectorAll(sel)).reduce((n, el) => n + el.getAnimations().length, 0);
+      }, WORDS);
+      expect(running).toBe(0);
+      expect(errors.filter((e) => e.includes("Encountered a script tag"))).toEqual([]);
     });
   });
 

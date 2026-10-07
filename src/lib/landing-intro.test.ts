@@ -58,6 +58,7 @@ describe("landing-intro", () => {
       const scriptFn = new Function("document", "localStorage", LANDING_SEEN_SCRIPT);
       scriptFn(fakeDocument, fakeLocalStorage);
 
+      expect(fakeLocalStorage.getItem).toHaveBeenCalledWith("purl:landing-seen");
       expect(setAttributeMock).toHaveBeenCalledWith(LANDING_SEEN_ATTR, "true");
     });
 
