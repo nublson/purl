@@ -101,10 +101,10 @@ body {
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
   /* Landing: the pearl gradient (the word "pearls") and its glow. */
-  --pearl-1: #8c7f66;
-  --pearl-2: #b0a184;
-  --pearl-3: #7f93a8;
-  --pearl-4: #a58aa8;
+  --pearl-1: #7a6c4f;
+  --pearl-2: #8a7b5a;
+  --pearl-3: #4f7396;
+  --pearl-4: #8660a0;
   --pearl-glow: rgb(176 161 132 / 0.35);
 }
 
