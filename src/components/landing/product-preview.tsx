@@ -62,15 +62,25 @@ function indexStyle(index: number) {
 }
 
 /**
- * A still, decorative picture of the app (one shared folder and its rows)
- * under the hero. No data, providers or client JS; a later demo replaces
- * its insides in the same frame. `data-landing-panel` / `data-landing-row`
- * (with `--i`) are hooks for the arrival animation.
+ * The panel's frame, shared by the still picture and the live demo: border,
+ * rounded top, a bottom fade into the page and the pearl glow behind it.
+ * `data-landing-panel` is the arrival animation's hook. `decorative` hides
+ * the still picture from assistive tech; the demo is real, interactive UI.
  */
-export function ProductPreview({ className }: { className?: string }) {
+export function ProductFrame({
+  header,
+  children,
+  className,
+  decorative = false,
+}: {
+  header: ReactNode;
+  children: ReactNode;
+  className?: string;
+  decorative?: boolean;
+}) {
   return (
     <div
-      aria-hidden="true"
+      aria-hidden={decorative ? "true" : undefined}
       className={cn("relative isolate mx-auto w-full md:px-[6%]", className)}
     >
       <div
@@ -82,7 +92,25 @@ export function ProductPreview({ className }: { className?: string }) {
         className="relative overflow-hidden rounded-t-2xl border border-b-0 bg-card/80 backdrop-blur-sm"
         style={FADE_MASK}
       >
-        {/* Header: pearl | folder + chevron ........ Public */}
+        {header}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A still, decorative picture of the app (one shared folder and its rows)
+ * under the hero. No data, providers or client JS; it is the
+ * fallback when the live demo has no data. `data-landing-panel` / `data-landing-row`
+ * (with `--i`) are hooks for the arrival animation.
+ */
+export function ProductPreview({ className }: { className?: string }) {
+  return (
+    <ProductFrame
+      decorative
+      className={className}
+      header={
         <div className="flex h-12 items-center justify-between gap-3 border-b px-3 md:px-4">
           <div className="flex min-w-0 items-center gap-3">
             <Logo size={20} />
@@ -103,66 +131,65 @@ export function ProductPreview({ className }: { className?: string }) {
             Public
           </span>
         </div>
-
-        <div className="px-1 py-2 md:px-2">
-          {LINKS.map((link, index) => (
-            <div
-              key={link.title}
-              data-landing-row
-              style={indexStyle(index)}
-              className={cn(ROW, rowIndexClass(index))}
-            >
-              <div className="mt-1.5 flex h-[1lh] items-center text-sm leading-normal max-md:mt-1 max-md:text-base max-md:leading-6">
-                <div
-                  className={cn(
-                    "size-5 overflow-hidden rounded-[3px] max-md:size-6",
-                    link.read && "opacity-50 grayscale",
-                  )}
-                >
-                  {link.icon}
-                </div>
-              </div>
-              <div className="min-w-0 pt-1.5 max-md:pt-1">
-                <div className="flex min-w-0 items-baseline gap-2">
-                  <Typography
-                    size="small"
-                    className={cn(
-                      "block truncate max-md:text-base max-md:leading-6",
-                      link.read
-                        ? "font-normal text-muted-foreground"
-                        : "font-medium text-accent-foreground",
-                    )}
-                  >
-                    {link.title}
-                  </Typography>
-                  <Typography
-                    component="span"
-                    size="small"
-                    className="hidden shrink-0 font-normal md:block"
-                  >
-                    {link.domain}
-                  </Typography>
-                </div>
+      }
+    >
+      <div className="px-1 py-2 md:px-2">
+        {LINKS.map((link, index) => (
+          <div
+            key={link.title}
+            data-landing-row
+            style={indexStyle(index)}
+            className={cn(ROW, rowIndexClass(index))}
+          >
+            <div className="mt-1.5 flex h-[1lh] items-center text-sm leading-normal max-md:mt-1 max-md:text-base max-md:leading-6">
+              <div
+                className={cn(
+                  "size-5 overflow-hidden rounded-[3px] max-md:size-6",
+                  link.read && "opacity-50 grayscale",
+                )}
+              >
+                {link.icon}
               </div>
             </div>
-          ))}
-          {SKELETON_WIDTHS.map((width, i) => {
-            const index = LINKS.length + i;
-            return (
-              <div
-                key={width}
-                data-landing-row
-                style={indexStyle(index)}
-                className={cn(ROW, "items-center", rowIndexClass(index))}
-              >
-                <Skeleton className="size-5 rounded-[3px] max-md:size-6" />
-                <Skeleton className={cn("h-3.5 max-md:h-4", width)} />
+            <div className="min-w-0 pt-1.5 max-md:pt-1">
+              <div className="flex min-w-0 items-baseline gap-2">
+                <Typography
+                  size="small"
+                  className={cn(
+                    "block truncate max-md:text-base max-md:leading-6",
+                    link.read
+                      ? "font-normal text-muted-foreground"
+                      : "font-medium text-accent-foreground",
+                  )}
+                >
+                  {link.title}
+                </Typography>
+                <Typography
+                  component="span"
+                  size="small"
+                  className="hidden shrink-0 font-normal md:block"
+                >
+                  {link.domain}
+                </Typography>
               </div>
-            );
-          })}
-        </div>
-
+            </div>
+          </div>
+        ))}
+        {SKELETON_WIDTHS.map((width, i) => {
+          const index = LINKS.length + i;
+          return (
+            <div
+              key={width}
+              data-landing-row
+              style={indexStyle(index)}
+              className={cn(ROW, "items-center", rowIndexClass(index))}
+            >
+              <Skeleton className="size-5 rounded-[3px] max-md:size-6" />
+              <Skeleton className={cn("h-3.5 max-md:h-4", width)} />
+            </div>
+          );
+        })}
       </div>
-    </div>
+    </ProductFrame>
   );
 }
