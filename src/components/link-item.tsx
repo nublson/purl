@@ -447,6 +447,7 @@ export const LinkItem = React.forwardRef<
     <LinkPreview
       link={link}
       eagerThumbnail={Boolean(eagerFavicon)}
+      placement={demo ? "below" : "beside"}
       open={previewOpen}
       onOpenChange={() => {
         // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.

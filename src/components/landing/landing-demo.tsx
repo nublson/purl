@@ -66,6 +66,7 @@ export function LandingDemo({
 
   return (
     <ProductFrame
+      label="Live demo"
       className={className}
       header={
         <div className="flex h-12 items-center justify-between gap-2 border-b px-3 md:px-4">
@@ -86,7 +87,9 @@ export function LandingDemo({
         </div>
       }
     >
-      <div className="h-[21rem] overflow-y-auto overscroll-contain px-1 py-2 md:h-[24rem] md:px-2">
+      {/* The bottom padding lets the last rows scroll up out of the frame's
+          fade, so every link can be read. */}
+      <div className="h-[21rem] overflow-y-auto overscroll-contain px-1 pt-2 pb-28 md:h-[24rem] md:px-2 md:pb-32">
         {groups.length === 0 ? (
           <Empty>
             <EmptyHeader>
@@ -113,9 +116,10 @@ export function LandingDemo({
                 .slice(0, groupIndex)
                 .reduce((sum, g) => sum + g.links.length, 0);
               return (
+                // Not a named region: one landmark per day would crowd the
+                // page's landmarks; the list is labelled by the heading.
                 <section
                   key={group.label}
-                  aria-labelledby={headingId}
                   className="flex w-full flex-col items-start justify-start gap-4"
                 >
                   <h2

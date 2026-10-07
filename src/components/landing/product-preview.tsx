@@ -65,22 +65,27 @@ function indexStyle(index: number) {
  * The panel's frame, shared by the still picture and the live demo: border,
  * rounded top, a bottom fade into the page and the pearl glow behind it.
  * `data-landing-panel` is the arrival animation's hook. `decorative` hides
- * the still picture from assistive tech; the demo is real, interactive UI.
+ * the still picture from assistive tech; the demo is real, interactive UI,
+ * named by `label` as a region so its controls read as a demo.
  */
 export function ProductFrame({
   header,
   children,
   className,
   decorative = false,
+  label,
 }: {
   header: ReactNode;
   children: ReactNode;
   className?: string;
   decorative?: boolean;
+  label?: string;
 }) {
   return (
     <div
       aria-hidden={decorative ? "true" : undefined}
+      role={label ? "region" : undefined}
+      aria-label={label}
       className={cn("relative isolate mx-auto w-full md:px-[6%]", className)}
     >
       <div

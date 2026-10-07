@@ -32,7 +32,7 @@ export function LandingHero({ providers }: { providers: ProviderId[] }) {
         <div data-landing-block="sub">
           <Typography className="mx-auto max-w-[48ch] text-pretty text-lg">
             The calm read-it-later app. Save links, PDFs, videos and audio to
-            one quiet list, and read them when you&apos;re ready.
+            one quiet list, and read them when you’re ready.
           </Typography>
         </div>
       </div>
