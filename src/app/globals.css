@@ -297,26 +297,30 @@ body {
 
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-landing-seen]) {
+    /* The pearl mark arrives first; everything else follows 80ms later. */
+    [data-landing-block="mark"] {
+      animation: landing-arrive 500ms var(--ease-out-strong) both;
+    }
     [data-landing-word] {
       display: inline-block;
       animation: landing-arrive 500ms var(--ease-out-strong) both;
-      animation-delay: calc(var(--i) * 60ms);
+      animation-delay: calc(80ms + var(--i) * 60ms);
     }
     [data-landing-block="sub"] {
-      animation: landing-arrive 500ms var(--ease-out-strong) 340ms both;
-    }
-    [data-landing-block="actions"] {
       animation: landing-arrive 500ms var(--ease-out-strong) 420ms both;
     }
+    [data-landing-block="actions"] {
+      animation: landing-arrive 500ms var(--ease-out-strong) 500ms both;
+    }
     [data-landing-panel] {
-      animation: landing-rise 500ms var(--ease-out-strong) 500ms both;
+      animation: landing-rise 500ms var(--ease-out-strong) 580ms both;
     }
     [data-landing-row] {
       animation: landing-row 400ms var(--ease-out-strong) both;
-      animation-delay: calc(600ms + var(--i) * 45ms);
+      animation-delay: calc(680ms + var(--i) * 45ms);
     }
     [data-pearl-word] {
-      animation: landing-sheen 800ms cubic-bezier(0.77, 0, 0.175, 1) 700ms both;
+      animation: landing-sheen 800ms cubic-bezier(0.77, 0, 0.175, 1) 780ms both;
     }
   }
 }

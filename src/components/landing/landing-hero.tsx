@@ -1,4 +1,5 @@
 import { PearlWord } from "@/components/landing/pearl-word";
+import { Logo } from "@/components/logo";
 import { ProviderButtons } from "@/components/provider-buttons";
 import { Typography } from "@/components/typography";
 import type { ProviderId } from "@/lib/auth-providers";
@@ -17,6 +18,11 @@ export function LandingHero({ providers }: { providers: ProviderId[] }) {
       className="flex w-full flex-col items-center gap-8 pt-12 text-center sm:pt-16 md:pt-20"
     >
       <div className="flex flex-col items-center gap-5">
+        {/* The brand mark: centered on the hero's axis, the first beat of the
+            arrival. Its alt text names the product (there's no wordmark). */}
+        <div data-landing-block="mark">
+          <Logo size={40} />
+        </div>
         <Typography component="h1" variant="h1" id="landing-title">
           {WORDS.map((word, i) => (
             <Fragment key={word}>

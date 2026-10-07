@@ -24,7 +24,7 @@ Out of scope: an app-wide theme default or theme switch, import from other read-
 
 - `/` stays static (`force-static` in `src/app/(public)/layout.tsx`), served from the CDN; the proxy keeps validating the session only to send signed-in users to `/home`.
 - Top to bottom, the page is exactly:
-  1. **Top bar:** the pearl logo (the existing `Logo`, `/logo.svg`) and "Purl" on the left; nothing on the right (sign-in is in the hero).
+  1. **No top bar** (changed 2026-10-07 after a layout review: a left-pinned bar was the only off-axis element and duplicated the demo's logo). The pearl logo (the existing `Logo`, alt "Purl", no wordmark) sits centered above the headline as the first beat of the arrival.
   2. **Hero:** centered.
   3. **Product panel:** under the hero, rising from the bottom of the first screen.
   4. **Footer.**
@@ -89,7 +89,7 @@ Played **on a visitor's first visit only**; later visits render the settled page
 ## Speed and accessibility
 
 - No raster images (only the existing logo SVG) and no new fonts on the page; motion is CSS only. The page stays static.
-- One `<h1>`; landmarks: the top bar in a `<header>`, the hero and panel in `<main>`, the footer in `<footer>`. The sign-in buttons keep their accessible names.
+- One `<h1>`; landmarks: the hero and panel in `<main>`, the footer in `<footer>` (no page `<header>`; the logo is in the hero). The sign-in buttons keep their accessible names.
 - Contrast: body and muted text meet the app's existing contrast in both themes; the gradient word is checked against both backgrounds.
 - Keyboard: buttons and footer links in visual order; visible focus rings (the app's).
 
