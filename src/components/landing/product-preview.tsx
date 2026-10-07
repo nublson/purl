@@ -51,6 +51,12 @@ function rowIndexClass(index: number) {
   return index === 3 || index === 6 ? "max-md:hidden" : undefined;
 }
 
+/** Fades the whole panel (rows and side borders) into the page at its bottom. */
+const FADE_MASK: CSSProperties = {
+  maskImage: "linear-gradient(to bottom, #000 55%, transparent)",
+  WebkitMaskImage: "linear-gradient(to bottom, #000 55%, transparent)",
+};
+
 function indexStyle(index: number) {
   return { "--i": index } as CSSProperties;
 }
@@ -68,12 +74,13 @@ export function ProductPreview({ className }: { className?: string }) {
       className={cn("relative isolate mx-auto w-full md:px-[6%]", className)}
     >
       <div
-        className="pearl-glow pointer-events-none absolute inset-x-[-10%] -bottom-10 -z-10 h-72"
+        className="pearl-glow pointer-events-none absolute inset-x-[-10%] -bottom-24 -z-10 h-[28rem]"
         aria-hidden="true"
       />
       <div
         data-landing-panel
         className="relative overflow-hidden rounded-t-2xl border border-b-0 bg-card/80 backdrop-blur-sm"
+        style={FADE_MASK}
       >
         {/* Header: pearl | folder + chevron ........ Public */}
         <div className="flex h-12 items-center justify-between gap-3 border-b px-3 md:px-4">
@@ -155,8 +162,6 @@ export function ProductPreview({ className }: { className?: string }) {
           })}
         </div>
 
-        {/* Fades the rows into the page. */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-background" />
       </div>
     </div>
   );

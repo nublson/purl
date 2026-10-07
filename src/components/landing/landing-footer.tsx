@@ -2,7 +2,7 @@ import { Logo } from "@/components/logo";
 import { Typography } from "@/components/typography";
 
 const LINK =
-  "inline-flex min-h-8 items-center rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11";
+  "inline-flex min-h-8 items-center rounded-sm transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11";
 
 const NAV = [
   { label: "API", href: "/docs/api", external: false },
@@ -20,21 +20,25 @@ export function LandingFooter() {
           <Logo size={20} />
           <Typography size="small">
             Made by{" "}
-            <a
+            <Typography
+              component="a"
+              size="small"
               href="https://github.com/nublson"
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-sm text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               @nublson
-            </a>
+            </Typography>
           </Typography>
         </div>
         <nav aria-label="Footer">
           <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 text-sm">
             {NAV.map(({ label, href, external }) => (
-              <li key={label}>
-                <a
+              <Typography component="li" size="small" key={label}>
+                <Typography
+                  component="a"
+                  size="small"
                   href={href}
                   className={LINK}
                   {...(external
@@ -42,8 +46,8 @@ export function LandingFooter() {
                     : {})}
                 >
                   {label}
-                </a>
-              </li>
+                </Typography>
+              </Typography>
             ))}
           </ul>
         </nav>

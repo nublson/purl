@@ -182,9 +182,11 @@ body {
 /* The soft pearl light behind the product panel. */
 @utility pearl-glow {
   background: radial-gradient(
-    55% 70% at 50% 100%,
+    closest-side at 50% 50%,
     var(--pearl-glow),
-    transparent 75%
+    color-mix(in srgb, var(--pearl-glow) 45%, transparent) 40%,
+    color-mix(in srgb, var(--pearl-glow) 12%, transparent) 70%,
+    transparent
   );
 }
 
