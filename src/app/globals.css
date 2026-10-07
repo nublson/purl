@@ -179,6 +179,15 @@ body {
   }
 }
 
+/* The soft pearl light behind the product panel. */
+@utility pearl-glow {
+  background: radial-gradient(
+    55% 70% at 50% 100%,
+    var(--pearl-glow),
+    transparent 75%
+  );
+}
+
 /* The signature word: a slow pearl gradient clipped to the text. The 200%
    background leaves room for the sheen to slide across (landing hero). */
 @utility pearl-text {
