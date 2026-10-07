@@ -104,13 +104,13 @@ export async function resolvePublicFolder(
   let redirected = false;
   let user = await prisma.user.findUnique({
     where: { username: wantedUsername },
-    select: { id: true, name: true, image: true, username: true },
+    select: { id: true, ...PUBLIC_OWNER_SELECT },
   });
   if (!user) {
     const old = await prisma.usernameRedirect.findUnique({
       where: { username: wantedUsername },
       select: {
-        user: { select: { id: true, name: true, image: true, username: true } },
+        user: { select: { id: true, ...PUBLIC_OWNER_SELECT } },
       },
     });
     if (!old) return null;
@@ -120,10 +120,7 @@ export async function resolvePublicFolder(
 
   const folderSelect = {
     id: true,
-    name: true,
-    slug: true,
-    emoji: true,
-    description: true,
+    ...PUBLIC_FOLDER_SELECT,
     isPublic: true,
   } as const;
   let folder = await prisma.folder.findFirst({

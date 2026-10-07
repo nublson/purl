@@ -47,6 +47,9 @@ export function User() {
 
   return (
     <>
+      {/* The demo has no account: no Settings, not even by ?settings= link. */}
+      {isDemo ? null : (
+        <>
       <React.Suspense fallback={null}>
         <SettingsDeepLink
           onOpen={(tab) => {
@@ -70,6 +73,8 @@ export function User() {
         }}
         defaultTab={settingsDefaultTab}
       />
+        </>
+      )}
       <DropdownWrapper
         className="w-52"
         align="end"

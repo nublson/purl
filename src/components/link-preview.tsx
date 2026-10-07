@@ -23,6 +23,8 @@ type LinkPreviewProps = {
    * span the whole panel, leaving no room beside them, so it opens below.
    */
   placement?: "beside" | "below";
+  /** Render PDFs through the signed-in PDF proxy (off in the demo). */
+  pdfThumbnail?: boolean;
 };
 
 export function LinkPreview({
@@ -34,6 +36,7 @@ export function LinkPreview({
   onPreviewMouseEnter,
   onPreviewMouseLeave,
   placement = "beside",
+  pdfThumbnail = true,
 }: LinkPreviewProps) {
   return (
     <HoverCard
@@ -52,7 +55,11 @@ export function LinkPreview({
         onMouseEnter={onPreviewMouseEnter}
         onMouseLeave={onPreviewMouseLeave}
       >
-        <LinkPreviewBody link={link} eagerThumbnail={eagerThumbnail} />
+        <LinkPreviewBody
+          link={link}
+          eagerThumbnail={eagerThumbnail}
+          pdfThumbnail={pdfThumbnail}
+        />
       </HoverCardContent>
     </HoverCard>
   );

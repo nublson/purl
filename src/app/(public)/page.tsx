@@ -16,7 +16,12 @@ export const revalidate = 3600;
 
 export default async function Home() {
   const providers = getSignInButtonProviders();
-  const data = await getDemoFolders();
+  // A failed read (no database during `next build`, a transient error) shows
+  // the still panel; ISR retries within the hour.
+  const data = await getDemoFolders().catch((error: unknown) => {
+    console.error("Landing demo: could not read the demo folders", error);
+    return null;
+  });
   // Fixed here so the cached HTML and hydration label days the same way.
   const now = new Date().toISOString();
 

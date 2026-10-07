@@ -110,6 +110,7 @@ test.describe("Landing demo", () => {
       for (const n of [1, 2, 3]) {
         await seedLink(userId, { url: `https://example.com/reading-${n}`, title: `Reading ${n}`, folderId: reading });
       }
+      await seedLink(userId, { url: "https://example.com/paper.pdf", title: "Paper", folderId: reading, contentType: "PDF" });
       for (const n of [1, 2]) {
         await seedLink(userId, { url: `https://example.com/started-${n}`, title: `Started ${n}`, folderId: started });
       }
@@ -122,7 +123,7 @@ test.describe("Landing demo", () => {
 
     test("opens on Reading list with its links; Secret never appears", async ({ page }) => {
       await openDemo(page);
-      await expect(rows(page)).toHaveCount(3);
+      await expect(rows(page)).toHaveCount(4);
       await expect(page.getByText("Reading 1")).toBeVisible();
       await expect(page.getByText("Secret 1")).toHaveCount(0);
 
@@ -200,7 +201,7 @@ test.describe("Landing demo", () => {
       await menu.getByRole("menuitem", { name: "View mode" }).click();
       await page.getByRole("menuitemradio", { name: "Grid" }).click();
 
-      await expect(page.locator('[data-cy="link-card"]')).toHaveCount(3);
+      await expect(page.locator('[data-cy="link-card"]')).toHaveCount(4);
       expect(apiRequests.filter((url) => url.includes("/api/user/layout"))).toEqual([]);
     });
 
@@ -226,6 +227,28 @@ test.describe("Landing demo", () => {
 
       expect(apiRequests).toEqual([]);
       expect(consoleErrors).toEqual([]);
+    });
+
+    test("hovering a PDF row previews it without the PDF proxy", async ({ page, isMobile }) => {
+      test.skip(isMobile, "hover previews are desktop only");
+      const { apiRequests } = watch(page);
+      await openDemo(page);
+      await page.getByRole("link", { name: /Paper/ }).hover();
+      await expect(page.getByText("Paper").nth(1)).toBeVisible();
+      await page.waitForLoadState("networkidle");
+      expect(apiRequests).toEqual([]);
+    });
+
+    test("?settings= opens no Settings dialog and calls no API", async ({ page }) => {
+      const { apiRequests } = watch(page);
+      await page.context().route(/^https:\/\/example\.com\//, (route) =>
+        route.fulfill({ contentType: "image/png", body: PNG_1X1 }),
+      );
+      await page.goto("/?settings=account");
+      await expect(page.getByRole("button", { name: "Folder: Reading list" })).toBeVisible();
+      await page.waitForLoadState("networkidle");
+      await expect(page.getByRole("dialog")).toHaveCount(0);
+      expect(apiRequests).toEqual([]);
     });
   });
 });
