@@ -251,3 +251,83 @@ body {
 .dialog-top {
   @apply top-0 md:top-24 translate-y-0 md:-translate-x-1/2 h-dvh max-h-dvh md:h-auto md:max-h-[calc(100dvh-11rem)] w-screen max-w-none md:w-[90vw] md:max-w-xl rounded-none md:rounded-xl;
 }
+
+/* Landing arrival: plays on a visitor's first visit only. The inline script
+   in the page sets data-landing-seen on <html> before first paint on later
+   visits, which switches all of this off. `both` fill keeps content visible
+   whatever happens (no JS, interrupted). Nothing here touches pointer-events.
+   Timeline (ms): words 0-740, sub 340-840, actions 420-920, panel 500-1000,
+   rows 600-1270, sheen 700-1500. */
+@keyframes landing-arrive {
+  from {
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateY(20%);
+  }
+}
+
+@keyframes landing-rise {
+  from {
+    opacity: 0;
+    transform: translateY(2.5%);
+  }
+}
+
+@keyframes landing-row {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes landing-sheen {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+@keyframes landing-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-landing-seen]) {
+    [data-landing-word] {
+      display: inline-block;
+      animation: landing-arrive 500ms var(--ease-out-strong) both;
+      animation-delay: calc(var(--i) * 60ms);
+    }
+    [data-landing-block="sub"] {
+      animation: landing-arrive 500ms var(--ease-out-strong) 340ms both;
+    }
+    [data-landing-block="actions"] {
+      animation: landing-arrive 500ms var(--ease-out-strong) 420ms both;
+    }
+    [data-landing-panel] {
+      animation: landing-rise 500ms var(--ease-out-strong) 500ms both;
+    }
+    [data-landing-row] {
+      animation: landing-row 400ms var(--ease-out-strong) both;
+      animation-delay: calc(600ms + var(--i) * 45ms);
+    }
+    [data-pearl-word] {
+      animation: landing-sheen 800ms cubic-bezier(0.77, 0, 0.175, 1) 700ms both;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-landing-seen]) {
+    [data-landing-word],
+    [data-landing-block],
+    [data-landing-panel],
+    [data-landing-row] {
+      animation: landing-fade 200ms ease both;
+    }
+  }
+}

@@ -2,7 +2,7 @@ import { PearlWord } from "@/components/landing/pearl-word";
 import { ProviderButtons } from "@/components/provider-buttons";
 import { Typography } from "@/components/typography";
 import type { ProviderId } from "@/lib/auth-providers";
-import type { CSSProperties } from "react";
+import { Fragment, type CSSProperties } from "react";
 
 const WORDS = ["A", "home", "for", "your"] as const;
 
@@ -19,9 +19,11 @@ export function LandingHero({ providers }: { providers: ProviderId[] }) {
       <div className="flex flex-col items-center gap-5">
         <Typography component="h1" variant="h1" id="landing-title">
           {WORDS.map((word, i) => (
-            <span key={word} data-landing-word style={wordStyle(i)}>
-              {word}{" "}
-            </span>
+            <Fragment key={word}>
+              <span data-landing-word style={wordStyle(i)}>
+                {word}
+              </span>{" "}
+            </Fragment>
           ))}
           <span data-landing-word style={wordStyle(4)}>
             <PearlWord>pearls</PearlWord>
