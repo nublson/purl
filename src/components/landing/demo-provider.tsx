@@ -33,7 +33,7 @@ export function DemoProvider({
         emoji: f.emoji,
         description: f.description,
         isPublic: true,
-        linkCount: f.links.length,
+        linkCount: f.linkCount,
       })),
     [data.folders],
   );

@@ -11,7 +11,12 @@ export const DEMO_USERNAME = "purl";
 /** Links shown per demo folder (newest first). */
 export const DEMO_LINKS_PER_FOLDER = 20;
 
-export type DemoFolder = PublicFolder & { id: string; links: PublicLink[] };
+/** `links` is capped at `DEMO_LINKS_PER_FOLDER`; `linkCount` is the real total. */
+export type DemoFolder = PublicFolder & {
+  id: string;
+  linkCount: number;
+  links: PublicLink[];
+};
 
 export type DemoData = { owner: PublicOwner; folders: DemoFolder[] };
 

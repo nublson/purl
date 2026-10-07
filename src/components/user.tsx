@@ -50,29 +50,29 @@ export function User() {
       {/* The demo has no account: no Settings, not even by ?settings= link. */}
       {isDemo ? null : (
         <>
-      <React.Suspense fallback={null}>
-        <SettingsDeepLink
-          onOpen={(tab) => {
-            setSettingsDefaultTab(tab);
-            setSettingsOpen(true);
-          }}
-        />
-      </React.Suspense>
-      {/*
-        Rendered outside the dropdown: Radix only mounts menu content while
-        the menu is open, so a dialog living in there couldn't be opened by
-        the deep link above.
-      */}
-      <SettingsDialog
-        open={settingsOpen}
-        onOpenChange={(open) => {
-          setSettingsOpen(open);
-          // Reset so a later manual open lands on the first tab instead
-          // of whatever a past deep link set.
-          if (!open) setSettingsDefaultTab(undefined);
-        }}
-        defaultTab={settingsDefaultTab}
-      />
+          <React.Suspense fallback={null}>
+            <SettingsDeepLink
+              onOpen={(tab) => {
+                setSettingsDefaultTab(tab);
+                setSettingsOpen(true);
+              }}
+            />
+          </React.Suspense>
+          {/*
+            Rendered outside the dropdown: Radix only mounts menu content while
+            the menu is open, so a dialog living in there couldn't be opened by
+            the deep link above.
+          */}
+          <SettingsDialog
+            open={settingsOpen}
+            onOpenChange={(open) => {
+              setSettingsOpen(open);
+              // Reset so a later manual open lands on the first tab instead
+              // of whatever a past deep link set.
+              if (!open) setSettingsDefaultTab(undefined);
+            }}
+            defaultTab={settingsDefaultTab}
+          />
         </>
       )}
       <DropdownWrapper

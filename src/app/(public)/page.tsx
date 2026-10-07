@@ -9,14 +9,18 @@ import { SignInErrorToast } from "@/components/sign-in-error-toast";
 import { getSignInButtonProviders } from "@/lib/auth-providers";
 import { getDemoFolders } from "@/lib/demo-folders";
 
+// Static (also set by the (public) layout; stated here so the page keeps it).
 // The demo reads the `purl` account's public folders; refresh hourly.
+export const dynamic = "force-static";
 export const revalidate = 3600;
 
 export default async function Home() {
   const providers = getSignInButtonProviders();
-  // A failed read (no database during `next build`, a transient error) shows
-  // the still panel; ISR retries within the hour.
+  // At build time (CI has no database) a failed read shows the still panel.
+  // At runtime it throws, so a failed revalidation keeps serving the last
+  // good page instead of caching the still one for an hour.
   const data = await getDemoFolders().catch((error: unknown) => {
+    if (process.env.NEXT_PHASE !== "phase-production-build") throw error;
     console.error("Landing demo: could not read the demo folders", error);
     return null;
   });

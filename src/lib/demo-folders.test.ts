@@ -43,7 +43,7 @@ describe("getDemoFolders", () => {
 
   it("queries the current username's public folders by name, newest 20 links each", async () => {
     mockFolderFindMany.mockResolvedValue([
-      { id: "f1", name: "A", slug: "a", emoji: null, description: "", links: [LINK] },
+      { id: "f1", name: "A", slug: "a", emoji: null, description: "", links: [LINK], _count: { links: 1 } },
     ]);
     await getDemoFolders("Purl");
     expect(mockUserFindUnique).toHaveBeenCalledWith(
@@ -69,6 +69,7 @@ describe("getDemoFolders", () => {
         isPublic: true,
         userId: "u1",
         links: [{ ...LINK, userId: "u1", folderId: "f1", readAt: null }],
+        _count: { links: 1 },
       },
     ]);
     const data = await getDemoFolders();
@@ -81,9 +82,20 @@ describe("getDemoFolders", () => {
           slug: "a",
           emoji: "🦪",
           description: null,
+          linkCount: 1,
           links: [LINK],
         },
       ],
     });
+  });
+
+  it("counts every link in the folder, not just the 20 it returns", async () => {
+    mockFolderFindMany.mockResolvedValue([
+      { id: "f1", name: "A", slug: "a", emoji: null, description: "", links: [LINK], _count: { links: 50 } },
+    ]);
+    const data = await getDemoFolders();
+    expect(data?.folders[0]).toMatchObject({ linkCount: 50, links: [LINK] });
+    const args = mockFolderFindMany.mock.calls[0][0];
+    expect(args.select._count).toEqual({ select: { links: { where: { userId: "u1" } } } });
   });
 });

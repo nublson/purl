@@ -39,6 +39,7 @@ export async function getDemoFolders(
         take: DEMO_LINKS_PER_FOLDER,
         select: PUBLIC_LINK_SELECT,
       },
+      _count: { select: { links: { where: { userId: user.id } } } },
     },
   });
   if (folders.length === 0) return null;
@@ -55,6 +56,7 @@ export async function getDemoFolders(
       slug: folder.slug,
       emoji: folder.emoji || DEFAULT_FOLDER_EMOJI,
       description: folder.description || null,
+      linkCount: folder._count.links,
       links: folder.links.map((link) => ({
         id: link.id,
         url: link.url,
