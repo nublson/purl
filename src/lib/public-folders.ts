@@ -47,6 +47,34 @@ export type PublicFolderPage =
   /** An old username or slug: send visitors to the current URL. */
   | { kind: "redirect"; username: string; slug: string };
 
+/** The only link columns visitors may see (one source for every public read). */
+export const PUBLIC_LINK_SELECT = {
+  id: true,
+  url: true,
+  title: true,
+  description: true,
+  thumbnail: true,
+  domain: true,
+  favicon: true,
+  contentType: true,
+  createdAt: true,
+} as const;
+
+/** The only user columns a shared page may show. */
+export const PUBLIC_OWNER_SELECT = {
+  name: true,
+  image: true,
+  username: true,
+} as const;
+
+/** The folder columns a shared page may show (add `id`/`isPublic` for server use). */
+export const PUBLIC_FOLDER_SELECT = {
+  name: true,
+  slug: true,
+  emoji: true,
+  description: true,
+} as const;
+
 export { publicFolderPath };
 
 /**
