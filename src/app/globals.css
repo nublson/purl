@@ -100,6 +100,12 @@ body {
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* Landing: the pearl gradient (the word "pearls") and its glow. */
+  --pearl-1: #8c7f66;
+  --pearl-2: #b0a184;
+  --pearl-3: #7f93a8;
+  --pearl-4: #a58aa8;
+  --pearl-glow: rgb(176 161 132 / 0.35);
 }
 
 .dark {
@@ -134,6 +140,11 @@ body {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --pearl-1: #f7f3ea;
+  --pearl-2: #d9cfbd;
+  --pearl-3: #c9d6e3;
+  --pearl-4: #efe6f2;
+  --pearl-glow: rgb(247 243 234 / 0.3);
 }
 
 @layer base {
@@ -166,6 +177,24 @@ body {
     text-underline-position: from-font;
     text-decoration-thickness: from-font;
   }
+}
+
+/* The signature word: a slow pearl gradient clipped to the text. The 200%
+   background leaves room for the sheen to slide across (landing hero). */
+@utility pearl-text {
+  background: linear-gradient(
+    100deg,
+    var(--pearl-1),
+    var(--pearl-2) 30%,
+    var(--pearl-3) 55%,
+    var(--pearl-4) 80%,
+    var(--pearl-1)
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 /* Focus rings are box-shadows (`ring-*`) on `outline-none` controls, and
