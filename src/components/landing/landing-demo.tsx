@@ -17,6 +17,7 @@ import { Separator } from "@/components/ui/separator";
 import { User } from "@/components/user";
 import { useLinkView } from "@/contexts/link-view-context";
 import { useCurrentFolder } from "@/hooks/use-folders";
+import { LINK_GRID_FRAME } from "@/lib/link-view";
 import { toDemoLinks, type DemoData } from "@/lib/demo-links";
 import { groupLinksByDate } from "@/utils/links";
 import { Box } from "reicon-react";
@@ -99,7 +100,11 @@ export function LandingDemo({
             </EmptyHeader>
           </Empty>
         ) : view === "grid" ? (
-          <LinkGrid groups={groups.map(({ label, links }) => ({ label, links }))} />
+          <div className={LINK_GRID_FRAME}>
+            <LinkGrid
+              groups={groups.map(({ label, links }) => ({ label, links }))}
+            />
+          </div>
         ) : (
           <div className="flex flex-col gap-8">
             {groups.map((group, groupIndex) => {

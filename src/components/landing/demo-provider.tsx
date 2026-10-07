@@ -61,7 +61,11 @@ export function DemoProvider({
   if (!current) return null;
   return (
     <DemoModeContext.Provider value={mode}>
-      <FoldersProvider initialFolders={folders} initialTotalLinks={totalLinks}>
+      <FoldersProvider
+        initialFolders={folders}
+        initialTotalLinks={totalLinks}
+        offline
+      >
         <CurrentFolderProvider folder={current}>
           <CurrentUserProvider user={user}>
             <LinkViewProvider initialLayout={DEMO_LAYOUT} persist={false}>
