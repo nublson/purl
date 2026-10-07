@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useLinkView } from "@/contexts/link-view-context";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { parseLinkView } from "@/lib/link-view";
@@ -98,9 +99,11 @@ export function ViewModeMenu() {
  */
 export function FolderTagsMenuItem() {
   const { folderTags, setFolderTags } = useLinkView();
+  const isDemo = useIsDemo();
   return (
     <DropdownMenuCheckboxItem
       checked={folderTags}
+      disabled={isDemo}
       data-cy="folder-tags-toggle"
       // The switch is the indicator: no check mark, no room kept for one.
       className="pr-2 [&>[data-slot=dropdown-menu-checkbox-item-indicator]]:hidden"
