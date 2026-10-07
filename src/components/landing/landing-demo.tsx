@@ -69,7 +69,9 @@ export function LandingDemo({
       label="Live demo"
       className={className}
       header={
-        <div className="flex h-12 items-center justify-between gap-2 border-b px-3 md:px-4">
+        // The app header's row (header.tsx): same padding and gaps, no
+        // border; the list below starts under it like on a folder page.
+        <div className="flex items-center justify-between gap-2 p-4">
           <div className="flex min-w-0 items-center gap-2">
             <div className="shrink-0">
               <Logo size={32} />
@@ -109,7 +111,9 @@ export function LandingDemo({
             />
           </div>
         ) : (
-          <div className="flex flex-col gap-8">
+          // The app's list column (LinkViewFrame: `wrapper-private`),
+          // centered at its max width like a folder page.
+          <div className="wrapper-private flex flex-col gap-8">
             {groups.map((group, groupIndex) => {
               const headingId = `demo-group-${groupIndex}`;
               const before = groups

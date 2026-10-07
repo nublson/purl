@@ -116,7 +116,7 @@ export function ProductPreview({ className }: { className?: string }) {
       decorative
       className={className}
       header={
-        <div className="flex h-12 items-center justify-between gap-3 border-b px-3 md:px-4">
+        <div className="flex items-center justify-between gap-3 p-4">
           <div className="flex min-w-0 items-center gap-3">
             <Logo size={20} />
             <span className="h-4 w-px shrink-0 bg-border" />
@@ -138,7 +138,7 @@ export function ProductPreview({ className }: { className?: string }) {
         </div>
       }
     >
-      <div className="px-1 py-2 md:px-2">
+      <div className="wrapper-private px-1 py-2 md:px-2">
         {LINKS.map((link, index) => (
           <div
             key={link.title}
