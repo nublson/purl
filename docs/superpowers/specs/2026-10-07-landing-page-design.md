@@ -4,7 +4,7 @@ Date: 2026-10-07 · Status: approved design, pending spec review
 
 ## Context
 
-Today's landing page (`src/app/(public)/page.tsx`, `src/sections/hero.tsx`) is a headline, one sentence and two sign-in buttons. A conversion audit (2026-10-06) found it asks strangers to sign in before showing anything: no picture of the product, no statement that it's free, no privacy or terms links next to an OAuth sign-in, and 404s for visitors typing `/login` or `/signup`. Traffic is low (197 views of `/` in 14 days, 79% desktop), so the redesign is judged on first principles, not A/B data.
+Today's landing page (`src/app/(public)/page.tsx`, `src/sections/hero.tsx`) is a headline, one sentence and two sign-in buttons. A conversion audit (2026-10-06) found it asks strangers to sign in before showing anything: no picture of the product, no statement that it's free, and no privacy or terms links next to an OAuth sign-in. (It also flagged `/login` and `/signup` as 404s; that was wrong: both have redirected to `/` since 2026-09-26.) Traffic is low (197 views of `/` in 14 days, 79% desktop), so the redesign is judged on first principles, not A/B data.
 
 Reference: [interfere.com](https://interfere.com/) and its write-up ([How we built Interfere's new website](https://interfere.com/blog/how-we-built-interferes-new-website)): one signature word in the headline, a plain description, the product as the hero visual built in code (skeleton UI for unimportant parts), one visual thread, and restrained motion played once.
 
@@ -24,11 +24,10 @@ Out of scope: an app-wide theme default or theme switch, import from other read-
 
 - `/` stays static (`force-static` in `src/app/(public)/layout.tsx`), served from the CDN; the proxy keeps validating the session only to send signed-in users to `/home`.
 - Top to bottom, the page is exactly:
-  1. **Top bar:** the pearl logo and "Purl" on the left; nothing on the right (sign-in is in the hero).
+  1. **Top bar:** the pearl logo (the existing `Logo`, `/logo.svg`) and "Purl" on the left; nothing on the right (sign-in is in the hero).
   2. **Hero:** centered.
   3. **Product panel:** under the hero, rising from the bottom of the first screen.
   4. **Footer.**
-- `/login` and `/signup` redirect (307) to `/` via `redirects()` in `next.config.ts`.
 - The sign-in error toast (`SignInErrorToast`) stays.
 
 ## Hero content
@@ -84,12 +83,12 @@ Played **on a visitor's first visit only**; later visits render the settled page
 - `src/sections/hero.tsx`: removed; the hero moves to `src/components/landing/landing-hero.tsx` (with `src/sections/` deleted if it ends up empty).
 - `src/components/landing/landing-hero.tsx`, `product-preview.tsx`, `landing-footer.tsx`, `pearl-word.tsx` (the signature word), `landing-motion.ts(x)` (first-visit flag script + classes).
 - `src/app/globals.css`: pearl gradient and glow tokens, landing keyframes.
-- `next.config.ts`: `/login` and `/signup` redirects.
-- `src/proxy.ts` tests: unchanged behavior for `/`.
+- `src/components/provider-buttons.tsx`: a `className` prop for the container, so the hero lays the buttons out in a row from `sm`.
+- `src/proxy.ts`: unchanged (`/` behavior stays; piece 3 adds its pages to the public routes).
 
 ## Speed and accessibility
 
-- No images and no new fonts on the page; motion is CSS only. The page stays static.
+- No raster images (only the existing logo SVG) and no new fonts on the page; motion is CSS only. The page stays static.
 - One `<h1>`; landmarks: the top bar in a `<header>`, the hero and panel in `<main>`, the footer in `<footer>`. The sign-in buttons keep their accessible names.
 - Contrast: body and muted text meet the app's existing contrast in both themes; the gradient word is checked against both backgrounds.
 - Keyboard: buttons and footer links in visual order; visible focus rings (the app's).
@@ -101,6 +100,5 @@ Played **on a visitor's first visit only**; later visits render the settled page
   - the headline, sub-headline, both provider buttons, free line and footer links render;
   - the arrival plays on a first visit (animation classes present) and not on the next (`data-landing-seen` set);
   - with `reducedMotion: 'reduce'`, no blur/rise/sheen animation runs;
-  - `/login` and `/signup` redirect to `/`;
   - screenshots at 390px and 1440px in dark and light for review.
 - Unit test for the first-visit flag helper (storage present, absent, throwing).
