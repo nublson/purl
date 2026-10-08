@@ -137,9 +137,11 @@ test.describe("Landing demo", () => {
       await openDemo(page);
       await page.getByRole("button", { name: "Folder: Reading list" }).click();
       const menu = page.getByRole("menu");
-      for (const name of [/Home/, /New folder/, /Reorder folders/, /Edit folder/, /Delete folder/]) {
+      for (const name of [/Home/, /New folder/, /Edit folder/, /Delete folder/]) {
         await expect(menu.getByRole("menuitem", { name })).toHaveAttribute("aria-disabled", "true");
       }
+      // No reordering in the demo: no grips.
+      await expect(menu.locator("[data-folder-grip]")).toHaveCount(0);
       await menu.getByRole("menuitem", { name: /Getting started/ }).click();
 
       await expect(page.getByRole("button", { name: "Folder: Getting started" })).toBeVisible();

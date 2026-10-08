@@ -1,7 +1,7 @@
 # Folder reorder — design
 
 Date: 2026-10-08
-Status: approved in brainstorming, pending spec review
+Status: implemented; UI revised 2026-10-08 (see "Revision: reorder in the folder menu")
 
 ## Goal
 
@@ -202,3 +202,22 @@ so seeded folders match real creation.
 - Reordering by drag inside the folder dropdown, or "Move up/down" items in
   the folder menu.
 - A keyboard shortcut to open the dialog.
+
+## Revision: reorder in the folder menu (2026-10-08)
+
+After the dialog was built, the user rejected it as an extra step. Replaced by
+reordering directly in the folder menu (the dialog was removed):
+
+- Each folder row gets a drag grip. Mouse: the grip replaces the emoji while
+  the row is hovered. Touch screens: the emoji stays and the grip is always
+  shown at the row's end, where the (useless on touch) digit key was.
+- Dragging (Motion `Reorder`, loaded on demand) reorders live and **saves on
+  the drop**; no Save/Cancel. A drag never opens a folder. The folder list
+  auto-scrolls near its edges.
+- Keyboard: ⌥↑ / ⌥↓ moves the highlighted folder; focus stays on it and each
+  move is announced.
+- Server hardening from the final review: `deleteFolder` takes the per-user
+  lock and `reorderFolders` writes all positions in one statement with a
+  row-count check (a racing delete is `INVALID_ORDER`, not a 500).
+- Client: saves are queued in order and only the latest response applies;
+  background folder fetches are held during a save; a failed save reloads.

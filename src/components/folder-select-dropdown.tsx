@@ -2,10 +2,11 @@
 
 import {
   useCurrentFolder,
+  useFolderActions,
   useFolders,
   type FolderSummary,
 } from "@/hooks/use-folders";
-import { Check, ChevronDown, Pen, Plus, SortV, Trash2 } from "reicon-react";
+import { Check, ChevronDown, Pen, Plus, Reorder as GripIcon, Trash2 } from "reicon-react";
 import {
   folderShortcutKey,
   HOME_SHORTCUT,
@@ -13,15 +14,16 @@ import {
 } from "@/lib/folder-shortcuts";
 import { useDemoFolderSelect, useIsDemo } from "@/contexts/demo-mode-context";
 import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
+import { cn } from "@/lib/utils";
+import type {
+  FolderGripProps,
+  ReorderableFolderRows as ReorderableFolderRowsType,
+} from "./folder-menu-reorder";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
 import { DialogDeleteFolder } from "./dialog-delete-folder";
 import { DialogFolderForm } from "./dialog-folder-form";
-import {
-  DialogReorderFolders,
-  preloadReorderFoldersList,
-} from "./dialog-reorder-folders";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { FolderEmoji } from "./folder-emoji";
 import { Typography } from "./typography";
@@ -35,6 +37,10 @@ import {
 
 const HOME_EMOJI = "🏠";
 
+// Motion's drag, for reordering folders: its own chunk, loaded on demand.
+const loadReorderableRows = () =>
+  import("./folder-menu-reorder").then((mod) => mod.ReorderableFolderRows);
+
 /**
  * Lines the menu's emoji and names up under the trigger's. The trigger's
  * emoji sits 9px in (1px border + 8px `ps-2`); a menu row's sits 12px in
@@ -47,15 +53,18 @@ const MENU_ALIGN_OFFSET = -3;
 type FolderDialog =
   | { kind: "create" }
   | { kind: "edit"; folder: FolderSummary }
-  | { kind: "delete"; folder: FolderSummary }
-  | { kind: "reorder" };
+  | { kind: "delete"; folder: FolderSummary };
 
 /**
  * Header folder switcher: shows where you are (Home or the current folder),
- * links to every folder (in the user's order), and opens the New / Reorder /
- * Edit / Delete folder dialogs. Digit keys switch folders anywhere in the app
+ * links to every folder (in the user's order), and opens the New / Edit /
+ * Delete folder dialogs. Digit keys switch folders anywhere in the app
  * (1 = Home, then 2–9 and 0 for the first nine folders in menu order); each
  * row shows its key unless it's current.
+ *
+ * Folders reorder in place: drag a row by its grip (on hover it replaces the
+ * emoji; on touch screens it's always at the row's end, where the unusable
+ * shortcut key was), or ⌥↑ / ⌥↓ on the highlighted row. Each drop saves.
  */
 export function FolderSelectDropdown() {
   const { folders, max, totalLinks } = useFolders();
@@ -70,11 +79,70 @@ export function FolderSelectDropdown() {
   const isDemo = useIsDemo();
   const demoSelectFolder = useDemoFolderSelect();
   const [menuOpen, setMenuOpen] = React.useState(false);
-  // The Reorder dialog's list (Motion's drag) loads while the menu is open,
-  // so it's ready by the time the dialog is.
+  const { reorderFolders } = useFolderActions();
+  const canReorder = !isDemo && folders.length >= 2;
+  const reorderHintId = React.useId();
+  const [announcement, setAnnouncement] = React.useState("");
+  // Motion's drag loads when the menu first opens (or the pointer nears its
+  // trigger); until then rows show without grips, and ⌥↑ / ⌥↓ still work.
+  const [ReorderableRows, setReorderableRows] = React.useState<
+    typeof ReorderableFolderRowsType | null
+  >(null);
+  const loadReorder = React.useCallback(() => {
+    if (!canReorder || ReorderableRows) return;
+    loadReorderableRows()
+      .then((component) => setReorderableRows(() => component))
+      .catch(() => {});
+  }, [canReorder, ReorderableRows]);
   React.useEffect(() => {
-    if (menuOpen && !isDemo && folders.length >= 2) preloadReorderFoldersList();
-  }, [menuOpen, isDemo, folders.length]);
+    if (menuOpen) loadReorder();
+  }, [menuOpen, loadReorder]);
+
+  // Keep focus (the menu's highlight) on a folder whose row remounts: after a
+  // keyboard move, and when the draggable rows replace the plain ones.
+  const refocusId = React.useRef<string | null>(null);
+  const focusedId = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    const id = refocusId.current;
+    refocusId.current = null;
+    if (!id) return;
+    document
+      .querySelector<HTMLElement>(`[data-folder-id="${CSS.escape(id)}"]`)
+      ?.focus();
+  }, [folders]);
+  React.useLayoutEffect(() => {
+    const id = focusedId.current;
+    if (!ReorderableRows || !id) return;
+    if (document.activeElement?.closest("[data-folder-id]")) return;
+    document
+      .querySelector<HTMLElement>(`[data-folder-id="${CSS.escape(id)}"]`)
+      ?.focus();
+  }, [ReorderableRows]);
+
+  const saveOrder = React.useCallback(
+    (ids: string[], moved: FolderSummary) => {
+      const position = ids.indexOf(moved.id) + 1;
+      setAnnouncement(`${moved.name} moved to position ${position} of ${ids.length}`);
+      void reorderFolders(ids);
+    },
+    [reorderFolders],
+  );
+
+  /** ⌥↑ / ⌥↓ on a folder row: moves it one place. */
+  const moveWithKeyboard = (event: React.KeyboardEvent, folder: FolderSummary) => {
+    if (!canReorder || !event.altKey || event.metaKey || event.ctrlKey) return;
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    event.stopPropagation();
+    const from = folders.findIndex((f) => f.id === folder.id);
+    const to = event.key === "ArrowUp" ? from - 1 : from + 1;
+    if (from === -1 || to < 0 || to >= folders.length) return;
+    const ids = folders.map((f) => f.id);
+    ids.splice(from, 1);
+    ids.splice(to, 0, folder.id);
+    refocusId.current = folder.id;
+    saveOrder(ids, folder);
+  };
 
   /** Handles a folder shortcut; returns whether the key was one. */
   const goToShortcut = React.useCallback(
@@ -119,6 +187,61 @@ export function FolderSelectDropdown() {
   const [dialog, setDialog] = React.useState<FolderDialog | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
 
+  /** A folder's menu row; `grip` once drag has loaded. */
+  const folderRow = (
+    folder: FolderSummary,
+    index: number,
+    grip?: FolderGripProps,
+  ) => {
+    const active = currentFolder?.id === folder.id;
+    const shortcut = folderShortcutKey(index);
+    return (
+      <DropdownMenuItem
+        key={folder.id}
+        asChild
+        onKeyDown={(event) => moveWithKeyboard(event, folder)}
+      >
+        <Link
+          href={`/folders/${folder.slug}`}
+          data-folder-id={folder.id}
+          aria-current={active ? "page" : undefined}
+          aria-keyshortcuts={shortcut ?? undefined}
+          aria-describedby={canReorder ? reorderHintId : undefined}
+          onFocus={() => {
+            focusedId.current = folder.id;
+          }}
+          onBlur={() => {
+            if (focusedId.current === folder.id) focusedId.current = null;
+          }}
+          className="group/row select-none"
+        >
+          {/* Mouse: the grip takes the emoji's place while hovered. */}
+          <span className="relative flex size-4 shrink-0 items-center justify-center">
+            <FolderEmoji
+              emoji={folder.emoji}
+              className={grip ? "pointer-fine:group-hover/row:invisible" : undefined}
+            />
+            {grip ? (
+              <FolderGrip
+                {...grip}
+                className="absolute -inset-1 hidden pointer-fine:group-hover/row:flex"
+              />
+            ) : null}
+          </span>
+          <RowLabel name={folder.name} count={folder.linkCount} />
+          <CurrentMark active={active} shortcut={shortcut} hideShortcutOnTouch={!!grip} />
+          {/* Touch: always there, at the end (no digit keys to show). */}
+          {grip ? (
+            <FolderGrip
+              {...grip}
+              className="-my-1.5 -me-1.5 hidden size-8 pointer-coarse:flex"
+            />
+          ) : null}
+        </Link>
+      </DropdownMenuItem>
+    );
+  };
+
   const label = currentFolder?.name ?? "Home";
 
   return (
@@ -145,9 +268,10 @@ export function FolderSelectDropdown() {
           onOpenChange={setDialogOpen}
         />
       ) : null}
-      {dialog?.kind === "reorder" ? (
-        <DialogReorderFolders open={dialogOpen} onOpenChange={setDialogOpen} />
-      ) : null}
+      {/* Outside the menu, so it outlives it. */}
+      <span role="status" aria-live="polite" className="sr-only">
+        {announcement}
+      </span>
       <DropdownWrapper
         open={menuOpen}
         onOpenChange={setMenuOpen}
@@ -170,6 +294,8 @@ export function FolderSelectDropdown() {
             variant="ghost"
             size="sm"
             aria-label={`Folder: ${label}`}
+            onPointerEnter={loadReorder}
+            onFocus={loadReorder}
             // Emoji side gets 2px less padding than the text default
             // (optical alignment); the chevron uses Button's inline-end inset.
             // `gap-2` matches the menu rows (see MENU_ALIGN_OFFSET).
@@ -217,43 +343,40 @@ export function FolderSelectDropdown() {
           at the bottom is the cue that the list scrolls.
         */}
         <DropdownMenuGroup className="max-h-60 overflow-y-auto overscroll-y-contain">
-          {folders.map((folder, index) => {
-            const active = currentFolder?.id === folder.id;
-            if (demoSelectFolder) {
-              return (
-                <DropdownMenuItem
-                  key={folder.id}
-                  aria-current={active ? "true" : undefined}
-                  aria-keyshortcuts={folderShortcutKey(index) ?? undefined}
-                  onSelect={() => demoSelectFolder(folder.id)}
-                >
-                  <FolderEmoji emoji={folder.emoji} />
-                  <RowLabel name={folder.name} count={folder.linkCount} />
-                  <CurrentMark
-                    active={active}
-                    shortcut={folderShortcutKey(index)}
-                  />
-                </DropdownMenuItem>
-              );
-            }
-            return (
-              <DropdownMenuItem key={folder.id} asChild>
-                <Link
-                  href={`/folders/${folder.slug}`}
-                  aria-current={active ? "page" : undefined}
-                  aria-keyshortcuts={folderShortcutKey(index) ?? undefined}
-                >
-                  <FolderEmoji emoji={folder.emoji} />
-                  <RowLabel name={folder.name} count={folder.linkCount} />
-                  <CurrentMark
-                    active={active}
-                    shortcut={folderShortcutKey(index)}
-                  />
-                </Link>
-              </DropdownMenuItem>
-            );
-          })}
+          {demoSelectFolder
+            ? folders.map((folder, index) => {
+                const active = currentFolder?.id === folder.id;
+                return (
+                  <DropdownMenuItem
+                    key={folder.id}
+                    aria-current={active ? "true" : undefined}
+                    aria-keyshortcuts={folderShortcutKey(index) ?? undefined}
+                    onSelect={() => demoSelectFolder(folder.id)}
+                  >
+                    <FolderEmoji emoji={folder.emoji} />
+                    <RowLabel name={folder.name} count={folder.linkCount} />
+                    <CurrentMark
+                      active={active}
+                      shortcut={folderShortcutKey(index)}
+                    />
+                  </DropdownMenuItem>
+                );
+              })
+            : canReorder && ReorderableRows
+              ? (
+                <ReorderableRows
+                  folders={folders}
+                  onReorder={saveOrder}
+                  renderRow={folderRow}
+                />
+              )
+              : folders.map((folder, index) => folderRow(folder, index))}
         </DropdownMenuGroup>
+        {canReorder ? (
+          <span id={reorderHintId} className="sr-only">
+            Alt+Up or Alt+Down moves this folder.
+          </span>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem
@@ -275,17 +398,6 @@ export function FolderSelectDropdown() {
             >
               You’ve reached {max} folders. Delete one to add another.
             </Typography>
-          ) : null}
-          {folders.length >= 2 ? (
-            <DropdownMenuItem
-              disabled={isDemo}
-              onSelect={() => {
-                pendingDialog.current = { kind: "reorder" };
-              }}
-            >
-              <SortV />
-              Reorder folders
-            </DropdownMenuItem>
           ) : null}
           {currentFolder ? (
             <>
@@ -359,9 +471,12 @@ function RowLabel({ name, count }: { name: string; count: number | null }) {
 function CurrentMark({
   active,
   shortcut,
+  hideShortcutOnTouch = false,
 }: {
   active: boolean;
   shortcut?: string | null;
+  /** Touch screens show the row's grip instead (no digit keys there). */
+  hideShortcutOnTouch?: boolean;
 }) {
   return (
     <Typography
@@ -371,8 +486,38 @@ function CurrentMark({
       {active ? (
         <Check aria-hidden="true" />
       ) : shortcut ? (
-        <Kbd aria-hidden="true">{shortcut}</Kbd>
+        <Kbd
+          aria-hidden="true"
+          className={hideShortcutOnTouch ? "pointer-coarse:hidden" : undefined}
+        >
+          {shortcut}
+        </Kbd>
       ) : null}
     </Typography>
+  );
+}
+
+/** A folder row's drag handle; decorative to assistive tech (⌥↑ / ⌥↓ do the same). */
+function FolderGrip({
+  onPointerDown,
+  onClick,
+  className,
+}: FolderGripProps & { className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      data-folder-grip=""
+      onPointerDown={onPointerDown}
+      // Rows are links, which the browser drags natively (cancelling the
+      // pointer events Motion's drag runs on): not from the grip.
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={onClick}
+      className={cn(
+        "cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground active:cursor-grabbing",
+        className,
+      )}
+    >
+      <GripIcon className="size-4" />
+    </span>
   );
 }
