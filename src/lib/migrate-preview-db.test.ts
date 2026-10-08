@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 // The Vercel build step (plain Node, run before `next build`).
-import { shouldMigratePreviewDb } from "../../scripts/migrate-preview-db.mjs";
+import {
+  assertMigratableUrl,
+  shouldMigratePreviewDb,
+} from "../../scripts/migrate-preview-db.mjs";
 
 describe("shouldMigratePreviewDb", () => {
   it("migrates the develop branch's Preview build (dev.purl.live)", () => {
@@ -16,5 +19,22 @@ describe("shouldMigratePreviewDb", () => {
     ["a local or CI build", {}],
   ])("skips %s", (_label, env) => {
     expect(shouldMigratePreviewDb(env)).toBe(false);
+  });
+});
+
+describe("assertMigratableUrl", () => {
+  it.each([
+    ["the session pooler", "postgresql://u:p@aws-0-eu-west-1.pooler.supabase.com:5432/postgres"],
+    ["a direct connection", "postgresql://u:p@db.abc.supabase.co:5432/postgres"],
+  ])("accepts %s", (_label, url) => {
+    expect(() => assertMigratableUrl(url)).not.toThrow();
+  });
+
+  it.each([
+    ["the transaction pooler (6543)", "postgresql://u:p@aws-0-eu-west-1.pooler.supabase.com:6543/postgres"],
+    ["a pgbouncer URL", "postgresql://u:p@host:5432/postgres?pgbouncer=true"],
+    ["no URL", undefined],
+  ])("rejects %s with a clear message", (_label, url) => {
+    expect(() => assertMigratableUrl(url)).toThrow(/session pooler|DATABASE_URL/);
   });
 });

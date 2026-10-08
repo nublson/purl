@@ -28,7 +28,30 @@ export function shouldMigratePreviewDb(env) {
   );
 }
 
-/** Idempotent: enables RLS on every table in `public` that doesn't have it. */
+/**
+ * Migrations need a session or direct connection: Prisma takes an advisory
+ * lock, which the transaction pooler (port 6543, `pgbouncer=true`) can't
+ * hold. Fails fast with the fix instead of a hung or confusing build. The
+ * URL is never printed (it carries the password).
+ */
+export function assertMigratableUrl(url) {
+  if (!url) {
+    throw new Error("[migrate-preview-db] DATABASE_URL is not set for Preview.");
+  }
+  const parsed = new URL(url);
+  if (parsed.port === "6543" || parsed.searchParams.get("pgbouncer") === "true") {
+    throw new Error(
+      "[migrate-preview-db] Preview's DATABASE_URL is the transaction pooler; " +
+        "use purl-dev's session pooler (port 5432) or a direct connection.",
+    );
+  }
+}
+
+/**
+ * Idempotent: enables RLS on every table and partitioned table in `public`
+ * that doesn't have it, `_prisma_migrations` included (harmless: Prisma owns
+ * it and bypasses RLS).
+ */
 const ENABLE_RLS_SQL = `
 DO $$
 DECLARE t record;
@@ -36,7 +59,7 @@ BEGIN
   FOR t IN
     SELECT c.relname FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT c.relrowsecurity
+    WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relrowsecurity
   LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t.relname);
   END LOOP;
@@ -48,6 +71,7 @@ function main() {
     console.log("[migrate-preview-db] not a develop Preview build; skipping.");
     return;
   }
+  assertMigratableUrl(process.env.DATABASE_URL);
   console.log("[migrate-preview-db] develop Preview build: migrating dev's database.");
   execFileSync("pnpm", ["exec", "prisma", "migrate", "deploy"], { stdio: "inherit" });
   execFileSync("pnpm", ["exec", "prisma", "db", "execute", "--stdin"], {
