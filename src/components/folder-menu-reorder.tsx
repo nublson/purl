@@ -15,6 +15,15 @@ const ROW_TRANSITION = {
   boxShadow: { duration: 0.15, ease: [0.23, 1, 0.32, 1] },
 } as const;
 
+/**
+ * A dragged row stays within the folder list: past its edges it gives only
+ * a little (rising friction, not a hard stop), and on release it springs
+ * back near-critically damped (2·√600 ≈ 49), quickly and without bouncing,
+ * instead of Motion's soft default return from wherever it was let go.
+ */
+const DRAG_ELASTIC = 0.1;
+const DRAG_TRANSITION = { bounceStiffness: 600, bounceDamping: 50 } as const;
+
 /** Props for a row's drag handle (its grip). */
 export type FolderGripProps = {
   onPointerDown: (event: React.PointerEvent) => void;
@@ -59,6 +68,8 @@ export function ReorderableFolderRows({
   React.useLayoutEffect(() => {
     orderRef.current = order;
   });
+  // The drag's bounds: the list itself.
+  const listRef = React.useRef<HTMLDivElement>(null);
 
   function dragStarted() {
     onDragActiveChange(true);
@@ -80,6 +91,7 @@ export function ReorderableFolderRows({
     // others jump into place instead of sliding.
     <MotionConfig reducedMotion="user">
     <Reorder.Group
+      ref={listRef}
       as="div"
       axis="y"
       values={order}
@@ -92,6 +104,7 @@ export function ReorderableFolderRows({
         <ReorderableRow
           key={folder.id}
           folder={folder}
+          constraints={listRef}
           onDragStart={dragStarted}
           onDragEnd={() => dragEnded(folder)}
         >
@@ -105,11 +118,13 @@ export function ReorderableFolderRows({
 
 function ReorderableRow({
   folder,
+  constraints,
   onDragStart,
   onDragEnd,
   children,
 }: {
   folder: FolderSummary;
+  constraints: React.RefObject<HTMLDivElement | null>;
   onDragStart: () => void;
   onDragEnd: () => void;
   children: (grip: FolderGripProps) => React.ReactNode;
@@ -121,6 +136,9 @@ function ReorderableRow({
       value={folder}
       dragListener={false}
       dragControls={controls}
+      dragConstraints={constraints}
+      dragElastic={DRAG_ELASTIC}
+      dragTransition={DRAG_TRANSITION}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       // Above the rows it passes, on the menu's own background.

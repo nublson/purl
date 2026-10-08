@@ -67,7 +67,11 @@ async function dragTo(
   page: Page,
   handle: Locator,
   toY: number,
-  { steps = 12, holdFrames = 0 }: { steps?: number; holdFrames?: number } = {},
+  {
+    steps = 12,
+    holdFrames = 0,
+    release = true,
+  }: { steps?: number; holdFrames?: number; release?: boolean } = {},
 ) {
   const nextFrame = () =>
     page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
@@ -86,7 +90,7 @@ async function dragTo(
     await page.mouse.move(x, toY - (frame % 2));
     await nextFrame();
   }
-  await page.mouse.up();
+  if (release) await page.mouse.up();
 }
 
 async function bottomOf(row: Locator) {
@@ -300,6 +304,30 @@ async function draggableRowsReady(menu: Locator) {
 }
 
 test.describe("Folder menu reorder polish", () => {
+  test("a drag stays by the folder list and snaps back quickly", async ({ page, seed }) => {
+    await seedThree(seed);
+    await page.goto("/home");
+    const menu = await openMenu(page);
+    await menuSettled(menu);
+    const list = (await menu
+      .locator('[role="group"]')
+      .filter({ has: page.locator('a[href^="/folders/"]') })
+      .boundingBox())!;
+    const listBottom = list.y + list.height;
+    const beta = folderRow(menu, "Beta");
+
+    // Far below the list (and the whole menu), still holding.
+    await dragTo(page, await grip(beta), listBottom + 300, { release: false });
+    const held = (await beta.boundingBox())!;
+    // Bounded by the list, with only a little elastic pull past it.
+    expect(held.y + held.height).toBeLessThanOrEqual(listBottom + 40);
+
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    expect(await sampleTransforms(page, "beta", 1)).toEqual(["none"]);
+    await expect.poll(() => menuFolderNames(page)).toEqual(["Alpha", "Gamma", "Beta"]);
+  });
+
   test("rows don't slide with reduced motion", async ({ page, seed }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await seedThree(seed);
