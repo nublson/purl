@@ -5,7 +5,7 @@ import {
   useFolders,
   type FolderSummary,
 } from "@/hooks/use-folders";
-import { Check, ChevronDown, Pen, Plus, Trash2 } from "reicon-react";
+import { Check, ChevronDown, Pen, Plus, SortV, Trash2 } from "reicon-react";
 import {
   folderShortcutKey,
   HOME_SHORTCUT,
@@ -18,6 +18,10 @@ import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
 import { DialogDeleteFolder } from "./dialog-delete-folder";
 import { DialogFolderForm } from "./dialog-folder-form";
+import {
+  DialogReorderFolders,
+  preloadReorderFoldersList,
+} from "./dialog-reorder-folders";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { FolderEmoji } from "./folder-emoji";
 import { Typography } from "./typography";
@@ -43,14 +47,15 @@ const MENU_ALIGN_OFFSET = -3;
 type FolderDialog =
   | { kind: "create" }
   | { kind: "edit"; folder: FolderSummary }
-  | { kind: "delete"; folder: FolderSummary };
+  | { kind: "delete"; folder: FolderSummary }
+  | { kind: "reorder" };
 
 /**
  * Header folder switcher: shows where you are (Home or the current folder),
- * links to every folder, and opens the New / Edit / Delete folder dialogs.
- * Digit keys switch folders anywhere in the app (1 = Home, then 2–9 and 0
- * for the first nine folders in menu order); each row shows its key unless
- * it's current.
+ * links to every folder (in the user's order), and opens the New / Reorder /
+ * Edit / Delete folder dialogs. Digit keys switch folders anywhere in the app
+ * (1 = Home, then 2–9 and 0 for the first nine folders in menu order); each
+ * row shows its key unless it's current.
  */
 export function FolderSelectDropdown() {
   const { folders, max, totalLinks } = useFolders();
@@ -65,6 +70,11 @@ export function FolderSelectDropdown() {
   const isDemo = useIsDemo();
   const demoSelectFolder = useDemoFolderSelect();
   const [menuOpen, setMenuOpen] = React.useState(false);
+  // The Reorder dialog's list (Motion's drag) loads while the menu is open,
+  // so it's ready by the time the dialog is.
+  React.useEffect(() => {
+    if (menuOpen && !isDemo && folders.length >= 2) preloadReorderFoldersList();
+  }, [menuOpen, isDemo, folders.length]);
 
   /** Handles a folder shortcut; returns whether the key was one. */
   const goToShortcut = React.useCallback(
@@ -134,6 +144,9 @@ export function FolderSelectDropdown() {
           open={dialogOpen}
           onOpenChange={setDialogOpen}
         />
+      ) : null}
+      {dialog?.kind === "reorder" ? (
+        <DialogReorderFolders open={dialogOpen} onOpenChange={setDialogOpen} />
       ) : null}
       <DropdownWrapper
         open={menuOpen}
@@ -262,6 +275,17 @@ export function FolderSelectDropdown() {
             >
               You’ve reached {max} folders. Delete one to add another.
             </Typography>
+          ) : null}
+          {folders.length >= 2 ? (
+            <DropdownMenuItem
+              disabled={isDemo}
+              onSelect={() => {
+                pendingDialog.current = { kind: "reorder" };
+              }}
+            >
+              <SortV />
+              Reorder folders
+            </DropdownMenuItem>
           ) : null}
           {currentFolder ? (
             <>
