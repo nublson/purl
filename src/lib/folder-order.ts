@@ -25,9 +25,11 @@ export const STALE_ORDER_ERROR = "Your folders changed elsewhere. Try again.";
 
 /**
  * Saves a new folder order optimistically: shows it at once, then adopts the
- * server's list. On failure it puts `previous` back and says so; when the
- * server rejects the list as stale (`INVALID_ORDER`, a folder was added or
- * deleted elsewhere) it also refreshes the folders.
+ * server's list. Background folder fetches are held (`hold`) until the save
+ * settles, so one started mid-save can't flash the old order back. On
+ * failure it puts `previous` back, reloads the folders (the snapshot may
+ * miss a change made meanwhile) and says why. A save overtaken by a newer
+ * one (`isCurrent` false, e.g. a second drop) leaves the list to it.
  */
 export async function saveFolderOrder(
   ids: string[],
@@ -37,20 +39,31 @@ export async function saveFolderOrder(
     put: (ids: string[]) => Promise<ActionResult<{ folders: FolderSummary[] }>>;
     refresh: () => void;
     notify: (message: string) => void;
+    /** Holds background fetches; returns the release. */
+    hold: () => () => void;
+    /** False once a newer save has started. */
+    isCurrent: () => boolean;
   },
 ): Promise<ActionResult<FolderSummary[]>> {
+  const release = deps.hold();
   deps.setFolders(applyFolderOrder(deps.previous, ids));
-  const result = await deps.put(ids);
+  let result: ActionResult<{ folders: FolderSummary[] }>;
+  try {
+    result = await deps.put(ids);
+  } finally {
+    release();
+  }
+  if (!deps.isCurrent()) {
+    return result.ok ? { ok: true, data: result.data.folders } : result;
+  }
   if (result.ok) {
     deps.setFolders(result.data.folders);
     return { ok: true, data: result.data.folders };
   }
   deps.setFolders(deps.previous);
-  if (result.code === "INVALID_ORDER") {
-    deps.refresh();
-    deps.notify(STALE_ORDER_ERROR);
-  } else {
-    deps.notify(SAVE_ORDER_ERROR);
-  }
+  deps.refresh();
+  deps.notify(
+    result.code === "INVALID_ORDER" ? STALE_ORDER_ERROR : SAVE_ORDER_ERROR,
+  );
   return result;
 }

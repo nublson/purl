@@ -49,13 +49,17 @@ describe("applyFolderOrder", () => {
 describe("saveFolderOrder", () => {
   type Put = (ids: string[]) => Promise<ActionResult<{ folders: FolderSummary[] }>>;
 
-  function deps(put: Put) {
+  function deps(put: Put, isCurrent = () => true) {
+    const release = vi.fn();
     return {
       previous: [a, b, c],
       setFolders: vi.fn(),
       put,
       refresh: vi.fn(),
       notify: vi.fn(),
+      hold: vi.fn(() => release),
+      release,
+      isCurrent,
     };
   }
 
@@ -87,15 +91,54 @@ describe("saveFolderOrder", () => {
     expect(d.notify).not.toHaveBeenCalled();
   });
 
-  it("rolls back and toasts on failure", async () => {
+  it("rolls back, refreshes and toasts on failure", async () => {
     const d = deps(vi.fn<Put>().mockResolvedValue({ ok: false, error: "x" }));
 
     const result = await saveFolderOrder(["c", "a", "b"], d);
 
     expect(d.setFolders).toHaveBeenLastCalledWith([a, b, c]);
+    // The snapshot may be stale (a folder created meanwhile): reload too.
+    expect(d.refresh).toHaveBeenCalledTimes(1);
     expect(d.notify).toHaveBeenCalledWith("Couldn't save folder order");
-    expect(d.refresh).not.toHaveBeenCalled();
     expect(result.ok).toBe(false);
+  });
+
+  it("holds background folder fetches until the save settles", async () => {
+    let resolvePut!: (value: unknown) => void;
+    const d = deps(vi.fn<Put>(() => new Promise((r) => (resolvePut = r as never))));
+
+    const pending = saveFolderOrder(["c", "a", "b"], d);
+    expect(d.hold).toHaveBeenCalledTimes(1);
+    expect(d.release).not.toHaveBeenCalled();
+
+    resolvePut({ ok: true, data: { folders: [c, a, b] } });
+    await pending;
+    expect(d.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases the hold when the save fails", async () => {
+    const d = deps(vi.fn<Put>().mockResolvedValue({ ok: false, error: "x" }));
+    await saveFolderOrder(["c", "a", "b"], d);
+    expect(d.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores its response once a newer save has started", async () => {
+    let current = true;
+    let resolvePut!: (value: unknown) => void;
+    const d = deps(
+      vi.fn<Put>(() => new Promise((r) => (resolvePut = r as never))),
+      () => current,
+    );
+
+    const pending = saveFolderOrder(["c", "a", "b"], d);
+    current = false; // another drop saved a newer order meanwhile
+    resolvePut({ ok: false, error: "x" });
+    await pending;
+
+    // Only the optimistic apply: no rollback over the newer order, no toast.
+    expect(d.setFolders).toHaveBeenCalledTimes(1);
+    expect(d.notify).not.toHaveBeenCalled();
+    expect(d.refresh).not.toHaveBeenCalled();
   });
 
   it("refreshes on INVALID_ORDER", async () => {

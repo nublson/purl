@@ -26,7 +26,7 @@ import {
 import { announceLinksMoved } from "@/lib/leaving-links";
 import { MAX_FOLDERS } from "@/lib/limits";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
 export type { ActionResult, CreateFolderInput, FolderSummary, UpdateFolderInput };
@@ -128,6 +128,7 @@ export function useFolderActions(): {
     upsertFolder,
     removeFolderLocally,
     replaceFolders,
+    holdFetches,
     refresh,
     initialTotalLinks,
   } = useFoldersContext();
@@ -362,18 +363,29 @@ export function useFolderActions(): {
   );
 
   // Order only: no links change, so no notifyLinksChanged() (other tabs hear
-  // the server's broadcast). Failures toast here; there's no Undo (the
-  // dialog's Cancel is the way back).
+  // the server's broadcast). Each drop saves: requests go one at a time, in
+  // order (so the server ends on the last), and only the latest save's
+  // response touches the list. Failures toast; there's no Undo.
+  const saveChain = useRef<Promise<unknown>>(Promise.resolve());
+  const latestSave = useRef(0);
   const reorderFolders = useCallback(
-    (ids: string[]) =>
-      saveFolderOrder(ids, {
+    (ids: string[]) => {
+      const save = ++latestSave.current;
+      return saveFolderOrder(ids, {
         previous: folders,
         setFolders: replaceFolders,
-        put: putFolderOrder,
+        put: (order) => {
+          const request = saveChain.current.then(() => putFolderOrder(order));
+          saveChain.current = request.catch(() => {});
+          return request;
+        },
         refresh,
         notify: (message) => toast.error(message),
-      }),
-    [folders, replaceFolders, refresh],
+        hold: holdFetches,
+        isCurrent: () => save === latestSave.current,
+      });
+    },
+    [folders, replaceFolders, holdFetches, refresh],
   );
 
   return useMemo(

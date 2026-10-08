@@ -31,6 +31,12 @@ export interface FoldersContextValue {
   removeFolderLocally: (id: string) => void;
   /** Replaces the whole list as given (a reorder, or its rollback). */
   replaceFolders: (folders: FolderSummary[]) => void;
+  /**
+   * Drops background fetch results until the returned release runs (a save
+   * in flight), so a fetch that read the old order can't land over the new
+   * one. Releasing also drops fetches that started during the hold.
+   */
+  holdFetches: () => () => void;
 }
 
 const FoldersContext = createContext<FoldersContextValue>({
@@ -41,6 +47,7 @@ const FoldersContext = createContext<FoldersContextValue>({
   upsertFolder: () => {},
   removeFolderLocally: () => {},
   replaceFolders: () => {},
+  holdFetches: () => () => {},
 });
 
 
@@ -85,6 +92,7 @@ export function FoldersProvider({
   const [isLoading, setIsLoading] = useState(!initialFolders);
   const [refreshToken, setRefreshToken] = useState(0);
   const mutationCountRef = useRef(0);
+  const heldRef = useRef(0);
   // True once the effect below has run once while seeded. Lets the very
   // first (mount) run skip its fetch when server-seeded data is already
   // fresh, while any later run — a version bump or refresh() — still
@@ -106,6 +114,7 @@ export function FoldersProvider({
       .then((data) => {
         if (cancelled) return;
         if (mutationCountRef.current !== mutationCountAtStart) return;
+        if (heldRef.current > 0) return;
         setFolders(data);
       })
       .catch(() => {
@@ -147,6 +156,17 @@ export function FoldersProvider({
     setFolders(next);
   }, []);
 
+  const holdFetches = useCallback(() => {
+    heldRef.current += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      heldRef.current -= 1;
+      mutationCountRef.current += 1;
+    };
+  }, []);
+
   const value = useMemo<FoldersContextValue>(
     () => ({
       folders,
@@ -156,6 +176,7 @@ export function FoldersProvider({
       upsertFolder,
       removeFolderLocally,
       replaceFolders,
+      holdFetches,
     }),
     [
       folders,
@@ -165,6 +186,7 @@ export function FoldersProvider({
       upsertFolder,
       removeFolderLocally,
       replaceFolders,
+      holdFetches,
     ],
   );
 
