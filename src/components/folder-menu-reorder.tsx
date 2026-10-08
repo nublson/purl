@@ -2,8 +2,18 @@
 
 import type { FolderSummary } from "@/lib/folders";
 import { haptic } from "@/lib/haptics";
-import { Reorder, useDragControls } from "motion/react";
+import { MotionConfig, Reorder, useDragControls } from "motion/react";
 import * as React from "react";
+
+/**
+ * Rows making way: a quick, unbouncy spring (a dropdown's budget, and it
+ * retargets smoothly as the drag moves on), not Motion's 450ms default.
+ * The lift shadow fades in briefly instead of repainting for longer.
+ */
+const ROW_TRANSITION = {
+  layout: { type: "spring", duration: 0.25, bounce: 0 },
+  boxShadow: { duration: 0.15, ease: [0.23, 1, 0.32, 1] },
+} as const;
 
 /** Props for a row's drag handle (its grip). */
 export type FolderGripProps = {
@@ -66,6 +76,9 @@ export function ReorderableFolderRows({
   }
 
   return (
+    // Reduced motion: the dragged row still follows the pointer, but the
+    // others jump into place instead of sliding.
+    <MotionConfig reducedMotion="user">
     <Reorder.Group
       as="div"
       axis="y"
@@ -86,6 +99,7 @@ export function ReorderableFolderRows({
         </ReorderableRow>
       ))}
     </Reorder.Group>
+    </MotionConfig>
   );
 }
 
@@ -112,6 +126,7 @@ function ReorderableRow({
       // Above the rows it passes, on the menu's own background.
       className="relative rounded-md bg-popover"
       whileDrag={{ zIndex: 1, boxShadow: "0 6px 16px rgb(0 0 0 / 0.25)" }}
+      transition={ROW_TRANSITION}
     >
       {children({
         onPointerDown: (event) => {

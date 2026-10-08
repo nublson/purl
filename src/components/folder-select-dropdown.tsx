@@ -83,6 +83,12 @@ export function FolderSelectDropdown() {
   const canReorder = !isDemo && folders.length >= 2;
   const reorderHintId = React.useId();
   const [announcement, setAnnouncement] = React.useState("");
+  // Clear, then set on the next frame: a message identical to the last one
+  // ("Alpha is already last" twice) is still a change, so it's read again.
+  const announce = React.useCallback((message: string) => {
+    setAnnouncement("");
+    requestAnimationFrame(() => setAnnouncement(message));
+  }, []);
   // Set by a drag; the menu swallows clicks meanwhile (see onClickCapture).
   const suppressClicks = React.useRef(false);
   const setSuppressClicks = React.useCallback((active: boolean) => {
@@ -127,10 +133,10 @@ export function FolderSelectDropdown() {
   const saveOrder = React.useCallback(
     (ids: string[], moved: FolderSummary) => {
       const position = ids.indexOf(moved.id) + 1;
-      setAnnouncement(`${moved.name} moved to position ${position} of ${ids.length}`);
+      announce(`${moved.name} moved to position ${position} of ${ids.length}`);
       void reorderFolders(ids);
     },
-    [reorderFolders],
+    [reorderFolders, announce],
   );
 
   /** ⌥↑ / ⌥↓ on a folder row: moves it one place. */
@@ -143,7 +149,7 @@ export function FolderSelectDropdown() {
     const to = event.key === "ArrowUp" ? from - 1 : from + 1;
     if (from === -1) return;
     if (to < 0 || to >= folders.length) {
-      setAnnouncement(`${folder.name} is already ${to < 0 ? "first" : "last"}`);
+      announce(`${folder.name} is already ${to < 0 ? "first" : "last"}`);
       return;
     }
     const ids = folders.map((f) => f.id);
@@ -224,27 +230,32 @@ export function FolderSelectDropdown() {
           }}
           className="group/row select-none"
         >
-          {/* Mouse: the grip takes the emoji's place while hovered. */}
+          {/* Mouse and keyboard: the grip takes the emoji's place on the
+              highlighted row (Radix highlights on hover and on arrow keys). */}
           <span className="relative flex size-4 shrink-0 items-center justify-center">
             <FolderEmoji
               emoji={folder.emoji}
-              className={grip ? "pointer-fine:group-hover/row:invisible" : undefined}
+              className={grip ? "pointer-fine:group-data-highlighted/row:invisible" : undefined}
             />
             {grip ? (
               <FolderGrip
                 {...grip}
-                className="absolute -inset-1 hidden pointer-fine:group-hover/row:flex"
+                className="absolute -inset-1 hidden pointer-fine:group-data-highlighted/row:flex"
               />
             ) : null}
           </span>
           <RowLabel name={folder.name} count={folder.linkCount} />
-          <CurrentMark active={active} shortcut={shortcut} hideShortcutOnTouch={!!grip} />
+          <CurrentMark active={active} shortcut={shortcut} hideOnTouch={!!grip} />
           {/* Touch: always there, at the end (no digit keys to show). */}
           {grip ? (
             <FolderGrip
               {...grip}
-              // 32px drawn, 44px to the touch (invisible extension).
-              className="relative -my-1.5 -me-1.5 hidden size-8 pointer-coarse:flex after:absolute after:-inset-1.5"
+              // 32px drawn; 44px wide to the touch. Not taller: rows are 33px
+              // apart, and the extra would reach into the next row's grip.
+              className={cn(
+                "relative -my-1.5 -me-1.5 hidden size-8 shrink-0 pointer-coarse:flex after:absolute after:inset-y-0 after:-inset-x-1.5",
+                !active && "pointer-coarse:ms-auto",
+              )}
             />
           ) : null}
         </Link>
@@ -390,7 +401,7 @@ export function FolderSelectDropdown() {
         {canReorder ? (
           <>
             <span id={reorderHintId} className="sr-only">
-              Alt (Option) with Up or Down moves this folder.
+              With a keyboard, Alt (Option) with Up or Down moves this folder.
             </span>
             {/* Inside the menu: Radix hides the rest of the page from
                 assistive tech while it's open, and moves only happen then. */}
@@ -470,6 +481,8 @@ function RowLabel({ name, count }: { name: string; count: number | null }) {
         component="span"
         size="small"
         className="min-w-0 truncate text-foreground"
+        // The full name when it's cut off (the row's accessible name has it).
+        title={name}
       >
         {name}
       </Typography>
@@ -493,27 +506,29 @@ function RowLabel({ name, count }: { name: string; count: number | null }) {
 function CurrentMark({
   active,
   shortcut,
-  hideShortcutOnTouch = false,
+  hideOnTouch = false,
 }: {
   active: boolean;
   shortcut?: string | null;
-  /** Touch screens show the row's grip instead (no digit keys there). */
-  hideShortcutOnTouch?: boolean;
+  /**
+   * Touch screens show the row's grip here instead: no digit keys there, so
+   * the slot goes (keeping the check on the current row).
+   */
+  hideOnTouch?: boolean;
 }) {
   return (
     <Typography
       component="span"
-      className="ms-auto flex h-4 min-w-5 shrink-0 items-center justify-center"
+      data-current-mark=""
+      className={cn(
+        "ms-auto flex h-4 min-w-5 shrink-0 items-center justify-center",
+        hideOnTouch && !active && "pointer-coarse:hidden",
+      )}
     >
       {active ? (
         <Check aria-hidden="true" />
       ) : shortcut ? (
-        <Kbd
-          aria-hidden="true"
-          className={hideShortcutOnTouch ? "pointer-coarse:hidden" : undefined}
-        >
-          {shortcut}
-        </Kbd>
+        <Kbd aria-hidden="true">{shortcut}</Kbd>
       ) : null}
     </Typography>
   );

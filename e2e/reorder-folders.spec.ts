@@ -271,3 +271,130 @@ test.describe("Reorder folders on a touch screen", () => {
     await expect.poll(() => menuFolderNames(page)).toEqual(["Beta", "Alpha", "Gamma"]);
   });
 });
+
+/** `transform` of a folder row's draggable wrapper, sampled once per frame. */
+async function sampleTransforms(page: Page, slug: string, frames: number) {
+  return page.evaluate(
+    async ({ slug, frames }) => {
+      const wrapper = document.querySelector(`a[href="/folders/${slug}"]`)!.parentElement!;
+      const samples: string[] = [];
+      for (let i = 0; i < frames; i++) {
+        samples.push(getComputedStyle(wrapper).transform);
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+      return samples;
+    },
+    { slug, frames },
+  );
+}
+
+async function draggableRowsReady(menu: Locator) {
+  await expect(menu.locator("[data-folder-grip]").first()).toBeAttached();
+}
+
+test.describe("Folder menu reorder polish", () => {
+  test("rows don't slide with reduced motion", async ({ page, seed }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await seedThree(seed);
+    await page.goto("/home");
+    const menu = await openMenu(page);
+    await draggableRowsReady(menu);
+
+    await folderRow(menu, "Alpha").focus();
+    await page.keyboard.press("Alt+ArrowDown");
+    const samples = await sampleTransforms(page, "beta", 6);
+    expect(samples.every((t) => t === "none")).toBe(true);
+  });
+
+  test("rows slide briefly and settle within a dropdown's budget", async ({ page, seed }) => {
+    await seedThree(seed);
+    await page.goto("/home");
+    const menu = await openMenu(page);
+    await draggableRowsReady(menu);
+
+    await folderRow(menu, "Alpha").focus();
+    await page.keyboard.press("Alt+ArrowDown");
+    const moving = await sampleTransforms(page, "beta", 3);
+    expect(moving.some((t) => t !== "none")).toBe(true);
+    await page.waitForTimeout(320);
+    expect(await sampleTransforms(page, "beta", 1)).toEqual(["none"]);
+  });
+
+  test("keyboard highlight shows the grip, and a visible focus ring", async ({ page, seed }) => {
+    await seedThree(seed);
+    await page.goto("/home");
+    const menu = await openMenu(page);
+    await draggableRowsReady(menu);
+
+    await page.keyboard.press("ArrowDown"); // Home
+    await page.keyboard.press("ArrowDown"); // Alpha
+    const alpha = folderRow(menu, "Alpha");
+    await expect(alpha).toBeFocused();
+    await expect(alpha.locator("[data-folder-grip]:visible")).toHaveCount(1);
+    await expect(alpha.getByText("🦪")).toBeHidden();
+    expect(await alpha.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
+  });
+
+  test("a cut-off name has its full text as a tooltip; the hint is keyboard-specific", async ({ page, seed }) => {
+    const long = "Design inspiration and references for later";
+    await seed.folder({ name: "Alpha", slug: "alpha" });
+    await seed.folder({ name: long, slug: "long" });
+    await page.goto("/home");
+    const menu = await openMenu(page);
+    await expect(folderRow(menu, "Design").locator(".truncate")).toHaveAttribute("title", long);
+    await expect(folderRow(menu, "Alpha")).toHaveAccessibleDescription(/^With a keyboard/);
+  });
+
+  test("an identical announcement is announced again", async ({ page, seed }) => {
+    await seedThree(seed);
+    await page.goto("/home");
+    const menu = await openMenu(page);
+    await folderRow(menu, "Gamma").focus();
+    await page.evaluate(() => {
+      const region = document.querySelector('[role="menu"] [role="status"]')!;
+      (window as unknown as { __changes: number }).__changes = 0;
+      new MutationObserver(() => {
+        (window as unknown as { __changes: number }).__changes++;
+      }).observe(region, { childList: true, characterData: true, subtree: true });
+    });
+    const changes = () =>
+      page.evaluate(() => (window as unknown as { __changes: number }).__changes);
+
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(menu.getByRole("status")).toHaveText("Gamma is already last");
+    const afterFirst = await changes();
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect.poll(changes).toBeGreaterThan(afterFirst);
+    await expect(menu.getByRole("status")).toHaveText("Gamma is already last");
+  });
+});
+
+test.describe("Folder menu reorder polish on a touch screen", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("a press low on a grip picks up that row, not the next", async ({ page, seed }) => {
+    await seedThree(seed);
+    await page.goto("/home");
+    const menu = await openMenu(page);
+    const box = (await folderRow(menu, "Alpha").locator("[data-folder-grip]:visible").boundingBox())!;
+    const hit = await page.evaluate(
+      ({ x, y }) => document.elementFromPoint(x, y)?.closest("a")?.getAttribute("href"),
+      { x: box.x + box.width / 2, y: box.y + box.height - 2 },
+    );
+    expect(hit).toBe("/folders/alpha");
+  });
+
+  test("a long name doesn't squeeze the grip or leave an empty slot before it", async ({ page, seed }) => {
+    await seed.folder({ name: "Alpha", slug: "alpha" });
+    await seed.folder({ name: "Design inspiration and references for later", slug: "long" });
+    await page.goto("/home");
+    const menu = await openMenu(page);
+    const row = folderRow(menu, "Design");
+    // Layout width: the menu's open animation scales its bounding box.
+    const width = await row
+      .locator("[data-folder-grip]:visible")
+      .evaluate((el) => (el as HTMLElement).offsetWidth);
+    expect(width).toBe(32);
+    await expect(row.locator("[data-current-mark]")).toBeHidden();
+  });
+});
