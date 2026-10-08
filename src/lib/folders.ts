@@ -90,6 +90,17 @@ export class FolderLimitError extends Error {
   readonly feature = "FOLDER_LIMIT";
 }
 
+/**
+ * Thrown when a reorder's ids aren't exactly the user's folders (one missing,
+ * extra, repeated, or someone else's). Routes map this to 400 `INVALID_ORDER`.
+ */
+export class InvalidFolderOrderError extends Error {
+  readonly name = "InvalidFolderOrderError";
+  constructor() {
+    super("The order must list each of your folders exactly once.");
+  }
+}
+
 type FolderRowWithCount = {
   id: string;
   name: string;
@@ -272,6 +283,39 @@ export async function listFoldersForUser(
     orderBy: [{ position: "asc" }, { name: "asc" }],
   });
   return (rows as FolderRowWithCount[]).map(toSummary);
+}
+
+/**
+ * Sets the user's folder order: `ids` must list every one of their folders
+ * exactly once, first to last (positions become 1..n). A stale or partial
+ * list throws `InvalidFolderOrderError` and writes nothing. Takes the same
+ * per-user lock as `createFolder`, so a folder created meanwhile can't slip
+ * between the check and the writes.
+ */
+export async function reorderFolders(
+  userId: string,
+  ids: string[],
+): Promise<FolderSummary[]> {
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
+    const owned = await tx.folder.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+    const ownedIds = new Set(owned.map((folder) => folder.id));
+    const unique = new Set(ids);
+    if (
+      unique.size !== ids.length ||
+      ids.length !== ownedIds.size ||
+      !ids.every((id) => ownedIds.has(id))
+    ) {
+      throw new InvalidFolderOrderError();
+    }
+    for (const [index, id] of ids.entries()) {
+      await tx.folder.update({ where: { id }, data: { position: index + 1 } });
+    }
+  });
+  return listFoldersForUser(userId);
 }
 
 /** Fetches a folder by slug if owned by `userId`; otherwise null. */

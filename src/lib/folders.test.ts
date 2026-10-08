@@ -40,6 +40,8 @@ const {
   FolderUpdateEmptyError,
   DEFAULT_FOLDER_EMOJI,
   assertFolderOwned,
+  reorderFolders,
+  InvalidFolderOrderError,
 } = await import("./folders");
 const { MAX_FOLDERS } = await import("./limits");
 
@@ -379,6 +381,60 @@ describe("listFoldersForUser", () => {
       ["Zeta", 1],
       ["alpha", 2],
     ]);
+  });
+});
+
+describe("reorderFolders", () => {
+  beforeEach(() => {
+    resetMocks();
+    // First call: the ownership check inside the transaction (ids only).
+    // Later calls: listFoldersForUser after it.
+    vi.mocked(prisma.folder.findMany)
+      .mockResolvedValueOnce([{ id: "a" }, { id: "b" }, { id: "c" }] as never)
+      .mockResolvedValue([
+        { id: "c", name: "C", slug: "c", position: 1, _count: { links: 0 } },
+        { id: "a", name: "A", slug: "a", position: 2, _count: { links: 0 } },
+        { id: "b", name: "B", slug: "b", position: 3, _count: { links: 0 } },
+      ] as never);
+  });
+
+  it("writes index + 1 to every folder and returns the new order", async () => {
+    const result = await reorderFolders("user-1", ["c", "a", "b"]);
+
+    expect(txExecuteRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.folder.update).toHaveBeenCalledTimes(3);
+    expect(prisma.folder.update).toHaveBeenCalledWith({
+      where: { id: "c" },
+      data: { position: 1 },
+    });
+    expect(prisma.folder.update).toHaveBeenCalledWith({
+      where: { id: "a" },
+      data: { position: 2 },
+    });
+    expect(prisma.folder.update).toHaveBeenCalledWith({
+      where: { id: "b" },
+      data: { position: 3 },
+    });
+    expect(result.map((f) => f.id)).toEqual(["c", "a", "b"]);
+  });
+
+  it.each([
+    ["a missing id", ["a", "b"]],
+    ["an extra id", ["a", "b", "c", "x"]],
+    ["a duplicate id", ["a", "a", "b", "c"]],
+    ["another user's id", ["a", "b", "x"]],
+  ])("rejects %s", async (_label, ids) => {
+    await expect(reorderFolders("user-1", ids)).rejects.toBeInstanceOf(
+      InvalidFolderOrderError,
+    );
+    expect(prisma.folder.update).not.toHaveBeenCalled();
+  });
+
+  it("accepts an empty list for a user with no folders", async () => {
+    vi.mocked(prisma.folder.findMany).mockReset().mockResolvedValue([]);
+
+    await expect(reorderFolders("user-1", [])).resolves.toEqual([]);
+    expect(prisma.folder.update).not.toHaveBeenCalled();
   });
 });
 

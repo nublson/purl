@@ -5,6 +5,7 @@ import {
   FolderNameError,
   FolderNotFoundError,
   FolderUpdateEmptyError,
+  InvalidFolderOrderError,
 } from "@/lib/folders";
 import { NextResponse } from "next/server";
 
@@ -22,7 +23,8 @@ const NAME_ERROR_STATUS: Record<FolderNameError["reason"], number> = {
 
 /**
  * Maps the folder library's errors (`FolderNameError`, `FolderEmojiError`,
- * `FolderDescriptionError`, `FolderUpdateEmptyError`, `FolderLimitError`, `FolderNotFoundError`) to the shared API response shape used by both the
+ * `FolderDescriptionError`, `FolderUpdateEmptyError`, `FolderLimitError`, `FolderNotFoundError`,
+ * `InvalidFolderOrderError`) to the shared API response shape used by both the
  * browser-session `/api/folders` routes and the API-key `/api/v1/folders`
  * routes. Returns `null` when `e` isn't one of these, so callers can
  * `throw e` unchanged.
@@ -43,6 +45,12 @@ export function mapFolderError(e: unknown): NextResponse | null {
   if (e instanceof FolderDescriptionError) {
     return NextResponse.json(
       { error: e.message, code: "INVALID_DESCRIPTION" },
+      { status: 400 },
+    );
+  }
+  if (e instanceof InvalidFolderOrderError) {
+    return NextResponse.json(
+      { error: e.message, code: "INVALID_ORDER" },
       { status: 400 },
     );
   }

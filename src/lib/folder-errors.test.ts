@@ -3,6 +3,7 @@ import {
   FolderLimitError,
   FolderNameError,
   FolderNotFoundError,
+  InvalidFolderOrderError,
 } from "@/lib/folders";
 import { mapFolderError } from "./folder-errors";
 
@@ -25,6 +26,16 @@ describe("mapFolderError", () => {
       expect(await res!.json()).toEqual({ error: message, code });
     },
   );
+
+  it("maps InvalidFolderOrderError to 400 INVALID_ORDER", async () => {
+    const res = mapFolderError(new InvalidFolderOrderError());
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(400);
+    expect(await res!.json()).toEqual({
+      error: "The order must list each of your folders exactly once.",
+      code: "INVALID_ORDER",
+    });
+  });
 
   it("maps FolderLimitError to 403 LIMIT_REACHED with feature", async () => {
     const res = mapFolderError(
