@@ -78,6 +78,9 @@ model Folder {
   description String?
   /// Readable by anyone at /@username/slug (no index); off by default.
   isPublic    Boolean  @default(false)
+  /// The user's manual order (ascending). Not unique or contiguous; ties
+  /// break by name. New folders get max + 1.
+  position    Int      @default(0)
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   links       Link[]
@@ -89,6 +92,7 @@ model Folder {
   @@unique([userId, name])
   @@unique([userId, slug])
   @@index([userId, createdAt])
+  @@index([userId, position])
   @@map("folders")
 }
 

@@ -42,6 +42,8 @@ export type FolderSummary = {
   description: string | null;
   /** Readable by anyone at `/@username/slug` (not indexed by search engines). */
   isPublic: boolean;
+  /** The user's manual order (ascending; ties break by name). */
+  position: number;
   linkCount: number;
 };
 
@@ -95,6 +97,7 @@ type FolderRowWithCount = {
   emoji?: string | null;
   description?: string | null;
   isPublic?: boolean;
+  position?: number;
   _count: { links: number };
 };
 
@@ -106,6 +109,7 @@ function toSummary(row: FolderRowWithCount): FolderSummary {
     emoji: row.emoji || DEFAULT_FOLDER_EMOJI,
     description: row.description || null,
     isPublic: row.isPublic ?? false,
+    position: row.position ?? 0,
     linkCount: row._count.links,
   };
 }
@@ -258,17 +262,16 @@ export async function assertFolderOwned(
   }
 }
 
-/** Lists the user's folders with their link counts, ordered by name (case-insensitive). */
+/** Lists the user's folders with their link counts, in the user's order (position, then name). */
 export async function listFoldersForUser(
   userId: string,
 ): Promise<FolderSummary[]> {
   const rows = await prisma.folder.findMany({
     where: { userId },
     include: { _count: { select: { links: true } } },
+    orderBy: [{ position: "asc" }, { name: "asc" }],
   });
-  return (rows as FolderRowWithCount[])
-    .map(toSummary)
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  return (rows as FolderRowWithCount[]).map(toSummary);
 }
 
 /** Fetches a folder by slug if owned by `userId`; otherwise null. */
@@ -317,6 +320,11 @@ export async function createFolder(
 
       await assertNameAvailable(userId, trimmed, undefined, tx);
       const slug = await generateUniqueSlug(userId, trimmed, undefined, tx);
+      // New folders go last, so the user's order (and digit shortcuts) stay put.
+      const { _max } = await tx.folder.aggregate({
+        where: { userId },
+        _max: { position: true },
+      });
 
       const created = await tx.folder.create({
         data: {
@@ -325,6 +333,7 @@ export async function createFolder(
           slug,
           emoji: normalizedEmoji,
           description: normalizedDescription,
+          position: (_max.position ?? 0) + 1,
         },
         include: { _count: { select: { links: true } } },
       });

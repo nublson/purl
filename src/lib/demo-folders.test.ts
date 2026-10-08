@@ -51,7 +51,7 @@ describe("getDemoFolders", () => {
     );
     const args = mockFolderFindMany.mock.calls[0][0];
     expect(args.where).toEqual({ userId: "u1", isPublic: true });
-    expect(args.orderBy).toEqual({ name: "asc" });
+    expect(args.orderBy).toEqual([{ position: "asc" }, { name: "asc" }]);
     expect(args.select.links).toMatchObject({
       orderBy: { createdAt: "desc" },
       take: 20,
