@@ -39,3 +39,11 @@ describe("matchFolderShortcut", () => {
     expect(matchFolderShortcut(key("1", { shiftKey: true }), folders)).toBeNull();
   });
 });
+
+describe("matchFolderShortcut with a manual folder order", () => {
+  it("maps digits to the folders' array order, not name order", () => {
+    const folders = [{ name: "Zeta" }, { name: "alpha" }];
+    expect(matchFolderShortcut(key("2"), folders)).toEqual({ name: "Zeta" });
+    expect(matchFolderShortcut(key("3"), folders)).toEqual({ name: "alpha" });
+  });
+});

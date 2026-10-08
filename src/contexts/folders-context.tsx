@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchFolders } from "@/lib/folder-client";
+import { byPosition } from "@/lib/folder-order";
 import type { FolderSummary } from "@/lib/folders";
 import { useLinksSyncState } from "@/hooks/use-links-sync";
 import {
@@ -28,6 +29,8 @@ export interface FoldersContextValue {
   upsertFolder: (folder: FolderSummary) => void;
   /** Removes a folder locally (delete), ahead of the background refetch. */
   removeFolderLocally: (id: string) => void;
+  /** Replaces the whole list as given (a reorder, or its rollback). */
+  replaceFolders: (folders: FolderSummary[]) => void;
 }
 
 const FoldersContext = createContext<FoldersContextValue>({
@@ -37,11 +40,9 @@ const FoldersContext = createContext<FoldersContextValue>({
   refresh: () => {},
   upsertFolder: () => {},
   removeFolderLocally: () => {},
+  replaceFolders: () => {},
 });
 
-const collator = new Intl.Collator(undefined, { sensitivity: "base" });
-const byName = (a: FolderSummary, b: FolderSummary) =>
-  collator.compare(a.name, b.name);
 
 /**
  * Single source of truth for the signed-in user's folders. Fetches once on
@@ -129,16 +130,21 @@ export function FoldersProvider({
     mutationCountRef.current += 1;
     setFolders((current) => {
       const idx = current.findIndex((f) => f.id === folder.id);
-      if (idx === -1) return [...current, folder].sort(byName);
+      if (idx === -1) return [...current, folder].sort(byPosition);
       const next = [...current];
       next[idx] = folder;
-      return next.sort(byName);
+      return next.sort(byPosition);
     });
   }, []);
 
   const removeFolderLocally = useCallback((id: string) => {
     mutationCountRef.current += 1;
     setFolders((current) => current.filter((f) => f.id !== id));
+  }, []);
+
+  const replaceFolders = useCallback((next: FolderSummary[]) => {
+    mutationCountRef.current += 1;
+    setFolders(next);
   }, []);
 
   const value = useMemo<FoldersContextValue>(
@@ -149,6 +155,7 @@ export function FoldersProvider({
       refresh,
       upsertFolder,
       removeFolderLocally,
+      replaceFolders,
     }),
     [
       folders,
@@ -157,6 +164,7 @@ export function FoldersProvider({
       refresh,
       upsertFolder,
       removeFolderLocally,
+      replaceFolders,
     ],
   );
 

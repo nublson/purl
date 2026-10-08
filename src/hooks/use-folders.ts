@@ -9,12 +9,14 @@ import {
   patchLinkFolder,
   patchLinksFolder,
   postFolder,
+  putFolderOrder,
   removeFolder,
   type ActionResult,
   type CreateFolderInput,
   type UpdateFolderInput,
 } from "@/lib/folder-client";
 import type { FolderSummary } from "@/lib/folders";
+import { saveFolderOrder } from "@/lib/folder-order";
 import { resolveCurrentFolder } from "@/lib/current-folder";
 import {
   formatBulkMoveMessage,
@@ -119,9 +121,16 @@ export function useFolderActions(): {
     folderId: string | null,
     opts?: { target?: FolderSummary; quietError?: boolean },
   ) => Promise<ActionResult<{ moved: number }>>;
+  reorderFolders: (ids: string[]) => Promise<ActionResult<FolderSummary[]>>;
 } {
-  const { folders, upsertFolder, removeFolderLocally, initialTotalLinks } =
-    useFoldersContext();
+  const {
+    folders,
+    upsertFolder,
+    removeFolderLocally,
+    replaceFolders,
+    refresh,
+    initialTotalLinks,
+  } = useFoldersContext();
   const { notifyLinksChanged, setLinksTotal } = useLinksSyncActions();
   const { total } = useLinksSyncState();
   const router = useRouter();
@@ -352,8 +361,30 @@ export function useFolderActions(): {
     [folders, notifyLinksChanged],
   );
 
+  // Order only: no links change, so no notifyLinksChanged() (other tabs hear
+  // the server's broadcast). Failures toast here; there's no Undo (the
+  // dialog's Cancel is the way back).
+  const reorderFolders = useCallback(
+    (ids: string[]) =>
+      saveFolderOrder(ids, {
+        previous: folders,
+        setFolders: replaceFolders,
+        put: putFolderOrder,
+        refresh,
+        notify: (message) => toast.error(message),
+      }),
+    [folders, replaceFolders, refresh],
+  );
+
   return useMemo(
-    () => ({ createFolder, updateFolder, deleteFolder, moveLink, moveLinks }),
-    [createFolder, updateFolder, deleteFolder, moveLink, moveLinks],
+    () => ({
+      createFolder,
+      updateFolder,
+      deleteFolder,
+      moveLink,
+      moveLinks,
+      reorderFolders,
+    }),
+    [createFolder, updateFolder, deleteFolder, moveLink, moveLinks, reorderFolders],
   );
 }

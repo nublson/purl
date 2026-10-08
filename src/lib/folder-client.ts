@@ -144,6 +144,16 @@ export function removeFolder(
   );
 }
 
+/** Sets the folder order; `ids` lists every folder, first to last. */
+export function putFolderOrder(
+  ids: string[],
+): Promise<ActionResult<{ folders: FolderSummary[] }>> {
+  return mutate<{ folders: FolderSummary[] }>("/api/folders/order", {
+    method: "PUT",
+    body: JSON.stringify({ ids }),
+  }, "save the folder order");
+}
+
 export function patchLinkFolder(
   linkId: string,
   folderId: string | null,
