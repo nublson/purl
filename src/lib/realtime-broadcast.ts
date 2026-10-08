@@ -1,21 +1,29 @@
 import "server-only";
 
 import { after } from "next/server";
+import { revalidateLandingDemoFor } from "@/lib/demo-revalidation";
 import { LINKS_CHANGED_EVENT } from "@/lib/realtime-constants";
 import { getAdminSupabase } from "@/lib/supabase-admin";
 
 const BROADCAST_TIMEOUT_MS = 5000;
 
 /**
- * Notifies all subscribed clients for this user that their link list changed.
- * Runs after the response is sent (`after()`), so callers never wait on Realtime.
- * Must be called within a request scope (route handler / server action).
+ * Notifies all subscribed clients for this user that their link list changed,
+ * and refreshes the landing page if they're the demo account (every link and
+ * folder write calls this). Runs after the response is sent (`after()`), so
+ * callers never wait on Realtime. Must be called within a request scope
+ * (route handler / server action).
  */
 export function broadcastLinksChanged(
   userId: string,
   origin: string | null = null,
 ): void {
-  after(() => sendLinksChangedBroadcast(userId, origin));
+  after(async () => {
+    await Promise.all([
+      sendLinksChangedBroadcast(userId, origin),
+      revalidateLandingDemoFor(userId),
+    ]);
+  });
 }
 
 /**

@@ -11,7 +11,12 @@ vi.mock("@/lib/supabase-admin", () => ({
   getAdminSupabase: vi.fn(),
 }));
 
+vi.mock("@/lib/demo-revalidation", () => ({
+  revalidateLandingDemoFor: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { after } from "next/server";
+import { revalidateLandingDemoFor } from "@/lib/demo-revalidation";
 import { getAdminSupabase } from "@/lib/supabase-admin";
 import {
   broadcastLinksChanged,
@@ -33,6 +38,7 @@ describe("broadcastLinksChanged", () => {
   beforeEach(() => {
     vi.mocked(getAdminSupabase).mockReset();
     vi.mocked(after).mockReset();
+    vi.mocked(revalidateLandingDemoFor).mockClear();
   });
 
   it("defers the send with after() instead of blocking the caller", async () => {
@@ -49,6 +55,19 @@ describe("broadcastLinksChanged", () => {
 
     expect(channel).toHaveBeenCalledWith("links:user-abc");
     expect(httpSend).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes the landing demo in the same deferred task", async () => {
+    mockAdminClient(vi.fn().mockResolvedValue({ success: true }));
+
+    broadcastLinksChanged("user-abc");
+
+    expect(revalidateLandingDemoFor).not.toHaveBeenCalled();
+
+    const task = vi.mocked(after).mock.calls[0][0] as () => Promise<void>;
+    await task();
+
+    expect(revalidateLandingDemoFor).toHaveBeenCalledWith("user-abc");
   });
 });
 
