@@ -369,15 +369,18 @@ export function FolderSelectDropdown() {
                 <CurrentMark
                   active={onHome}
                   shortcut={HOME_SHORTCUT}
-                  hideOnTouch={canReorder}
+                  className={canReorder ? "pointer-coarse:hidden" : undefined}
                 />
-                {/* Touch: the folders' grip column, so Home's check lines up
-                    with a current folder's (check, then grip). */}
+                {/* Touch: Home has no grip, so its check sits in the folders'
+                    grip column, lined up with the grips. */}
                 {canReorder ? (
-                  <span
+                  <Typography
+                    component="span"
                     aria-hidden="true"
-                    className="-my-1.5 -me-1.5 hidden size-8 shrink-0 pointer-coarse:block"
-                  />
+                    className="-my-1.5 -me-1.5 ms-auto hidden size-8 shrink-0 items-center justify-center pointer-coarse:flex"
+                  >
+                    {onHome ? <Check /> : null}
+                  </Typography>
                 ) : null}
               </Link>
             </DropdownMenuItem>
@@ -528,6 +531,7 @@ function CurrentMark({
   active,
   shortcut,
   hideOnTouch = false,
+  className,
 }: {
   active: boolean;
   shortcut?: string | null;
@@ -536,6 +540,7 @@ function CurrentMark({
    * the slot goes (keeping the check on the current row).
    */
   hideOnTouch?: boolean;
+  className?: string;
 }) {
   return (
     <Typography
@@ -544,6 +549,7 @@ function CurrentMark({
       className={cn(
         "ms-auto flex h-4 min-w-5 shrink-0 items-center justify-center",
         hideOnTouch && !active && "pointer-coarse:hidden",
+        className,
       )}
     >
       {active ? (
