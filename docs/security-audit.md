@@ -82,7 +82,7 @@ const BASE_SECURITY_HEADERS = [
 | Area | Status | Notes |
 |---|---|---|
 | Hardcoded secrets | ✅ | No keys in source; `.env*` gitignored; `server-only` guards on all sensitive modules |
-| Supabase service role | ✅ | `SUPABASE_SERVICE_ROLE_KEY` never exposed client-side |
+| Supabase secret key | ✅ | `SUPABASE_SECRET_KEY` (fallback `SUPABASE_SERVICE_ROLE_KEY`) never exposed client-side; only `SUPABASE_URL` and `SUPABASE_ANON_KEY` reach the browser, via `next.config.ts` `env` |
 | Payments | ✅ | Price ID read server-side from env; webhook verified with `constructEvent`; idempotency handled |
 | Authentication | ✅ | Session verified on every API route; `getCurrentUserId()` throws consistently |
 | Ownership checks | ✅ | Chat and link ownership verified before all mutations |

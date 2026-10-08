@@ -18,8 +18,8 @@ describe("getBrowserRealtime", () => {
 
   it("connects to the project's realtime websocket with the anon key, once", async () => {
     vi.stubGlobal("window", {});
-    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://abc.supabase.co");
-    vi.stubEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "anon-key");
+    vi.stubEnv("SUPABASE_URL", "https://abc.supabase.co");
+    vi.stubEnv("SUPABASE_ANON_KEY", "anon-key");
     const { getBrowserRealtime } = await import("./supabase-client");
 
     const first = getBrowserRealtime();

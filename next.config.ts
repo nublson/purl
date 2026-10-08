@@ -39,6 +39,16 @@ const nextConfig: NextConfig = {
   // Next's default, set explicitly: production builds don't emit browser
   // source maps, so the client code structure isn't published.
   productionBrowserSourceMaps: false,
+  // Supabase's Vercel integration names these without NEXT_PUBLIC_, so they
+  // reach the browser (Realtime) through here. Both are public: the project
+  // URL and the anon key. Never add a secret to this list. Next inlines these
+  // at build time in server code too (getAdminSupabase reads the build's
+  // SUPABASE_URL): fine on Vercel, where build and runtime env match; a
+  // runtime-only env (self-hosting) would need them at build as well.
+  env: {
+    SUPABASE_URL: process.env.SUPABASE_URL ?? "",
+    SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY ?? "",
+  },
   experimental: {
     // reicon-react's barrel re-exports ~2,700 icons; import only the ones used
     // (lucide-react, which it replaced, is on Next's built-in list).
