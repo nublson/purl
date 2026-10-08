@@ -117,3 +117,19 @@ export function parseIsPublicField(
     { status: 400 },
   );
 }
+
+/**
+ * Parses a folder-order body (`{ ids: string[] }`) for `PUT .../folders/order`;
+ * anything else is a 400. Whether the ids are the user's folders is checked
+ * by `reorderFolders`.
+ */
+export function parseFolderOrderBody(body: unknown): string[] | NextResponse {
+  const ids = (body as { ids?: unknown } | null)?.ids;
+  if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string")) {
+    return NextResponse.json(
+      { error: "ids must be an array of folder ids" },
+      { status: 400 },
+    );
+  }
+  return ids;
+}
