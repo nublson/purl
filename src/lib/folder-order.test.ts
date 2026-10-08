@@ -103,6 +103,25 @@ describe("saveFolderOrder", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("rolls back to the last saved order when given one", async () => {
+    // `previous` is an earlier drop's unsaved order; `rollbackTo` the order
+    // before it, which is where a failure should land.
+    const d = {
+      ...deps(vi.fn<Put>().mockResolvedValue({ ok: false, error: "x" })),
+      previous: [b, a, c],
+      rollbackTo: [a, b, c],
+    };
+
+    await saveFolderOrder(["c", "b", "a"], d);
+
+    expect(d.setFolders.mock.calls[0][0].map((f: FolderSummary) => f.id)).toEqual([
+      "c",
+      "b",
+      "a",
+    ]);
+    expect(d.setFolders).toHaveBeenLastCalledWith([a, b, c]);
+  });
+
   it("holds background folder fetches until the save settles", async () => {
     let resolvePut!: (value: unknown) => void;
     const d = deps(vi.fn<Put>(() => new Promise((r) => (resolvePut = r as never))));

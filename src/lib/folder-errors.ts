@@ -7,6 +7,7 @@ import {
   FolderUpdateEmptyError,
   InvalidFolderOrderError,
 } from "@/lib/folders";
+import { MAX_FOLDERS } from "@/lib/limits";
 import { NextResponse } from "next/server";
 
 const NAME_ERROR_CODES: Record<FolderNameError["reason"], string> = {
@@ -130,6 +131,10 @@ export function parseFolderOrderBody(body: unknown): string[] | NextResponse {
       { error: "ids must be an array of folder ids" },
       { status: 400 },
     );
+  }
+  // More than anyone can have: reject before taking the lock or querying.
+  if (ids.length > MAX_FOLDERS) {
+    return mapFolderError(new InvalidFolderOrderError())!;
   }
   return ids;
 }

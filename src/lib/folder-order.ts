@@ -35,6 +35,11 @@ export async function saveFolderOrder(
   ids: string[],
   deps: {
     previous: FolderSummary[];
+    /**
+     * Where a failure lands; defaults to `previous`. Give the last saved
+     * order when `previous` may be an earlier save's unconfirmed one.
+     */
+    rollbackTo?: FolderSummary[];
     setFolders: (folders: FolderSummary[]) => void;
     put: (ids: string[]) => Promise<ActionResult<{ folders: FolderSummary[] }>>;
     refresh: () => void;
@@ -60,7 +65,7 @@ export async function saveFolderOrder(
     deps.setFolders(result.data.folders);
     return { ok: true, data: result.data.folders };
   }
-  deps.setFolders(deps.previous);
+  deps.setFolders(deps.rollbackTo ?? deps.previous);
   deps.refresh();
   deps.notify(
     result.code === "INVALID_ORDER" ? STALE_ORDER_ERROR : SAVE_ORDER_ERROR,

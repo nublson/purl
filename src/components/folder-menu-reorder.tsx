@@ -90,28 +90,28 @@ export function ReorderableFolderRows({
     // Reduced motion: the dragged row still follows the pointer, but the
     // others jump into place instead of sliding.
     <MotionConfig reducedMotion="user">
-    <Reorder.Group
-      ref={listRef}
-      as="div"
-      axis="y"
-      values={order}
-      onReorder={(next) => {
-        orderRef.current = next;
-        setOrder(next);
-      }}
-    >
-      {order.map((folder, index) => (
-        <ReorderableRow
-          key={folder.id}
-          folder={folder}
-          constraints={listRef}
-          onDragStart={dragStarted}
-          onDragEnd={() => dragEnded(folder)}
-        >
-          {(grip) => renderRow(folder, index, grip)}
-        </ReorderableRow>
-      ))}
-    </Reorder.Group>
+      <Reorder.Group
+        ref={listRef}
+        as="div"
+        axis="y"
+        values={order}
+        onReorder={(next) => {
+          orderRef.current = next;
+          setOrder(next);
+        }}
+      >
+        {order.map((folder, index) => (
+          <ReorderableRow
+            key={folder.id}
+            folder={folder}
+            constraints={listRef}
+            onDragStart={dragStarted}
+            onDragEnd={() => dragEnded(folder)}
+          >
+            {(grip) => renderRow(folder, index, grip)}
+          </ReorderableRow>
+        ))}
+      </Reorder.Group>
     </MotionConfig>
   );
 }

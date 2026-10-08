@@ -368,12 +368,23 @@ export function useFolderActions(): {
   // response touches the list. Failures toast; there's no Undo.
   const saveChain = useRef<Promise<unknown>>(Promise.resolve());
   const latestSave = useRef(0);
+  // The order before the first save still in flight: where a failure rolls
+  // back to, not an earlier drop's unconfirmed order.
+  const lastSaved = useRef<FolderSummary[] | null>(null);
   const reorderFolders = useCallback(
     (ids: string[]) => {
       const save = ++latestSave.current;
+      lastSaved.current ??= folders;
+      const rollbackTo = lastSaved.current;
       return saveFolderOrder(ids, {
         previous: folders,
+        rollbackTo,
         setFolders: replaceFolders,
+        // Accepted edge case: a save that times out (15s) is aborted here but
+        // may still run on the server while the next one is sent, so the two
+        // can land in either order (the lock serializes them). Either way the
+        // list converges: a failure refreshes, and the next success adopts
+        // the server's list.
         put: (order) => {
           const request = saveChain.current.then(() => putFolderOrder(order));
           saveChain.current = request.catch(() => {});
@@ -383,6 +394,8 @@ export function useFolderActions(): {
         notify: (message) => toast.error(message),
         hold: holdFetches,
         isCurrent: () => save === latestSave.current,
+      }).finally(() => {
+        if (save === latestSave.current) lastSaved.current = null;
       });
     },
     [folders, replaceFolders, holdFetches, refresh],

@@ -50,7 +50,6 @@ const FoldersContext = createContext<FoldersContextValue>({
   holdFetches: () => () => {},
 });
 
-
 /**
  * Single source of truth for the signed-in user's folders. Fetches once on
  * mount and again whenever the links-sync `version` changes (a save, edit,
