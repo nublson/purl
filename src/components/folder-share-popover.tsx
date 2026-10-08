@@ -97,11 +97,13 @@ export function FolderSharePopover() {
           // Private: the action ("Share", ghost). Public: the state, in the
           // switch's word ("Public", filled), so a shared folder reads as
           // shared at a glance. The name keeps the visible word first.
+          // The word shows from lg; below, the lock/globe alone in a 32px
+          // square (like the header's Add button), with the same name.
           variant={isPublic ? "secondary" : "ghost"}
           size="sm"
-          aria-label={isPublic ? "Public, sharing settings" : undefined}
+          aria-label={isPublic ? "Public, sharing settings" : "Share"}
           aria-haspopup="dialog"
-          className="cursor-pointer"
+          className="cursor-pointer max-lg:size-8 max-lg:px-0 max-lg:has-data-[icon=inline-start]:pl-0"
         >
           {/* Lock and globe cross-fade (same recipe as the copy button);
               the label swaps instantly. */}
@@ -119,7 +121,7 @@ export function FolderSharePopover() {
               )}
             />
           </span>
-          {isPublic ? "Public" : "Share"}
+          <span className="max-lg:hidden">{isPublic ? "Public" : "Share"}</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-80 gap-0 p-0">
