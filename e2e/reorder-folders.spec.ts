@@ -18,6 +18,13 @@ async function openMenu(page: Page) {
   return menu;
 }
 
+/** Waits out the menu's open animation (it scales), before measuring. */
+async function menuSettled(menu: Locator) {
+  await menu.evaluate((el) =>
+    Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)),
+  );
+}
+
 async function closeMenu(page: Page) {
   await page.keyboard.press("Escape");
   // Fully closed: a click on the trigger during the close is dropped.
@@ -302,8 +309,12 @@ test.describe("Folder menu reorder polish", () => {
 
     await folderRow(menu, "Alpha").focus();
     await page.keyboard.press("Alt+ArrowDown");
+    // A jump, not a slide: Motion may hold the old offset for the first
+    // frame, but never shows a position in between.
     const samples = await sampleTransforms(page, "beta", 6);
-    expect(samples.every((t) => t === "none")).toBe(true);
+    const offsets = samples.filter((t) => t !== "none");
+    expect(offsets.length, JSON.stringify(samples)).toBeLessThanOrEqual(1);
+    expect(samples.at(-1)).toBe("none");
   });
 
   test("rows slide briefly and settle within a dropdown's budget", async ({ page, seed }) => {
@@ -332,7 +343,48 @@ test.describe("Folder menu reorder polish", () => {
     await expect(alpha).toBeFocused();
     await expect(alpha.locator("[data-folder-grip]:visible")).toHaveCount(1);
     await expect(alpha.getByText("🦪")).toBeHidden();
-    expect(await alpha.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe("none");
+    // Tailwind always sets box-shadow (transparent ring layers): look for the ring.
+    expect(await alpha.evaluate((el) => getComputedStyle(el).boxShadow)).toContain("2px inset");
+  });
+
+  test("the hover grip lines up with the emoji column", async ({ page, seed }) => {
+    await seed.folder({ name: "Dev Tool", slug: "dev", emoji: "🛠️" });
+    await seed.folder({ name: "Reading list", slug: "reading", emoji: "📚" });
+    await page.goto("/home");
+    const menu = await openMenu(page);
+    await grip(folderRow(menu, "Dev Tool"));
+    const { emoji, drawn } = await page.evaluate(() => {
+      const range = document.createRange();
+      range.selectNodeContents(
+        document.querySelector('[role=menu] a[href="/folders/reading"] span[aria-hidden]')!,
+      );
+      const glyph = range.getBoundingClientRect();
+      const handle = [
+        ...document.querySelectorAll('[role=menu] a[href="/folders/dev"] [data-folder-grip]'),
+      ].find((el) => getComputedStyle(el).display !== "none")!;
+      const paths = [...handle.querySelectorAll("path")].map((p) => p.getBoundingClientRect());
+      return {
+        emoji: { left: glyph.left, right: glyph.right },
+        drawn: {
+          left: Math.min(...paths.map((p) => p.left)),
+          right: Math.max(...paths.map((p) => p.right)),
+        },
+      };
+    });
+    const center = (box: { left: number; right: number }) => (box.left + box.right) / 2;
+    expect(Math.abs(center(drawn) - center(emoji))).toBeLessThan(1);
+    // Wide enough to read as the emoji's column, not an indented icon.
+    expect(drawn.right - drawn.left).toBeGreaterThanOrEqual(12);
+  });
+
+  test("mouse hover doesn't draw the keyboard focus ring", async ({ page, seed }) => {
+    await seedThree(seed);
+    await page.goto("/home");
+    const menu = await openMenu(page);
+    const alpha = folderRow(menu, "Alpha");
+    await alpha.hover();
+    await expect(alpha).toBeFocused();
+    expect(await alpha.evaluate((el) => getComputedStyle(el).boxShadow)).not.toContain("2px inset");
   });
 
   test("a cut-off name has its full text as a tooltip; the hint is keyboard-specific", async ({ page, seed }) => {
@@ -371,6 +423,27 @@ test.describe("Folder menu reorder polish", () => {
 
 test.describe("Folder menu reorder polish on a touch screen", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("Home's trailing column lines up with the folders' check and grip", async ({ page, seed }) => {
+    await seedThree(seed);
+    await page.goto("/folders/beta");
+    let menu = await openMenu(page);
+    await menuSettled(menu);
+    await expect(menu.getByRole("menuitem", { name: /^Home/ }).locator("kbd")).toBeHidden();
+    const folderCheck = (await folderRow(menu, "Beta")
+      .locator("[data-current-mark] svg")
+      .boundingBox())!;
+    await closeMenu(page);
+
+    await page.goto("/home");
+    menu = await openMenu(page);
+    await menuSettled(menu);
+    const homeCheck = (await menu
+      .getByRole("menuitem", { name: /^Home/ })
+      .locator("[data-current-mark] svg")
+      .boundingBox())!;
+    expect(Math.abs(homeCheck.x - folderCheck.x)).toBeLessThan(1);
+  });
 
   test("a press low on a grip picks up that row, not the next", async ({ page, seed }) => {
     await seedThree(seed);

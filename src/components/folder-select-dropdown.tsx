@@ -240,13 +240,22 @@ export function FolderSelectDropdown() {
             {grip ? (
               <FolderGrip
                 {...grip}
-                className="absolute -inset-1 hidden pointer-fine:group-data-highlighted/row:flex"
+                // 20px icon: its lines then span ~13px, the emoji's ink width
+                // (at 16px they'd read as an indented, smaller icon).
+                className="absolute -inset-1 hidden pointer-fine:group-data-highlighted/row:flex [&_svg]:size-5"
               />
             ) : null}
           </span>
           <RowLabel name={folder.name} count={folder.linkCount} />
-          <CurrentMark active={active} shortcut={shortcut} hideOnTouch={!!grip} />
-          {/* Touch: always there, at the end (no digit keys to show). */}
+          <CurrentMark active={active} shortcut={shortcut} hideOnTouch={canReorder} />
+          {/* Touch: always there, at the end (no digit keys to show). Until
+              drag loads, an empty slot of its size, so rows don't reflow. */}
+          {canReorder && !grip ? (
+            <span
+              aria-hidden="true"
+              className="-my-1.5 -me-1.5 hidden size-8 shrink-0 pointer-coarse:block"
+            />
+          ) : null}
           {grip ? (
             <FolderGrip
               {...grip}
@@ -357,7 +366,19 @@ export function FolderSelectDropdown() {
               >
                 <FolderEmoji emoji={HOME_EMOJI} />
                 <RowLabel name="Home" count={totalLinks} />
-                <CurrentMark active={onHome} shortcut={HOME_SHORTCUT} />
+                <CurrentMark
+                  active={onHome}
+                  shortcut={HOME_SHORTCUT}
+                  hideOnTouch={canReorder}
+                />
+                {/* Touch: the folders' grip column, so Home's check lines up
+                    with a current folder's (check, then grip). */}
+                {canReorder ? (
+                  <span
+                    aria-hidden="true"
+                    className="-my-1.5 -me-1.5 hidden size-8 shrink-0 pointer-coarse:block"
+                  />
+                ) : null}
               </Link>
             </DropdownMenuItem>
           )}
