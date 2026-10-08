@@ -264,8 +264,9 @@ function isUniqueConstraintError(error: unknown): boolean {
 export async function assertFolderOwned(
   userId: string,
   folderId: string,
+  db: Db = prisma,
 ): Promise<void> {
-  const existing = await prisma.folder.findFirst({
+  const existing = await db.folder.findFirst({
     where: { id: folderId, userId },
   });
   if (!existing) {
@@ -289,8 +290,8 @@ export async function listFoldersForUser(
  * Sets the user's folder order: `ids` must list every one of their folders
  * exactly once, first to last (positions become 1..n). A stale or partial
  * list throws `InvalidFolderOrderError` and writes nothing. Takes the same
- * per-user lock as `createFolder`, so a folder created meanwhile can't slip
- * between the check and the writes.
+ * per-user lock as `createFolder` and `deleteFolder`, so a folder created or
+ * deleted meanwhile can't slip between the check and the write.
  */
 export async function reorderFolders(
   userId: string,
@@ -311,8 +312,16 @@ export async function reorderFolders(
     ) {
       throw new InvalidFolderOrderError();
     }
-    for (const [index, id] of ids.entries()) {
-      await tx.folder.update({ where: { id }, data: { position: index + 1 } });
+    if (ids.length === 0) return;
+    // One statement, not a round trip per folder: positions 1..n in `ids`
+    // order. The lock keeps creates and deletes out, so every row matches;
+    // the count check is a backstop.
+    const updated = await tx.$executeRaw`
+      UPDATE "folders" AS f SET "position" = o.ord::int
+      FROM unnest(${ids}::text[]) WITH ORDINALITY AS o(id, ord)
+      WHERE f."id" = o.id AND f."userId" = ${userId}`;
+    if (updated !== ids.length) {
+      throw new InvalidFolderOrderError();
     }
   });
   return listFoldersForUser(userId);
@@ -502,16 +511,18 @@ export async function deleteFolder(
   id: string,
   opts: { withLinks: boolean },
 ): Promise<{ deletedLinks: number }> {
-  await assertFolderOwned(userId, id);
-
-  if (!opts.withLinks) {
-    await prisma.folder.delete({ where: { id } });
-    return { deletedLinks: 0 };
-  }
-
-  const [deleteManyResult] = await prisma.$transaction([
-    prisma.link.deleteMany({ where: { userId, folderId: id } }),
-    prisma.folder.delete({ where: { id } }),
-  ]);
-  return { deletedLinks: deleteManyResult.count };
+  // The per-user lock (as in createFolder/reorderFolders) so a reorder
+  // can't check this folder, then find it gone when it writes.
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
+    await assertFolderOwned(userId, id, tx);
+    let deletedLinks = 0;
+    if (opts.withLinks) {
+      ({ count: deletedLinks } = await tx.link.deleteMany({
+        where: { userId, folderId: id },
+      }));
+    }
+    await tx.folder.delete({ where: { id } });
+    return { deletedLinks };
+  });
 }
