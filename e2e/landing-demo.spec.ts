@@ -137,7 +137,7 @@ test.describe("Landing demo", () => {
       await openDemo(page);
       await page.getByRole("button", { name: "Folder: Reading list" }).click();
       const menu = page.getByRole("menu");
-      for (const name of [/Home/, /New folder/, /Edit folder/, /Delete folder/]) {
+      for (const name of [/Home/, /New folder/, /Reorder folders/, /Edit folder/, /Delete folder/]) {
         await expect(menu.getByRole("menuitem", { name })).toHaveAttribute("aria-disabled", "true");
       }
       await menu.getByRole("menuitem", { name: /Getting started/ }).click();
@@ -158,11 +158,12 @@ test.describe("Landing demo", () => {
 
     test("a digit key switches folders and the URL stays /", async ({ page }) => {
       await openDemo(page);
-      // Menu order is by name: 2 = Design engineering, 3 = Getting started, 4 = Reading list.
+      // Menu order is the owner's (seed order here): 2 = Reading list,
+      // 3 = Getting started, 4 = Design engineering.
       await page.keyboard.press("3");
       await expect(page.getByRole("button", { name: "Folder: Getting started" })).toBeVisible();
       await expect(rows(page)).toHaveCount(2);
-      await page.keyboard.press("2");
+      await page.keyboard.press("4");
       await expect(page.getByText("No links in this folder yet")).toBeVisible();
       // 1 is Home, which would leave the page: it does nothing.
       await page.keyboard.press("1");

@@ -1,7 +1,7 @@
 import { expect, test, waitForHydration } from "./fixtures";
 
 // Digit keys switch folders: 1 = Home, then 2–9 and 0 for folders in menu
-// order (by name).
+// order (the user's order; seeded folders go last, like created ones).
 
 test.use({ colorScheme: "dark" });
 
