@@ -338,6 +338,8 @@ describe("putFolderOrder", () => {
         [LINKS_ORIGIN_HEADER]: LINKS_CLIENT_ORIGIN,
       },
       body: JSON.stringify({ ids: ["b", "a"] }),
+      // Bounded: a stalled save would hold folder updates and later saves.
+      signal: expect.any(AbortSignal),
     });
     expect(result).toEqual({ ok: true, data: { folders } });
   });

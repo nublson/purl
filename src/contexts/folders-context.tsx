@@ -164,8 +164,11 @@ export function FoldersProvider({
       released = true;
       heldRef.current -= 1;
       mutationCountRef.current += 1;
+      // Fetches dropped meanwhile may have carried other changes (counts, a
+      // folder added in another tab): fetch again once nothing is held.
+      if (heldRef.current === 0) refresh();
     };
-  }, []);
+  }, [refresh]);
 
   const value = useMemo<FoldersContextValue>(
     () => ({

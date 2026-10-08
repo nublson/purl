@@ -123,9 +123,7 @@ test.describe("Reorder folders in the folder menu", () => {
     await expect(menu).toBeVisible();
     await expect(page).toHaveURL(/\/home$/);
     await expect.poll(() => menuFolderNames(page)).toEqual(["Beta", "Gamma", "Alpha"]);
-    await expect(page.getByRole("status").filter({ hasText: "moved" })).toHaveText(
-      "Alpha moved to position 3 of 3",
-    );
+    await expect(menu.getByRole("status")).toHaveText("Alpha moved to position 3 of 3");
 
     await closeMenu(page);
     await page.waitForLoadState("networkidle");
@@ -133,6 +131,47 @@ test.describe("Reorder folders in the folder menu", () => {
     expect(await menuFolderNames(page)).toEqual(["Beta", "Gamma", "Alpha"]);
     await page.keyboard.press("2");
     await expect(page).toHaveURL(/\/folders\/beta$/);
+  });
+
+  test("releasing a drag over Home or New folder doesn't activate them", async ({ page, seed }) => {
+    await seedThree(seed);
+    await page.goto("/folders/gamma");
+    let menu = await openMenu(page);
+
+    // Overshoot up onto Home.
+    const home = menu.getByRole("menuitem", { name: /^Home/ });
+    let handle = await grip(folderRow(menu, "Beta"));
+    const homeBox = (await home.boundingBox())!;
+    await dragTo(page, handle, homeBox.y + homeBox.height / 2);
+    await expect(menu).toBeVisible();
+    await expect(page).toHaveURL(/\/folders\/gamma$/);
+    await expect.poll(() => menuFolderNames(page)).toEqual(["Beta", "Alpha", "Gamma"]);
+
+    // Overshoot down onto New folder.
+    menu = page.getByRole("menu");
+    const newFolder = menu.getByRole("menuitem", { name: "New folder" });
+    handle = await grip(folderRow(menu, "Beta"));
+    const newBox = (await newFolder.boundingBox())!;
+    await dragTo(page, handle, newBox.y + newBox.height / 2);
+    await expect(menu).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page).toHaveURL(/\/folders\/gamma$/);
+  });
+
+  test("moves are announced inside the open menu, and at the ends", async ({ page, seed }) => {
+    await seedThree(seed);
+    await page.goto("/home");
+    const menu = await openMenu(page);
+
+    const alpha = folderRow(menu, "Alpha");
+    await alpha.focus();
+    await page.keyboard.press("Alt+ArrowDown");
+    // Inside the menu: Radix hides everything outside an open menu from
+    // assistive tech, so a region there would never be read.
+    await expect(menu.getByRole("status")).toHaveText("Alpha moved to position 2 of 3");
+    await page.keyboard.press("Alt+ArrowDown");
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(menu.getByRole("status")).toHaveText("Alpha is already last");
   });
 
   test("pressing the grip without dragging doesn't open the folder", async ({ page, seed }) => {

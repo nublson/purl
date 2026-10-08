@@ -83,6 +83,11 @@ export function FolderSelectDropdown() {
   const canReorder = !isDemo && folders.length >= 2;
   const reorderHintId = React.useId();
   const [announcement, setAnnouncement] = React.useState("");
+  // Set by a drag; the menu swallows clicks meanwhile (see onClickCapture).
+  const suppressClicks = React.useRef(false);
+  const setSuppressClicks = React.useCallback((active: boolean) => {
+    suppressClicks.current = active;
+  }, []);
   // Motion's drag loads when the menu first opens (or the pointer nears its
   // trigger); until then rows show without grips, and ⌥↑ / ⌥↓ still work.
   const [ReorderableRows, setReorderableRows] = React.useState<
@@ -136,7 +141,11 @@ export function FolderSelectDropdown() {
     event.stopPropagation();
     const from = folders.findIndex((f) => f.id === folder.id);
     const to = event.key === "ArrowUp" ? from - 1 : from + 1;
-    if (from === -1 || to < 0 || to >= folders.length) return;
+    if (from === -1) return;
+    if (to < 0 || to >= folders.length) {
+      setAnnouncement(`${folder.name} is already ${to < 0 ? "first" : "last"}`);
+      return;
+    }
     const ids = folders.map((f) => f.id);
     ids.splice(from, 1);
     ids.splice(to, 0, folder.id);
@@ -234,7 +243,8 @@ export function FolderSelectDropdown() {
           {grip ? (
             <FolderGrip
               {...grip}
-              className="-my-1.5 -me-1.5 hidden size-8 pointer-coarse:flex"
+              // 32px drawn, 44px to the touch (invisible extension).
+              className="relative -my-1.5 -me-1.5 hidden size-8 pointer-coarse:flex after:absolute after:-inset-1.5"
             />
           ) : null}
         </Link>
@@ -268,16 +278,20 @@ export function FolderSelectDropdown() {
           onOpenChange={setDialogOpen}
         />
       ) : null}
-      {/* Outside the menu, so it outlives it. */}
-      <span role="status" aria-live="polite" className="sr-only">
-        {announcement}
-      </span>
+
       <DropdownWrapper
         open={menuOpen}
         onOpenChange={setMenuOpen}
         // Digits switch folders here too, ahead of the menu's typeahead.
         onKeyDown={(event) => {
           if (!event.repeat) goToShortcut(event);
+        }}
+        // A drag's release must not activate the item it lands on (a folder,
+        // Home, New/Edit/Delete): Radix clicks the item under a pointerup.
+        onClickCapture={(event) => {
+          if (!suppressClicks.current) return;
+          event.preventDefault();
+          event.stopPropagation();
         }}
         className="w-60"
         align="start"
@@ -368,14 +382,22 @@ export function FolderSelectDropdown() {
                   folders={folders}
                   onReorder={saveOrder}
                   renderRow={folderRow}
+                  onDragActiveChange={setSuppressClicks}
                 />
               )
               : folders.map((folder, index) => folderRow(folder, index))}
         </DropdownMenuGroup>
         {canReorder ? (
-          <span id={reorderHintId} className="sr-only">
-            Alt+Up or Alt+Down moves this folder.
-          </span>
+          <>
+            <span id={reorderHintId} className="sr-only">
+              Alt (Option) with Up or Down moves this folder.
+            </span>
+            {/* Inside the menu: Radix hides the rest of the page from
+                assistive tech while it's open, and moves only happen then. */}
+            <span role="status" aria-live="polite" className="sr-only">
+              {announcement}
+            </span>
+          </>
         ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuGroup>

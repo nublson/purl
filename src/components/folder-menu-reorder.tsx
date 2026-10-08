@@ -15,15 +15,20 @@ export type FolderGripProps = {
  * The folder menu's rows, draggable by their grips (Motion `Reorder`; this
  * module loads when the menu opens, keeping Motion's drag off first load).
  * The order changes live while dragging and is handed to `onReorder` once,
- * on the drop. A drag never opens the folder it started or ended on.
+ * on the drop. `onDragActiveChange` is true from the drag's start until just
+ * after its release: the menu swallows clicks meanwhile, so the release never
+ * opens a folder or activates the item it lands on (Radix clicks the item
+ * under a pointerup that started elsewhere).
  */
 export function ReorderableFolderRows({
   folders,
   onReorder,
   renderRow,
+  onDragActiveChange,
 }: {
   folders: FolderSummary[];
   onReorder: (ids: string[], moved: FolderSummary) => void;
+  onDragActiveChange: (active: boolean) => void;
   renderRow: (
     folder: FolderSummary,
     index: number,
@@ -44,20 +49,16 @@ export function ReorderableFolderRows({
   React.useLayoutEffect(() => {
     orderRef.current = order;
   });
-  // Set from the drag's start until just after its release, so the click
-  // that ends it (on any row) doesn't navigate or close the menu.
-  const suppressClicks = React.useRef(false);
 
   function dragStarted() {
-    suppressClicks.current = true;
+    onDragActiveChange(true);
     setDragging(true);
   }
 
   function dragEnded(folder: FolderSummary) {
     setDragging(false);
-    setTimeout(() => {
-      suppressClicks.current = false;
-    }, 0);
+    // After the release's click (Motion ends the drag after pointerup).
+    setTimeout(() => onDragActiveChange(false), 0);
     const ids = orderRef.current.map((f) => f.id);
     if (ids.some((id, index) => id !== folders[index]?.id)) {
       onReorder(ids, folder);
@@ -80,7 +81,6 @@ export function ReorderableFolderRows({
           folder={folder}
           onDragStart={dragStarted}
           onDragEnd={() => dragEnded(folder)}
-          suppressClicks={suppressClicks}
         >
           {(grip) => renderRow(folder, index, grip)}
         </ReorderableRow>
@@ -93,13 +93,11 @@ function ReorderableRow({
   folder,
   onDragStart,
   onDragEnd,
-  suppressClicks,
   children,
 }: {
   folder: FolderSummary;
   onDragStart: () => void;
   onDragEnd: () => void;
-  suppressClicks: React.RefObject<boolean>;
   children: (grip: FolderGripProps) => React.ReactNode;
 }) {
   const controls = useDragControls();
@@ -114,11 +112,6 @@ function ReorderableRow({
       // Above the rows it passes, on the menu's own background.
       className="relative rounded-md bg-popover"
       whileDrag={{ zIndex: 1, boxShadow: "0 6px 16px rgb(0 0 0 / 0.25)" }}
-      onClickCapture={(event) => {
-        if (!suppressClicks.current) return;
-        event.preventDefault();
-        event.stopPropagation();
-      }}
     >
       {children({
         onPointerDown: (event) => {

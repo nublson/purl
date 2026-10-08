@@ -144,6 +144,8 @@ export function removeFolder(
   );
 }
 
+const FOLDER_ORDER_TIMEOUT_MS = 15_000;
+
 /** Sets the folder order; `ids` lists every folder, first to last. */
 export function putFolderOrder(
   ids: string[],
@@ -151,6 +153,8 @@ export function putFolderOrder(
   return mutate<{ folders: FolderSummary[] }>("/api/folders/order", {
     method: "PUT",
     body: JSON.stringify({ ids }),
+    // A save holds folder refreshes and queues the next one: never for long.
+    signal: AbortSignal.timeout(FOLDER_ORDER_TIMEOUT_MS),
   }, "save the folder order");
 }
 
