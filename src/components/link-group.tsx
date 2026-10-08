@@ -96,9 +96,12 @@ export type LinkGridGroup = Omit<LinkGroupProps, "newLinkId">;
 export function LinkGrid({
   groups,
   newLinkId,
+  columns = LINK_GRID_COLUMNS,
 }: {
   groups: LinkGridGroup[];
   newLinkId?: string | null;
+  /** The grid's column classes (the landing demo stops at three). */
+  columns?: string;
 }) {
   const { masonry, listRef } = useMasonry(true);
   const pendingDeletes = usePendingLinkDeletes();
@@ -157,7 +160,7 @@ export function LinkGrid({
         masonry ? "auto-rows-[1px]" : "items-start",
         // Room for the first row's labels (16px, 8px above the card).
         "md:pt-6",
-        LINK_GRID_COLUMNS,
+        columns,
       )}
     >
       {cells.map((cell) => (

@@ -10,7 +10,8 @@ import {
 interface UserItemProps {
   user: {
     name: string;
-    email: string;
+    /** `@username`, under the name. */
+    handle: string;
     image?: string;
   };
 }
@@ -29,9 +30,9 @@ export function UserItem({ user }: UserItemProps) {
         <ItemTitle>{user?.name}</ItemTitle>
         <ItemDescription
           className="line-clamp-1 wrap-anywhere"
-          title={user?.email}
+          title={user?.handle}
         >
-          {user?.email}
+          {user?.handle}
         </ItemDescription>
       </ItemContent>
     </Item>

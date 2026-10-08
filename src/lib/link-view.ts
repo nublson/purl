@@ -62,3 +62,13 @@ export const LINK_GRID_COLUMNS =
 
 /** A page frame wide enough for four cards and their gaps (4×210 + 3×40). */
 export const LINK_GRID_FRAME = "mx-auto w-full max-w-[960px]";
+
+/**
+ * The landing demo's grid: `LINK_GRID_COLUMNS` stopping at three columns,
+ * which suit the narrower product panel.
+ */
+export const DEMO_GRID_COLUMNS =
+  "grid-cols-[repeat(2,minmax(0,210px))] justify-center gap-x-4 sm:grid-cols-[repeat(3,minmax(0,210px))] md:gap-x-10";
+
+/** A frame for three cards and their gaps (3×210 + 2×40). */
+export const DEMO_GRID_FRAME = "mx-auto w-full max-w-[710px]";

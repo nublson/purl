@@ -26,8 +26,7 @@ import { FolderTagsMenuItem, ViewModeMenu } from "./view-mode-menu";
 export function User() {
   const { user } = useCurrentUser();
   const { signOut } = useAuth();
-  // The landing page's demo: the account's actions are shown but off, and the
-  // demo user has no email, so the header shows the handle instead.
+  // The landing page's demo: the account's actions are shown but off.
   const isDemo = useIsDemo();
 
   // Owned here, not inside SettingsDialog/its dropdown trigger: Radix only
@@ -107,7 +106,7 @@ export function User() {
             user={{
               image: user?.image ?? "",
               name: user?.name ?? "",
-              email: isDemo ? `@${user?.username}` : (user?.email ?? ""),
+              handle: user?.username ? `@${user.username}` : "",
             }}
           />
           <DropdownMenuSeparator />
