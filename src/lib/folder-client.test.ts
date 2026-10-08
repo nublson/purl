@@ -7,6 +7,7 @@ import {
   patchLinkFolder,
   patchLinksFolder,
   postFolder,
+  putFolderOrder,
   removeFolder,
 } from "./folder-client";
 
@@ -313,6 +314,47 @@ describe("patchLinksFolder", () => {
     expect(await patchLinksFolder(["l1"], "nope")).toEqual({
       ok: false,
       error: "Folder not found",
+    });
+  });
+});
+
+describe("putFolderOrder", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("PUTs the ids to /api/folders/order with the origin header", async () => {
+    const folders = [{ id: "b" }, { id: "a" }];
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ folders }), { status: 200 }),
+    );
+
+    const result = await putFolderOrder(["b", "a"]);
+
+    expect(fetchSpy).toHaveBeenCalledWith("/api/folders/order", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        [LINKS_ORIGIN_HEADER]: LINKS_CLIENT_ORIGIN,
+      },
+      body: JSON.stringify({ ids: ["b", "a"] }),
+      // Bounded: a stalled save would hold folder updates and later saves.
+      signal: expect.any(AbortSignal),
+    });
+    expect(result).toEqual({ ok: true, data: { folders } });
+  });
+
+  it("passes the API's code through on failure", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ error: "Stale", code: "INVALID_ORDER" }), {
+        status: 400,
+      }),
+    );
+
+    expect(await putFolderOrder(["a"])).toEqual({
+      ok: false,
+      error: "Stale",
+      code: "INVALID_ORDER",
     });
   });
 });

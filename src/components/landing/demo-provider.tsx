@@ -26,13 +26,14 @@ export function DemoProvider({
 }) {
   const folders = useMemo<FolderSummary[]>(
     () =>
-      data.folders.map((f) => ({
+      data.folders.map((f, i) => ({
         id: f.id,
         name: f.name,
         slug: f.slug,
         emoji: f.emoji,
         description: f.description,
         isPublic: true,
+        position: i + 1,
         linkCount: f.linkCount,
       })),
     [data.folders],

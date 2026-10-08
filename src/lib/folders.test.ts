@@ -6,6 +6,7 @@ vi.mock("@/lib/prisma", () => ({
       findMany: vi.fn(),
       findFirst: vi.fn(),
       count: vi.fn(),
+      aggregate: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -39,6 +40,8 @@ const {
   FolderUpdateEmptyError,
   DEFAULT_FOLDER_EMOJI,
   assertFolderOwned,
+  reorderFolders,
+  InvalidFolderOrderError,
 } = await import("./folders");
 const { MAX_FOLDERS } = await import("./limits");
 
@@ -50,6 +53,7 @@ const { MAX_FOLDERS } = await import("./limits");
 const txExecuteRaw = vi.fn();
 const tx = {
   folder: prisma.folder,
+  link: prisma.link,
   folderSlugRedirect: prisma.folderSlugRedirect,
   $executeRaw: txExecuteRaw,
 };
@@ -59,6 +63,9 @@ function resetMocks() {
   vi.mocked(prisma.folder.findMany).mockReset();
   vi.mocked(prisma.folder.findFirst).mockReset();
   vi.mocked(prisma.folder.count).mockReset();
+  vi.mocked(prisma.folder.aggregate)
+    .mockReset()
+    .mockResolvedValue({ _max: { position: null } } as never);
   vi.mocked(prisma.folder.create).mockReset();
   vi.mocked(prisma.folder.update).mockReset();
   vi.mocked(prisma.folder.delete).mockReset();
@@ -173,6 +180,7 @@ describe("createFolder", () => {
       emoji: DEFAULT_FOLDER_EMOJI,
       description: null,
       isPublic: false,
+      position: 0,
       linkCount: 0,
     });
     expect(prisma.folder.create).toHaveBeenCalledWith(
@@ -245,9 +253,10 @@ describe("createFolder", () => {
         }),
         findFirst: vi.fn(async () => null),
         findMany: vi.fn(async () => []),
+        aggregate: vi.fn(async () => ({ _max: { position: null } })),
         create: vi.fn(async () => {
           order.push("create");
-          return { id: "new-id", name: "Books", slug: "books", _count: { links: 0 } };
+          return { id: "new-id", name: "Books", slug: "books", position: 1, _count: { links: 0 } };
         }),
       },
     };
@@ -264,6 +273,7 @@ describe("createFolder", () => {
       emoji: DEFAULT_FOLDER_EMOJI,
       description: null,
       isPublic: false,
+      position: 1,
       linkCount: 0,
     });
     expect(order).toEqual([
@@ -279,6 +289,7 @@ describe("createFolder", () => {
           slug: "books",
           emoji: null,
           description: null,
+          position: 1,
         },
       }),
     );
@@ -294,6 +305,143 @@ describe("createFolder", () => {
     expect(err).toBeInstanceOf(FolderLimitError);
     expect(txExecuteRaw).toHaveBeenCalledTimes(1);
     expect(prisma.folder.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("createFolder position", () => {
+  beforeEach(resetMocks);
+
+  it("puts a new folder after the last one", async () => {
+    vi.mocked(prisma.folder.count).mockResolvedValue(3);
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.folder.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.folder.aggregate).mockResolvedValue({
+      _max: { position: 7 },
+    } as never);
+    vi.mocked(prisma.folder.create).mockResolvedValue({
+      id: "f",
+      name: "Books",
+      slug: "books",
+      position: 8,
+      _count: { links: 0 },
+    } as never);
+
+    await createFolder("user-1", "Books");
+
+    expect(prisma.folder.aggregate).toHaveBeenCalledWith({
+      where: { userId: "user-1" },
+      _max: { position: true },
+    });
+    expect(prisma.folder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ position: 8 }),
+      }),
+    );
+  });
+
+  it("starts a first folder at 1", async () => {
+    vi.mocked(prisma.folder.count).mockResolvedValue(0);
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.folder.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.folder.create).mockResolvedValue({
+      id: "f",
+      name: "Books",
+      slug: "books",
+      position: 1,
+      _count: { links: 0 },
+    } as never);
+
+    await createFolder("user-1", "Books");
+
+    expect(prisma.folder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ position: 1 }),
+      }),
+    );
+  });
+});
+
+describe("listFoldersForUser", () => {
+  beforeEach(resetMocks);
+
+  it("orders by position then name in the database", async () => {
+    vi.mocked(prisma.folder.findMany).mockResolvedValue([
+      { id: "z", name: "Zeta", slug: "zeta", position: 1, _count: { links: 0 } },
+      { id: "a", name: "alpha", slug: "alpha", position: 2, _count: { links: 2 } },
+    ] as never);
+
+    const folders = await listFoldersForUser("user-1");
+
+    expect(prisma.folder.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "user-1" },
+        orderBy: [{ position: "asc" }, { name: "asc" }],
+      }),
+    );
+    expect(folders.map((f) => [f.name, f.position])).toEqual([
+      ["Zeta", 1],
+      ["alpha", 2],
+    ]);
+  });
+});
+
+describe("reorderFolders", () => {
+  beforeEach(() => {
+    resetMocks();
+    // First call: the ownership check inside the transaction (ids only).
+    // Later calls: listFoldersForUser after it.
+    vi.mocked(prisma.folder.findMany)
+      .mockResolvedValueOnce([{ id: "a" }, { id: "b" }, { id: "c" }] as never)
+      .mockResolvedValue([
+        { id: "c", name: "C", slug: "c", position: 1, _count: { links: 0 } },
+        { id: "a", name: "A", slug: "a", position: 2, _count: { links: 0 } },
+        { id: "b", name: "B", slug: "b", position: 3, _count: { links: 0 } },
+      ] as never);
+  });
+
+  it("writes positions 1..n in one statement and returns the new order", async () => {
+    txExecuteRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(3);
+
+    const result = await reorderFolders("user-1", ["c", "a", "b"]);
+
+    expect(txExecuteRaw).toHaveBeenCalledTimes(2);
+    const [lockSql, lockUser] = txExecuteRaw.mock.calls[0];
+    expect(lockSql.join("?")).toContain("pg_advisory_xact_lock");
+    expect(lockUser).toBe("user-1");
+    const [updateSql, ...values] = txExecuteRaw.mock.calls[1];
+    expect(updateSql.join("?")).toMatch(/UPDATE "folders"[\s\S]*WITH ORDINALITY/);
+    expect(values).toEqual([["c", "a", "b"], "user-1"]);
+    expect(prisma.folder.update).not.toHaveBeenCalled();
+    expect(result.map((f) => f.id)).toEqual(["c", "a", "b"]);
+  });
+
+  it("rejects the order when a folder vanished before the write", async () => {
+    // Only two of three rows updated: one was deleted after the check.
+    txExecuteRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(2);
+
+    await expect(
+      reorderFolders("user-1", ["c", "a", "b"]),
+    ).rejects.toBeInstanceOf(InvalidFolderOrderError);
+  });
+
+  it.each([
+    ["a missing id", ["a", "b"]],
+    ["an extra id", ["a", "b", "c", "x"]],
+    ["a duplicate id", ["a", "a", "b", "c"]],
+    ["another user's id", ["a", "b", "x"]],
+  ])("rejects %s", async (_label, ids) => {
+    await expect(reorderFolders("user-1", ids)).rejects.toBeInstanceOf(
+      InvalidFolderOrderError,
+    );
+    // Only the lock ran: no write.
+    expect(txExecuteRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts an empty list for a user with no folders", async () => {
+    vi.mocked(prisma.folder.findMany).mockReset().mockResolvedValue([]);
+
+    await expect(reorderFolders("user-1", [])).resolves.toEqual([]);
+    expect(txExecuteRaw).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -340,6 +488,7 @@ describe("updateFolder", () => {
       emoji: DEFAULT_FOLDER_EMOJI,
       description: null,
       isPublic: false,
+      position: 0,
       linkCount: 3,
     });
     expect(prisma.folder.findFirst).toHaveBeenNthCalledWith(2, {
@@ -479,6 +628,7 @@ describe("updateFolder", () => {
       emoji: "📚",
       description: null,
       isPublic: false,
+      position: 0,
       linkCount: 2,
     });
     expect(prisma.folder.update).toHaveBeenCalledWith(
@@ -788,6 +938,13 @@ describe("folder description", () => {
 describe("deleteFolder", () => {
   beforeEach(resetMocks);
 
+  const owned = {
+    id: "folder-1",
+    name: "Books",
+    slug: "books",
+    userId: "user-1",
+  };
+
   it("treats another user's folder as not found", async () => {
     vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
 
@@ -795,25 +952,37 @@ describe("deleteFolder", () => {
       withLinks: false,
     }).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(FolderNotFoundError);
+    expect(prisma.folder.delete).not.toHaveBeenCalled();
+  });
+
+  it("takes the per-user lock before checking and deleting", async () => {
+    const order: string[] = [];
+    txExecuteRaw.mockImplementation(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      order.push(`lock:${strings.join("?")}:${values.join(",")}`);
+      return 1;
+    });
+    vi.mocked(prisma.folder.findFirst).mockImplementation((async () => {
+      order.push("check");
+      return owned;
+    }) as never);
+    vi.mocked(prisma.folder.delete).mockImplementation((async () => {
+      order.push("delete");
+      return {};
+    }) as never);
+
+    await deleteFolder("user-1", "folder-1", { withLinks: false });
+
+    expect(order).toEqual([
+      "lock:SELECT pg_advisory_xact_lock(hashtext(?)):user-1",
+      "check",
+      "delete",
+    ]);
   });
 
   it("deletes only this folder's links when withLinks", async () => {
-    vi.mocked(prisma.folder.findFirst).mockResolvedValue({
-      id: "folder-1",
-      name: "Books",
-      slug: "books",
-      userId: "user-1",
-    } as never);
-    // Sentinels (not just default `undefined`) so the $transaction assertion
-    // below actually pins which two operations were batched, in order —
-    // rather than trivially matching because both calls return `undefined`.
-    const deleteManySentinel = Symbol("deleteMany-op");
-    const deleteSentinel = Symbol("delete-op");
-    vi.mocked(prisma.link.deleteMany).mockReturnValue(
-      deleteManySentinel as never,
-    );
-    vi.mocked(prisma.folder.delete).mockReturnValue(deleteSentinel as never);
-    vi.mocked(prisma.$transaction).mockResolvedValue([{ count: 5 }, {}]);
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue(owned as never);
+    vi.mocked(prisma.link.deleteMany).mockResolvedValue({ count: 5 } as never);
+    vi.mocked(prisma.folder.delete).mockResolvedValue({} as never);
 
     const result = await deleteFolder("user-1", "folder-1", {
       withLinks: true,
@@ -825,20 +994,11 @@ describe("deleteFolder", () => {
     expect(prisma.folder.delete).toHaveBeenCalledWith({
       where: { id: "folder-1" },
     });
-    expect(prisma.$transaction).toHaveBeenCalledWith([
-      deleteManySentinel,
-      deleteSentinel,
-    ]);
     expect(result).toEqual({ deletedLinks: 5 });
   });
 
   it("keeps links when not withLinks", async () => {
-    vi.mocked(prisma.folder.findFirst).mockResolvedValue({
-      id: "folder-1",
-      name: "Books",
-      slug: "books",
-      userId: "user-1",
-    } as never);
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue(owned as never);
     vi.mocked(prisma.folder.delete).mockResolvedValue({} as never);
 
     const result = await deleteFolder("user-1", "folder-1", {
@@ -848,7 +1008,7 @@ describe("deleteFolder", () => {
     expect(prisma.folder.delete).toHaveBeenCalledWith({
       where: { id: "folder-1" },
     });
-    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.link.deleteMany).not.toHaveBeenCalled();
   });
 });
 
@@ -873,18 +1033,17 @@ describe("assertFolderOwned", () => {
   });
 });
 
-describe("listFoldersForUser", () => {
+describe("listFoldersForUser summaries", () => {
   beforeEach(resetMocks);
 
-  it("orders by name, case-insensitive", async () => {
+  it("keeps the database's order and maps rows to summaries", async () => {
     vi.mocked(prisma.folder.findMany).mockResolvedValue([
-      { id: "1", name: "banana", slug: "banana", emoji: null, _count: { links: 0 } },
-      { id: "2", name: "Apple", slug: "apple", emoji: "🍎", _count: { links: 2 } },
-      { id: "3", name: "cherry", slug: "cherry", _count: { links: 1 } },
+      { id: "2", name: "Apple", slug: "apple", emoji: "🍎", position: 1, _count: { links: 2 } },
+      { id: "1", name: "banana", slug: "banana", emoji: null, position: 2, _count: { links: 0 } },
     ] as never);
 
     const result = await listFoldersForUser("user-1");
-    expect(result.map((f) => f.name)).toEqual(["Apple", "banana", "cherry"]);
+    expect(result.map((f) => f.name)).toEqual(["Apple", "banana"]);
     expect(result[1]).toEqual({
       id: "1",
       name: "banana",
@@ -892,6 +1051,7 @@ describe("listFoldersForUser", () => {
       emoji: DEFAULT_FOLDER_EMOJI,
       description: null,
       isPublic: false,
+      position: 2,
       linkCount: 0,
     });
     // A stored emoji wins over the default.
@@ -924,6 +1084,7 @@ describe("getFolderBySlug", () => {
       emoji: "📚",
       description: null,
       isPublic: false,
+      position: 0,
       linkCount: 4,
     });
   });

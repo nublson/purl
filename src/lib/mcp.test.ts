@@ -25,6 +25,7 @@ const mockListFoldersForUser = vi.fn();
 const mockCreateFolder = vi.fn();
 const mockUpdateFolder = vi.fn();
 const mockDeleteFolder = vi.fn();
+const mockReorderFolders = vi.fn();
 class MockFolderNotFoundError extends Error {
   constructor() { super("Folder not found."); }
 }
@@ -33,11 +34,16 @@ class MockFolderEmojiError extends Error {}
 class MockFolderDescriptionError extends Error {}
 class MockFolderUpdateEmptyError extends Error {}
 class MockFolderLimitError extends Error {}
+class MockInvalidFolderOrderError extends Error {
+  constructor() { super("The order must list each of your folders exactly once."); }
+}
 vi.mock("@/lib/folders", () => ({
   listFoldersForUser: mockListFoldersForUser,
   createFolder: mockCreateFolder,
   updateFolder: mockUpdateFolder,
   deleteFolder: mockDeleteFolder,
+  reorderFolders: mockReorderFolders,
+  InvalidFolderOrderError: MockInvalidFolderOrderError,
   FolderNotFoundError: MockFolderNotFoundError,
   FolderNameError: MockFolderNameError,
   FolderEmojiError: MockFolderEmojiError,
@@ -74,6 +80,7 @@ const {
   createFolderTool,
   updateFolderTool,
   deleteFolderTool,
+  reorderFoldersTool,
   moveLinkTool,
   moveLinksTool,
 } = await import("./mcp");
@@ -104,6 +111,7 @@ describe("registerPurlTools", () => {
       "create_folder",
       "update_folder",
       "delete_folder",
+      "reorder_folders",
       "move_link",
       "move_links",
       "mark_links_read",
@@ -438,6 +446,28 @@ describe("listFoldersTool", () => {
     const result = await listFoldersTool("user-1");
     expect(mockListFoldersForUser).toHaveBeenCalledWith("user-1");
     expect(parse(result)).toEqual(folders);
+  });
+});
+
+describe("reorderFoldersTool", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("reorders, broadcasts, and returns the folders", async () => {
+    const folders = [{ id: "b" }, { id: "a" }];
+    mockReorderFolders.mockResolvedValue(folders);
+    const result = await reorderFoldersTool("user-1", ["b", "a"]);
+    expect(mockReorderFolders).toHaveBeenCalledWith("user-1", ["b", "a"]);
+    expect(mockBroadcast).toHaveBeenCalledWith("user-1");
+    expect(parse(result)).toEqual(folders);
+  });
+
+  it("reports a stale or partial list as a tool error pointing at list_folders", async () => {
+    mockReorderFolders.mockRejectedValue(new MockInvalidFolderOrderError());
+    const result = await reorderFoldersTool("user-1", ["a"]);
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("exactly once");
+    expect(result.content[0].text).toContain("list_folders");
+    expect(mockBroadcast).not.toHaveBeenCalled();
   });
 });
 

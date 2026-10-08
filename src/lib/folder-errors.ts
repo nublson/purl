@@ -5,7 +5,9 @@ import {
   FolderNameError,
   FolderNotFoundError,
   FolderUpdateEmptyError,
+  InvalidFolderOrderError,
 } from "@/lib/folders";
+import { MAX_FOLDERS } from "@/lib/limits";
 import { NextResponse } from "next/server";
 
 const NAME_ERROR_CODES: Record<FolderNameError["reason"], string> = {
@@ -22,7 +24,8 @@ const NAME_ERROR_STATUS: Record<FolderNameError["reason"], number> = {
 
 /**
  * Maps the folder library's errors (`FolderNameError`, `FolderEmojiError`,
- * `FolderDescriptionError`, `FolderUpdateEmptyError`, `FolderLimitError`, `FolderNotFoundError`) to the shared API response shape used by both the
+ * `FolderDescriptionError`, `FolderUpdateEmptyError`, `FolderLimitError`, `FolderNotFoundError`,
+ * `InvalidFolderOrderError`) to the shared API response shape used by both the
  * browser-session `/api/folders` routes and the API-key `/api/v1/folders`
  * routes. Returns `null` when `e` isn't one of these, so callers can
  * `throw e` unchanged.
@@ -43,6 +46,12 @@ export function mapFolderError(e: unknown): NextResponse | null {
   if (e instanceof FolderDescriptionError) {
     return NextResponse.json(
       { error: e.message, code: "INVALID_DESCRIPTION" },
+      { status: 400 },
+    );
+  }
+  if (e instanceof InvalidFolderOrderError) {
+    return NextResponse.json(
+      { error: e.message, code: "INVALID_ORDER" },
       { status: 400 },
     );
   }
@@ -108,4 +117,24 @@ export function parseIsPublicField(
     { error: "isPublic must be true or false.", code: "INVALID_PUBLIC" },
     { status: 400 },
   );
+}
+
+/**
+ * Parses a folder-order body (`{ ids: string[] }`) for `PUT .../folders/order`;
+ * anything else is a 400. Whether the ids are the user's folders is checked
+ * by `reorderFolders`.
+ */
+export function parseFolderOrderBody(body: unknown): string[] | NextResponse {
+  const ids = (body as { ids?: unknown } | null)?.ids;
+  if (!Array.isArray(ids) || !ids.every((id) => typeof id === "string")) {
+    return NextResponse.json(
+      { error: "ids must be an array of folder ids" },
+      { status: 400 },
+    );
+  }
+  // More than anyone can have: reject before taking the lock or querying.
+  if (ids.length > MAX_FOLDERS) {
+    return mapFolderError(new InvalidFolderOrderError())!;
+  }
+  return ids;
 }

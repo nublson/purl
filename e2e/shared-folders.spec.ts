@@ -464,3 +464,28 @@ test.describe("Share popover", () => {
     }
   });
 });
+
+test.describe("The header's Share button", () => {
+  for (const isPublic of [false, true]) {
+    const name = isPublic ? "Public, sharing settings" : "Share";
+    const label = isPublic ? "Public" : "Share";
+
+    test(`${isPublic ? "public" : "private"}: labelled from lg, icon-only below`, async ({ page, seed }) => {
+      await seed.folder({ name: "Design", slug: "design", isPublic });
+
+      await page.setViewportSize({ width: 1280, height: 800 });
+      await page.goto("/folders/design");
+      const button = page.getByRole("button", { name });
+      // innerText: only what's rendered (the hidden label is still in the DOM).
+      await expect(button).toHaveText(label, { useInnerText: true });
+
+      // Just under Tailwind's lg (1024px): the icon alone, a 32px square,
+      // with the same accessible name.
+      await page.setViewportSize({ width: 1023, height: 800 });
+      await expect(button).toHaveText("", { useInnerText: true });
+      const box = (await button.boundingBox())!;
+      expect(Math.round(box.width)).toBe(32);
+      expect(Math.round(box.height)).toBe(32);
+    });
+  }
+});

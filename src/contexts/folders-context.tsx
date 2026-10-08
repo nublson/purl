@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchFolders } from "@/lib/folder-client";
+import { byPosition } from "@/lib/folder-order";
 import type { FolderSummary } from "@/lib/folders";
 import { useLinksSyncState } from "@/hooks/use-links-sync";
 import {
@@ -28,6 +29,14 @@ export interface FoldersContextValue {
   upsertFolder: (folder: FolderSummary) => void;
   /** Removes a folder locally (delete), ahead of the background refetch. */
   removeFolderLocally: (id: string) => void;
+  /** Replaces the whole list as given (a reorder, or its rollback). */
+  replaceFolders: (folders: FolderSummary[]) => void;
+  /**
+   * Drops background fetch results until the returned release runs (a save
+   * in flight), so a fetch that read the old order can't land over the new
+   * one. Releasing also drops fetches that started during the hold.
+   */
+  holdFetches: () => () => void;
 }
 
 const FoldersContext = createContext<FoldersContextValue>({
@@ -37,11 +46,9 @@ const FoldersContext = createContext<FoldersContextValue>({
   refresh: () => {},
   upsertFolder: () => {},
   removeFolderLocally: () => {},
+  replaceFolders: () => {},
+  holdFetches: () => () => {},
 });
-
-const collator = new Intl.Collator(undefined, { sensitivity: "base" });
-const byName = (a: FolderSummary, b: FolderSummary) =>
-  collator.compare(a.name, b.name);
 
 /**
  * Single source of truth for the signed-in user's folders. Fetches once on
@@ -84,6 +91,7 @@ export function FoldersProvider({
   const [isLoading, setIsLoading] = useState(!initialFolders);
   const [refreshToken, setRefreshToken] = useState(0);
   const mutationCountRef = useRef(0);
+  const heldRef = useRef(0);
   // True once the effect below has run once while seeded. Lets the very
   // first (mount) run skip its fetch when server-seeded data is already
   // fresh, while any later run — a version bump or refresh() — still
@@ -105,6 +113,7 @@ export function FoldersProvider({
       .then((data) => {
         if (cancelled) return;
         if (mutationCountRef.current !== mutationCountAtStart) return;
+        if (heldRef.current > 0) return;
         setFolders(data);
       })
       .catch(() => {
@@ -129,10 +138,10 @@ export function FoldersProvider({
     mutationCountRef.current += 1;
     setFolders((current) => {
       const idx = current.findIndex((f) => f.id === folder.id);
-      if (idx === -1) return [...current, folder].sort(byName);
+      if (idx === -1) return [...current, folder].sort(byPosition);
       const next = [...current];
       next[idx] = folder;
-      return next.sort(byName);
+      return next.sort(byPosition);
     });
   }, []);
 
@@ -140,6 +149,25 @@ export function FoldersProvider({
     mutationCountRef.current += 1;
     setFolders((current) => current.filter((f) => f.id !== id));
   }, []);
+
+  const replaceFolders = useCallback((next: FolderSummary[]) => {
+    mutationCountRef.current += 1;
+    setFolders(next);
+  }, []);
+
+  const holdFetches = useCallback(() => {
+    heldRef.current += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      heldRef.current -= 1;
+      mutationCountRef.current += 1;
+      // Fetches dropped meanwhile may have carried other changes (counts, a
+      // folder added in another tab): fetch again once nothing is held.
+      if (heldRef.current === 0) refresh();
+    };
+  }, [refresh]);
 
   const value = useMemo<FoldersContextValue>(
     () => ({
@@ -149,6 +177,8 @@ export function FoldersProvider({
       refresh,
       upsertFolder,
       removeFolderLocally,
+      replaceFolders,
+      holdFetches,
     }),
     [
       folders,
@@ -157,6 +187,8 @@ export function FoldersProvider({
       refresh,
       upsertFolder,
       removeFolderLocally,
+      replaceFolders,
+      holdFetches,
     ],
   );
 

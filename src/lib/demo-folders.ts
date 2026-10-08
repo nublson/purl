@@ -14,7 +14,7 @@ import {
 } from "@/lib/public-folders";
 
 /**
- * The demo account's public folders (by name) with their newest links, for
+ * The demo account's public folders (in its owner's order) with their newest links, for
  * the landing page. Current username only (no redirects). `null` when the
  * account is missing or shares nothing. Only public fields are returned.
  */
@@ -29,7 +29,7 @@ export async function getDemoFolders(
 
   const folders = await prisma.folder.findMany({
     where: { userId: user.id, isPublic: true },
-    orderBy: { name: "asc" },
+    orderBy: [{ position: "asc" }, { name: "asc" }],
     select: {
       id: true,
       ...PUBLIC_FOLDER_SELECT,

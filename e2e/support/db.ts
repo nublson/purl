@@ -107,8 +107,10 @@ export async function seedFolder(
 ): Promise<string> {
   const id = randomUUID();
   await pool.query(
-    `INSERT INTO "folders" ("id", "name", "slug", "emoji", "description", "isPublic", "userId", "updatedAt")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, now())`,
+    // Last in the user's order, like a folder created in the app.
+    `INSERT INTO "folders" ("id", "name", "slug", "emoji", "description", "isPublic", "userId", "position", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7,
+       (SELECT COALESCE(MAX("position"), 0) + 1 FROM "folders" WHERE "userId" = $7), now())`,
     [id, name, slug, emoji ?? null, description ?? null, isPublic, userId],
   );
   return id;

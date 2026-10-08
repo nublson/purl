@@ -9,12 +9,14 @@ import {
   patchLinkFolder,
   patchLinksFolder,
   postFolder,
+  putFolderOrder,
   removeFolder,
   type ActionResult,
   type CreateFolderInput,
   type UpdateFolderInput,
 } from "@/lib/folder-client";
 import type { FolderSummary } from "@/lib/folders";
+import { saveFolderOrder } from "@/lib/folder-order";
 import { resolveCurrentFolder } from "@/lib/current-folder";
 import {
   formatBulkMoveMessage,
@@ -24,7 +26,7 @@ import {
 import { announceLinksMoved } from "@/lib/leaving-links";
 import { MAX_FOLDERS } from "@/lib/limits";
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 
 export type { ActionResult, CreateFolderInput, FolderSummary, UpdateFolderInput };
@@ -119,9 +121,17 @@ export function useFolderActions(): {
     folderId: string | null,
     opts?: { target?: FolderSummary; quietError?: boolean },
   ) => Promise<ActionResult<{ moved: number }>>;
+  reorderFolders: (ids: string[]) => Promise<ActionResult<FolderSummary[]>>;
 } {
-  const { folders, upsertFolder, removeFolderLocally, initialTotalLinks } =
-    useFoldersContext();
+  const {
+    folders,
+    upsertFolder,
+    removeFolderLocally,
+    replaceFolders,
+    holdFetches,
+    refresh,
+    initialTotalLinks,
+  } = useFoldersContext();
   const { notifyLinksChanged, setLinksTotal } = useLinksSyncActions();
   const { total } = useLinksSyncState();
   const router = useRouter();
@@ -352,8 +362,54 @@ export function useFolderActions(): {
     [folders, notifyLinksChanged],
   );
 
+  // Order only: no links change, so no notifyLinksChanged() (other tabs hear
+  // the server's broadcast). Each drop saves: requests go one at a time, in
+  // order (so the server ends on the last), and only the latest save's
+  // response touches the list. Failures toast; there's no Undo.
+  const saveChain = useRef<Promise<unknown>>(Promise.resolve());
+  const latestSave = useRef(0);
+  // The order before the first save still in flight: where a failure rolls
+  // back to, not an earlier drop's unconfirmed order.
+  const lastSaved = useRef<FolderSummary[] | null>(null);
+  const reorderFolders = useCallback(
+    (ids: string[]) => {
+      const save = ++latestSave.current;
+      lastSaved.current ??= folders;
+      const rollbackTo = lastSaved.current;
+      return saveFolderOrder(ids, {
+        previous: folders,
+        rollbackTo,
+        setFolders: replaceFolders,
+        // Accepted edge case: a save that times out (15s) is aborted here but
+        // may still run on the server while the next one is sent, so the two
+        // can land in either order (the lock serializes them). Either way the
+        // list converges: a failure refreshes, and the next success adopts
+        // the server's list.
+        put: (order) => {
+          const request = saveChain.current.then(() => putFolderOrder(order));
+          saveChain.current = request.catch(() => {});
+          return request;
+        },
+        refresh,
+        notify: (message) => toast.error(message),
+        hold: holdFetches,
+        isCurrent: () => save === latestSave.current,
+      }).finally(() => {
+        if (save === latestSave.current) lastSaved.current = null;
+      });
+    },
+    [folders, replaceFolders, holdFetches, refresh],
+  );
+
   return useMemo(
-    () => ({ createFolder, updateFolder, deleteFolder, moveLink, moveLinks }),
-    [createFolder, updateFolder, deleteFolder, moveLink, moveLinks],
+    () => ({
+      createFolder,
+      updateFolder,
+      deleteFolder,
+      moveLink,
+      moveLinks,
+      reorderFolders,
+    }),
+    [createFolder, updateFolder, deleteFolder, moveLink, moveLinks, reorderFolders],
   );
 }

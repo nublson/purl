@@ -42,6 +42,8 @@ export type FolderSummary = {
   description: string | null;
   /** Readable by anyone at `/@username/slug` (not indexed by search engines). */
   isPublic: boolean;
+  /** The user's manual order (ascending; ties break by name). */
+  position: number;
   linkCount: number;
 };
 
@@ -88,6 +90,17 @@ export class FolderLimitError extends Error {
   readonly feature = "FOLDER_LIMIT";
 }
 
+/**
+ * Thrown when a reorder's ids aren't exactly the user's folders (one missing,
+ * extra, repeated, or someone else's). Routes map this to 400 `INVALID_ORDER`.
+ */
+export class InvalidFolderOrderError extends Error {
+  readonly name = "InvalidFolderOrderError";
+  constructor() {
+    super("The order must list each of your folders exactly once.");
+  }
+}
+
 type FolderRowWithCount = {
   id: string;
   name: string;
@@ -95,6 +108,7 @@ type FolderRowWithCount = {
   emoji?: string | null;
   description?: string | null;
   isPublic?: boolean;
+  position?: number;
   _count: { links: number };
 };
 
@@ -106,6 +120,7 @@ function toSummary(row: FolderRowWithCount): FolderSummary {
     emoji: row.emoji || DEFAULT_FOLDER_EMOJI,
     description: row.description || null,
     isPublic: row.isPublic ?? false,
+    position: row.position ?? 0,
     linkCount: row._count.links,
   };
 }
@@ -249,8 +264,9 @@ function isUniqueConstraintError(error: unknown): boolean {
 export async function assertFolderOwned(
   userId: string,
   folderId: string,
+  db: Db = prisma,
 ): Promise<void> {
-  const existing = await prisma.folder.findFirst({
+  const existing = await db.folder.findFirst({
     where: { id: folderId, userId },
   });
   if (!existing) {
@@ -258,17 +274,57 @@ export async function assertFolderOwned(
   }
 }
 
-/** Lists the user's folders with their link counts, ordered by name (case-insensitive). */
+/** Lists the user's folders with their link counts, in the user's order (position, then name). */
 export async function listFoldersForUser(
   userId: string,
 ): Promise<FolderSummary[]> {
   const rows = await prisma.folder.findMany({
     where: { userId },
     include: { _count: { select: { links: true } } },
+    orderBy: [{ position: "asc" }, { name: "asc" }],
   });
-  return (rows as FolderRowWithCount[])
-    .map(toSummary)
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+  return (rows as FolderRowWithCount[]).map(toSummary);
+}
+
+/**
+ * Sets the user's folder order: `ids` must list every one of their folders
+ * exactly once, first to last (positions become 1..n). A stale or partial
+ * list throws `InvalidFolderOrderError` and writes nothing. Takes the same
+ * per-user lock as `createFolder` and `deleteFolder`, so a folder created or
+ * deleted meanwhile can't slip between the check and the write.
+ */
+export async function reorderFolders(
+  userId: string,
+  ids: string[],
+): Promise<FolderSummary[]> {
+  await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
+    const owned = await tx.folder.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+    const ownedIds = new Set(owned.map((folder) => folder.id));
+    const unique = new Set(ids);
+    if (
+      unique.size !== ids.length ||
+      ids.length !== ownedIds.size ||
+      !ids.every((id) => ownedIds.has(id))
+    ) {
+      throw new InvalidFolderOrderError();
+    }
+    if (ids.length === 0) return;
+    // One statement, not a round trip per folder: positions 1..n in `ids`
+    // order. The lock keeps creates and deletes out, so every row matches;
+    // the count check is a backstop.
+    const updated = await tx.$executeRaw`
+      UPDATE "folders" AS f SET "position" = o.ord::int
+      FROM unnest(${ids}::text[]) WITH ORDINALITY AS o(id, ord)
+      WHERE f."id" = o.id AND f."userId" = ${userId}`;
+    if (updated !== ids.length) {
+      throw new InvalidFolderOrderError();
+    }
+  });
+  return listFoldersForUser(userId);
 }
 
 /** Fetches a folder by slug if owned by `userId`; otherwise null. */
@@ -317,6 +373,11 @@ export async function createFolder(
 
       await assertNameAvailable(userId, trimmed, undefined, tx);
       const slug = await generateUniqueSlug(userId, trimmed, undefined, tx);
+      // New folders go last, so the user's order (and digit shortcuts) stay put.
+      const { _max } = await tx.folder.aggregate({
+        where: { userId },
+        _max: { position: true },
+      });
 
       const created = await tx.folder.create({
         data: {
@@ -325,6 +386,7 @@ export async function createFolder(
           slug,
           emoji: normalizedEmoji,
           description: normalizedDescription,
+          position: (_max.position ?? 0) + 1,
         },
         include: { _count: { select: { links: true } } },
       });
@@ -449,16 +511,18 @@ export async function deleteFolder(
   id: string,
   opts: { withLinks: boolean },
 ): Promise<{ deletedLinks: number }> {
-  await assertFolderOwned(userId, id);
-
-  if (!opts.withLinks) {
-    await prisma.folder.delete({ where: { id } });
-    return { deletedLinks: 0 };
-  }
-
-  const [deleteManyResult] = await prisma.$transaction([
-    prisma.link.deleteMany({ where: { userId, folderId: id } }),
-    prisma.folder.delete({ where: { id } }),
-  ]);
-  return { deletedLinks: deleteManyResult.count };
+  // The per-user lock (as in createFolder/reorderFolders) so a reorder
+  // can't check this folder, then find it gone when it writes.
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
+    await assertFolderOwned(userId, id, tx);
+    let deletedLinks = 0;
+    if (opts.withLinks) {
+      ({ count: deletedLinks } = await tx.link.deleteMany({
+        where: { userId, folderId: id },
+      }));
+    }
+    await tx.folder.delete({ where: { id } });
+    return { deletedLinks };
+  });
 }

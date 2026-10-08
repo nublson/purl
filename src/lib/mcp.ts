@@ -12,6 +12,8 @@ import {
   FolderNameError,
   FolderNotFoundError,
   FolderUpdateEmptyError,
+  InvalidFolderOrderError,
+  reorderFolders,
   listFoldersForUser,
   updateFolder,
 } from "@/lib/folders";
@@ -136,6 +138,9 @@ function folderErrorContent(e: unknown): ToolResult | null {
   if (e instanceof FolderNotFoundError) {
     return errorContent("Folder not found");
   }
+  if (e instanceof InvalidFolderOrderError) {
+    return errorContent(`${e.message} Call list_folders for the current ids.`);
+  }
   if (
     e instanceof FolderNameError ||
     e instanceof FolderEmojiError ||
@@ -189,6 +194,21 @@ export async function updateFolderTool(
     const folder = await updateFolder(userId, folderId, input);
     broadcastLinksChanged(userId);
     return jsonContent(folder);
+  } catch (e) {
+    const content = folderErrorContent(e);
+    if (content) return content;
+    throw e;
+  }
+}
+
+export async function reorderFoldersTool(
+  userId: string,
+  ids: string[],
+): Promise<ToolResult> {
+  try {
+    const folders = await reorderFolders(userId, ids);
+    broadcastLinksChanged(userId);
+    return jsonContent(folders);
   } catch (e) {
     const content = folderErrorContent(e);
     if (content) return content;
@@ -326,7 +346,7 @@ export function registerPurlTools(server: McpServer): void {
 
   server.tool(
     "list_folders",
-    "List the user's folders (collections of saved links) with id, name, emoji, description and link count",
+    "List the user's folders (collections of saved links) in the user's order, with id, name, emoji, description, link count and position",
     {},
     async (_args, extra) => listFoldersTool(getUserId(extra)),
   );
@@ -387,6 +407,16 @@ export function registerPurlTools(server: McpServer): void {
     { destructiveHint: true, idempotentHint: false },
     async ({ folderId, deleteLinks }, extra) =>
       deleteFolderTool(getUserId(extra), folderId, deleteLinks),
+  );
+
+  server.tool(
+    "reorder_folders",
+    "Set the order of the user's folders. Pass every folder id from list_folders, in the new order; the list must contain each folder exactly once.",
+    {
+      ids: z.array(z.string()).describe("All folder ids, first to last"),
+    },
+    { destructiveHint: false, idempotentHint: true },
+    async ({ ids }, extra) => reorderFoldersTool(getUserId(extra), ids),
   );
 
   server.tool(
