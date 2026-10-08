@@ -11,8 +11,11 @@ let browserRealtime: RealtimeClient | null = null;
 export function getBrowserRealtime(): RealtimeClient | null {
   if (typeof window === "undefined") return null;
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Inlined at build by next.config.ts `env` (the integration's names have no
+  // NEXT_PUBLIC_ prefix). The legacy anon key, a JWT: Realtime takes it as
+  // the access token too.
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY;
   if (!url || !key) return null;
 
   if (!browserRealtime) {
