@@ -11,6 +11,7 @@ import {
   HOME_SHORTCUT,
   matchFolderShortcut,
 } from "@/lib/folder-shortcuts";
+import { useDemoFolderSelect, useIsDemo } from "@/contexts/demo-mode-context";
 import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -59,6 +60,10 @@ export function FolderSelectDropdown() {
   const atCap = folders.length >= max;
   const capHintId = React.useId();
   const router = useRouter();
+  // The landing page's demo has no routes: folders switch in place, and
+  // everything that writes or navigates away is disabled.
+  const isDemo = useIsDemo();
+  const demoSelectFolder = useDemoFolderSelect();
   const [menuOpen, setMenuOpen] = React.useState(false);
 
   /** Handles a folder shortcut; returns whether the key was one. */
@@ -66,13 +71,21 @@ export function FolderSelectDropdown() {
     (event: KeyboardEvent | React.KeyboardEvent) => {
       const target = matchFolderShortcut(event, folders);
       if (!target) return false;
+      if (isDemo) {
+        // Home leaves the demo, so 1 does nothing there.
+        if (target === "home") return false;
+        event.preventDefault();
+        setMenuOpen(false);
+        demoSelectFolder?.(target.id);
+        return true;
+      }
       event.preventDefault();
       const href = target === "home" ? "/home" : `/folders/${target.slug}`;
       setMenuOpen(false);
       if (pathname !== href) router.push(href);
       return true;
     },
-    [folders, pathname, router],
+    [folders, pathname, router, isDemo, demoSelectFolder],
   );
 
   // Anywhere in the app, except while typing or with a dialog or menu open
@@ -165,17 +178,25 @@ export function FolderSelectDropdown() {
         }
       >
         <DropdownMenuGroup>
-          <DropdownMenuItem asChild>
-            <Link
-              href="/home"
-              aria-current={onHome ? "page" : undefined}
-              aria-keyshortcuts={HOME_SHORTCUT}
-            >
+          {isDemo ? (
+            <DropdownMenuItem disabled>
               <FolderEmoji emoji={HOME_EMOJI} />
               <RowLabel name="Home" count={totalLinks} />
-              <CurrentMark active={onHome} shortcut={HOME_SHORTCUT} />
-            </Link>
-          </DropdownMenuItem>
+              <CurrentMark active={false} />
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem asChild>
+              <Link
+                href="/home"
+                aria-current={onHome ? "page" : undefined}
+                aria-keyshortcuts={HOME_SHORTCUT}
+              >
+                <FolderEmoji emoji={HOME_EMOJI} />
+                <RowLabel name="Home" count={totalLinks} />
+                <CurrentMark active={onHome} shortcut={HOME_SHORTCUT} />
+              </Link>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuGroup>
         {/*
           Only the folders scroll, so Home and the New/Edit/Delete actions stay
@@ -185,6 +206,23 @@ export function FolderSelectDropdown() {
         <DropdownMenuGroup className="max-h-60 overflow-y-auto overscroll-y-contain">
           {folders.map((folder, index) => {
             const active = currentFolder?.id === folder.id;
+            if (demoSelectFolder) {
+              return (
+                <DropdownMenuItem
+                  key={folder.id}
+                  aria-current={active ? "true" : undefined}
+                  aria-keyshortcuts={folderShortcutKey(index) ?? undefined}
+                  onSelect={() => demoSelectFolder(folder.id)}
+                >
+                  <FolderEmoji emoji={folder.emoji} />
+                  <RowLabel name={folder.name} count={folder.linkCount} />
+                  <CurrentMark
+                    active={active}
+                    shortcut={folderShortcutKey(index)}
+                  />
+                </DropdownMenuItem>
+              );
+            }
             return (
               <DropdownMenuItem key={folder.id} asChild>
                 <Link
@@ -206,7 +244,7 @@ export function FolderSelectDropdown() {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem
-            disabled={atCap}
+            disabled={atCap || isDemo}
             aria-describedby={atCap ? capHintId : undefined}
             onSelect={() => {
               pendingDialog.current = { kind: "create" };
@@ -228,6 +266,7 @@ export function FolderSelectDropdown() {
           {currentFolder ? (
             <>
               <DropdownMenuItem
+                disabled={isDemo}
                 onSelect={() => {
                   pendingDialog.current = {
                     kind: "edit",
@@ -240,6 +279,7 @@ export function FolderSelectDropdown() {
               </DropdownMenuItem>
               <DropdownMenuItem
                 variant="destructive"
+                disabled={isDemo}
                 onSelect={() => {
                   pendingDialog.current = {
                     kind: "delete",

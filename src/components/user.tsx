@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { ChatRoundLike, Logout4, Setting2 } from "reicon-react";
@@ -25,6 +26,9 @@ import { FolderTagsMenuItem, ViewModeMenu } from "./view-mode-menu";
 export function User() {
   const { user } = useCurrentUser();
   const { signOut } = useAuth();
+  // The landing page's demo: the account's actions are shown but off, and the
+  // demo user has no email, so the header shows the handle instead.
+  const isDemo = useIsDemo();
 
   // Owned here, not inside SettingsDialog/its dropdown trigger: Radix only
   // mounts the dropdown's menu content once it's been opened, so a
@@ -43,29 +47,34 @@ export function User() {
 
   return (
     <>
-      <React.Suspense fallback={null}>
-        <SettingsDeepLink
-          onOpen={(tab) => {
-            setSettingsDefaultTab(tab);
-            setSettingsOpen(true);
-          }}
-        />
-      </React.Suspense>
-      {/*
-        Rendered outside the dropdown: Radix only mounts menu content while
-        the menu is open, so a dialog living in there couldn't be opened by
-        the deep link above.
-      */}
-      <SettingsDialog
-        open={settingsOpen}
-        onOpenChange={(open) => {
-          setSettingsOpen(open);
-          // Reset so a later manual open lands on the first tab instead
-          // of whatever a past deep link set.
-          if (!open) setSettingsDefaultTab(undefined);
-        }}
-        defaultTab={settingsDefaultTab}
-      />
+      {/* The demo has no account: no Settings, not even by ?settings= link. */}
+      {isDemo ? null : (
+        <>
+          <React.Suspense fallback={null}>
+            <SettingsDeepLink
+              onOpen={(tab) => {
+                setSettingsDefaultTab(tab);
+                setSettingsOpen(true);
+              }}
+            />
+          </React.Suspense>
+          {/*
+            Rendered outside the dropdown: Radix only mounts menu content while
+            the menu is open, so a dialog living in there couldn't be opened by
+            the deep link above.
+          */}
+          <SettingsDialog
+            open={settingsOpen}
+            onOpenChange={(open) => {
+              setSettingsOpen(open);
+              // Reset so a later manual open lands on the first tab instead
+              // of whatever a past deep link set.
+              if (!open) setSettingsDefaultTab(undefined);
+            }}
+            defaultTab={settingsDefaultTab}
+          />
+        </>
+      )}
       <DropdownWrapper
         className="w-52"
         align="end"
@@ -98,7 +107,7 @@ export function User() {
             user={{
               image: user?.image ?? "",
               name: user?.name ?? "",
-              email: user?.email ?? "",
+              email: isDemo ? `@${user?.username}` : (user?.email ?? ""),
             }}
           />
           <DropdownMenuSeparator />
@@ -116,6 +125,7 @@ export function User() {
         <DropdownMenuGroup>
           <FeedbackDialog>
             <DropdownMenuItem
+              disabled={isDemo}
               onSelect={(event) => {
                 event.preventDefault();
               }}
@@ -125,6 +135,7 @@ export function User() {
             </DropdownMenuItem>
           </FeedbackDialog>
           <DropdownMenuItem
+            disabled={isDemo}
             onSelect={() => {
               // Let the menu close normally; onCloseAutoFocus above opens
               // the dialog once it has.
@@ -138,6 +149,7 @@ export function User() {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           data-cy="sign-out-menu-item"
+          disabled={isDemo}
           onClick={() => signOut()}
         >
           <Logout4 />

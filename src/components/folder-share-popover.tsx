@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCurrentFolder, useFolderActions } from "@/hooks/use-folders";
 import { haptic } from "@/lib/haptics";
@@ -41,6 +42,8 @@ export function FolderSharePopover() {
   const folder = useCurrentFolder();
   const { user } = useCurrentUser();
   const { updateFolder } = useFolderActions();
+  // The demo's folder is shown as shared and can't be changed.
+  const isDemo = useIsDemo();
   const [saving, setSaving] = React.useState(false);
   // Shown right away; the server's answer (or a failure) settles it.
   const [optimistic, setOptimistic] = React.useState<boolean | null>(null);
@@ -56,7 +59,7 @@ export function FolderSharePopover() {
   );
 
   if (!folder || !user) return null;
-  const isPublic = optimistic ?? folder.isPublic;
+  const isPublic = isDemo || (optimistic ?? folder.isPublic);
   const path = publicFolderPath(user.username, folder.slug);
 
   async function setPublic(next: boolean) {
@@ -141,7 +144,7 @@ export function FolderSharePopover() {
             <Switch
               id={switchId}
               checked={isPublic}
-              disabled={saving}
+              disabled={saving || isDemo}
               onCheckedChange={(next) => void setPublic(next)}
             />
           </div>
@@ -165,7 +168,7 @@ export function FolderSharePopover() {
               size="icon-sm"
               // Only once sharing is saved: the switch moves right away, but
               // the link works only after the server confirms.
-              disabled={!folder.isPublic || saving}
+              disabled={(!isDemo && !folder.isPublic) || saving}
               aria-label={copied ? "Link copied" : "Copy link"}
               onClick={() => void copyLink()}
               // Concentric with the field: its radius minus the 4px inset.

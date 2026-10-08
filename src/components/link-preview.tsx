@@ -18,6 +18,13 @@ type LinkPreviewProps = {
   eagerThumbnail?: boolean;
   onPreviewMouseEnter?: () => void;
   onPreviewMouseLeave?: () => void;
+  /**
+   * Where the card opens. Beside the row by default; the landing demo's rows
+   * span the whole panel, leaving no room beside them, so it opens below.
+   */
+  placement?: "beside" | "below";
+  /** Render PDFs through the signed-in PDF proxy (off in the demo). */
+  pdfThumbnail?: boolean;
 };
 
 export function LinkPreview({
@@ -28,6 +35,8 @@ export function LinkPreview({
   eagerThumbnail = false,
   onPreviewMouseEnter,
   onPreviewMouseLeave,
+  placement = "beside",
+  pdfThumbnail = true,
 }: LinkPreviewProps) {
   return (
     <HoverCard
@@ -38,15 +47,19 @@ export function LinkPreview({
     >
       <HoverCardTrigger asChild>{children}</HoverCardTrigger>
       <HoverCardContent
-        side="right"
-        align="start"
+        side={placement === "below" ? "bottom" : "right"}
+        align={placement === "below" ? "end" : "start"}
         // Seen on every row hover: appear and disappear instantly. Important so
         // it beats the primitive's animate-in/animate-out rules.
         className="p-0 flex-col hidden md:[@media(hover:hover)]:flex z-40 data-open:animate-none! data-closed:animate-none!"
         onMouseEnter={onPreviewMouseEnter}
         onMouseLeave={onPreviewMouseLeave}
       >
-        <LinkPreviewBody link={link} eagerThumbnail={eagerThumbnail} />
+        <LinkPreviewBody
+          link={link}
+          eagerThumbnail={eagerThumbnail}
+          pdfThumbnail={pdfThumbnail}
+        />
       </HoverCardContent>
     </HoverCard>
   );

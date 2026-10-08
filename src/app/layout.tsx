@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import type { Metadata, Viewport } from "next";
+import { LANDING_SEEN_SCRIPT } from "@/lib/landing-intro";
 import { ThemeProvider } from "next-themes";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -72,6 +73,11 @@ export default function RootLayout({
       className={`${inter.variable} h-full`}
       suppressHydrationWarning
     >
+      <head>
+        {/* Runs on every full page load, before paint: marks a returning
+            visitor so the landing page renders settled. */}
+        <script dangerouslySetInnerHTML={{ __html: LANDING_SEEN_SCRIPT }} />
+      </head>
       <body className={`antialiased h-full flex flex-col relative`}>
         <ThemeProvider
           attribute="class"

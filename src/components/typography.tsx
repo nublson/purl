@@ -34,6 +34,10 @@ type TypographySize = "regular" | "small" | "mini";
 
 interface BaseTypographyProps extends React.HTMLAttributes<HTMLElement> {
   component?: TypographyComponent;
+  // For component="a".
+  href?: string;
+  target?: React.HTMLAttributeAnchorTarget;
+  rel?: string;
 }
 
 // Props when using variant (variant has priority, size is not allowed)

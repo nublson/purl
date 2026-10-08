@@ -47,6 +47,34 @@ export type PublicFolderPage =
   /** An old username or slug: send visitors to the current URL. */
   | { kind: "redirect"; username: string; slug: string };
 
+/** The only link columns visitors may see (one source for every public read). */
+export const PUBLIC_LINK_SELECT = {
+  id: true,
+  url: true,
+  title: true,
+  description: true,
+  thumbnail: true,
+  domain: true,
+  favicon: true,
+  contentType: true,
+  createdAt: true,
+} as const;
+
+/** The only user columns a shared page may show. */
+export const PUBLIC_OWNER_SELECT = {
+  name: true,
+  image: true,
+  username: true,
+} as const;
+
+/** The folder columns a shared page may show (add `id`/`isPublic` for server use). */
+export const PUBLIC_FOLDER_SELECT = {
+  name: true,
+  slug: true,
+  emoji: true,
+  description: true,
+} as const;
+
 export { publicFolderPath };
 
 /**
@@ -76,13 +104,13 @@ export async function resolvePublicFolder(
   let redirected = false;
   let user = await prisma.user.findUnique({
     where: { username: wantedUsername },
-    select: { id: true, name: true, image: true, username: true },
+    select: { id: true, ...PUBLIC_OWNER_SELECT },
   });
   if (!user) {
     const old = await prisma.usernameRedirect.findUnique({
       where: { username: wantedUsername },
       select: {
-        user: { select: { id: true, name: true, image: true, username: true } },
+        user: { select: { id: true, ...PUBLIC_OWNER_SELECT } },
       },
     });
     if (!old) return null;
@@ -92,10 +120,7 @@ export async function resolvePublicFolder(
 
   const folderSelect = {
     id: true,
-    name: true,
-    slug: true,
-    emoji: true,
-    description: true,
+    ...PUBLIC_FOLDER_SELECT,
     isPublic: true,
   } as const;
   let folder = await prisma.folder.findFirst({

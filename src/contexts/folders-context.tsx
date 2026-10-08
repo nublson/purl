@@ -68,10 +68,14 @@ export function FoldersProvider({
   children,
   initialFolders,
   initialTotalLinks = null,
+  offline = false,
 }: {
   children: ReactNode;
   initialFolders?: FolderSummary[];
   initialTotalLinks?: number | null;
+  /** Never fetch (mount, version bump or `refresh()`): the landing demo's
+   * folders are its own data, not the account's. */
+  offline?: boolean;
 }) {
   const { version } = useLinksSyncState();
   const [folders, setFolders] = useState<FolderSummary[]>(
@@ -87,6 +91,7 @@ export function FoldersProvider({
   const skippedSeededMountRef = useRef(false);
 
   useEffect(() => {
+    if (offline) return;
     if (initialFolders !== undefined && !skippedSeededMountRef.current) {
       skippedSeededMountRef.current = true;
       return;

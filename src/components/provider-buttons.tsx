@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { ProviderIcon } from "@/components/provider-icons";
+import { cn } from "@/lib/utils";
 
 const PROVIDER_LABEL: Record<ProviderId, string> = {
   google: "Continue with Google",
@@ -13,7 +14,13 @@ const PROVIDER_LABEL: Record<ProviderId, string> = {
   apple: "Continue with Apple",
 };
 
-export function ProviderButtons({ providers }: { providers: ProviderId[] }) {
+export function ProviderButtons({
+  providers,
+  className,
+}: {
+  providers: ProviderId[];
+  className?: string;
+}) {
   const { signInWithProvider } = useAuth();
   const [pendingProvider, setPendingProvider] = useState<ProviderId | null>(
     null,
@@ -31,7 +38,12 @@ export function ProviderButtons({ providers }: { providers: ProviderId[] }) {
   const disabled = pendingProvider !== null;
 
   return (
-    <div className="flex flex-col items-stretch gap-3 w-full max-w-xs">
+    <div
+      className={cn(
+        "flex flex-col items-stretch gap-3 w-full max-w-xs",
+        className,
+      )}
+    >
       {providers.map((provider) => {
         const isPending = pendingProvider === provider;
         return (

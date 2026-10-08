@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { useLeavingLinks } from "@/lib/leaving-links";
 import { ARRIVE, ARRIVE_ICON, ARRIVE_LATE } from "@/lib/motion";
@@ -40,10 +41,9 @@ const LONG_PRESS_MS = 500;
 /** Finger travel that turns a long-press into a scroll. */
 const LONG_PRESS_SLOP = 10;
 
-const LinkMenu = dynamic(
-  () => import("./link-menu").then((m) => m.LinkMenu),
-  { loading: () => <div className="size-8" aria-hidden /> },
-);
+const LinkMenu = dynamic(() => import("./link-menu").then((m) => m.LinkMenu), {
+  loading: () => <div className="size-8" aria-hidden />,
+});
 
 interface LinkItemProps {
   link: LinkType;
@@ -60,13 +60,7 @@ export const LinkItem = React.forwardRef<
   HTMLDivElement,
   LinkItemProps & React.ComponentPropsWithoutRef<typeof Item>
 >(function LinkItem(
-  {
-    link,
-    className,
-    eagerFavicon,
-    arriving = false,
-    ...rest
-  },
+  { link, className, eagerFavicon, arriving = false, ...rest },
   ref,
 ) {
   const { notifyLinksChanged } = useLinksSyncActions();
@@ -78,13 +72,16 @@ export const LinkItem = React.forwardRef<
   // Selection mode (anything selected): every row shows its checkbox, a
   // click toggles the row instead of opening it, and row menus hide so
   // every action goes through the selection bar.
-  const selecting = useIsSelectionActive();
+  // The landing page's demo is read-only: no selecting, no menu, no read
+  // marking. The actions slot stays (empty) so the row keeps its height.
+  const demo = useIsDemo();
+  const selecting = useIsSelectionActive() && !demo;
   const selected = useIsLinkSelected(link.id);
   // Read links stay in the list, faded back: opening one marks it read.
   const read = useIsLinkRead(link);
   const folderTag = useFolderTag(link);
   const markOpened = () => {
-    if (!read) void setLinksRead([link.id], true);
+    if (!demo && !read) void setLinksRead([link.id], true);
   };
   const longPressRef = React.useRef<{
     timer: ReturnType<typeof setTimeout>;
@@ -204,7 +201,7 @@ export const LinkItem = React.forwardRef<
         className,
       )}
       onPointerDown={(event) => {
-        if (event.pointerType !== "touch") return;
+        if (demo || event.pointerType !== "touch") return;
         cancelLongPress();
         longPressedRef.current = false;
         longPressRef.current = {
@@ -316,11 +313,13 @@ export const LinkItem = React.forwardRef<
             className={cn(
               // Cross-fades with the checkbox: a fast opacity swap, no movement.
               "contents *:transition-opacity *:duration-150 *:ease-out-strong",
-              selecting
-                ? "*:opacity-0"
-                : // Keyboard focus only: a mouse click leaves focus on the
-                  // checkbox, and the favicon must come back once you move away.
-                  "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-has-[:focus-visible]/media:*:opacity-0",
+              demo
+                ? null
+                : selecting
+                  ? "*:opacity-0"
+                  : // Keyboard focus only: a mouse click leaves focus on the
+                    // checkbox, and the favicon must come back once you move away.
+                    "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-has-[:focus-visible]/media:*:opacity-0",
               // Read: the favicon loses its color and steps back with the title.
               read && !selecting && "*:opacity-50 *:grayscale",
             )}
@@ -333,29 +332,36 @@ export const LinkItem = React.forwardRef<
               <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
             )}
           </div>
-          <Checkbox
-            checked={selected}
-            aria-label={`Select ${link.title}`}
-            className={cn(
-              "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background max-md:size-5 transition-[opacity,box-shadow] duration-150 ease-out-strong",
-              selecting
-                ? "opacity-100"
-                : "opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:group-hover/item:opacity-100",
-            )}
-            onClick={(event) => {
-              event.preventDefault();
-              // A long-press started here already toggled the row.
-              if (longPressedRef.current) {
-                longPressedRef.current = false;
-                return;
-              }
-              linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-            }}
-          />
-          {/* Touch: the checkbox's tap, with a tick. Over its hit area (its
+          {demo ? null : (
+            <>
+              <Checkbox
+                checked={selected}
+                aria-label={`Select ${link.title}`}
+                className={cn(
+                  "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background max-md:size-5 transition-[opacity,box-shadow] duration-150 ease-out-strong",
+                  selecting
+                    ? "opacity-100"
+                    : "opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:group-hover/item:opacity-100",
+                )}
+                onClick={(event) => {
+                  event.preventDefault();
+                  // A long-press started here already toggled the row.
+                  if (longPressedRef.current) {
+                    longPressedRef.current = false;
+                    return;
+                  }
+                  linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+                }}
+              />
+              {/* Touch: the checkbox's tap, with a tick. Over its hit area (its
               after: extension included); the checkbox's own onClick stays
               for the mouse and keyboard. */}
-          <HapticTarget className="-inset-x-2.5 -inset-y-1.5 z-[11]" onTap={tapToSelect} />
+              <HapticTarget
+                className="-inset-x-2.5 -inset-y-1.5 z-[11]"
+                onTap={tapToSelect}
+              />
+            </>
+          )}
         </div>
       </ItemMedia>
       {/* min-w-0: the grid's 1fr column can then shrink below a one-line
@@ -407,7 +413,7 @@ export const LinkItem = React.forwardRef<
       <ItemActions
         inert={selecting}
         className={cn(
-          selecting && "invisible",
+          (selecting || demo) && "invisible",
           "z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100",
         )}
         onPointerEnter={(event) => {
@@ -422,12 +428,18 @@ export const LinkItem = React.forwardRef<
           scheduleOpen();
         }}
       >
-        <LinkMenu link={link} onDelete={deleteRow} />
+        {demo ? (
+          <div className="size-8" aria-hidden />
+        ) : (
+          <LinkMenu link={link} onDelete={deleteRow} />
+        )}
       </ItemActions>
       {/* While selecting, a tap anywhere on the row toggles it, with a
           tick (touch). Also where a long-press's lift lands, once it has
           started selecting. Above the link, under the checkbox. */}
-      {selecting ? <HapticTarget className="z-[5]" onTap={tapToSelect} /> : null}
+      {selecting ? (
+        <HapticTarget className="z-[5]" onTap={tapToSelect} />
+      ) : null}
     </Item>
   );
 
@@ -435,6 +447,8 @@ export const LinkItem = React.forwardRef<
     <LinkPreview
       link={link}
       eagerThumbnail={Boolean(eagerFavicon)}
+      placement={demo ? "below" : "beside"}
+      pdfThumbnail={!demo}
       open={previewOpen}
       onOpenChange={() => {
         // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.

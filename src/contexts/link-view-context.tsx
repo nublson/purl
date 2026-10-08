@@ -38,6 +38,7 @@ function useSavedSetting<K extends keyof LayoutPrefs>(
   key: K,
   initial: LayoutPrefs[K],
   failMessage: (value: LayoutPrefs[K]) => string,
+  persist: boolean,
 ) {
   const [value, setValue] = React.useState(initial);
   const latest = React.useRef(initial);
@@ -71,10 +72,10 @@ function useSavedSetting<K extends keyof LayoutPrefs>(
       if (next === latest.current) return false;
       latest.current = next;
       setValue(next);
-      void flush();
+      if (persist) void flush();
       return true;
     },
-    [flush],
+    [flush, persist],
   );
 
   return [value, set] as const;
@@ -93,16 +94,20 @@ const tagsFailed = (on: boolean) =>
  */
 export function LinkViewProvider({
   initialLayout,
+  persist = true,
   children,
 }: {
   initialLayout: LayoutPrefs;
+  /** False (the landing demo): changes show at once and are never saved. */
+  persist?: boolean;
   children: React.ReactNode;
 }) {
-  const [view, saveView] = useSavedSetting("view", initialLayout.view, viewFailed);
+  const [view, saveView] = useSavedSetting("view", initialLayout.view, viewFailed, persist);
   const [folderTags, setFolderTags] = useSavedSetting(
     "folderTags",
     initialLayout.folderTags,
     tagsFailed,
+    persist,
   );
   const [switched, setSwitched] = React.useState(false);
 
