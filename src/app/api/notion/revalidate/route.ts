@@ -37,9 +37,9 @@ function readVerificationToken(body: string): string | null {
     const parsed = JSON.parse(body) as unknown;
     if (parsed && typeof parsed === "object" && "verification_token" in parsed) {
       const token = (parsed as { verification_token: unknown }).verification_token;
-      // Notion's tokens are short opaque strings (`secret_…`); anything else
-      // isn't logged, so unauthenticated callers can't write arbitrary text.
-      return typeof token === "string" && /^[\w-]{1,128}$/.test(token)
+      // Notion's tokens are short opaque strings (`secret_…`). Only one
+      // printable "word" is logged, so callers can't forge log lines.
+      return typeof token === "string" && /^[\x21-\x7e]{1,256}$/.test(token)
         ? token
         : null;
     }
@@ -54,8 +54,10 @@ function readVerificationToken(body: string): string | null {
  * next visit. Called by:
  * - a Notion integration webhook subscription (page events), signed with
  *   `X-Notion-Signature` using its verification token, `NOTION_WEBHOOK_SECRET`.
- *   Creating the subscription first POSTs `{ verification_token }` unsigned:
- *   it's logged so it can be pasted back into Notion (and into the env var);
+ *   Creating the subscription first POSTs `{ verification_token }`: it's
+ *   logged (whether or not that request carries a signature, which can't be
+ *   checked before the secret is set) so it can be pasted back into Notion
+ *   and into the env var;
  * - by hand, with `NOTION_REVALIDATION_SECRET` as `?secret=` or a Bearer token.
  * Event bodies are ignored: the pages are few, so everything is refreshed.
  */
@@ -64,19 +66,29 @@ export async function POST(request: NextRequest) {
   const signature = request.headers.get("x-notion-signature");
   const webhookSecret = process.env.NOTION_WEBHOOK_SECRET?.trim();
 
+  // Anyone can send this; it changes nothing, it only surfaces the token.
+  const verificationToken = readVerificationToken(body);
+  if (verificationToken) {
+    console.info(
+      `[notion] Webhook verification token: ${verificationToken} — paste it into the subscription's Verify dialog and set NOTION_WEBHOOK_SECRET to it.`,
+    );
+    return NextResponse.json({ received: true });
+  }
+
   if (signature) {
-    if (!webhookSecret || !notionSignatureMatches(body, signature, webhookSecret)) {
+    if (!webhookSecret) {
+      console.warn(
+        "[notion] Signed webhook event rejected: NOTION_WEBHOOK_SECRET is not set.",
+      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!notionSignatureMatches(body, signature, webhookSecret)) {
+      console.warn(
+        "[notion] Webhook event rejected: X-Notion-Signature doesn't match NOTION_WEBHOOK_SECRET.",
+      );
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   } else if (!manualSecretMatches(request)) {
-    const verificationToken = readVerificationToken(body);
-    if (verificationToken) {
-      // Anyone can send this; it changes nothing, it only surfaces the token.
-      console.info(
-        `[notion] Webhook verification token: ${verificationToken} — paste it into the subscription's Verify dialog and set NOTION_WEBHOOK_SECRET to it.`,
-      );
-      return NextResponse.json({ received: true });
-    }
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
