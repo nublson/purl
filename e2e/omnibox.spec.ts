@@ -101,6 +101,58 @@ test.describe("Search field", () => {
     await expect(rows(page)).toHaveCount(2);
   });
 
+  test("a folder's search offers your other links, and adding one moves it here", async ({ page, seed }) => {
+    const tools = await seed.folder({ name: "Dev Tools", slug: "dev-tools" });
+    const reading = await seed.folder({ name: "Reading list", slug: "reading-list" });
+    await seed.link({ url: "https://tools.example", title: "Some tool", folderId: tools });
+    await seed.link({ url: "https://greptile.example", title: "AI code review agent", folderId: reading });
+    await seed.link({ url: "https://unfiled.example", title: "Another AI code review" });
+    await open(page, "/folders/dev-tools");
+
+    await field(page).fill("ai code review");
+    const section = page.locator('[data-cy="omnibox-add-section"]');
+    await expect(section.getByRole("heading")).toHaveText(/Add to\s*.*Dev Tools/);
+    const addRows = page.locator('[data-cy="omnibox-add-row"]');
+    await expect(addRows).toHaveCount(2);
+    // Nothing in the folder matches, but the other links are the answer.
+    await expect(page.locator('[data-cy="link-group-empty"]')).toHaveCount(0);
+    await expect(addRows.filter({ hasText: "AI code review agent" })).toContainText("Reading list");
+
+    await page.getByRole("button", { name: "Add AI code review agent to Dev Tools (moves it from Reading list)" }).click();
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page)).toContainText("AI code review agent");
+    await expect(addRows).toHaveCount(1);
+    await page.getByText("Undo").click();
+    await expect(rows(page)).toHaveCount(0);
+    await expect(addRows).toHaveCount(2);
+  });
+
+  test("the folder's Add section shows five, then Show more", async ({ page, seed }) => {
+    await seed.folder({ name: "Dev Tools", slug: "dev-tools" });
+    for (let i = 1; i <= 7; i++) {
+      await seed.link({ url: `https://tool${i}.example`, title: `Tool ${i}` });
+    }
+    await open(page, "/folders/dev-tools");
+
+    await field(page).fill("tool");
+    const addRows = page.locator('[data-cy="omnibox-add-row"]');
+    await expect(addRows).toHaveCount(5);
+    await page.locator('[data-cy="omnibox-add-more"]').click();
+    await expect(addRows).toHaveCount(7);
+    await expect(page.locator('[data-cy="omnibox-add-more"]')).toHaveCount(0);
+  });
+
+  test("a URL saved in another folder offers to move it here", async ({ page, seed }) => {
+    await seed.folder({ name: "Dev Tools", slug: "dev-tools" });
+    const reading = await seed.folder({ name: "Reading", slug: "reading" });
+    await seed.link({ url: "https://example.com/post", title: "A post", folderId: reading });
+    await open(page, "/folders/dev-tools");
+    await field(page).fill("https://example.com/post");
+    await expect(saveRow(page)).toHaveAccessibleName(/^Add .* to Dev Tools \(already saved\)$/, {
+      timeout: 15_000,
+    });
+  });
+
   test("/ focuses the field, and the selection bar sits above it", async ({ page, seed }) => {
     await seed.link({ url: "https://a.example", title: "Alpha" });
     await open(page, "/home");

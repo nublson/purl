@@ -60,6 +60,7 @@ const EMOJI_IN_CHIP =
 export function FolderTag({
   folder,
   inCard = false,
+  inButton = false,
   className,
 }: {
   folder: FolderSummary;
@@ -69,6 +70,12 @@ export function FolderTag({
    * the title does (the card's column gap), so the icons stack.
    */
   inCard?: boolean;
+  /**
+   * Inside a button (the search field's "Add to folder" rows): the phone's
+   * emoji is a plain chip, not a button of its own (buttons can't nest);
+   * the row's own name says the folder.
+   */
+  inButton?: boolean;
   className?: string;
 }) {
   return (
@@ -104,7 +111,22 @@ export function FolderTag({
       </Typography>
       {/* A card has its own line for the tag, room for the name on every
           screen; a phone's row doesn't. */}
-      {inCard ? null : <FolderTagIcon folder={folder} className={className} />}
+      {inCard ? null : inButton ? (
+        <Typography
+          component="span"
+          aria-hidden
+          data-cy="folder-tag"
+          className={cn(
+            "hidden size-5 shrink-0 items-center justify-center rounded-md bg-muted",
+            className,
+            "phone:flex",
+          )}
+        >
+          <FolderEmoji emoji={folder.emoji} className={EMOJI_IN_CHIP} />
+        </Typography>
+      ) : (
+        <FolderTagIcon folder={folder} className={className} />
+      )}
     </>
   );
 }
