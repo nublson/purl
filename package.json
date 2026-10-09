@@ -24,6 +24,7 @@
   "dependencies": {
     "@better-auth/api-key": "^1.6.14",
     "@modelcontextprotocol/sdk": "1.26.0",
+    "@notionhq/client": "^5.20.0",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "@serwist/next": "^9.5.7",
