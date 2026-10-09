@@ -2,12 +2,12 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.nublson/purl",
   "title": "Purl",
-  "description": "Search and save to your Purl read-it-later knowledge base from any MCP client.",
+  "description": "Save, organize and share your Purl links from any MCP client.",
   "repository": {
     "url": "https://github.com/nublson/purl",
     "source": "github"
   },
-  "version": "0.1.12",
+  "version": "0.1.13",
   "remotes": [
     {
       "type": "streamable-http",
