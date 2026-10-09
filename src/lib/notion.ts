@@ -16,9 +16,9 @@ import { cache } from "react";
  *
  * Each page is a row of one Notion database, `NOTION_PAGES_DATA_SOURCE_ID`:
  * - `Name` (title): the page's title
- * - `Slug` (text): its URL segment, e.g. `privacy`
- * - `Description` (text, optional): the meta description
- * - `State` (select): only rows set to `Done` are published
+ * - `slug` (text): its URL segment, e.g. `privacy`
+ * - `description` (text, optional): the meta description
+ * - `state` (select: planned, writing, published): only `published` rows show
  * The row's body is the page's content.
  *
  * Reads are cached under {@link NOTION_CACHE_TAG} for an hour, and
@@ -32,7 +32,7 @@ export const NOTION_CACHE_TAG = "notion";
 /** Seconds a cached read lives without a webhook (fallback for missed ones). */
 const NOTION_REVALIDATE_SECONDS = 3600;
 
-export const PUBLISHED_STATE = "Done";
+export const PUBLISHED_STATE = "published";
 
 /** Max nesting depth when resolving block children (avoids huge trees). */
 const MAX_BLOCK_DEPTH = 5;
@@ -90,9 +90,9 @@ function plainText(
 export function toPageSummary(page: PageObjectResponse): NotionPageSummary {
   return {
     id: page.id,
-    slug: plainText(page.properties.Slug).trim(),
+    slug: plainText(page.properties.slug).trim(),
     title: plainText(page.properties.Name).trim(),
-    description: plainText(page.properties.Description).trim(),
+    description: plainText(page.properties.description).trim(),
     lastEditedAt: page.last_edited_time,
   };
 }
@@ -102,7 +102,7 @@ async function queryPublishedPages(
   slug?: string,
 ): Promise<PageObjectResponse[]> {
   const published = {
-    property: "State",
+    property: "state",
     select: { equals: PUBLISHED_STATE },
   };
   const rows = await collectPaginatedAPI(
@@ -111,7 +111,7 @@ async function queryPublishedPages(
       data_source_id: config.dataSourceId,
       filter: slug
         ? {
-            and: [published, { property: "Slug", rich_text: { equals: slug } }],
+            and: [published, { property: "slug", rich_text: { equals: slug } }],
           }
         : published,
       sorts: [{ property: "Name", direction: "ascending" }],

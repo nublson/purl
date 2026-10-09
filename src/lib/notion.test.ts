@@ -36,8 +36,8 @@ function page(id: string, name: string, slug: string, description = "") {
     last_edited_time: "2026-10-01T12:00:00.000Z",
     properties: {
       Name: { type: "title", title: richText(name) },
-      Slug: { type: "rich_text", rich_text: richText(slug) },
-      Description: { type: "rich_text", rich_text: richText(description) },
+      slug: { type: "rich_text", rich_text: richText(slug) },
+      description: { type: "rich_text", rich_text: richText(description) },
     },
   };
 }
@@ -90,7 +90,7 @@ describe("notion", () => {
     expect(mockQuery).toHaveBeenCalledWith(
       expect.objectContaining({
         data_source_id: "ds_1",
-        filter: { property: "State", select: { equals: "Done" } },
+        filter: { property: "state", select: { equals: "published" } },
       }),
     );
   });
@@ -117,8 +117,8 @@ describe("notion", () => {
       expect.objectContaining({
         filter: {
           and: [
-            { property: "State", select: { equals: "Done" } },
-            { property: "Slug", rich_text: { equals: "terms" } },
+            { property: "state", select: { equals: "published" } },
+            { property: "slug", rich_text: { equals: "terms" } },
           ],
         },
       }),
