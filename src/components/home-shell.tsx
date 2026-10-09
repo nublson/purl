@@ -9,6 +9,10 @@ import {
   OmniboxSaveRow,
   OmniboxSearchAllRow,
 } from "@/components/omnibox-rows";
+import {
+  OmniboxAddSection,
+  useOmniboxAddResults,
+} from "@/components/omnibox-add-section";
 import { PasteHandler } from "@/components/paste-handler";
 import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
 import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
@@ -221,6 +225,26 @@ export function HomeShell({
     groups.some((group) =>
       group.links.some((link) => isSameLinkUrl(link.url, saveUrl)),
     );
+  // A folder's search also finds your other links, to add here. A URL in
+  // the field is the Save row's (saving it files it here).
+  const otherResults = useOmniboxAddResults(folderId, searchQuery);
+  const addResults = useMemo(
+    () =>
+      saveUrl
+        ? {
+            ...otherResults,
+            links: otherResults.links.filter(
+              (link) => !isSameLinkUrl(link.url, saveUrl),
+            ),
+          }
+        : otherResults,
+    [otherResults, saveUrl],
+  );
+  const onAddedFromSearch = useCallback((id: string) => {
+    // Its row in the folder's results plays the arrival (see onSaveSuccess).
+    setArrivingId(id);
+    setTimeout(() => setArrivingId((current) => (current === id ? null : current)), 1000);
+  }, []);
   const saveFromField = useCallback(() => {
     if (!saveUrl) return;
     // Its preview's "saved" is about to be wrong.
@@ -439,6 +463,18 @@ export function HomeShell({
   // A selection belongs to one list: switching folders or leaving drops it.
   useEffect(() => () => linkSelection.clear(), [folderId]);
 
+  const listShown = !((!groups.length || allLinksHidden) && !showSyntheticToday);
+  // On a folder page with a search: your other links that match, to add
+  // here. Under the folder's matches, a day group's gap below them.
+  const addSection =
+    folderId && currentFolder && searchQuery ? (
+      <OmniboxAddSection
+        folder={currentFolder}
+        results={addResults}
+        onAdded={onAddedFromSearch}
+      />
+    ) : null;
+
   return (
     <>
       <PasteHandler
@@ -450,12 +486,17 @@ export function HomeShell({
         <OmniboxSaveRow
           url={saveUrl}
           alreadySaved={alreadySaved}
+          folderName={folderId ? currentFolder?.name : undefined}
           onSave={saveFromField}
         />
       ) : null}
-      {(!groups.length || allLinksHidden) && !showSyntheticToday ? (
+      {!listShown ? (
         // A URL that matches nothing: the Save row above is the answer.
-        searchQuery && saveUrl ? null : (
+        // In a folder, so are your other links that match (below), once in.
+        (searchQuery && saveUrl) ||
+        (folderId &&
+          searchQuery &&
+          (addResults.loading || addResults.links.length > 0)) ? null : (
           <LinkGroupEmpty
             inFolder={Boolean(folderId)}
             query={searchQuery || undefined}
@@ -497,6 +538,9 @@ export function HomeShell({
               eagerFavicons={eagerFaviconsByGroup[groupIndex]}
             />
           ))}
+          {/* Once every folder match is loaded (until then, it waits
+              below the loader). */}
+          {nextCursor ? null : addSection}
           {/* Always rendered with the list, so the status region is in place
               before "Loading more links" is announced and its height never
               appears or disappears (including when the last page loads). The
@@ -523,8 +567,11 @@ export function HomeShell({
               </>
             ) : null}
           </div>
+          {nextCursor ? addSection : null}
         </div>
       )}
+      {/* No folder matches (the list isn't shown): the section is all there is. */}
+      {listShown ? null : addSection}
       {/* A folder searches only itself; this widens it to every link. */}
       {folderId && searchQuery ? (
         <OmniboxSearchAllRow

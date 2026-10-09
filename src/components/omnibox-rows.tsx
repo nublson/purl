@@ -4,7 +4,7 @@ import { ARRIVE, ARRIVE_ICON, ARRIVE_LATE } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import type { Link } from "@/utils/links";
-import { ArrowUpRight, Plus } from "reicon-react";
+import { ArrowUpRight, FolderMove, Plus } from "reicon-react";
 import * as React from "react";
 import { LinkIcon } from "./link-icon";
 import { Typography } from "./typography";
@@ -104,14 +104,20 @@ function useLinkPreview(url: string): Preview | null {
  * when the URL is already saved (the server's answer once the preview is
  * in; `alreadySaved`, from the loaded list, until then); saving again just
  * refreshes it (or files it into this folder).
+ *
+ * On a folder page (`folderName`), a URL you've saved elsewhere moves into
+ * this folder: the + becomes the row menu's "Move to folder" icon.
  */
 export function OmniboxSaveRow({
   url,
   alreadySaved,
+  folderName,
   onSave,
 }: {
   url: string;
+  /** In the loaded list (on a folder page: already in this folder). */
   alreadySaved: boolean;
+  folderName?: string;
   onSave: () => void;
 }) {
   const preview = useLinkPreview(url);
@@ -122,7 +128,11 @@ export function OmniboxSaveRow({
     ? { ...preview, id: "preview", createdAt: new Date(0), folderId: null, readAt: null }
     : null;
 
-  const label = `Save ${link?.title ?? shown}${saved ? " (already saved)" : ""}`;
+  // Saved, but not in this folder's list: saving moves it here.
+  const moves = Boolean(folderName) && saved && !alreadySaved;
+  const label = moves
+    ? `Add ${link?.title ?? shown} to ${folderName} (already saved)`
+    : `Save ${link?.title ?? shown}${saved ? " (already saved)" : ""}`;
   return (
     // The whole row saves (as Enter in the field does).
     <button
@@ -194,7 +204,7 @@ export function OmniboxSaveRow({
             "pointer-events-none ease-out-strong group-active/save:scale-[0.96]",
           )}
         >
-          <Plus />
+          {moves ? <FolderMove /> : <Plus />}
         </Typography>
       </Typography>
     </button>
