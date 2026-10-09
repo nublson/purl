@@ -22,7 +22,8 @@ import { cache } from "react";
  * The row's body is the page's content.
  *
  * Reads are cached under {@link NOTION_CACHE_TAG} for an hour, and
- * `POST /api/notion/revalidate` (a Notion automation) expires them on edit.
+ * `POST /api/notion/revalidate` (the integration's webhook subscription)
+ * expires them on edit.
  * Without `NOTION_ACCESS_TOKEN` / `NOTION_PAGES_DATA_SOURCE_ID` (local dev,
  * PR previews) every read returns nothing, so pages 404 instead of failing.
  */
@@ -90,7 +91,8 @@ function plainText(
 export function toPageSummary(page: PageObjectResponse): NotionPageSummary {
   return {
     id: page.id,
-    slug: plainText(page.properties.slug).trim(),
+    // Lowercased like the lookup, so a row typed `Privacy` still serves /privacy.
+    slug: plainText(page.properties.slug).trim().toLowerCase(),
     title: plainText(page.properties.Name).trim(),
     description: plainText(page.properties.description).trim(),
     lastEditedAt: page.last_edited_time,
@@ -99,21 +101,12 @@ export function toPageSummary(page: PageObjectResponse): NotionPageSummary {
 
 async function queryPublishedPages(
   config: NotionConfig,
-  slug?: string,
 ): Promise<PageObjectResponse[]> {
-  const published = {
-    property: "state",
-    select: { equals: PUBLISHED_STATE },
-  };
   const rows = await collectPaginatedAPI(
     getClient(config.token).dataSources.query,
     {
       data_source_id: config.dataSourceId,
-      filter: slug
-        ? {
-            and: [published, { property: "slug", rich_text: { equals: slug } }],
-          }
-        : published,
+      filter: { property: "state", select: { equals: PUBLISHED_STATE } },
       sorts: [{ property: "Name", direction: "ascending" }],
     },
   );
@@ -177,7 +170,11 @@ const getPageBySlugCached = unstable_cache(
   async (slug: string): Promise<NotionPage | null> => {
     const config = getNotionConfig();
     if (!config) return null;
-    const [page] = await queryPublishedPages(config, slug);
+    // Matched here rather than with a Notion `rich_text equals` filter, which
+    // is case-sensitive; there are only a handful of pages.
+    const page = (await queryPublishedPages(config)).find(
+      (row) => toPageSummary(row).slug === slug,
+    );
     if (!page) return null;
     return {
       ...toPageSummary(page),

@@ -96,7 +96,9 @@ describe("notion", () => {
   });
 
   it("finds a published page by slug with its nested blocks", async () => {
-    mockQuery.mockResolvedValue(list([page("p1", "Terms", "terms")]));
+    mockQuery.mockResolvedValue(
+      list([page("p0", "Privacy", "privacy"), page("p1", "Terms", "Terms")]),
+    );
     mockListChildren.mockImplementation(({ block_id }: { block_id: string }) =>
       Promise.resolve(
         list(
@@ -113,17 +115,9 @@ describe("notion", () => {
 
     const result = await getPageBySlug(" Terms ");
 
-    expect(mockQuery).toHaveBeenCalledWith(
-      expect.objectContaining({
-        filter: {
-          and: [
-            { property: "state", select: { equals: "published" } },
-            { property: "slug", rich_text: { equals: "terms" } },
-          ],
-        },
-      }),
-    );
+    // Slugs match case-insensitively: the row's "Terms" serves "terms".
     expect(result?.title).toBe("Terms");
+    expect(result?.slug).toBe("terms");
     expect(result?.blocks.map((b) => b.id)).toEqual(["b1", "b2", "b3"]);
     expect(result?.blocks[1]?.children?.map((b) => b.id)).toEqual(["b2a"]);
     // Child pages are their own documents: never fetched into this one.

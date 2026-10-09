@@ -115,4 +115,19 @@ describe("POST /api/notion/revalidate", () => {
     expect(mockRevalidateTag).not.toHaveBeenCalled();
     info.mockRestore();
   });
+
+  it("doesn't log a malformed verification token", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const res = await POST(
+      request(
+        "/api/notion/revalidate",
+        {},
+        JSON.stringify({ verification_token: "fake\nlog line" }),
+      ),
+    );
+
+    expect(res.status).toBe(401);
+    expect(info).not.toHaveBeenCalled();
+    info.mockRestore();
+  });
 });

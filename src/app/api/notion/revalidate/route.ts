@@ -37,7 +37,11 @@ function readVerificationToken(body: string): string | null {
     const parsed = JSON.parse(body) as unknown;
     if (parsed && typeof parsed === "object" && "verification_token" in parsed) {
       const token = (parsed as { verification_token: unknown }).verification_token;
-      return typeof token === "string" ? token : null;
+      // Notion's tokens are short opaque strings (`secret_…`); anything else
+      // isn't logged, so unauthenticated callers can't write arbitrary text.
+      return typeof token === "string" && /^[\w-]{1,128}$/.test(token)
+        ? token
+        : null;
     }
   } catch {
     /* not JSON */
