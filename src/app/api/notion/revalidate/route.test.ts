@@ -1,3 +1,4 @@
+import { createHmac } from "node:crypto";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -9,17 +10,27 @@ vi.mock("next/cache", () => ({
 
 const { POST } = await import("./route");
 
-function request(path: string, headers: Record<string, string> = {}) {
+function request(
+  path: string,
+  headers: Record<string, string> = {},
+  body?: string,
+) {
   return new NextRequest(`http://localhost:3000${path}`, {
     method: "POST",
     headers,
+    body,
   });
+}
+
+function sign(body: string, key = "secret_verify") {
+  return `sha256=${createHmac("sha256", key).update(body).digest("hex")}`;
 }
 
 describe("POST /api/notion/revalidate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("NOTION_REVALIDATION_SECRET", "s3cret");
+    vi.stubEnv("NOTION_WEBHOOK_SECRET", "secret_verify");
   });
 
   afterEach(() => {
@@ -53,5 +64,55 @@ describe("POST /api/notion/revalidate", () => {
 
     expect((await POST(request("/api/notion/revalidate?secret="))).status).toBe(401);
     expect(mockRevalidateTag).not.toHaveBeenCalled();
+  });
+
+  it("expires the cache for a correctly signed Notion event", async () => {
+    const body = JSON.stringify({ type: "page.content_updated" });
+    const res = await POST(
+      request("/api/notion/revalidate", { "x-notion-signature": sign(body) }, body),
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockRevalidateTag).toHaveBeenCalledWith("notion", { expire: 0 });
+  });
+
+  it("rejects a Notion event with a wrong signature", async () => {
+    const body = JSON.stringify({ type: "page.content_updated" });
+    const res = await POST(
+      request(
+        "/api/notion/revalidate",
+        { "x-notion-signature": sign(body, "other") },
+        body,
+      ),
+    );
+
+    expect(res.status).toBe(401);
+    expect(mockRevalidateTag).not.toHaveBeenCalled();
+  });
+
+  it("rejects signed events while no webhook secret is set", async () => {
+    vi.stubEnv("NOTION_WEBHOOK_SECRET", "");
+    const body = "{}";
+    const res = await POST(
+      request("/api/notion/revalidate", { "x-notion-signature": sign(body) }, body),
+    );
+
+    expect(res.status).toBe(401);
+  });
+
+  it("logs the verification token without revalidating", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const res = await POST(
+      request(
+        "/api/notion/revalidate",
+        {},
+        JSON.stringify({ verification_token: "secret_abc" }),
+      ),
+    );
+
+    expect(res.status).toBe(200);
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("secret_abc"));
+    expect(mockRevalidateTag).not.toHaveBeenCalled();
+    info.mockRestore();
   });
 });
