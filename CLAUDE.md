@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is Purl
 
-Read-it-later app: a home for your "pearls". Users save URLs (web, PDF, YouTube, audio); Purl resolves metadata (title, favicon, description, thumbnail) and keeps them in one place. There is no AI layer: the in-app chat and the extraction/embeddings/semantic-search pipeline were removed. `/ai` and `/chat/*` redirect to `/home` via `redirects()` in `next.config.ts`.
+A calm place to save and share the links you find: a home for your "pearls". Users save URLs (web, PDF, YouTube, audio); Purl resolves metadata (title, favicon, description, thumbnail) and keeps them in one place. There is no AI layer: the in-app chat and the extraction/embeddings/semantic-search pipeline were removed. `/ai` and `/chat/*` redirect to `/home` via `redirects()` in `next.config.ts`.
 
 No paid plans: every account gets the same **1,000-link cap** (`MAX_SAVED_LINKS` in `src/lib/limits.ts`, enforced by `assertCanSaveLink` in `src/lib/entitlements.ts`; API/MCP return `403` with `code: LIMIT_REACHED`, `feature: SAVE_LIMIT`).
 

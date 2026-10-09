@@ -4,15 +4,15 @@
 
 # Purl
 
-**Save anything. Keep it in one place.**
+**Save the links worth keeping. Share the ones worth passing on.**
 
 **Live preview:** [https://purl.live](https://purl.live)
 
-Purl is a read-it-later app — a home for your "pearls". You paste URLs: web pages, PDFs, YouTube videos, and audio. Purl resolves each item's metadata (title, favicon, description, thumbnail) and keeps everything in one place, available from the app, a REST API, and an MCP server.
+Purl is a calm place to save and share the links you find — a home for your "pearls". You paste URLs: web pages, PDFs, YouTube videos, and audio. Purl resolves each item's metadata (title, favicon, description, thumbnail) and keeps everything in one place, available from the app, a REST API, and an MCP server.
 
 Purl is free, with one limit: each account can save up to **1,000 links** (`MAX_SAVED_LINKS` in [`src/lib/limits.ts`](src/lib/limits.ts)).
 
-The product goal: one place to stash material you care about.
+The product goal: one place to keep the links you care about, and an easy way to share the ones worth passing on.
 
 ## Implemented today
 

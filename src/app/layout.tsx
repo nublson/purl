@@ -15,7 +15,7 @@ const inter = Inter({
 });
 
 const description =
-  "Purl is a read-it-later app. Save any link, PDF, video, or audio file and keep it all in one place.";
+  "Purl is a calm place to save and share the links you find. Keep articles, PDFs, videos and audio in folders, and share any folder with a link.";
 
 export const metadata: Metadata = {
   applicationName: "Purl",
