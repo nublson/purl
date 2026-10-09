@@ -130,4 +130,22 @@ describe("POST /api/notion/revalidate", () => {
     expect(info).not.toHaveBeenCalled();
     info.mockRestore();
   });
+
+  it("logs the verification token even when the request is signed", async () => {
+    vi.stubEnv("NOTION_WEBHOOK_SECRET", "");
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    const body = JSON.stringify({ verification_token: "secret_abc" });
+    const res = await POST(
+      request(
+        "/api/notion/revalidate",
+        { "x-notion-signature": sign(body, "whatever") },
+        body,
+      ),
+    );
+
+    expect(res.status).toBe(200);
+    expect(info).toHaveBeenCalledWith(expect.stringContaining("secret_abc"));
+    expect(mockRevalidateTag).not.toHaveBeenCalled();
+    info.mockRestore();
+  });
 });
