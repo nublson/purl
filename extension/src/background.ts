@@ -103,16 +103,82 @@ function showToast(state: ToastState, message: string | null): void {
   }
 }
 
+/**
+ * Shows a toast in the page. Best effort: Chrome refuses to run scripts on some
+ * pages (its own pages, the Web Store…), and a missing toast must never stop a
+ * save. Resolves to whether the toast was shown.
+ */
 async function injectToast(
   tabId: number,
   state: ToastState,
   message: string | null = null,
+): Promise<boolean> {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: showToast,
+      args: [state, message],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const DEFAULT_TITLE = "Save to Purl";
+const BADGE_MS = 3000;
+
+/**
+ * Where a toast can't run, the toolbar icon says it instead: a badge (✓ or !)
+ * with the message as its tooltip, cleared after a few seconds.
+ */
+async function flashBadge(
+  tabId: number,
+  state: Exclude<ToastState, "saving">,
+  message: string,
 ): Promise<void> {
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    func: showToast,
-    args: [state, message],
-  });
+  const saved = state === "saved";
+  try {
+    await chrome.action.setBadgeBackgroundColor({
+      tabId,
+      color: saved ? "#16a34a" : "#dc2626",
+    });
+    await chrome.action.setBadgeText({ tabId, text: saved ? "✓" : "!" });
+    await chrome.action.setTitle({ tabId, title: message });
+  } catch {
+    return; // the tab went away
+  }
+  setTimeout(() => {
+    void Promise.all([
+      chrome.action.setBadgeText({ tabId, text: "" }),
+      chrome.action.setTitle({ tabId, title: DEFAULT_TITLE }),
+    ]).catch(() => {});
+  }, BADGE_MS);
+}
+
+/** Tells the user how it went: a toast in the page, or the icon where that can't run. */
+async function report(
+  tabId: number,
+  state: ToastState,
+  message: string | null = null,
+): Promise<void> {
+  const shown = await injectToast(tabId, state, message);
+  if (shown || state === "saving") return;
+  await flashBadge(
+    tabId,
+    state,
+    message ?? (state === "saved" ? "Saved with Purl" : "Something went wrong"),
+  );
+}
+
+/** Only web pages can be saved; Purl rejects chrome://, file:// and the like. */
+function isWebUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url);
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 // The server answers 403 { code: "LIMIT_REACHED" } at the link cap; any other
@@ -131,9 +197,16 @@ async function isLimitReached(res: Response): Promise<boolean> {
 }
 
 chrome.action.onClicked.addListener(async (tab) => {
-  if (!tab.id || !tab.url) return;
+  if (!tab.id) return;
+  const tabId = tab.id;
 
-  await injectToast(tab.id, "saving");
+  // No address means Chrome gave us no access to the page (its own pages).
+  if (!tab.url || !isWebUrl(tab.url)) {
+    await report(tabId, "error", "Can't save this page");
+    return;
+  }
+
+  await report(tabId, "saving");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
@@ -149,25 +222,33 @@ chrome.action.onClicked.addListener(async (tab) => {
     clearTimeout(timeout);
 
     if (res.status === 401) {
-      await injectToast(tab.id, "error", "Log in to Purl first");
+      await report(tabId, "error", "Log in to Purl first");
       return;
     }
     if (res.status === 403 && (await isLimitReached(res))) {
-      await injectToast(tab.id, "error", "Link limit reached");
+      await report(tabId, "error", "Link limit reached");
+      return;
+    }
+    if (res.status === 429) {
+      // Saves are limited to 30 a minute.
+      await report(tabId, "error", "Too many saves, try again in a minute");
       return;
     }
     if (!res.ok) {
-      await injectToast(tab.id, "error", "Something went wrong");
+      await report(tabId, "error", "Something went wrong");
       return;
     }
 
-    await injectToast(tab.id, "saved");
+    await report(tabId, "saved");
   } catch (e) {
     clearTimeout(timeout);
     const msg =
       e instanceof Error && e.name === "AbortError"
         ? "Request timed out"
         : "Could not reach Purl";
-    await injectToast(tab.id, "error", msg);
+    await report(tabId, "error", msg);
   }
 });
+
+// Marks this entry point as a module (it has no imports), so tests can import it.
+export {};

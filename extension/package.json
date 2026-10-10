@@ -2,7 +2,8 @@
   "name": "purl-extension",
   "private": true,
   "scripts": {
-    "dev": "vite build --watch",
+    "dev": "vite build --watch --mode development",
+    "typecheck": "tsc --noEmit",
     "build": "vite build && node scripts/zip.mjs"
   },
   "devDependencies": {

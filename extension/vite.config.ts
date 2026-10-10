@@ -2,12 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, loadEnv, type Plugin } from "vite";
 
+const PRODUCTION_URL = "https://purl.live";
+
 /**
- * Writes a production-safe manifest.json into dist/ after the build.
- * In development (watch) mode the source manifest is used as-is so
- * localhost permissions remain available for local testing.
+ * Writes manifest.json into dist/ after the build. The source manifest only
+ * allows the production site; `npm run dev` adds the local server it talks to
+ * (VITE_PURL_URL), so a store build can never carry a localhost permission.
  */
-function manifestPlugin(isDev: boolean): Plugin {
+function manifestPlugin(isDev: boolean, purlUrl: string): Plugin {
   return {
     name: "purl-manifest",
     closeBundle() {
@@ -15,12 +17,16 @@ function manifestPlugin(isDev: boolean): Plugin {
       const dest = path.resolve(__dirname, "dist/manifest.json");
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const manifest: any = JSON.parse(fs.readFileSync(src, "utf-8"));
+      const hosts: string[] = manifest.host_permissions;
 
-      if (!isDev) {
-        // Strip localhost from host_permissions for store submissions
-        manifest.host_permissions = (
-          manifest.host_permissions as string[]
-        ).filter((p) => !p.startsWith("http://localhost"));
+      if (isDev) {
+        const local = `${new URL(purlUrl).origin}/*`;
+        if (!hosts.includes(local)) hosts.push(local);
+        manifest.name = `${manifest.name} (dev)`;
+      } else if (hosts.some((h) => h !== `${PRODUCTION_URL}/*`)) {
+        throw new Error(
+          `public/manifest.json must only allow ${PRODUCTION_URL}/*, found: ${hosts.join(", ")}`,
+        );
       }
 
       fs.writeFileSync(dest, JSON.stringify(manifest, null, 2));
@@ -29,16 +35,26 @@ function manifestPlugin(isDev: boolean): Plugin {
 }
 
 export default defineConfig(({ mode }) => {
+  // `npm run dev` builds with --mode development, which also reads
+  // .env.development; a production build only ever reads .env(.production).
   const env = loadEnv(mode, process.cwd(), "VITE_");
-  const purlUrl = env.VITE_PURL_URL ?? "https://purl.live";
   const isDev = mode === "development";
+  // Empty counts as unset (`??` would have baked an empty address in).
+  const purlUrl = (env.VITE_PURL_URL || PRODUCTION_URL).replace(/\/+$/, "");
+
+  if (!isDev && purlUrl !== PRODUCTION_URL) {
+    throw new Error(
+      `A production build must talk to ${PRODUCTION_URL}, but VITE_PURL_URL is ${purlUrl}. ` +
+        "Remove it from .env / .env.production (local development belongs in .env.development).",
+    );
+  }
 
   return {
     define: {
       // Replaced at build time so the value is baked into background.js
       __PURL_URL__: JSON.stringify(purlUrl),
     },
-    plugins: [manifestPlugin(isDev)],
+    plugins: [manifestPlugin(isDev, purlUrl)],
     build: {
       // Minification must be disabled: chrome.scripting.executeScript serializes
       // functions via .toString(), which breaks with minified variable names.
