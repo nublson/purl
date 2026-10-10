@@ -13,6 +13,7 @@ const WORDS = "[data-landing-word]";
 const FOOTER_LINKS = [
   { name: "API", href: "/docs/api" },
   { name: "MCP", href: "/docs/mcp" },
+  { name: "Support", href: "/support" },
   { name: "Privacy", href: "/privacy" },
   { name: "Terms", href: "/terms" },
   { name: "GitHub", href: "https://github.com/nublson/purl" },

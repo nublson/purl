@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { BrandMark } from "@/components/brand-mark";
 import { LandingFooter } from "@/components/landing/landing-footer";
@@ -52,8 +53,19 @@ export async function staticPageMetadata(
   };
 }
 
-/** A Notion-backed page: Purl mark, title, description, Updated line, its Notion content and the footer. */
-export async function StaticPage({ slug }: { slug: StaticPageSlug }) {
+/**
+ * A Notion-backed page: Purl mark, title, description, Updated line, its Notion
+ * content and the footer. `intro` is code-rendered content that doesn't live in
+ * Notion (the support page's contact card), between the Updated line and the
+ * Notion content.
+ */
+export async function StaticPage({
+  slug,
+  intro,
+}: {
+  slug: StaticPageSlug;
+  intro?: ReactNode;
+}) {
   const [page, published] = await Promise.all([
     readStaticPage(slug),
     readAtBuild(
@@ -96,6 +108,7 @@ export async function StaticPage({ slug }: { slug: StaticPageSlug }) {
             Updated {formatUpdatedDate(page.lastEditedAt)}
           </time>
         </Typography>
+        {intro ? <div className="mt-10">{intro}</div> : null}
         {page.blocks.length > 0 ? (
           <div className="mt-10">
             <NotionBlocks blocks={page.blocks} context={context} />

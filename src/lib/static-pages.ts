@@ -7,6 +7,7 @@
 export const STATIC_PAGES = [
   { slug: "api", path: "/docs/api", label: "API" },
   { slug: "mcp", path: "/docs/mcp", label: "MCP" },
+  { slug: "support", path: "/support", label: "Support" },
   { slug: "privacy", path: "/privacy", label: "Privacy" },
   { slug: "terms", path: "/terms", label: "Terms" },
 ] as const;
