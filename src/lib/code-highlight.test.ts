@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { HIGHLIGHT_LANGUAGES } from "./code-languages";
 import { highlightCode } from "./code-highlight";
 
 describe("highlightCode", () => {
@@ -10,12 +11,9 @@ describe("highlightCode", () => {
     expect(json).toContain("--shiki-dark:");
   });
 
-  it("highlights every supported language without throwing", async () => {
-    for (const lang of [
-      "bash", "json", "typescript", "javascript", "tsx", "http",
-      "python", "yaml", "markdown", "diff", "toml",
-    ] as const) {
-      expect((await highlightCode("x", lang)).tagName).toBe("code");
-    }
+  it.each([...HIGHLIGHT_LANGUAGES])("highlights %s", async (lang) => {
+    const code = await highlightCode("x", lang);
+    expect(code.tagName).toBe("code");
+    expect(JSON.stringify(code.children)).toContain("--shiki-light:");
   });
 });

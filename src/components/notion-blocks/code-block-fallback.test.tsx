@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildPageIdToPath } from "@/lib/notion-links";
 import { NotionBlocks, createRenderContext } from ".";
 import { block, renderToHtml, richText } from "./test-utils";
@@ -8,7 +8,10 @@ vi.mock("@/lib/code-highlight", () => ({
 }));
 
 describe("CodeBlock when highlighting throws", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("renders plain text in the same frame", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const context = createRenderContext("api", buildPageIdToPath([]));
     const html = await renderToHtml(
       <NotionBlocks
@@ -26,5 +29,6 @@ describe("CodeBlock when highlighting throws", () => {
     expect(html).toContain("<pre");
     expect(html).toContain("&lt;b&gt;");
     expect(html).not.toContain("--shiki-");
+    expect(warn).toHaveBeenCalledOnce();
   });
 });
