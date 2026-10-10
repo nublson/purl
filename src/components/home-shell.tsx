@@ -357,7 +357,14 @@ export function HomeShell({
           { timeZone: groupsTimeZone },
         ),
       );
-      return () => {
+      // Out again (Undo, or the move failed): it glides back to its row in
+      // the Add section, which the caller restores in the same update. On
+      // Undo the revert's own reload follows once it's saved (reloading now
+      // would still find the link here); a failed move reloads at once.
+      return ({ reload: reloadNow }: { reload: boolean }) => {
+        flipRef.current = captureFlip();
+        setFlipCount((count) => count + 1);
+        reloadSeq.current++;
         setGroups((current) =>
           current
             .map((group) => ({
@@ -366,7 +373,7 @@ export function HomeShell({
             }))
             .filter((group) => group.links.length > 0),
         );
-        void reload();
+        if (reloadNow) void reload();
       };
     },
     [folderId, groupsTimeZone, reload],

@@ -28,7 +28,14 @@ export type OmniboxAddResults = {
   showMore: () => void;
   /** Hides `id` at once (it's being added); `undo` brings it back if that fails. */
   hide: (id: string) => { settle: () => void; undo: () => void };
+  /**
+   * Shows `link` again at `index` at once (its add was undone), until a
+   * fetch started after `settle` (the revert saved) lists it where it is.
+   */
+  restore: (link: Link, index: number) => { settle: () => void };
 };
+
+type Restored = { key: string; link: Link; index: number; after: number | null };
 
 type Fetched = {
   key: string;
@@ -58,6 +65,10 @@ export function useOmniboxAddResults(
   // Links being added, by id: hidden until a fetch started after the move
   // was saved (`after`) shows where they are now. Null while it's saving.
   const [hidden, setHidden] = React.useState<ReadonlyMap<string, number | null>>(
+    () => new Map(),
+  );
+  // Links put back by Undo, by id, the same way round.
+  const [restored, setRestored] = React.useState<ReadonlyMap<string, Restored>>(
     () => new Map(),
   );
 
@@ -92,6 +103,15 @@ export function useOmniboxAddResults(
           for (const [id] of settled) next.delete(id);
           return next;
         });
+        setRestored((current) => {
+          const settled = [...current].filter(
+            ([, entry]) => entry.after !== null && seq > entry.after,
+          );
+          if (settled.length === 0) return current;
+          const next = new Map(current);
+          for (const [id] of settled) next.delete(id);
+          return next;
+        });
       })
       .catch(() => {
         // An error reads as no results: the empty state stays the answer.
@@ -102,10 +122,16 @@ export function useOmniboxAddResults(
   }, [folderId, query, count, version]);
 
   const current = fetched?.key === key ? fetched : null;
-  const links = React.useMemo(
-    () => (current?.links ?? []).filter((link) => !hidden.has(link.id)),
-    [current, hidden],
-  );
+  const links = React.useMemo(() => {
+    const shown = (current?.links ?? []).filter((link) => !hidden.has(link.id));
+    for (const entry of restored.values()) {
+      if (entry.key !== key || shown.some((link) => link.id === entry.link.id)) {
+        continue;
+      }
+      shown.splice(Math.min(entry.index, shown.length), 0, entry.link);
+    }
+    return shown;
+  }, [current, hidden, restored, key]);
 
   const showMore = React.useCallback(() => {
     setLimit({ key, count: count + OMNIBOX_ADD_PAGE });
@@ -128,12 +154,36 @@ export function useOmniboxAddResults(
     };
   }, []);
 
+  const restore = React.useCallback(
+    (link: Link, index: number) => {
+      setHidden((map) => {
+        if (!map.has(link.id)) return map;
+        const next = new Map(map);
+        next.delete(link.id);
+        return next;
+      });
+      setRestored((map) =>
+        new Map(map).set(link.id, { key, link, index, after: null }),
+      );
+      return {
+        settle: () =>
+          setRestored((map) => {
+            const entry = map.get(link.id);
+            if (!entry) return map;
+            return new Map(map).set(link.id, { ...entry, after: seqRef.current });
+          }),
+      };
+    },
+    [key],
+  );
+
   return {
     loading: Boolean(key) && !current,
     links,
     hasMore: current?.hasMore ?? false,
     showMore,
     hide,
+    restore,
   };
 }
 
@@ -159,9 +209,9 @@ export function OmniboxAddSection({
    * The link is on its way into the folder: shown in its results at once,
    * in the same frame its row leaves this section (no moment where it's
    * nowhere, or the empty state stands in). Returns how to take it back
-   * out if the move fails.
+   * out (Undo, or a failed move; `reload` when nothing else will).
    */
-  onAdding: (link: Link) => () => void;
+  onAdding: (link: Link) => (opts: { reload: boolean }) => void;
 }) {
   const { folders } = useFolders();
   const { moveLinks } = useFolderActions();
@@ -187,10 +237,18 @@ export function OmniboxAddSection({
     // One update: the row leaves here and arrives in the folder's results.
     const { settle, undo } = results.hide(link.id);
     const takeBack = onAdding(link);
-    const result = await moveLinks([link.id], folder.id, { target: folder });
+    const result = await moveLinks([link.id], folder.id, {
+      target: folder,
+      // Undo, the same way back: in one update the link leaves the
+      // folder's results and its row returns here, where it was.
+      onUndo: () => {
+        takeBack({ reload: false });
+        return results.restore(link, index).settle;
+      },
+    });
     if (!result.ok) {
       undo();
-      takeBack();
+      takeBack({ reload: true });
       return;
     }
     settle();

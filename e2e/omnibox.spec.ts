@@ -155,6 +155,37 @@ test.describe("Search field", () => {
     await expect(page.locator('[data-cy="link-group-empty"]')).toHaveCount(0);
   });
 
+  test("Undo puts the link back in the Add section at once, with no empty state between", async ({ page, seed }) => {
+    await seed.folder({ name: "Reading list", slug: "reading-list" });
+    await seed.link({ url: "https://interfaces.example", title: "Interfaces › Log in" });
+    await open(page, "/folders/reading-list");
+
+    await field(page).fill("interfaces");
+    const addRows = page.locator('[data-cy="omnibox-add-row"]');
+    await addRows.first().click();
+    await expect(rows(page)).toHaveCount(1);
+    await expect(page.getByText("Undo")).toBeVisible();
+
+    // Hold the revert: the page must not wait for it.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/links/bulk", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.getByText("Undo").click();
+    await expect(addRows).toHaveCount(1);
+    await expect(rows(page)).toHaveCount(0);
+    await expect(page.locator('[data-cy="link-group-empty"]')).toHaveCount(0);
+
+    release();
+    // Saved and reloaded: still where Undo put it.
+    await page.waitForLoadState("networkidle");
+    await expect(addRows).toHaveCount(1);
+    await expect(rows(page)).toHaveCount(0);
+    await expect(page.locator('[data-cy="link-group-empty"]')).toHaveCount(0);
+  });
+
   test("a failed add puts the link back in the Add section", async ({ page, seed }) => {
     await seed.folder({ name: "Reading list", slug: "reading-list" });
     await seed.link({ url: "https://interfaces.example", title: "Interfaces › Log in" });

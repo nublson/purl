@@ -97,6 +97,19 @@ export function useCurrentFolder(): FolderSummary | null {
  * `error` inline. `moveLink` and `moveLinks` have no dialog, so they toast
  * their own failures.
  */
+export type MoveLinksOptions = {
+  /** The target folder, for the toast, when the list may not have it yet. */
+  target?: FolderSummary;
+  /** The caller reports a failure itself. */
+  quietError?: boolean;
+  /**
+   * Undo was pressed for these links (the ones not moved again since): the
+   * caller can show them back where they were right away. What it returns
+   * runs once the revert is saved (or failed), before the lists reload.
+   */
+  onUndo?: (ids: string[]) => (() => void) | void;
+};
+
 export function useFolderActions(): {
   createFolder: (
     input: CreateFolderInput,
@@ -119,7 +132,7 @@ export function useFolderActions(): {
   moveLinks: (
     linkIds: string[],
     folderId: string | null,
-    opts?: { target?: FolderSummary; quietError?: boolean },
+    opts?: MoveLinksOptions,
   ) => Promise<ActionResult<{ moved: number }>>;
   reorderFolders: (ids: string[]) => Promise<ActionResult<FolderSummary[]>>;
 } {
@@ -301,7 +314,7 @@ export function useFolderActions(): {
       // The target folder when the caller has it and the list may not yet
       // (a folder created a moment ago), so the toast can name it.
       // `quietError`: the caller reports a failure itself.
-      opts?: { target?: FolderSummary; quietError?: boolean },
+      opts?: MoveLinksOptions,
     ): Promise<ActionResult<{ moved: number }>> => {
       const result = await patchLinksFolder(linkIds, folderId);
       if (!result.ok) {
@@ -343,6 +356,11 @@ export function useFolderActions(): {
                 ({ id }) => latestMoveByLink.get(id) === move,
               );
               for (const { id } of stillLatest) latestMoveByLink.delete(id);
+              // The caller shows the way back at once; told when it's saved.
+              const settled =
+                stillLatest.length > 0
+                  ? opts?.onUndo?.(stillLatest.map(({ id }) => id))
+                  : undefined;
               const results = await Promise.all(
                 Array.from(groupByPreviousFolder(stillLatest)).map(
                   ([previousFolderId, ids]) =>
@@ -351,6 +369,7 @@ export function useFolderActions(): {
               );
               const failed = results.find((reverted) => !reverted.ok);
               if (failed && !failed.ok) toast.error(failed.error);
+              settled?.();
               notifyLinksChanged();
             },
           },
