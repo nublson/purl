@@ -77,29 +77,26 @@ export async function StaticPage({ slug }: { slug: StaticPageSlug }) {
         </Typography>
       </header>
       <main className="flex w-full flex-1 flex-col md:px-[6%]">
-        {/* The content is one centered 68ch column (on the landing demo's
-            axis); text inside stays left-aligned. The mark and footer keep
-            the landing layout. */}
-        <div className="mx-auto w-full max-w-[68ch]">
-          <Typography variant="h2" component="h1" className="mt-8 md:mt-10">
-            {page.title}
+        <Typography variant="h2" component="h1" className="mt-8 md:mt-10">
+          {page.title}
+        </Typography>
+        {page.description ? (
+          <Typography className="mt-3.5 max-w-[60ch] text-lg text-pretty">
+            {page.description}
           </Typography>
-          {page.description ? (
-            <Typography className="mt-3.5 text-lg text-pretty">
-              {page.description}
-            </Typography>
-          ) : null}
-          <Typography size="small" className="mt-4">
-            <time dateTime={page.lastEditedAt}>
-              Updated {formatUpdatedDate(page.lastEditedAt)}
-            </time>
-          </Typography>
-          {page.blocks.length > 0 ? (
-            <div className="mt-10">
-              <NotionBlocks blocks={page.blocks} context={context} />
-            </div>
-          ) : null}
-        </div>
+        ) : null}
+        <Typography size="small" className="mt-4">
+          <time dateTime={page.lastEditedAt}>
+            Updated {formatUpdatedDate(page.lastEditedAt)}
+          </time>
+        </Typography>
+        {page.blocks.length > 0 ? (
+          // The Notion content is one centered 68ch column (on the landing
+          // demo's axis), text left-aligned and every block sharing its edge.
+          <div className="mx-auto mt-10 w-full max-w-[68ch]">
+            <NotionBlocks blocks={page.blocks} context={context} />
+          </div>
+        ) : null}
       </main>
       <LandingFooter currentPath={STATIC_PAGES.find((p) => p.slug === slug)?.path} />
     </div>
