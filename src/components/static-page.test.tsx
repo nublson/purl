@@ -13,6 +13,7 @@ vi.mock("@/lib/notion", () => ({
 }));
 vi.mock("next/navigation", () => ({ notFound: () => notFound() }));
 
+import { LandingFooter } from "@/components/landing/landing-footer";
 import { StaticPage, staticPageMetadata } from "./static-page";
 
 const PRIVACY_ID = "244b1726-8ab3-83c3-9388-87a7a5748b73";
@@ -49,6 +50,26 @@ describe("StaticPage", () => {
     expect(html).toContain("Updated ");
     expect(html).toContain("October 3, 2026");
     expect(html).toContain('aria-label="Footer"');
+  });
+
+  it("marks only the current page's footer link", async () => {
+    getPageBySlug.mockResolvedValue(page());
+    const html = await renderToHtml(await StaticPage({ slug: "privacy" }));
+    const links = html.match(/<a [^>]*href="[^"]*"[^>]*>(Privacy|Terms|API|MCP|GitHub)<\/a>/g)!;
+    expect(links.length).toBeGreaterThanOrEqual(4);
+    const current = links.filter((l) => l.includes('aria-current="page"'));
+    expect(current).toHaveLength(1);
+    expect(current[0]).toContain('href="/privacy"');
+    expect(current[0]).toContain("text-foreground");
+    expect(current[0]).toContain("font-medium");
+    const others = links.filter((l) => !l.includes("aria-current"));
+    for (const l of others) expect(l).not.toMatch(/ text-foreground| font-medium/);
+  });
+
+  it("marks no footer link on the landing page", async () => {
+    const html = await renderToHtml(<LandingFooter />);
+    expect(html).toContain('aria-label="Footer"');
+    expect(html).not.toContain("aria-current");
   });
 
   it("renders no body container for an empty page", async () => {

@@ -96,7 +96,7 @@ export async function StaticPage({ slug }: { slug: StaticPageSlug }) {
           </div>
         ) : null}
       </main>
-      <LandingFooter />
+      <LandingFooter currentPath={STATIC_PAGES.find((p) => p.slug === slug)?.path} />
     </div>
   );
 }

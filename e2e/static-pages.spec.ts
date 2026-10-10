@@ -31,6 +31,13 @@ test.describe("Static pages (signed out)", () => {
       await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
       await expect(page.getByText(/^Updated /)).toBeVisible();
       await expect(page.getByRole("contentinfo")).toBeVisible();
+      // The footer marks the page you're on.
+      const footer = page.getByRole("contentinfo");
+      await expect(footer.getByRole("link", { name: label, exact: true })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      await expect(footer.locator('a[aria-current="page"]')).toHaveCount(1);
     });
   }
 
