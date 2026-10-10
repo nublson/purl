@@ -31,6 +31,46 @@ describe("NotionBlocks", () => {
     expect(await render([para()])).not.toContain("<p");
   });
 
+  it("renders a paragraph's nested blocks indented after its text, lists grouped", async () => {
+    const html = await render([
+      block(
+        "paragraph",
+        { rich_text: [richText("Parent")] },
+        {
+          children: [
+            block("bulleted_list_item", { rich_text: [richText("one")] }),
+            block("bulleted_list_item", { rich_text: [richText("two")] }),
+          ],
+        },
+      ),
+    ]);
+    expect(html).toContain("flex flex-col gap-4 pl-6");
+    expect(html.indexOf("one")).toBeGreaterThan(html.indexOf("Parent"));
+    expect(html.match(/<ul/g)).toHaveLength(1);
+    expect(html.match(/<li[ >]/g)).toHaveLength(2);
+  });
+
+  it("renders the children of an empty paragraph, without a text line", async () => {
+    const html = await render([
+      block("paragraph", { rich_text: [] }, { children: [para(richText("Kid"))] }),
+    ]);
+    expect(html).toContain("Kid");
+    expect(html.match(/<p[ >]/g)).toHaveLength(1);
+  });
+
+  it("renders a quote's nested blocks inside the blockquote", async () => {
+    const html = await render([
+      block(
+        "quote",
+        { rich_text: [richText("Said")] },
+        { children: [para(richText("Aside"))] },
+      ),
+    ]);
+    const quote = html.match(/<blockquote[\s\S]*<\/blockquote>/)![0];
+    expect(quote).toContain("Said");
+    expect(quote.indexOf("Aside")).toBeGreaterThan(quote.indexOf("Said"));
+  });
+
   it("lets inline links inherit the surrounding font size", async () => {
     const html = await render([
       block("heading_1", {

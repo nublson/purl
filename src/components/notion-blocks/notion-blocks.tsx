@@ -74,10 +74,16 @@ export function renderBlock(
   context: NotionRenderContext,
 ): ReactNode {
   const children = <BlockList blocks={block.children} context={context} />;
+  // For blocks that render nested content only when there is some.
+  const nested = block.children?.length ? children : undefined;
 
   switch (block.type) {
     case "paragraph":
-      return <ParagraphBlock block={block} context={context} />;
+      return (
+        <ParagraphBlock block={block} context={context}>
+          {nested}
+        </ParagraphBlock>
+      );
     case "heading_1":
     case "heading_2":
     case "heading_3":
@@ -87,7 +93,11 @@ export function renderBlock(
         </HeadingBlock>
       );
     case "quote":
-      return <QuoteBlock block={block} context={context} />;
+      return (
+        <QuoteBlock block={block} context={context}>
+          {nested}
+        </QuoteBlock>
+      );
     case "callout":
       return (
         <CalloutBlock block={block} context={context}>
