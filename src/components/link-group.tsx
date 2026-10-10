@@ -59,7 +59,11 @@ export const LinkGroup = ({
       aria-labelledby={headingId}
       className="w-full flex flex-col justify-start items-start gap-4"
     >
-      <h2 id={headingId} className="text-xs text-muted-foreground font-medium ms-2">
+      <h2
+        id={headingId}
+        data-flip={`day:${label}`}
+        className="text-xs text-muted-foreground font-medium ms-2"
+      >
         {label}
       </h2>
       <ItemGroup aria-labelledby={headingId} className="w-full gap-0">
@@ -71,6 +75,7 @@ export const LinkGroup = ({
           <div
             key={link.id}
             role="listitem"
+            data-flip={`link:${link.id}`}
             className="[content-visibility:auto] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px] [&:has(+div_[data-selected])_[data-selected]]:rounded-b-none [&:has([data-selected])+div_[data-selected]]:rounded-t-none"
           >
             <LinkItem
@@ -125,7 +130,7 @@ export function LinkGrid({
         {group.label}
       </h2>
     );
-    const groupCells: { key: string; node: ReactNode }[] = [];
+    const groupCells: { key: string; node: ReactNode; flip?: string }[] = [];
     if (group.pendingUrl) {
       groupCells.push({
         key: `pending-${group.label}`,
@@ -135,6 +140,7 @@ export function LinkGrid({
     visible.forEach((link, index) => {
       groupCells.push({
         key: link.id,
+        flip: `link:${link.id}`,
         node: (
           <LinkCard
             link={link}
@@ -166,6 +172,7 @@ export function LinkGrid({
       {cells.map((cell) => (
         <MasonryItem
           key={cell.key}
+          flip={cell.flip}
           className={cell.heading ? "relative" : undefined}
         >
           {cell.heading}
