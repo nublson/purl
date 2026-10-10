@@ -115,6 +115,21 @@ async function injectToast(
   });
 }
 
+// The server answers 403 { code: "LIMIT_REACHED" } at the link cap; any other
+// 403 (or an unreadable body) stays a generic error.
+async function isLimitReached(res: Response): Promise<boolean> {
+  try {
+    const body: unknown = await res.json();
+    return (
+      typeof body === "object" &&
+      body !== null &&
+      (body as { code?: unknown }).code === "LIMIT_REACHED"
+    );
+  } catch {
+    return false;
+  }
+}
+
 chrome.action.onClicked.addListener(async (tab) => {
   if (!tab.id || !tab.url) return;
 
@@ -137,7 +152,7 @@ chrome.action.onClicked.addListener(async (tab) => {
       await injectToast(tab.id, "error", "Log in to Purl first");
       return;
     }
-    if (res.status === 402) {
+    if (res.status === 403 && (await isLimitReached(res))) {
       await injectToast(tab.id, "error", "Link limit reached");
       return;
     }
