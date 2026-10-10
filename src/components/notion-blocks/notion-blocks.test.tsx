@@ -143,6 +143,25 @@ describe("NotionBlocks", () => {
     expect(html).toContain("<h4");
   });
 
+  it("renders nothing for a blank heading, and only its children when it has some", async () => {
+    const blank = await render([block("heading_2", { rich_text: [richText("  ")] })]);
+    expect(blank).not.toContain("<h3");
+    expect(blank).not.toContain("<a");
+    expect(blank).not.toContain("id=");
+    const empty = await render([block("heading_1", { rich_text: [] })]);
+    expect(empty).not.toContain("<h2");
+    const withKids = await render([
+      block(
+        "heading_2",
+        { rich_text: [] },
+        { children: [para(richText("Kid"))] },
+      ),
+    ]);
+    expect(withKids).toContain("Kid");
+    expect(withKids).not.toContain("<h3");
+    expect(withKids).not.toContain("<a ");
+  });
+
   it("dedupes heading ids across the page", async () => {
     const rt = [richText("Request")];
     const html = await render([

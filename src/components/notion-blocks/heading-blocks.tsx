@@ -26,6 +26,8 @@ export function HeadingBlock({ block, context, children }: Props) {
         ? block.heading_2
         : block.heading_3;
   const text = data.rich_text.map((t) => t.plain_text).join("");
+  // A blank heading would get an empty id and an unnamed anchor.
+  if (text.trim() === "") return <>{children}</>;
   const id = context.slug(text);
 
   const content = (
