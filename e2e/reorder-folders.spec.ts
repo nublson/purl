@@ -452,25 +452,29 @@ test.describe("Folder menu reorder polish", () => {
 test.describe("Folder menu reorder polish on a touch screen", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test("Home's trailing column lines up with the folders' check and grip", async ({ page, seed }) => {
+  test("Home's check lines up with the folders' grips, and its shortcut hint is gone", async ({ page, seed }) => {
     await seedThree(seed);
+    // No digit keys on touch: Home's shortcut slot is hidden while it isn't current.
     await page.goto("/folders/beta");
     let menu = await openMenu(page);
     await menuSettled(menu);
     await expect(menu.getByRole("menuitem", { name: /^Home/ }).locator("kbd")).toBeHidden();
-    const folderCheck = (await folderRow(menu, "Beta")
-      .locator("[data-current-mark] svg")
-      .boundingBox())!;
     await closeMenu(page);
 
+    // Home has no grip, so its check takes the grips' column (a folder's own
+    // check sits beside its grip instead).
     await page.goto("/home");
     menu = await openMenu(page);
     await menuSettled(menu);
     const homeCheck = (await menu
       .getByRole("menuitem", { name: /^Home/ })
-      .locator("[data-current-mark] svg")
+      .locator("[data-current-mark]:visible svg")
       .boundingBox())!;
-    expect(Math.abs(homeCheck.x - folderCheck.x)).toBeLessThan(1);
+    const grip = (await folderRow(menu, "Alpha")
+      .locator("[data-folder-grip]:visible svg")
+      .boundingBox())!;
+    expect(Math.abs(homeCheck.x - grip.x)).toBeLessThan(1);
+    expect(Math.abs(homeCheck.width - grip.width)).toBeLessThan(1);
   });
 
   test("a press low on a grip picks up that row, not the next", async ({ page, seed }) => {
