@@ -309,6 +309,10 @@ describe("media, links and tables", () => {
     expect(html).toContain(`src="${IMG}"`);
     expect(html).toContain('alt="Claude settings"');
     expect(html).toContain('loading="lazy"');
+    expect(html).toContain('decoding="async"');
+    const img = html.match(/<img [^>]*>/)![0];
+    expect(img).toContain("h-auto max-w-full");
+    expect(img).not.toMatch(/[" ]w-full/);
     expect(html).toContain("<figcaption");
     const bare = await render([block("image", { ...ext(IMG), caption: [] })]);
     expect(bare).toContain('alt=""');

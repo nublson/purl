@@ -66,7 +66,8 @@ export function ImageBlock({ block, context }: Props) {
         src={image.external.url}
         alt={plain(image.caption)}
         loading="lazy"
-        className="w-full rounded-lg border border-border"
+        decoding="async"
+        className="h-auto max-w-full rounded-lg border border-border"
       />
       <Caption caption={image.caption} context={context} />
     </figure>
