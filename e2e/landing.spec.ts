@@ -10,10 +10,10 @@ const SEEN_KEY = "purl:landing-seen";
 const WORDS = "[data-landing-word]";
 
 const FOOTER_LINKS = [
-  { name: "API", href: "/" },
-  { name: "MCP", href: "/" },
-  { name: "Privacy", href: "/" },
-  { name: "Terms", href: "/" },
+  { name: "API", href: "/docs/api" },
+  { name: "MCP", href: "/docs/mcp" },
+  { name: "Privacy", href: "/privacy" },
+  { name: "Terms", href: "/terms" },
   { name: "GitHub", href: "https://github.com/nublson/purl" },
 ];
 

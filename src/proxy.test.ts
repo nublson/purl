@@ -99,18 +99,6 @@ describe("proxy", () => {
     expect(res.headers.get("location")).toBeNull();
   });
 
-  it.each(["/privacy", "/terms", "/docs", "/docs/mcp", "/docs/api"])(
-    "redirects removed public page %s to / when no session",
-    async (path) => {
-      vi.mocked(auth.auth.api.getSession).mockResolvedValue(null);
-      const res = await proxy(createRequest(path));
-      expect(res.status).toBe(307);
-      const location = res.headers.get("location");
-      expect(location).not.toBeNull();
-      expect(new URL(location as string).pathname).toBe("/");
-    },
-  );
-
   it.each(["/", "/.well-known/oauth-authorization-server"])(
     "skips the session lookup on public page %s (same response either way)",
     async (path) => {
@@ -140,6 +128,22 @@ describe("proxy", () => {
       expect(auth.auth.api.getSession).not.toHaveBeenCalled();
     },
   );
+
+  it.each(["/privacy", "/terms", "/docs/api", "/docs/mcp"])(
+    "lets anyone read the static pages: %s passes without a session lookup",
+    async (path) => {
+      const res = await proxy(createRequest(path));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+      expect(auth.auth.api.getSession).not.toHaveBeenCalled();
+    },
+  );
+
+  it("still gates paths under the static pages", async () => {
+    const res = await proxy(createRequest("/docs"));
+    expect(res.status).toBe(307);
+    expect(new URL(res.headers.get("location") as string).pathname).toBe("/");
+  });
 
   it("still gates look-alike private paths", async () => {
     const res = await proxy(createRequest("/upload"));

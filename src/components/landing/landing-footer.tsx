@@ -1,15 +1,16 @@
 import { Logo } from "@/components/logo";
 import { Typography } from "@/components/typography";
+import { STATIC_PAGES } from "@/lib/static-pages";
 
 const LINK =
   "inline-flex min-h-8 items-center rounded-sm transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11";
 
-// API, MCP, Privacy and Terms point home until their pages exist.
 const NAV = [
-  { label: "API", href: "/", external: false },
-  { label: "MCP", href: "/", external: false },
-  { label: "Privacy", href: "/", external: false },
-  { label: "Terms", href: "/", external: false },
+  ...STATIC_PAGES.map(({ label, path }) => ({
+    label,
+    href: path,
+    external: false,
+  })),
   { label: "GitHub", href: "https://github.com/nublson/purl", external: true },
 ];
 
