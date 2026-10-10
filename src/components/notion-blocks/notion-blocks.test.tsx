@@ -176,3 +176,49 @@ describe("NotionBlocks", () => {
     );
   });
 });
+
+describe("lists", () => {
+  const item = (
+    type: string,
+    text: string,
+    extra: Record<string, unknown> = {},
+    children?: NotionBlock[],
+  ) => block(type, { rich_text: [richText(text)], ...extra }, { children });
+
+  it("groups bulleted items into one ul", async () => {
+    const html = await render([
+      item("bulleted_list_item", "a"),
+      item("bulleted_list_item", "b"),
+    ]);
+    expect(html.match(/<ul/g)).toHaveLength(1);
+    expect(html.match(/<li[ >]/g)).toHaveLength(2);
+  });
+
+  it("renders numbered items as an ol", async () => {
+    const html = await render([
+      item("numbered_list_item", "a"),
+      item("numbered_list_item", "b"),
+    ]);
+    expect(html).toContain("<ol");
+    expect(html).not.toContain("<ul");
+  });
+
+  it("nests child lists inside the li", async () => {
+    const html = await render([
+      item("bulleted_list_item", "a", {}, [item("bulleted_list_item", "child")]),
+    ]);
+    expect(html.match(/<ul/g)).toHaveLength(2);
+    expect(html.indexOf("child")).toBeGreaterThan(html.indexOf("a"));
+    expect(html.indexOf("</li>")).toBeGreaterThan(html.indexOf("child"));
+  });
+
+  it("renders to-dos with a disabled checkbox and struck-through checked text", async () => {
+    const done = await render([item("to_do", "done", { checked: true })]);
+    expect(done).toMatch(/<input type="checkbox" disabled=""[^>]* checked=""/);
+    expect(done).toMatch(/<s>/);
+    const open = await render([item("to_do", "open", { checked: false })]);
+    expect(open).toContain('type="checkbox"');
+    expect(open).not.toContain("checked");
+    expect(open).not.toMatch(/<s>/);
+  });
+});

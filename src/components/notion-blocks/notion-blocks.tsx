@@ -8,6 +8,8 @@ import {
   ColumnListBlock,
   ToggleBlock,
 } from "./layout-blocks";
+import { groupBlocks } from "./group-blocks";
+import { ListBlock } from "./list-blocks";
 import { DividerBlock, ParagraphBlock, QuoteBlock } from "./text-blocks";
 import type { NotionRenderContext } from "./types";
 
@@ -37,9 +39,23 @@ function BlockList({
   if (!blocks?.length) return null;
   return (
     <>
-      {blocks.map((child) => (
-        <Fragment key={child.id}>{renderBlock(child, context)}</Fragment>
-      ))}
+      {groupBlocks(blocks).map((group) =>
+        group.kind === "block" ? (
+          <Fragment key={group.block.id}>
+            {renderBlock(group.block, context)}
+          </Fragment>
+        ) : (
+          <ListBlock
+            key={group.items[0].id}
+            kind={group.kind}
+            items={group.items}
+            context={context}
+            renderChildren={(item) => (
+              <BlockList blocks={item.children} context={context} />
+            )}
+          />
+        ),
+      )}
     </>
   );
 }
