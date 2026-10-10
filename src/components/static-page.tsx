@@ -91,7 +91,9 @@ export async function StaticPage({ slug }: { slug: StaticPageSlug }) {
           </time>
         </Typography>
         {page.blocks.length > 0 ? (
-          <div className="mt-10">
+          // One column for every block (prose, code, tables, media): a
+          // 68ch measure, so the text and the wider blocks share a right edge.
+          <div className="mt-10 max-w-[68ch]">
             <NotionBlocks blocks={page.blocks} context={context} />
           </div>
         ) : null}

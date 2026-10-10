@@ -37,11 +37,32 @@ export function normalizeLanguage(
     : null;
 }
 
-/** The label shown on a code block: Notion's own, or "Plain text". */
+// The API sends Notion's language values in lowercase ("javascript").
+const DISPLAY_NAMES: Record<string, string> = {
+  bash: "Bash",
+  shell: "Shell",
+  json: "JSON",
+  typescript: "TypeScript",
+  javascript: "JavaScript",
+  tsx: "TSX",
+  jsx: "JSX",
+  http: "HTTP",
+  python: "Python",
+  yaml: "YAML",
+  markdown: "Markdown",
+  diff: "Diff",
+  toml: "TOML",
+  html: "HTML",
+  css: "CSS",
+  sql: "SQL",
+};
+
+/** The label shown on a code block: the language's name, or "Plain text". */
 export function codeLanguageLabel(label: string | null | undefined): string {
   const text = (label ?? "").trim();
   const key = text.toLowerCase();
-  return !text || key === "plain text" || key === "plaintext" || key === "text"
-    ? "Plain text"
-    : text;
+  if (!text || key === "plain text" || key === "plaintext" || key === "text") {
+    return "Plain text";
+  }
+  return DISPLAY_NAMES[key] ?? text.charAt(0).toUpperCase() + text.slice(1);
 }

@@ -19,7 +19,7 @@ export function ParagraphBlock({ block, context, children }: Props) {
   return (
     <>
       {empty ? null : (
-        <Typography className="max-w-[68ch] text-foreground">
+        <Typography className="text-foreground">
           <RichText text={block.paragraph.rich_text} context={context} />
         </Typography>
       )}
@@ -33,7 +33,7 @@ export function ParagraphBlock({ block, context, children }: Props) {
 export function QuoteBlock({ block, context, children }: Props) {
   if (block.type !== "quote") return null;
   return (
-    <blockquote className="max-w-[68ch] border-l-2 pl-4">
+    <blockquote className="border-l-2 pl-4">
       <Typography component="span" className="block text-foreground">
         <RichText text={block.quote.rich_text} context={context} />
       </Typography>

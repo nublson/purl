@@ -33,7 +33,17 @@ describe("codeLanguageLabel", () => {
     expect(codeLanguageLabel(null)).toBe("Plain text");
   });
 
-  it("keeps Notion's label otherwise", () => {
+  it("names languages properly, whatever case Notion sends", () => {
     expect(codeLanguageLabel("JSON")).toBe("JSON");
+    expect(codeLanguageLabel("json")).toBe("JSON");
+    expect(codeLanguageLabel("bash")).toBe("Bash");
+    expect(codeLanguageLabel("shell")).toBe("Shell");
+    expect(codeLanguageLabel("javascript")).toBe("JavaScript");
+    expect(codeLanguageLabel("typescript")).toBe("TypeScript");
+    expect(codeLanguageLabel("http")).toBe("HTTP");
+  });
+
+  it("capitalizes languages it doesn't know", () => {
+    expect(codeLanguageLabel("swift")).toBe("Swift");
   });
 });

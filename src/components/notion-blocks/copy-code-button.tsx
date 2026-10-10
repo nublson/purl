@@ -35,7 +35,7 @@ export function CopyCodeButton({ code }: { code: string }) {
         size="sm"
         aria-label={copied ? "Code copied" : "Copy code"}
         onClick={() => void copy()}
-        className="relative h-8 cursor-pointer gap-1.5 px-2 text-xs text-muted-foreground after:absolute after:-inset-y-0 after:inset-x-0 pointer-coarse:after:-inset-y-1.5"
+        className="relative h-8 cursor-pointer gap-1.5 px-2 text-xs text-foreground/70 after:absolute after:inset-x-0 pointer-coarse:after:-inset-y-1.5"
       >
         {copied ? (
           <Check aria-hidden className="size-4" />

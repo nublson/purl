@@ -143,6 +143,26 @@ describe("NotionBlocks", () => {
     expect(html).toContain("<h4");
   });
 
+  it("keeps the anchor out of the heading, so its name is only its text", async () => {
+    const html = await render([
+      block("heading_1", { rich_text: [richText("Save a link")] }),
+    ]);
+    const heading = html.match(/<h2[^>]*>(.*?)<\/h2>/)?.[1] ?? "";
+    expect(heading).toContain("Save a link");
+    expect(heading).not.toContain("<a");
+    expect(html).toMatch(/<\/h2><a href="#save-a-link"/);
+  });
+
+  it("tells screen reader users when a link opens a new tab", async () => {
+    const html = await render([
+      block("paragraph", {
+        rich_text: [richText("docs", { href: "https://example.com" })],
+      }),
+      block("paragraph", { rich_text: [richText("terms", { href: "/terms" })] }),
+    ]);
+    expect(html.match(/opens in a new tab/g)).toHaveLength(1);
+  });
+
   it("renders nothing for a blank heading, and only its children when it has some", async () => {
     const blank = await render([block("heading_2", { rich_text: [richText("  ")] })]);
     expect(blank).not.toContain("<h3");
@@ -415,7 +435,8 @@ describe("media, links and tables", () => {
     expect(html).toContain('<th scope="row"');
     expect(html.match(/<tbody/g)).toHaveLength(1);
     expect(html).toContain('role="region"');
-    expect(html).toContain('aria-label="Table"');
+    // Named by its columns, so tables on one page can be told apart.
+    expect(html).toContain('aria-label="Table: H1, H2"');
     expect(html).toContain('tabindex="0"');
     const noHead = await render([
       block(
@@ -426,6 +447,7 @@ describe("media, links and tables", () => {
     ]);
     expect(noHead).not.toContain("<thead");
     expect(noHead).toContain("<td");
+    expect(noHead).toContain('aria-label="Table"');
   });
 
   describe("code blocks", () => {

@@ -55,6 +55,7 @@ export function NotionAnchor({
       )}
     >
       {children}
+      {link.external ? <span className="sr-only"> (opens in a new tab)</span> : null}
     </Typography>
   );
 }

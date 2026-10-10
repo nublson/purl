@@ -39,9 +39,10 @@ export async function CodeBlock({
   }
 
   return (
-    <figure className="max-w-3xl overflow-hidden rounded-lg border border-border bg-muted">
+    <figure className="overflow-hidden rounded-lg border border-border bg-muted">
       <div className="flex items-center justify-between border-b border-border px-4 py-2">
-        <Typography component="span" size="mini">
+        {/* foreground/70, not muted: muted on bg-muted is 4.35:1 in light mode. */}
+        <Typography component="span" size="mini" className="text-foreground/70">
           {label}
         </Typography>
         <CopyCodeButton code={code} />
@@ -50,7 +51,8 @@ export async function CodeBlock({
         tabIndex={0}
         role="region"
         aria-label={`Code, ${label}`}
-        className="overflow-x-auto px-4 py-3 font-mono text-[0.8125rem] leading-relaxed"
+        // Inset ring: the figure's overflow-hidden would clip an outer one.
+        className="overflow-x-auto px-4 py-3 font-mono text-[0.8125rem] leading-relaxed focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
       >
         <code className="shiki">{content}</code>
       </pre>

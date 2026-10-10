@@ -42,12 +42,18 @@ export function TableBlock({
   );
 
   const [first, ...rest] = rows;
+  // Named by its columns, so several tables on a page can be told apart.
+  const columns = has_column_header
+    ? cells(first)
+        .map((cell) => cell.map((t) => t.plain_text).join("").trim())
+        .filter(Boolean)
+    : [];
   return (
     <div
       role="region"
-      aria-label="Table"
+      aria-label={columns.length > 0 ? `Table: ${columns.join(", ")}` : "Table"}
       tabIndex={0}
-      className="max-w-3xl overflow-x-auto rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      className="overflow-x-auto rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
     >
       <table className="w-full border-collapse text-sm text-muted-foreground">
         {has_column_header ? (

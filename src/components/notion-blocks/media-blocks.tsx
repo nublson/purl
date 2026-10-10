@@ -29,7 +29,7 @@ function Caption({
 
 function LinkLine({ children }: { children: ReactNode }) {
   return (
-    <Typography className="max-w-[68ch] break-words text-foreground">
+    <Typography className="break-words text-foreground">
       {children}
     </Typography>
   );
@@ -60,14 +60,14 @@ export function ImageBlock({ block, context }: Props) {
     return null;
   }
   return (
-    <figure className="max-w-3xl">
+    <figure>
       {/* eslint-disable-next-line @next/next/no-img-element -- remote, unknown dimensions */}
       <img
         src={image.external.url}
         alt={plain(image.caption)}
         loading="lazy"
         decoding="async"
-        className="h-auto max-w-full rounded-lg border border-border"
+        className="h-auto max-w-full rounded-lg outline outline-black/10 -outline-offset-1 dark:outline-white/10"
       />
       <Caption caption={image.caption} context={context} />
     </figure>
@@ -81,7 +81,7 @@ export function VideoBlock({ block, context }: Props) {
   const embed = getYouTubeEmbedUrl(url);
   if (embed) {
     return (
-      <figure className="max-w-3xl">
+      <figure>
         <iframe
           src={embed}
           title={plain(caption) || "YouTube video"}

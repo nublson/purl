@@ -52,7 +52,7 @@ export function ListBlock({ kind, items, context, renderChildren }: ListProps) {
   return (
     <Tag
       className={cn(
-        "flex max-w-[68ch] flex-col gap-2 pl-6",
+        "flex flex-col gap-2 pl-6",
         kind === "bulleted" && "list-disc",
         kind === "numbered" && "list-decimal",
         kind === "todo" && "list-none pl-0",
