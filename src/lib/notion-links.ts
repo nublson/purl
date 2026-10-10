@@ -48,6 +48,11 @@ export function buildPageIdToPath(
   return map;
 }
 
+/** A same-site path; never `//host` or `/\host`, which browsers read as another site. */
+function internalPath(path: string): NotionLink | null {
+  return /^\/(?![/\\])/.test(path) ? { href: path, external: false } : null;
+}
+
 /**
  * How a link from Notion content should render: a same-tab link, an external
  * one (new tab), or null for text without a link (empty or unsafe).
@@ -56,13 +61,12 @@ export function classifyNotionLink(
   href: string | null | undefined,
   pageIdToPath: ReadonlyMap<string, string>,
 ): NotionLink | null {
-  const value = href?.trim();
+  // Browsers drop tabs and newlines inside URLs, so do the same before checking.
+  const value = href?.replace(/[\u0000-\u001f\u007f]/g, "").trim();
   if (!value) return null;
 
-  if (value.startsWith("//")) return null;
-  if (value.startsWith("/") || value.startsWith("#")) {
-    return { href: value, external: false };
-  }
+  if (value.startsWith("#")) return { href: value, external: false };
+  if (value.startsWith("/")) return internalPath(value);
 
   let url: URL;
   try {
@@ -75,10 +79,7 @@ export function classifyNotionLink(
   if (url.protocol !== "http:" && url.protocol !== "https:") return null;
 
   if (isPurlHost(url.hostname)) {
-    return {
-      href: `${url.pathname}${url.search}${url.hash}`,
-      external: false,
-    };
+    return internalPath(`${url.pathname}${url.search}${url.hash}`);
   }
 
   const pageId = notionPageIdFromUrl(value);
