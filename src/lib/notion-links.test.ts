@@ -48,9 +48,26 @@ describe("classifyNotionLink", () => {
     ).toEqual({ href: "/privacy", external: false });
   });
 
-  it("leaves notion links to unknown pages external", () => {
-    const href = "https://www.notion.so/Draft-99999999999999999999999999999999";
-    expect(classifyNotionLink(href, map)).toEqual({ href, external: true });
+  it("renders links to unpublished notion pages as plain text", () => {
+    const id = "99999999999999999999999999999999";
+    expect(
+      classifyNotionLink(`https://www.notion.so/Draft-${id}`, map),
+    ).toBeNull();
+    expect(classifyNotionLink(`https://team.notion.site/${id}`, map)).toBeNull();
+    expect(classifyNotionLink(`/${id}`, map)).toBeNull();
+  });
+
+  it("maps root-relative notion page links to static pages", () => {
+    const privacy = { href: "/privacy", external: false };
+    expect(
+      classifyNotionLink("/244b17268ab383c3938887a7a5748b73", map),
+    ).toEqual(privacy);
+    expect(
+      classifyNotionLink("/Privacy-244b17268ab383c3938887a7a5748b73?pvs=4", map),
+    ).toEqual(privacy);
+    expect(
+      classifyNotionLink("/244b1726-8ab3-83c3-9388-87a7a5748b73", map),
+    ).toEqual(privacy);
   });
 
   it("keeps same-site links in the same tab", () => {

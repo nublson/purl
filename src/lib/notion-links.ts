@@ -54,6 +54,16 @@ function internalPath(path: string): NotionLink | null {
 }
 
 /**
+ * The page id in a root-relative Notion link (`/<id>`, `/Title-<id>?pvs=4`),
+ * which is how Notion writes in-text links to workspace pages; null for real paths.
+ */
+function notionPageIdFromPath(path: string): string | null {
+  const segment = path.slice(1).split(/[?#/]/)[0] ?? "";
+  const match = segment.match(PLAIN_ID) ?? segment.match(DASHED_ID);
+  return match ? match[0].replace(/-/g, "").toLowerCase() : null;
+}
+
+/**
  * How a link from Notion content should render: a same-tab link, an external
  * one (new tab), or null for text without a link (empty or unsafe).
  */
@@ -66,7 +76,13 @@ export function classifyNotionLink(
   if (!value) return null;
 
   if (value.startsWith("#")) return { href: value, external: false };
-  if (value.startsWith("/")) return internalPath(value);
+  if (value.startsWith("/")) {
+    const pageId = notionPageIdFromPath(value);
+    if (!pageId) return internalPath(value);
+    // A workspace page: only published static pages are readable by visitors.
+    const path = pageIdToPath.get(pageId);
+    return path ? { href: path, external: false } : null;
+  }
 
   let url: URL;
   try {
@@ -83,8 +99,10 @@ export function classifyNotionLink(
   }
 
   const pageId = notionPageIdFromUrl(value);
-  const path = pageId ? pageIdToPath.get(pageId) : undefined;
-  if (path) return { href: path, external: false };
+  if (pageId) {
+    const path = pageIdToPath.get(pageId);
+    return path ? { href: path, external: false } : null;
+  }
 
   return { href: value, external: true };
 }
