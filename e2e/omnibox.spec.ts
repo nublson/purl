@@ -127,6 +127,50 @@ test.describe("Search field", () => {
     await expect(addRows).toHaveCount(2);
   });
 
+  test("an added link moves into the folder's results at once, with no empty state between", async ({ page, seed }) => {
+    await seed.folder({ name: "Reading list", slug: "reading-list" });
+    await seed.link({ url: "https://interfaces.example", title: "Interfaces › Log in" });
+    await open(page, "/folders/reading-list");
+
+    await field(page).fill("interfaces");
+    const addRows = page.locator('[data-cy="omnibox-add-row"]');
+    await expect(addRows).toHaveCount(1);
+    // Hold the move: the page must not wait for it.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/links/bulk", async (route) => {
+      await held;
+      await route.continue();
+    });
+
+    await addRows.first().click();
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page)).toContainText("Interfaces › Log in");
+    await expect(addRows).toHaveCount(0);
+    await expect(page.locator('[data-cy="link-group-empty"]')).toHaveCount(0);
+
+    release();
+    await expect(page.getByText("Undo")).toBeVisible();
+    await expect(rows(page)).toHaveCount(1);
+    await expect(page.locator('[data-cy="link-group-empty"]')).toHaveCount(0);
+  });
+
+  test("a failed add puts the link back in the Add section", async ({ page, seed }) => {
+    await seed.folder({ name: "Reading list", slug: "reading-list" });
+    await seed.link({ url: "https://interfaces.example", title: "Interfaces › Log in" });
+    await open(page, "/folders/reading-list");
+
+    await field(page).fill("interfaces");
+    const addRows = page.locator('[data-cy="omnibox-add-row"]');
+    await expect(addRows).toHaveCount(1);
+    await page.route("**/api/links/bulk", (route) =>
+      route.fulfill({ status: 500, json: { error: "Nope" } }),
+    );
+    await addRows.first().click();
+    await expect(addRows).toHaveCount(1);
+    await expect(rows(page)).toHaveCount(0);
+  });
+
   test("the folder's Add section shows five, then Show more", async ({ page, seed }) => {
     await seed.folder({ name: "Dev Tools", slug: "dev-tools" });
     for (let i = 1; i <= 7; i++) {

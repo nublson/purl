@@ -151,12 +151,17 @@ const ROW =
 export function OmniboxAddSection({
   folder,
   results,
-  onAdded,
+  onAdding,
 }: {
   folder: FolderSummary;
   results: OmniboxAddResults;
-  /** The link is in the folder now (its row there can play the arrival). */
-  onAdded: (id: string) => void;
+  /**
+   * The link is on its way into the folder: shown in its results at once,
+   * in the same frame its row leaves this section (no moment where it's
+   * nowhere, or the empty state stands in). Returns how to take it back
+   * out if the move fails.
+   */
+  onAdding: (link: Link) => () => void;
 }) {
   const { folders } = useFolders();
   const { moveLinks } = useFolderActions();
@@ -179,14 +184,16 @@ export function OmniboxAddSection({
 
   const add = async (link: Link, index: number, fromKeyboard: boolean) => {
     if (fromKeyboard) refocusRef.current = index;
+    // One update: the row leaves here and arrives in the folder's results.
     const { settle, undo } = results.hide(link.id);
+    const takeBack = onAdding(link);
     const result = await moveLinks([link.id], folder.id, { target: folder });
     if (!result.ok) {
       undo();
+      takeBack();
       return;
     }
     settle();
-    onAdded(link.id);
   };
 
   const headingId = `omnibox-add-${folder.id}`;

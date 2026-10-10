@@ -40,8 +40,10 @@ import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { requestSaveUrl } from "@/lib/save-link";
 import {
   countGroupedLinks,
+  groupLinksByDate,
   mergeLinkGroups,
   parseJsonLinkGroups,
+  type Link,
   type LinkGroup as LinkGroupType,
 } from "@/utils/links";
 import {
@@ -317,11 +319,44 @@ export function HomeShell({
     "transition-opacity duration-150 ease-out motion-reduce:transition-none",
     pending && !skeletonShown ? "opacity-60 delay-150" : "delay-0",
   );
-  const onAddedFromSearch = useCallback((id: string) => {
-    // Its row in the folder's results plays the arrival (see onSaveSuccess).
-    setArrivingId(id);
-    setTimeout(() => setArrivingId((current) => (current === id ? null : current)), 1000);
-  }, []);
+  // A link added from the Add section joins this folder's results at once,
+  // under its day (as the server will list it), and plays the arrival; the
+  // reload that follows the move confirms it. A failed move takes it out.
+  const onAddingFromSearch = useCallback(
+    (link: Link) => {
+      // A reload already on its way predates this: its list mustn't drop
+      // the link again (the move's own reload replaces it).
+      reloadSeq.current++;
+      setGroups((current) =>
+        groupLinksByDate(
+          [
+            ...current.flatMap((group) =>
+              group.links.filter((other) => other.id !== link.id),
+            ),
+            { ...link, folderId: folderId ?? null },
+          ],
+          { timeZone: groupsTimeZone },
+        ),
+      );
+      setArrivingId(link.id);
+      setTimeout(
+        () => setArrivingId((current) => (current === link.id ? null : current)),
+        1000,
+      );
+      return () => {
+        setGroups((current) =>
+          current
+            .map((group) => ({
+              ...group,
+              links: group.links.filter((other) => other.id !== link.id),
+            }))
+            .filter((group) => group.links.length > 0),
+        );
+        void reload();
+      };
+    },
+    [folderId, groupsTimeZone, reload],
+  );
   const saveFromField = useCallback(() => {
     if (!saveUrl) return;
     // Its preview's "saved" is about to be wrong.
@@ -551,7 +586,7 @@ export function HomeShell({
       <OmniboxAddSection
         folder={currentFolder}
         results={addResults}
-        onAdded={onAddedFromSearch}
+        onAdding={onAddingFromSearch}
       />
     ) : null;
 
