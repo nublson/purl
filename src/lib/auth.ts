@@ -11,34 +11,20 @@ import {
   getSocialProviders,
 } from "@/lib/auth-providers";
 import { assignUsernameOnCreate } from "@/lib/auth-hooks";
+import { API_KEY_PREFIX, getPurlApiKey } from "@/lib/api-key-getter";
 
 export const auth = betterAuth({
   plugins: [
     apiKey({
       enableSessionForAPIKeys: true,
-      defaultPrefix: "purl_",
+      defaultPrefix: API_KEY_PREFIX,
       // Per-key rate limiting defaults to 10 requests/day, which is far too low
       // for the MCP server (every request re-validates the key) and the REST
       // API. Abuse protection is handled at the proxy layer (Upstash).
       rateLimit: {
         enabled: false,
       },
-      customAPIKeyGetter: (ctx) => {
-        // Extract token from "Authorization: Bearer purl_..." header
-        // GenericEndpointContext is a Better Auth internal type — cast via unknown
-        type CtxLike = {
-          request?: { headers?: { get?: (k: string) => string | null } };
-          headers?: { get?: (k: string) => string | null };
-        };
-        const c = ctx as unknown as CtxLike;
-        const authHeader =
-          c.request?.headers?.get?.("authorization") ??
-          c.headers?.get?.("authorization") ??
-          null;
-        if (typeof authHeader !== "string") return null;
-        if (!authHeader.startsWith("Bearer ") || authHeader.length <= 7) return null;
-        return authHeader.slice(7);
-      },
+      customAPIKeyGetter: getPurlApiKey,
     }),
     mcp({
       loginPage: AUTH_LOGIN_PAGE,
