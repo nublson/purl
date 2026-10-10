@@ -1,5 +1,6 @@
 import { Logo } from "@/components/logo";
 import { Typography } from "@/components/typography";
+import { getAuthorUrl } from "@/lib/author-url";
 import { STATIC_PAGES } from "@/lib/static-pages";
 
 const LINK =
@@ -25,7 +26,7 @@ export function LandingFooter() {
             <Typography
               component="a"
               size="small"
-              href="https://github.com/nublson"
+              href={getAuthorUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-sm text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
