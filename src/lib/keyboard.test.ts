@@ -17,17 +17,17 @@ describe("isTypingTarget", () => {
   it("is false for null and non-elements", () => {
     vi.stubGlobal("Element", FakeElement);
     expect(isTypingTarget(null)).toBe(false);
-    expect(isTypingTarget({} as EventTarget)).toBe(false);
+    expect(isTypingTarget({} as unknown as EventTarget)).toBe(false);
   });
 
   it("is true when closest finds a text field", () => {
     vi.stubGlobal("Element", FakeElement);
-    expect(isTypingTarget(new FakeElement(true) as EventTarget)).toBe(true);
+    expect(isTypingTarget(new FakeElement(true) as unknown as EventTarget)).toBe(true);
   });
 
   it("is false when the target is not in a text field", () => {
     vi.stubGlobal("Element", FakeElement);
-    expect(isTypingTarget(new FakeElement(false) as EventTarget)).toBe(false);
+    expect(isTypingTarget(new FakeElement(false) as unknown as EventTarget)).toBe(false);
   });
 });
 
