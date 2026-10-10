@@ -1,5 +1,9 @@
 packages: []
 
+overrides:
+  ip-address: 10.1.1
+  jsdom: 25.0.1
+
 allowBuilds:
   '@prisma/engines': true
   cypress: true

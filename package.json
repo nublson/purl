@@ -82,17 +82,5 @@
     "undici": "^7.29.1",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.1.0"
-  },
-  "pnpm": {
-    "overrides": {
-      "ip-address": "10.1.1",
-      "jsdom": "25.0.1"
-    },
-    "onlyBuiltDependencies": [
-      "@prisma/engines",
-      "esbuild",
-      "msw",
-      "prisma"
-    ]
   }
 }
