@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import type { NotionBlock } from "@/lib/notion";
 import { createSlugger } from "@/lib/heading-slugs";
+import { CodeBlock } from "./code-block";
 import { HeadingBlock } from "./heading-blocks";
 import {
   CalloutBlock,
@@ -123,6 +124,8 @@ export function renderBlock(
       return <BookmarkBlock block={block} context={context} />;
     case "link_to_page":
       return <LinkToPageBlock block={block} context={context} />;
+    case "code":
+      return <CodeBlock block={block} context={context} />;
     case "table":
       return <TableBlock block={block} context={context} />;
     case "synced_block":

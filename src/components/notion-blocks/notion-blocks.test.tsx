@@ -351,4 +351,33 @@ describe("media, links and tables", () => {
     expect(noHead).not.toContain("<thead");
     expect(noHead).toContain("<td");
   });
+
+  describe("code blocks", () => {
+    const code = (language: string, text: string, caption: RichTextItemResponse[] = []) =>
+      block("code", { language, rich_text: [richText(text)], caption });
+
+    it("highlights known languages inside an accessible frame", async () => {
+      const html = await render([code("JSON", '{"a":1}')]);
+      expect(html).toContain("<figure");
+      expect(html).toContain("JSON");
+      expect(html).toContain('tabindex="0"');
+      expect(html).toContain('role="region"');
+      expect(html).toContain('aria-label="Code, JSON"');
+      expect(html).toContain("--shiki-dark");
+      expect(html).toContain('aria-label="Copy code"');
+    });
+
+    it("renders the caption", async () => {
+      const html = await render([code("JSON", "{}", [richText("A cap")])]);
+      expect(html).toContain("<figcaption");
+      expect(html).toContain("A cap");
+    });
+
+    it("falls back to plain text for unknown languages", async () => {
+      const html = await render([code("Swift", 'let a = "<x>"')]);
+      expect(html).toContain("<pre");
+      expect(html).toContain("&lt;x&gt;");
+      expect(html).not.toContain("--shiki-");
+    });
+  });
 });
