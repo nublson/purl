@@ -2,7 +2,7 @@
 const PURL_ACCESS = [
   "See your saved links and folders",
   "Save links and move them between folders",
-  "Manage folders, including deleting them and the links inside",
+  "Delete links, and manage folders, including deleting them",
 ] as const;
 
 /** Standard OpenID Connect scopes that share your name and email with the app. */

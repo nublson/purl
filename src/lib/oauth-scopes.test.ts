@@ -7,7 +7,7 @@ describe("describeAccess", () => {
     expect(items).toEqual([
       "See your saved links and folders",
       "Save links and move them between folders",
-      "Manage folders, including deleting them and the links inside",
+      "Delete links, and manage folders, including deleting them",
     ]);
   });
 
