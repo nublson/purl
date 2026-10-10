@@ -14,6 +14,10 @@ import {
   useOmniboxAddResults,
 } from "@/components/omnibox-add-section";
 import { PasteHandler } from "@/components/paste-handler";
+import {
+  LinkResultsSkeleton,
+  OmniboxAddSkeleton,
+} from "@/components/skeletons/home";
 import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
 import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
@@ -30,12 +34,16 @@ import {
 import { coolPreviews } from "@/lib/link-preview-warmth";
 import { linkSelection, setSelectableLinks } from "@/lib/link-selection";
 import { isSameLinkUrl, omniboxSaveUrl } from "@/lib/omnibox";
+import { captureFlip, playFlip, type FlipSnapshot } from "@/lib/flip";
+import { cn } from "@/lib/utils";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { requestSaveUrl } from "@/lib/save-link";
 import {
   countGroupedLinks,
+  groupLinksByDate,
   mergeLinkGroups,
   parseJsonLinkGroups,
+  type Link,
   type LinkGroup as LinkGroupType,
 } from "@/utils/links";
 import {
@@ -45,7 +53,14 @@ import {
 } from "@/utils/time-zone";
 import { BouncingDots } from "loading-dev";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { LinkGroupEmpty } from "./link-group-empty";
 
@@ -54,6 +69,10 @@ const RETURN_REFRESH_AFTER_MS = 30_000;
 
 /** Wait after the last keystroke before the list follows the search field. */
 const SEARCH_DEBOUNCE_MS = 250;
+/** A first search slower than this shows a skeleton… */
+const SEARCH_SKELETON_DELAY_MS = 300;
+/** …for at least this long, so it doesn't blink. */
+const SEARCH_SKELETON_MIN_MS = 300;
 
 type LinksPageResponse = {
   groups: Parameters<typeof parseJsonLinkGroups>[0];
@@ -101,6 +120,10 @@ export function HomeShell({
   // The search `nextCursor` belongs to: a cursor only pages the list it came
   // from, so loadMore never sends an old list's cursor with a new query.
   const cursorQueryRef = useRef("");
+  // The search the list on screen answers ("" for the whole list, as the
+  // server rendered it). Until it catches up with the field, the list shows
+  // a skeleton instead of the previous answer.
+  const [loadedQuery, setLoadedQuery] = useState("");
   const [groups, setGroups] = useState(initialGroups);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
@@ -153,13 +176,17 @@ export function HomeShell({
       setGroups(page.groups);
       setNextCursor(page.nextCursor);
       cursorQueryRef.current = query;
+      setLoadedQuery(query);
       // The list now says where every row is: rows faded out by a move
       // before this reload began are gone (or back, after Undo).
       settleLeavingLinks(startedAt);
       if (page.timeZone) setGroupsTimeZone(page.timeZone);
       if (typeof page.total === "number") setLinksTotal(page.total);
     } catch {
-      // Keep the current list; the next change or reload will retry.
+      // Keep the current list; the next change or reload will retry. It
+      // stands as this search's answer, rather than a skeleton that never
+      // ends.
+      if (seq === reloadSeq.current) setLoadedQuery(searchQueryRef.current);
     }
   }, [setLinksTotal, folderId]);
 
@@ -219,23 +246,129 @@ export function HomeShell({
   // A folder's search also finds your other links, to add here. A URL in
   // the field is the Save row's (saving it files it here).
   const otherResults = useOmniboxAddResults(folderId, searchQuery);
-  const addResults = useMemo(
+  const addLinks = useMemo(
     () =>
       saveUrl
-        ? {
-            ...otherResults,
-            links: otherResults.links.filter(
-              (link) => !isSameLinkUrl(link.url, saveUrl),
-            ),
-          }
-        : otherResults,
-    [otherResults, saveUrl],
+        ? otherResults.links.filter((link) => !isSameLinkUrl(link.url, saveUrl))
+        : otherResults.links,
+    [otherResults.links, saveUrl],
   );
-  const onAddedFromSearch = useCallback((id: string) => {
-    // Its row in the folder's results plays the arrival (see onSaveSuccess).
-    setArrivingId(id);
-    setTimeout(() => setArrivingId((current) => (current === id ? null : current)), 1000);
-  }, []);
+
+  // A search on its way (typing, its debounce, the list's reload and, in a
+  // folder, the Add section's fetch). Meanwhile the page keeps the last
+  // whole answer (`settled`: the list and the Add section together, for
+  // one search), dimmed, and swaps it all at once: no "Search all" ahead of
+  // its results, no "no match" flashing between two searches.
+  const typedQuery = query.trim();
+  const pending =
+    typedQuery !== loadedQuery ||
+    Boolean(folderId && typedQuery && otherResults.loading);
+  const [settled, setSettled] = useState(() => ({
+    query: loadedQuery,
+    groups: initialGroups,
+    addLinks,
+    addHasMore: otherResults.hasMore,
+  }));
+  if (
+    !pending &&
+    (settled.query !== loadedQuery ||
+      settled.groups !== groups ||
+      settled.addLinks !== addLinks ||
+      settled.addHasMore !== otherResults.hasMore)
+  ) {
+    setSettled({
+      query: loadedQuery,
+      groups,
+      addLinks,
+      addHasMore: otherResults.hasMore,
+    });
+  }
+  const addResults = useMemo(
+    () => ({ ...otherResults, links: settled.addLinks, hasMore: settled.addHasMore }),
+    [otherResults, settled.addLinks, settled.addHasMore],
+  );
+
+  // The first search from the whole list has nothing relevant to keep on
+  // screen: if it takes a moment (300ms), a skeleton stands in for its
+  // answer, and once shown stays at least as long, so it never blinks.
+  // Refining a search keeps the previous results (dimmed) instead.
+  const wantsSkeleton = pending && settled.query === "" && typedQuery !== "";
+  const [skeletonShown, setSkeletonShown] = useState(false);
+  const skeletonSinceRef = useRef(0);
+  useEffect(() => {
+    if (wantsSkeleton && !skeletonShown) {
+      const timer = setTimeout(() => {
+        skeletonSinceRef.current = Date.now();
+        setSkeletonShown(true);
+      }, SEARCH_SKELETON_DELAY_MS);
+      return () => clearTimeout(timer);
+    }
+    if (!pending && skeletonShown) {
+      const shownFor = Date.now() - skeletonSinceRef.current;
+      const timer = setTimeout(
+        () => setSkeletonShown(false),
+        Math.max(0, SEARCH_SKELETON_MIN_MS - shownFor),
+      );
+      return () => clearTimeout(timer);
+    }
+  }, [wantsSkeleton, pending, skeletonShown]);
+  // The previous answer, while the next one loads: stepped back after a
+  // beat (no flicker when it's quick), back at once when it lands.
+  const dimClass = cn(
+    "transition-opacity duration-150 ease-out motion-reduce:transition-none",
+    pending && !skeletonShown ? "opacity-60 delay-150" : "delay-0",
+  );
+  // A link added from the Add section joins this folder's results at once,
+  // under its day (as the server will list it), gliding there from its row
+  // in the section while everything it displaces slides into place (FLIP:
+  // positions recorded here, played once that render is on screen). The
+  // reload that follows the move confirms it; a failed move takes it out.
+  const flipRef = useRef<FlipSnapshot | null>(null);
+  const [flipCount, setFlipCount] = useState(0);
+  useLayoutEffect(() => {
+    const before = flipRef.current;
+    flipRef.current = null;
+    if (before) playFlip(before);
+  }, [flipCount]);
+  const onAddingFromSearch = useCallback(
+    (link: Link) => {
+      flipRef.current = captureFlip();
+      setFlipCount((count) => count + 1);
+      // A reload already on its way predates this: its list mustn't drop
+      // the link again (the move's own reload replaces it).
+      reloadSeq.current++;
+      setGroups((current) =>
+        groupLinksByDate(
+          [
+            ...current.flatMap((group) =>
+              group.links.filter((other) => other.id !== link.id),
+            ),
+            { ...link, folderId: folderId ?? null },
+          ],
+          { timeZone: groupsTimeZone },
+        ),
+      );
+      // Out again (Undo, or the move failed): it glides back to its row in
+      // the Add section, which the caller restores in the same update. On
+      // Undo the revert's own reload follows once it's saved (reloading now
+      // would still find the link here); a failed move reloads at once.
+      return ({ reload: reloadNow }: { reload: boolean }) => {
+        flipRef.current = captureFlip();
+        setFlipCount((count) => count + 1);
+        reloadSeq.current++;
+        setGroups((current) =>
+          current
+            .map((group) => ({
+              ...group,
+              links: group.links.filter((other) => other.id !== link.id),
+            }))
+            .filter((group) => group.links.length > 0),
+        );
+        if (reloadNow) void reload();
+      };
+    },
+    [folderId, groupsTimeZone, reload],
+  );
   const saveFromField = useCallback(() => {
     if (!saveUrl) return;
     // Its preview's "saved" is about to be wrong.
@@ -387,7 +520,9 @@ export function HomeShell({
   }, []);
 
   const { view } = useLinkView();
-  const todayGroup = groups.find((g) => g.label === "Today");
+  // What's on screen: the settled answer (see `settled`).
+  const shownGroups = settled.groups;
+  const todayGroup = shownGroups.find((g) => g.label === "Today");
 
   // Optimistic row only for a URL this tab is saving.
   const showSkeleton = pendingUrl !== null;
@@ -404,7 +539,7 @@ export function HomeShell({
   // rows people see first don't wait on the scroll observer: each group
   // gets what's left of the budget after the groups above it. Hidden rows
   // (deleted, moved out) don't render, so they don't spend it.
-  const eagerFaviconsByGroup = groups.reduce<number[]>((counts, group, index) => {
+  const eagerFaviconsByGroup = shownGroups.reduce<number[]>((counts, group, index) => {
     const used = counts.reduce((sum, count) => sum + count, 0);
     const visible = group.links.filter((link) => !isHidden(link.id)).length;
     counts[index] = Math.min(visible, EAGER_FAVICONS - used);
@@ -412,14 +547,14 @@ export function HomeShell({
   }, []);
   const allLinksHidden =
     !nextCursor &&
-    groups.every((group) => group.links.every((link) => isHidden(link.id)));
+    shownGroups.every((group) => group.links.every((link) => isHidden(link.id)));
 
   // The selectable links are the ones on screen, in display order; a link
   // that leaves the list (moved out of this folder, deleted) leaves the
   // selection too.
   useEffect(() => {
     setSelectableLinks(
-      groups.flatMap((group) =>
+      shownGroups.flatMap((group) =>
         group.links
           .filter(
             (link) =>
@@ -429,7 +564,7 @@ export function HomeShell({
           .map((link) => link.id),
       ),
     );
-  }, [groups, pendingDeletes, leavingLinks]);
+  }, [shownGroups, pendingDeletes, leavingLinks]);
 
   // Each loaded link, for the selection bar: its folder ("Remove from
   // folders").
@@ -453,15 +588,16 @@ export function HomeShell({
   // A selection belongs to one list: switching folders or leaving drops it.
   useEffect(() => () => linkSelection.clear(), [folderId]);
 
-  const listShown = !((!groups.length || allLinksHidden) && !showSyntheticToday);
+  const listShown = !((!shownGroups.length || allLinksHidden) && !showSyntheticToday);
+  const shownQuery = settled.query;
   // On a folder page with a search: your other links that match, to add
   // here. Under the folder's matches, a day group's gap below them.
   const addSection =
-    folderId && currentFolder && searchQuery ? (
+    folderId && currentFolder && shownQuery ? (
       <OmniboxAddSection
         folder={currentFolder}
         results={addResults}
-        onAdded={onAddedFromSearch}
+        onAdding={onAddingFromSearch}
       />
     ) : null;
 
@@ -473,29 +609,44 @@ export function HomeShell({
         onSaveError={onSaveError}
       />
       {saveUrl ? (
-        <OmniboxSaveRow
-          url={saveUrl}
-          alreadySaved={alreadySaved}
-          folderName={folderId ? currentFolder?.name : undefined}
-          onSave={saveFromField}
-        />
-      ) : null}
-      {!listShown ? (
-        // A URL that matches nothing: the Save row above is the answer.
-        // In a folder, so are your other links that match (below), once in.
-        (searchQuery && saveUrl) ||
-        (folderId &&
-          searchQuery &&
-          (addResults.loading || addResults.links.length > 0)) ? null : (
-          <LinkGroupEmpty
-            inFolder={Boolean(folderId)}
-            query={searchQuery || undefined}
+        // A row, so the list's column in the grid view too.
+        <div className="wrapper-private">
+          <OmniboxSaveRow
+            url={saveUrl}
+            alreadySaved={alreadySaved}
+            folderName={folderId ? currentFolder?.name : undefined}
+            onSave={saveFromField}
           />
+        </div>
+      ) : null}
+      {skeletonShown ? (
+        <div aria-busy className="flex w-full flex-col gap-8">
+          <span className="sr-only" role="status">
+            Searching links
+          </span>
+          <LinkResultsSkeleton rows={3} cards={4} />
+          {folderId && typedQuery ? <OmniboxAddSkeleton /> : null}
+        </div>
+      ) : !listShown ? (
+        // A URL that matches nothing: the Save row above is the answer.
+        // In a folder, so are your other links that match (below).
+        (shownQuery && saveUrl) ||
+        (folderId && shownQuery && addResults.links.length > 0) ? null : (
+          <div className={dimClass}>
+            <LinkGroupEmpty
+              inFolder={Boolean(folderId)}
+              query={shownQuery || undefined}
+            />
+          </div>
         )
       ) : (
         // Leaving the list resets the preview hover delay (see
         // link-preview-warmth); gaps between date groups don't.
-        <div className="flex flex-col gap-8" onMouseLeave={coolPreviews}>
+        <div
+          aria-busy={pending || undefined}
+          className={cn("flex flex-col gap-8", dimClass)}
+          onMouseLeave={coolPreviews}
+        >
           {view === "grid" ? (
             <LinkGrid
               newLinkId={arrivingId}
@@ -503,7 +654,7 @@ export function HomeShell({
                 ...(showSyntheticToday
                   ? [{ label: "Today", links: [], pendingUrl: skeletonUrl }]
                   : []),
-                ...groups.map((group, groupIndex) => ({
+                ...shownGroups.map((group, groupIndex) => ({
                   label: group.label,
                   links: group.links,
                   pendingUrl:
@@ -516,7 +667,7 @@ export function HomeShell({
           {view !== "grid" && showSyntheticToday && (
             <LinkGroup label="Today" links={[]} pendingUrl={skeletonUrl} />
           )}
-          {view !== "grid" && groups.map((group, groupIndex) => (
+          {view !== "grid" && shownGroups.map((group, groupIndex) => (
             <LinkGroup
               key={group.label}
               label={group.label}
@@ -561,15 +712,26 @@ export function HomeShell({
         </div>
       )}
       {/* No folder matches (the list isn't shown): the section is all there is. */}
-      {listShown ? null : addSection}
-      {/* A folder searches only itself; this widens it to every link. */}
-      {folderId && searchQuery ? (
-        <OmniboxSearchAllRow
-          query={searchQuery}
-          onSearchAll={() =>
-            router.push(`/home?q=${encodeURIComponent(searchQuery)}`)
-          }
-        />
+      {listShown || skeletonShown ? null : (
+        <div className={dimClass}>{addSection}</div>
+      )}
+      {/* A folder searches only itself; this widens it to every link. It
+          comes with its search's results (under the skeleton, the search
+          being typed), in the list's column whatever the view. */}
+      {folderId && (skeletonShown ? typedQuery : shownQuery) ? (
+        <div
+          data-flip="search-all"
+          className={cn("wrapper-private", !skeletonShown && dimClass)}
+        >
+          <OmniboxSearchAllRow
+            query={skeletonShown ? typedQuery : shownQuery}
+            onSearchAll={() =>
+              router.push(
+                `/home?q=${encodeURIComponent(skeletonShown ? typedQuery : shownQuery)}`,
+              )
+            }
+          />
+        </div>
       ) : null}
       {/* Pinned to the bottom, so they come last in the page too: keyboard
           order follows the screen (list, selection bar, search field). */}

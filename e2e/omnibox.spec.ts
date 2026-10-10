@@ -127,6 +127,81 @@ test.describe("Search field", () => {
     await expect(addRows).toHaveCount(2);
   });
 
+  test("an added link moves into the folder's results at once, with no empty state between", async ({ page, seed }) => {
+    await seed.folder({ name: "Reading list", slug: "reading-list" });
+    await seed.link({ url: "https://interfaces.example", title: "Interfaces › Log in" });
+    await open(page, "/folders/reading-list");
+
+    await field(page).fill("interfaces");
+    const addRows = page.locator('[data-cy="omnibox-add-row"]');
+    await expect(addRows).toHaveCount(1);
+    // Hold the move: the page must not wait for it.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/links/bulk", async (route) => {
+      await held;
+      await route.continue();
+    });
+
+    await addRows.first().click();
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page)).toContainText("Interfaces › Log in");
+    await expect(addRows).toHaveCount(0);
+    await expect(page.locator('[data-cy="link-group-empty"]')).toHaveCount(0);
+
+    release();
+    await expect(page.getByText("Undo")).toBeVisible();
+    await expect(rows(page)).toHaveCount(1);
+    await expect(page.locator('[data-cy="link-group-empty"]')).toHaveCount(0);
+  });
+
+  test("Undo puts the link back in the Add section at once, with no empty state between", async ({ page, seed }) => {
+    await seed.folder({ name: "Reading list", slug: "reading-list" });
+    await seed.link({ url: "https://interfaces.example", title: "Interfaces › Log in" });
+    await open(page, "/folders/reading-list");
+
+    await field(page).fill("interfaces");
+    const addRows = page.locator('[data-cy="omnibox-add-row"]');
+    await addRows.first().click();
+    await expect(rows(page)).toHaveCount(1);
+    await expect(page.getByText("Undo")).toBeVisible();
+
+    // Hold the revert: the page must not wait for it.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/links/bulk", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.getByText("Undo").click();
+    await expect(addRows).toHaveCount(1);
+    await expect(rows(page)).toHaveCount(0);
+    await expect(page.locator('[data-cy="link-group-empty"]')).toHaveCount(0);
+
+    release();
+    // Saved and reloaded: still where Undo put it.
+    await page.waitForLoadState("networkidle");
+    await expect(addRows).toHaveCount(1);
+    await expect(rows(page)).toHaveCount(0);
+    await expect(page.locator('[data-cy="link-group-empty"]')).toHaveCount(0);
+  });
+
+  test("a failed add puts the link back in the Add section", async ({ page, seed }) => {
+    await seed.folder({ name: "Reading list", slug: "reading-list" });
+    await seed.link({ url: "https://interfaces.example", title: "Interfaces › Log in" });
+    await open(page, "/folders/reading-list");
+
+    await field(page).fill("interfaces");
+    const addRows = page.locator('[data-cy="omnibox-add-row"]');
+    await expect(addRows).toHaveCount(1);
+    await page.route("**/api/links/bulk", (route) =>
+      route.fulfill({ status: 500, json: { error: "Nope" } }),
+    );
+    await addRows.first().click();
+    await expect(addRows).toHaveCount(1);
+    await expect(rows(page)).toHaveCount(0);
+  });
+
   test("the folder's Add section shows five, then Show more", async ({ page, seed }) => {
     await seed.folder({ name: "Dev Tools", slug: "dev-tools" });
     for (let i = 1; i <= 7; i++) {
@@ -140,6 +215,74 @@ test.describe("Search field", () => {
     await page.locator('[data-cy="omnibox-add-more"]').click();
     await expect(addRows).toHaveCount(7);
     await expect(page.locator('[data-cy="omnibox-add-more"]')).toHaveCount(0);
+  });
+
+  test("while a folder's search runs, one skeleton stands for the results and the Add section", async ({ page, seed }) => {
+    await seed.folder({ name: "Dev Tools", slug: "dev-tools" });
+    await seed.link({ url: "https://greptile.example", title: "AI code review agent" });
+    await open(page, "/folders/dev-tools");
+    // Hold the Add section's search, so the skeleton stays up.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/links/search?**", async (route) => {
+      await held;
+      await route.continue();
+    });
+
+    await field(page).fill("code review");
+    await expect(page.getByRole("status").filter({ hasText: "Searching links" })).toBeAttached();
+    // The search's answer isn't in yet: neither "no match" nor the old list.
+    await expect(page.locator('[data-cy="link-group-empty"]')).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Search all links for “code review”" })).toBeVisible();
+
+    release();
+    await expect(page.locator('[data-cy="omnibox-add-row"]')).toHaveCount(1);
+    await expect(page.getByRole("status").filter({ hasText: "Searching links" })).toHaveCount(0);
+  });
+
+  test("refining a search keeps the previous results, stepped back, until the new ones land together", async ({ page, seed }) => {
+    await seed.folder({ name: "Dev Tools", slug: "dev-tools" });
+    await seed.link({ url: "https://greptile.example", title: "AI code review agent" });
+    await seed.link({ url: "https://linter.example", title: "A code linter" });
+    await open(page, "/folders/dev-tools");
+    const addRows = page.locator('[data-cy="omnibox-add-row"]');
+
+    await field(page).fill("code");
+    await expect(addRows).toHaveCount(2);
+
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/links/search?**", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await field(page).fill("code review");
+    // The search is out (the list's own part may be back already): the
+    // previous answer stays, dimmed, with its own Search all row.
+    await expect(page.getByRole("button", { name: "Search all links for “code review”" })).toHaveCount(0);
+    await expect(page.locator('[data-cy="omnibox-add-section"]').locator("xpath=ancestor::*[contains(@class,'opacity-60')]").first()).toBeAttached();
+    await expect(addRows).toHaveCount(2);
+    await expect(page.getByRole("status").filter({ hasText: "Searching links" })).toHaveCount(0);
+
+    release();
+    await expect(addRows).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Search all links for “code review”" })).toBeVisible();
+  });
+
+  test("in the grid view, the Add section and Search all keep the list's width", async ({ page, seed }) => {
+    await seed.folder({ name: "Dev Tools", slug: "dev-tools" });
+    await seed.link({ url: "https://greptile.example", title: "AI code review agent" });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    expect((await page.request.patch("/api/user/layout", { data: { view: "grid" } })).ok()).toBe(true);
+    await open(page, "/folders/dev-tools");
+
+    await field(page).fill("code review");
+    const section = page.locator('[data-cy="omnibox-add-section"]');
+    await expect(section).toBeVisible();
+    // The list's column: max-w-2xl (672px).
+    expect((await section.boundingBox())!.width).toBeLessThanOrEqual(672);
+    const searchAll = page.getByRole("button", { name: "Search all links for “code review”" });
+    expect((await searchAll.boundingBox())!.width).toBeLessThanOrEqual(672);
   });
 
   test("a URL saved in another folder offers to move it here", async ({ page, seed }) => {

@@ -140,8 +140,11 @@ function clearPlacement(item: HTMLElement) {
 export function MasonryItem({
   className,
   style,
+  flip,
   children,
 }: {
+  /** Its `data-flip` key (see `src/lib/flip.ts`). */
+  flip?: string;
   /** For the card's box (e.g. its arrival animation). */
   className?: string;
   style?: CSSProperties;
@@ -149,7 +152,11 @@ export function MasonryItem({
 }) {
   return (
     <li>
-      <div className={cn("pb-4 md:pb-10", className)} style={style}>
+      <div
+        className={cn("pb-4 md:pb-10", className)}
+        style={style}
+        data-flip={flip}
+      >
         {children}
       </div>
     </li>
