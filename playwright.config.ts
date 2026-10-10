@@ -10,6 +10,13 @@ loadEnv({ path: resolve(__dirname, ".env"), quiet: true });
 if (existsSync(resolve(__dirname, ".env.local"))) {
   loadEnv({ path: resolve(__dirname, ".env.local"), override: true, quiet: true });
 }
+// Optional, git-ignored: points the tests (and the dev server they start) at a
+// local database when .env.local points at a hosted one. It usually also sets
+// BETTER_AUTH_URL to another port and NEXT_DIST_DIR, so that server runs beside
+// your own `pnpm dev` without sharing its port or .next cache.
+if (existsSync(resolve(__dirname, ".env.e2e"))) {
+  loadEnv({ path: resolve(__dirname, ".env.e2e"), override: true, quiet: true });
+}
 
 // The e2e helpers create and delete users, folders and links. Refuse to run
 // against anything but a local database (e.g. a production URL left in
@@ -45,7 +52,9 @@ export default defineConfig({
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
   ],
   webServer: {
-    command: "pnpm dev",
+    // The server inherits this process's env (.env.e2e included), which wins
+    // over the .env files Next loads itself.
+    command: `pnpm dev --port ${new URL(baseURL).port || "3000"}`,
     url: baseURL,
     // Reuse a `pnpm dev` you already have running.
     reuseExistingServer: !process.env.CI,

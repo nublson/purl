@@ -36,6 +36,9 @@ const withBundleAnalyzer = bundleAnalyzer({
 });
 
 const nextConfig: NextConfig = {
+  // `.next` unless NEXT_DIST_DIR says otherwise: the e2e dev server (.env.e2e)
+  // uses its own, so it never shares a cache with your `pnpm dev`.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Next's default, set explicitly: production builds don't emit browser
   // source maps, so the client code structure isn't published.
   productionBrowserSourceMaps: false,
