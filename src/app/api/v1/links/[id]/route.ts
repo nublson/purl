@@ -57,8 +57,6 @@ export async function PATCH(
   const hasUrl = typeof body?.url === "string";
   const hasTitle = typeof body?.title === "string";
   const hasDescription = body?.description !== undefined;
-  const hasRead =
-    body !== null && typeof body === "object" && "read" in body;
   const hasFolderId =
     body !== null && typeof body === "object" && "folderId" in body;
 
@@ -66,16 +64,10 @@ export async function PATCH(
     return addCors(NextResponse.json({ error: "Invalid folder" }, { status: 400 }));
   }
 
-  if (hasRead && typeof body.read !== "boolean") {
-    return addCors(
-      NextResponse.json({ error: "read must be true or false" }, { status: 400 }),
-    );
-  }
-
-  if (!hasUrl && !hasTitle && !hasDescription && !hasFolderId && !hasRead) {
+  if (!hasUrl && !hasTitle && !hasDescription && !hasFolderId) {
     return addCors(
       NextResponse.json(
-        { error: "At least one of url, title, description, folderId, or read is required" },
+        { error: "At least one of url, title, description, or folderId is required" },
         { status: 400 },
       ),
     );
@@ -90,8 +82,7 @@ export async function PATCH(
   if (url !== undefined) data.url = url;
   if (hasTitle) data.title = body.title as string;
   if (hasDescription) data.description = body.description;
-  if (hasRead) data.read = body.read;
-  const hasOtherFields = hasUrl || hasTitle || hasDescription || hasRead;
+  const hasOtherFields = hasUrl || hasTitle || hasDescription;
 
   try {
     const { id } = await context.params;

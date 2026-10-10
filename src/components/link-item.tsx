@@ -5,7 +5,6 @@ import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { useLeavingLinks } from "@/lib/leaving-links";
 import { ARRIVE, ARRIVE_ICON, ARRIVE_LATE } from "@/lib/motion";
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
-import { setLinksRead, useIsLinkRead } from "@/lib/link-read-state";
 import {
   linkSelection,
   useIsLinkSelected,
@@ -72,17 +71,12 @@ export const LinkItem = React.forwardRef<
   // Selection mode (anything selected): every row shows its checkbox, a
   // click toggles the row instead of opening it, and row menus hide so
   // every action goes through the selection bar.
-  // The landing page's demo is read-only: no selecting, no menu, no read
-  // marking. The actions slot stays (empty) so the row keeps its height.
+  // The landing page's demo is read-only: no selecting, no menu. The
+  // actions slot stays (empty) so the row keeps its height.
   const demo = useIsDemo();
   const selecting = useIsSelectionActive() && !demo;
   const selected = useIsLinkSelected(link.id);
-  // Read links stay in the list, faded back: opening one marks it read.
-  const read = useIsLinkRead(link);
   const folderTag = useFolderTag(link);
-  const markOpened = () => {
-    if (!demo && !read) void setLinksRead([link.id], true);
-  };
   const longPressRef = React.useRef<{
     timer: ReturnType<typeof setTimeout>;
     x: number;
@@ -252,7 +246,7 @@ export const LinkItem = React.forwardRef<
       <a
         ref={anchorRef}
         href={link.url}
-        aria-label={`${link.title} (${read ? "read, " : ""}opens in new tab)`}
+        aria-label={`${link.title} (opens in new tab)`}
         aria-describedby={link.description ? descriptionId : undefined}
         target="_blank"
         rel="noopener noreferrer"
@@ -269,16 +263,9 @@ export const LinkItem = React.forwardRef<
             event.preventDefault();
             return;
           }
-          if (!selecting) {
-            markOpened();
-            return;
-          }
+          if (!selecting) return;
           event.preventDefault();
           linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-        }}
-        onAuxClick={(event) => {
-          // Middle-click opens it in a background tab, selecting or not.
-          if (event.button === 1) markOpened();
         }}
         onFocus={(event) => {
           // Keyboard users get the same preview mouse users get on hover.
@@ -320,8 +307,6 @@ export const LinkItem = React.forwardRef<
                   : // Keyboard focus only: a mouse click leaves focus on the
                     // checkbox, and the favicon must come back once you move away.
                     "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-has-[:focus-visible]/media:*:opacity-0",
-              // Read: the favicon loses its color and steps back with the title.
-              read && !selecting && "*:opacity-50 *:grayscale",
             )}
           >
             {arriving ? (
@@ -383,11 +368,7 @@ export const LinkItem = React.forwardRef<
               // Phones: the page's reading size (16px), like the search
               // field's, not desktop's 14px density.
               "max-md:text-base max-md:leading-6",
-              // Read steps back in weight too, not just color: a cue that
-              // survives low contrast and color-blindness (unread mail's bold).
-              read
-                ? "font-normal text-muted-foreground"
-                : "font-medium text-accent-foreground",
+              "font-medium text-accent-foreground",
               arriving && ARRIVE,
             )}
           >

@@ -16,7 +16,6 @@ interface PreviewLink {
   title: string;
   domain: string;
   icon: ReactNode;
-  read?: boolean;
 }
 
 const LINKS: PreviewLink[] = [
@@ -34,7 +33,6 @@ const LINKS: PreviewLink[] = [
     title: "The case for slow software",
     domain: "nytimes.com",
     icon: <NewspaperMark />,
-    read: true,
   },
   { title: "Attention is a garden", domain: "arxiv.org", icon: <PdfMark /> },
 ];
@@ -148,10 +146,7 @@ export function ProductPreview({ className }: { className?: string }) {
           >
             <div className="mt-1.5 flex h-[1lh] items-center text-sm leading-normal max-md:mt-1 max-md:text-base max-md:leading-6">
               <div
-                className={cn(
-                  "size-5 overflow-hidden rounded-[3px] max-md:size-6",
-                  link.read && "opacity-50 grayscale",
-                )}
+                className="size-5 overflow-hidden rounded-[3px] max-md:size-6"
               >
                 {link.icon}
               </div>
@@ -160,12 +155,7 @@ export function ProductPreview({ className }: { className?: string }) {
               <div className="flex min-w-0 items-baseline gap-2">
                 <Typography
                   size="small"
-                  className={cn(
-                    "block truncate max-md:text-base max-md:leading-6",
-                    link.read
-                      ? "font-normal text-muted-foreground"
-                      : "font-medium text-accent-foreground",
-                  )}
+                  className="block truncate font-medium text-accent-foreground max-md:text-base max-md:leading-6"
                 >
                   {link.title}
                 </Typography>

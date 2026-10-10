@@ -3,7 +3,6 @@
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { copyToClipboard } from "@/lib/clipboard";
 import { haptic } from "@/lib/haptics";
-import { setLinksRead, useIsLinkRead } from "@/lib/link-read-state";
 import type { Link as LinkType } from "@/utils/links";
 import {
   Export5,
@@ -17,7 +16,6 @@ import { EditDialog } from "./dialog-edit-link";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { HapticTarget } from "./haptic-target";
 import { LinkFolderSubmenu } from "./link-folder-submenu";
-import { ReadToggleIcon } from "./read-toggle-icon";
 import { Button } from "./ui/button";
 import {
   DropdownMenuGroup,
@@ -37,12 +35,10 @@ interface LinkMenuProps {
 }
 
 export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
-  const read = useIsLinkRead(link);
   const isPhone = useIsPhone();
 
   async function handleOpenInNewTab() {
     window.open(link.url, "_blank");
-    if (!read) void setLinksRead([link.id], true);
   }
 
   async function handleCopyLink() {
@@ -87,17 +83,6 @@ export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
           }}
         >
           <Link /> Copy link
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          data-cy="toggle-read-menu-item"
-          onSelect={() => {
-            haptic("success");
-            void setLinksRead([link.id], !read);
-          }}
-        >
-          <ReadToggleIcon read={read} />
-          {read ? "Mark as unread" : "Mark as read"}
-          <HapticTarget />
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <LinkFolderSubmenu link={link} />

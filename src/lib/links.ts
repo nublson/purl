@@ -200,7 +200,6 @@ type LinkRow = {
   thumbnail: string | null;
   createdAt: Date;
   folderId?: string | null;
-  readAt?: Date | null;
 };
 
 function mapRowToLink(row: LinkRow): Link {
@@ -215,7 +214,6 @@ function mapRowToLink(row: LinkRow): Link {
     contentType: row.contentType,
     createdAt: row.createdAt,
     folderId: row.folderId ?? null,
-    readAt: row.readAt ?? null,
   };
 }
 
@@ -421,8 +419,6 @@ async function refreshExistingLink(
       domain: resolved.domain,
       contentType: resolved.contentType,
       createdAt: new Date(),
-      // Saving it again puts it back on the reading list.
-      readAt: null,
       ...(folderId !== undefined ? { folderId } : {}),
     },
   });
@@ -546,8 +542,6 @@ export type UpdateLinkData = {
   url?: string;
   title?: string;
   description?: string | null;
-  /** true marks it read (keeping an earlier read time), false unread. */
-  read?: boolean;
 };
 
 export type UpdateLinkResult = Awaited<ReturnType<typeof prisma.link.update>>;
@@ -571,9 +565,6 @@ export type UpdateLinkForUserData = UpdateLinkData & {
  * changed url re-scrapes metadata, exactly as `updateLink`) and, when
  * `data.folderId` is present, its folder — in a SINGLE `prisma.link.update`,
  * so a combined edit + move either fully lands or doesn't land at all.
- * `data.read: true` sets `readAt` only where it's still unset, in the same
- * transaction as that update, so it never restores a timestamp that another
- * request cleared meanwhile; `false` clears it.
  *
  * Returns null when the link isn't found or isn't owned by `userId`. Callers
  * should check folder ownership (`assertFolderOwned`) before calling; a folder
@@ -619,26 +610,12 @@ export async function updateLinkForUser(
     updatePayload.folderId = data.folderId;
   }
 
-  const markRead = data.read === true;
-  if (data.read === false) updatePayload.readAt = null;
-
-  if (Object.keys(updatePayload).length === 0 && !markRead) return existing;
+  if (Object.keys(updatePayload).length === 0) return existing;
 
   try {
-    if (!markRead) {
-      return await prisma.link.update({
-        where: { id },
-        data: updatePayload,
-      });
-    }
-    return await prisma.$transaction(async (tx) => {
-      // Conditional on the row as it is now, not as read above: an earlier
-      // read time is kept, and nothing written here can undo a newer change.
-      await tx.link.updateMany({
-        where: { id, readAt: null },
-        data: { readAt: new Date() },
-      });
-      return tx.link.update({ where: { id }, data: updatePayload });
+    return await prisma.link.update({
+      where: { id },
+      data: updatePayload,
     });
   } catch (error) {
     if (isForeignKeyConstraintError(error)) {
@@ -755,27 +732,6 @@ export async function moveLinksToFolder(
     notFound: linkIds.filter((id) => !previousById.has(id)),
   };
 }
-/**
- * Marks every link in `linkIds` owned by `userId` read (`read: true`; links
- * already read keep their first read time) or unread, in one write. Ids
- * that aren't the user's are ignored. Returns how many links changed.
- */
-export async function markLinksReadForUser(
-  userId: string,
-  linkIds: string[],
-  read: boolean,
-): Promise<number> {
-  const { count } = await prisma.link.updateMany({
-    where: {
-      id: { in: linkIds },
-      userId,
-      readAt: read ? null : { not: null },
-    },
-    data: { readAt: read ? new Date() : null },
-  });
-  return count;
-}
-
 /**
  * Deletes every link in `linkIds` owned by `userId` in one write; ids that
  * aren't the user's are ignored. Returns how many links were deleted.

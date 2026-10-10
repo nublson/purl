@@ -19,7 +19,6 @@ function link(createdAt: Date, title: string, folderId: string | null = null): L
     thumbnail: null,
     createdAt,
     folderId,
-    readAt: null,
   };
 }
 

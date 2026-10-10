@@ -32,9 +32,9 @@ describe("demo constants", () => {
 });
 
 describe("toDemoLinks", () => {
-  it("maps public links to app links: unread, filed in the folder", () => {
+  it("maps public links to app links, filed in the folder", () => {
     expect(toDemoLinks(FOLDER)).toEqual([
-      { ...FOLDER.links[0], readAt: null, folderId: "f1" },
+      { ...FOLDER.links[0], folderId: "f1" },
     ]);
   });
 

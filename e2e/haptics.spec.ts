@@ -312,20 +312,6 @@ test.describe("Haptics: selection bar", () => {
     expect(await vibrations(page)).toEqual([[10]]);
   });
 
-  test("Mark as read ticks once", async ({ page, seed }) => {
-    await seedRows(seed);
-    await selectFirst(page);
-    // One link: PATCH /api/links/[id] (several go through /bulk).
-    const marks = countRequests(page, "PATCH", /^\/api\/links\/[^/]+$/);
-    await tapOn(page, bar(page).getByRole("button", { name: /^Mark 1 link as read$/ }));
-    await expect.poll(() => marks.length).toBe(1);
-    expect(JSON.parse(marks[0])).toMatchObject({ read: true });
-    await expect.poll(() => ticks(page)).toBe(1);
-    expect(await vibrations(page)).toEqual([[10, 60, 10]]);
-    await page.waitForTimeout(300);
-    expect(marks).toHaveLength(1);
-  });
-
   test("Delete ticks once with a warning", async ({ page, seed }) => {
     await seedRows(seed);
     await selectFirst(page);
@@ -400,20 +386,6 @@ test.describe("Haptics: row menu and Copy link", () => {
     await waitForHydration(page, '[data-cy="link-item"]');
     await row(page, title).getByRole("button", { name: "Open link menu" }).tap();
     await expect(page.getByRole("menu")).toBeVisible();
-  }
-
-  for (const reducedMotion of ["no-preference", "reduce"] as const) {
-    test(`Mark as read ticks once (${reducedMotion} motion)`, async ({ page, seed }) => {
-      await page.emulateMedia({ reducedMotion });
-      await seedRows(seed);
-      await openMenu(page, "Link 1");
-      const marks = countRequests(page, "PATCH", /^\/api\/links\/[^/]+$/);
-      await tapOn(page, page.getByRole("menuitem", { name: "Mark as read" }));
-      await expect.poll(() => marks.length).toBe(1);
-      expect(JSON.parse(marks[0])).toMatchObject({ read: true });
-      await expect.poll(() => ticks(page)).toBe(1);
-      expect(await vibrations(page)).toEqual([[10, 60, 10]]);
-    });
   }
 
   test("Delete ticks once with a warning", async ({ page, seed }) => {

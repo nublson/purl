@@ -65,7 +65,6 @@ const {
   moveLinkToFolder,
   moveLinksToFolder,
   deleteLinksForUser,
-  markLinksReadForUser,
   searchLinksForUser,
   listLinksForUser,
   isUrlSavedForUser,
@@ -608,7 +607,6 @@ describe("createLink", () => {
         domain: "youtu.be",
         contentType: "YOUTUBE",
         createdAt: expect.any(Date),
-        readAt: null,
         },
     });
     expect(result).toEqual({ ...refreshed, moved: false });
@@ -844,7 +842,6 @@ describe("createLinkForUser – folders", () => {
         domain: expect.any(String),
         contentType: "WEB",
         createdAt: expect.any(Date),
-        readAt: null,
         folderId: "folder-2",
       },
     });
@@ -1202,76 +1199,6 @@ describe("deleteLinksForUser", () => {
     expect(await deleteLinksForUser("user-123", ["l1", "l2", "foreign"])).toBe(2);
     expect(prisma.link.deleteMany).toHaveBeenCalledWith({
       where: { id: { in: ["l1", "l2", "foreign"] }, userId: "user-123" },
-    });
-  });
-});
-
-describe("markLinksReadForUser", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("marks only the user's unread links read, keeping earlier read times", async () => {
-    vi.mocked(prisma.link.updateMany).mockResolvedValue({ count: 2 } as never);
-    expect(await markLinksReadForUser("user-123", ["l1", "l2"], true)).toBe(2);
-    expect(prisma.link.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ["l1", "l2"] }, userId: "user-123", readAt: null },
-      data: { readAt: expect.any(Date) },
-    });
-  });
-
-  it("marks only the user's read links unread", async () => {
-    vi.mocked(prisma.link.updateMany).mockResolvedValue({ count: 1 } as never);
-    expect(await markLinksReadForUser("user-123", ["l1"], false)).toBe(1);
-    expect(prisma.link.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ["l1"] }, userId: "user-123", readAt: { not: null } },
-      data: { readAt: null },
-    });
-  });
-});
-
-describe("updateLinkForUser – read", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("marks an unread link read now", async () => {
-    vi.mocked(prisma.link.findFirst).mockResolvedValue(makeRow() as never);
-    vi.mocked(prisma.link.update).mockResolvedValue(makeRow() as never);
-    await updateLinkForUser("user-123", "link-1", { read: true });
-    expect(prisma.link.updateMany).toHaveBeenCalledWith({
-      where: { id: "link-1", readAt: null },
-      data: { readAt: expect.any(Date) },
-    });
-    expect(prisma.link.update).toHaveBeenCalledWith({
-      where: { id: "link-1" },
-      data: {},
-    });
-  });
-
-  it("only sets readAt where it's still unset, so a read time is kept and a newer unread isn't undone", async () => {
-    const readAt = new Date("2025-07-01T00:00:00Z");
-    vi.mocked(prisma.link.findFirst).mockResolvedValue({ ...makeRow(), readAt } as never);
-    vi.mocked(prisma.link.update).mockResolvedValue(makeRow() as never);
-    await updateLinkForUser("user-123", "link-1", { read: true, title: "New" });
-    // The condition is checked by the database at write time, not against
-    // the readAt fetched above.
-    expect(prisma.link.updateMany).toHaveBeenCalledWith({
-      where: { id: "link-1", readAt: null },
-      data: { readAt: expect.any(Date) },
-    });
-    expect(prisma.link.update).toHaveBeenCalledWith({
-      where: { id: "link-1" },
-      data: { title: "New" },
-    });
-  });
-
-  it("marks a link unread", async () => {
-    vi.mocked(prisma.link.findFirst).mockResolvedValue({
-      ...makeRow(),
-      readAt: new Date(),
-    } as never);
-    vi.mocked(prisma.link.update).mockResolvedValue(makeRow() as never);
-    await updateLinkForUser("user-123", "link-1", { read: false });
-    expect(prisma.link.update).toHaveBeenCalledWith({
-      where: { id: "link-1" },
-      data: { readAt: null },
     });
   });
 });

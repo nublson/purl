@@ -20,11 +20,10 @@ export type DemoFolder = PublicFolder & {
 
 export type DemoData = { owner: PublicOwner; folders: DemoFolder[] };
 
-/** A demo folder's links in the app's `Link` shape: unread, filed in the folder. */
+/** A demo folder's links in the app's `Link` shape: filed in the folder. */
 export function toDemoLinks(folder: DemoFolder): Link[] {
   return folder.links.map((link) => ({
     ...link,
     folderId: folder.id,
-    readAt: null,
   }));
 }

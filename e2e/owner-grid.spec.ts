@@ -102,20 +102,20 @@ test.describe("Owner grid view", () => {
     await expect.poll(columns).toBe(4);
   });
 
-  test("a card opens its link (marking it read), selects, and has the row menu", async ({ page, seed }) => {
+  test("a card opens its link, selects, and has the row menu", async ({ page, seed }) => {
     await seed.link({ url: "https://alpha.example", title: "Alpha" });
     await seed.link({ url: "https://bravo.example", title: "Bravo" });
     await openHome(page);
     await chooseView(page, "Grid");
 
-    // Open: a new tab, and the card reads as read.
+    // Open: a new tab.
     await page.context().route("https://alpha.example/**", (route) => route.abort());
     const popup = page.waitForEvent("popup");
     await card(page, "Alpha").locator("a[href]").click();
     await (await popup).close();
     await expect(card(page, "Alpha").locator("a[href]")).toHaveAttribute(
       "aria-label",
-      "Alpha (read, opens in new tab)",
+      "Alpha (opens in new tab)",
     );
 
     // Select: the checkbox in the corner, then a click toggles a card.

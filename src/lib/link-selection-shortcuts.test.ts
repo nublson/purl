@@ -34,8 +34,7 @@ describe("matchSelectionShortcut", () => {
     expect(matchSelectionShortcut(key("Delete"), other)).toBe("delete");
     expect(matchSelectionShortcut(key("m"), apple)).toBe("move");
     expect(matchSelectionShortcut(key("M"), apple)).toBe("move");
-    expect(matchSelectionShortcut(key("r"), apple)).toBe("read");
-    expect(matchSelectionShortcut(key("r", { metaKey: true }), apple)).toBeNull();
+    expect(matchSelectionShortcut(key("r"), apple)).toBeNull();
     expect(matchSelectionShortcut(key("Backspace", { metaKey: true }), apple)).toBeNull();
     expect(matchSelectionShortcut(key("m", { ctrlKey: true }), other)).toBeNull();
   });

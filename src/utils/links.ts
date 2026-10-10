@@ -13,8 +13,6 @@ export type Link = {
   contentType: ContentType;
   createdAt: Date;
   folderId: string | null;
-  /** When it was read (opened or marked read); null = unread. */
-  readAt: Date | null;
 };
 
 export type LinkGroup = {
@@ -72,21 +70,19 @@ export function countGroupedLinks(groups: LinkGroup[]): number {
   return groups.reduce((sum, group) => sum + group.links.length, 0);
 }
 
-type JsonLink = Omit<Link, "createdAt" | "readAt"> & {
+type JsonLink = Omit<Link, "createdAt"> & {
   createdAt: string | Date;
-  readAt?: string | Date | null;
 };
 
-/** Restores `createdAt` / `readAt` Dates on links parsed from a JSON API response. */
+/** Restores `createdAt` Dates on links parsed from a JSON API response. */
 export function parseJsonLinks(links: JsonLink[]): Link[] {
   return links.map((link) => ({
     ...link,
     createdAt: new Date(link.createdAt),
-    readAt: link.readAt ? new Date(link.readAt) : null,
   }));
 }
 
-/** Restores `createdAt` / `readAt` Dates on groups parsed from a JSON API response. */
+/** Restores `createdAt` Dates on groups parsed from a JSON API response. */
 export function parseJsonLinkGroups(
   groups: { label: string; links: JsonLink[] }[],
 ): LinkGroup[] {
