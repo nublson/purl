@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatDomain, getDateGroupLabel, getUrlDomain } from "./formatter";
+import {
+  formatDomain,
+  formatUpdatedDate,
+  getDateGroupLabel,
+  getUrlDomain,
+} from "./formatter";
 
 describe("formatDomain", () => {
   it("strips subdomains", () => {
@@ -122,5 +127,11 @@ describe("getDateGroupLabel", () => {
     expect(label("2026-03-28T23:30:00Z", "Europe/Lisbon", mon)).toBe(
       "Last week",
     );
+  });
+});
+
+describe("formatUpdatedDate", () => {
+  it("formats in UTC", () => {
+    expect(formatUpdatedDate("2026-10-03T23:30:00.000Z")).toBe("October 3, 2026");
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isYouTubeUrl } from "./youtube";
+import { getYouTubeEmbedUrl, isYouTubeUrl } from "./youtube";
 
 describe("isYouTubeUrl", () => {
   describe("returns true for supported YouTube URL patterns", () => {
@@ -72,5 +72,23 @@ describe("isYouTubeUrl", () => {
     it("rejects youtube.com channel pages", () => {
       expect(isYouTubeUrl("https://youtube.com/channel/UCdQw4w9WgXcQ")).toBe(false);
     });
+  });
+});
+
+describe("getYouTubeEmbedUrl", () => {
+  it.each([
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=3",
+    "https://youtu.be/dQw4w9WgXcQ",
+    "https://youtube.com/shorts/dQw4w9WgXcQ",
+    "https://www.youtube.com/embed/dQw4w9WgXcQ",
+  ])("embeds %s without cookies", (url) => {
+    expect(getYouTubeEmbedUrl(url)).toBe(
+      "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+    );
+  });
+
+  it("returns null for other sites and invalid ids", () => {
+    expect(getYouTubeEmbedUrl("https://vimeo.com/1")).toBeNull();
+    expect(getYouTubeEmbedUrl("https://youtube.com/watch?v=<script>")).toBeNull();
   });
 });
