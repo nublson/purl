@@ -165,6 +165,35 @@ test.describe("Search field", () => {
     await expect(page.getByRole("status").filter({ hasText: "Searching links" })).toHaveCount(0);
   });
 
+  test("refining a search keeps the previous results, stepped back, until the new ones land together", async ({ page, seed }) => {
+    await seed.folder({ name: "Dev Tools", slug: "dev-tools" });
+    await seed.link({ url: "https://greptile.example", title: "AI code review agent" });
+    await seed.link({ url: "https://linter.example", title: "A code linter" });
+    await open(page, "/folders/dev-tools");
+    const addRows = page.locator('[data-cy="omnibox-add-row"]');
+
+    await field(page).fill("code");
+    await expect(addRows).toHaveCount(2);
+
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/links/search?**", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await field(page).fill("code review");
+    // The search is out (the list's own part may be back already): the
+    // previous answer stays, dimmed, with its own Search all row.
+    await expect(page.getByRole("button", { name: "Search all links for “code review”" })).toHaveCount(0);
+    await expect(page.locator('[data-cy="omnibox-add-section"]').locator("xpath=ancestor::*[contains(@class,'opacity-60')]").first()).toBeAttached();
+    await expect(addRows).toHaveCount(2);
+    await expect(page.getByRole("status").filter({ hasText: "Searching links" })).toHaveCount(0);
+
+    release();
+    await expect(addRows).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Search all links for “code review”" })).toBeVisible();
+  });
+
   test("in the grid view, the Add section and Search all keep the list's width", async ({ page, seed }) => {
     await seed.folder({ name: "Dev Tools", slug: "dev-tools" });
     await seed.link({ url: "https://greptile.example", title: "AI code review agent" });
