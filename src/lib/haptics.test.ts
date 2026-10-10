@@ -50,6 +50,14 @@ describe("haptic", () => {
     expect(() => haptic("selection")).not.toThrow();
   });
 
+  it("does nothing when matchMedia is missing (SSR)", () => {
+    const vibrate = vi.fn(() => true);
+    vi.stubGlobal("navigator", { vibrate });
+    vi.stubGlobal("matchMedia", undefined);
+    haptic("selection");
+    expect(vibrate).not.toHaveBeenCalled();
+  });
+
   it("swallows a throwing vibrate", () => {
     stubDevice({
       coarse: true,
