@@ -437,6 +437,8 @@ describe("media, links and tables", () => {
       expect(html).toContain('aria-label="Code, JSON"');
       expect(html).toContain("--shiki-dark");
       expect(html).toContain('aria-label="Copy code"');
+      const pre = html.match(/<pre[\s\S]*<\/pre>/)![0];
+      expect(pre.match(/<code/g)).toHaveLength(1);
     });
 
     it("renders the caption", async () => {

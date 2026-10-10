@@ -25,7 +25,11 @@ export async function CodeBlock({
   if (language) {
     try {
       const element = await highlightCode(code, language);
-      content = toJsxRuntime(element, { Fragment, jsx, jsxs });
+      // The tokens only: our own <code> wraps them (the element is a <code> itself).
+      content = toJsxRuntime(
+        { type: "root", children: element.children },
+        { Fragment, jsx, jsxs },
+      );
     } catch (error) {
       console.warn(
         `Static page "${context.pageSlug}": could not highlight ${block.id}`,
