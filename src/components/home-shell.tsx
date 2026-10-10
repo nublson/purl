@@ -35,6 +35,7 @@ import { coolPreviews } from "@/lib/link-preview-warmth";
 import { settleLinkReadOverrides } from "@/lib/link-read-state";
 import { linkSelection, setSelectableLinks } from "@/lib/link-selection";
 import { isSameLinkUrl, omniboxSaveUrl } from "@/lib/omnibox";
+import { captureFlip, playFlip, type FlipSnapshot } from "@/lib/flip";
 import { cn } from "@/lib/utils";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { requestSaveUrl } from "@/lib/save-link";
@@ -53,7 +54,14 @@ import {
 } from "@/utils/time-zone";
 import { BouncingDots } from "loading-dev";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { toast } from "sonner";
 import { LinkGroupEmpty } from "./link-group-empty";
 
@@ -320,10 +328,21 @@ export function HomeShell({
     pending && !skeletonShown ? "opacity-60 delay-150" : "delay-0",
   );
   // A link added from the Add section joins this folder's results at once,
-  // under its day (as the server will list it), and plays the arrival; the
-  // reload that follows the move confirms it. A failed move takes it out.
+  // under its day (as the server will list it), gliding there from its row
+  // in the section while everything it displaces slides into place (FLIP:
+  // positions recorded here, played once that render is on screen). The
+  // reload that follows the move confirms it; a failed move takes it out.
+  const flipRef = useRef<FlipSnapshot | null>(null);
+  const [flipCount, setFlipCount] = useState(0);
+  useLayoutEffect(() => {
+    const before = flipRef.current;
+    flipRef.current = null;
+    if (before) playFlip(before);
+  }, [flipCount]);
   const onAddingFromSearch = useCallback(
     (link: Link) => {
+      flipRef.current = captureFlip();
+      setFlipCount((count) => count + 1);
       // A reload already on its way predates this: its list mustn't drop
       // the link again (the move's own reload replaces it).
       reloadSeq.current++;
@@ -337,11 +356,6 @@ export function HomeShell({
           ],
           { timeZone: groupsTimeZone },
         ),
-      );
-      setArrivingId(link.id);
-      setTimeout(
-        () => setArrivingId((current) => (current === link.id ? null : current)),
-        1000,
       );
       return () => {
         setGroups((current) =>
@@ -708,7 +722,10 @@ export function HomeShell({
           comes with its search's results (under the skeleton, the search
           being typed), in the list's column whatever the view. */}
       {folderId && (skeletonShown ? typedQuery : shownQuery) ? (
-        <div className={cn("wrapper-private", !skeletonShown && dimClass)}>
+        <div
+          data-flip="search-all"
+          className={cn("wrapper-private", !skeletonShown && dimClass)}
+        >
           <OmniboxSearchAllRow
             query={skeletonShown ? typedQuery : shownQuery}
             onSearchAll={() =>

@@ -206,6 +206,7 @@ export function OmniboxAddSection({
     >
       <h2
         id={headingId}
+        data-flip="add-heading"
         className="ms-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
       >
         Add to
@@ -219,7 +220,9 @@ export function OmniboxAddSection({
             : null;
           const title = link.title || formatDomain(link.domain);
           return (
-            <div key={link.id} role="listitem">
+            // Same key as its row in the folder's results: added, it glides
+            // there (see onAdding).
+            <div key={link.id} role="listitem" data-flip={`link:${link.id}`}>
               <button
                 type="button"
                 data-add-row=""
@@ -281,7 +284,7 @@ export function OmniboxAddSection({
           );
         })}
         {results.hasMore ? (
-          <div role="listitem">
+          <div role="listitem" data-flip="add-more">
             <button
               type="button"
               data-cy="omnibox-add-more"
