@@ -48,7 +48,11 @@ export function NotionAnchor({
       {...(link.external
         ? { target: "_blank", rel: "noopener noreferrer" }
         : {})}
-      className={cn("text-inherit", LINK_CLASSES, className)}
+      className={cn(
+        "text-inherit text-[length:inherit] leading-[inherit]",
+        LINK_CLASSES,
+        className,
+      )}
     >
       {children}
     </Typography>

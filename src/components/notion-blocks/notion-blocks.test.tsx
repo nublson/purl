@@ -31,6 +31,19 @@ describe("NotionBlocks", () => {
     expect(await render([para()])).not.toContain("<p");
   });
 
+  it("lets inline links inherit the surrounding font size", async () => {
+    const html = await render([
+      block("heading_1", {
+        rich_text: [richText("See ", {}), richText("terms", { href: "/terms" })],
+      }),
+    ]);
+    const anchor = html.match(/<a [^>]*href="\/terms"[^>]*>/)![0];
+    expect(anchor).not.toContain("text-base");
+    expect(anchor).not.toContain("leading-normal");
+    expect(anchor).toContain("text-[length:inherit]");
+    expect(anchor).toContain("leading-[inherit]");
+  });
+
   it("renders annotations", async () => {
     const a = (annotations: Record<string, unknown>) =>
       render([para(richText("x", { annotations }))]);
