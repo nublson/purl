@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildPageIdToPath } from "@/lib/notion-links";
 import { NotionBlocks, createRenderContext } from ".";
 import { block, renderToHtml, richText } from "./test-utils";
@@ -220,5 +220,125 @@ describe("lists", () => {
     expect(open).toContain('type="checkbox"');
     expect(open).not.toContain("checked");
     expect(open).not.toMatch(/<s>/);
+  });
+});
+
+describe("media, links and tables", () => {
+  const ext = (url: string) => ({ type: "external", external: { url } });
+  const IMG = "https://example.com/a.png";
+
+  it("renders an external image with caption, or empty alt", async () => {
+    const html = await render([
+      block("image", { ...ext(IMG), caption: [richText("Claude settings")] }),
+    ]);
+    expect(html).toContain("<figure");
+    expect(html).toContain(`src="${IMG}"`);
+    expect(html).toContain('alt="Claude settings"');
+    expect(html).toContain('loading="lazy"');
+    expect(html).toContain("<figcaption");
+    const bare = await render([block("image", { ...ext(IMG), caption: [] })]);
+    expect(bare).toContain('alt=""');
+    expect(bare).not.toContain("<figcaption");
+  });
+
+  it("skips uploaded images with a warning", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const html = await render([
+      block(
+        "image",
+        { type: "file", file: { url: "https://s3/x.png" }, caption: [] },
+        { id: "img-1" },
+      ),
+    ]);
+    expect(html).toBe('<div class="flex flex-col gap-4"></div>');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      'Static page "terms": skipped uploaded image img-1; link images instead',
+    );
+    warn.mockRestore();
+  });
+
+  it("embeds YouTube videos and links other videos", async () => {
+    const yt = await render([
+      block("video", {
+        ...ext("https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+        caption: [],
+      }),
+    ]);
+    expect(yt).toContain("<iframe");
+    expect(yt).toContain('src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"');
+    expect(yt).toContain('title="YouTube video"');
+    expect(yt).toContain("allowFullScreen");
+    const other = await render([
+      block("video", { ...ext("https://vimeo.com/1"), caption: [] }),
+    ]);
+    expect(other).not.toContain("<iframe");
+    expect(other).toContain('href="https://vimeo.com/1"');
+    const file = await render([
+      block("video", { type: "file", file: { url: "https://s3/v.mp4" }, caption: [] }),
+    ]);
+    expect(file).not.toContain("<iframe");
+    expect(file).not.toContain("<a");
+  });
+
+  it("renders bookmarks as links and drops unsafe ones", async () => {
+    const withCaption = await render([
+      block("bookmark", { url: "https://example.com", caption: [richText("Example")] }),
+    ]);
+    expect(withCaption).toContain('href="https://example.com"');
+    expect(withCaption).toContain(">Example<");
+    const bare = await render([
+      block("bookmark", { url: "https://example.com", caption: [] }),
+    ]);
+    expect(bare).toContain(">https://example.com<");
+    const bad = await render([
+      block("bookmark", { url: "javascript:alert(1)", caption: [] }),
+    ]);
+    expect(bad).not.toContain("<a");
+  });
+
+  it("links to a static page by its label, and ignores unknown pages", async () => {
+    const html = await render([
+      block("link_to_page", { type: "page_id", page_id: PRIVACY_ID }),
+    ]);
+    expect(html).toContain('href="/privacy"');
+    expect(html).toContain(">Privacy<");
+    expect(html).not.toContain("_blank");
+    const unknown = await render([
+      block("link_to_page", {
+        type: "page_id",
+        page_id: "00000000-0000-0000-0000-000000000000",
+      }),
+    ]);
+    expect(unknown).not.toContain("<a");
+  });
+
+  it("renders tables with column and row headers", async () => {
+    const row = (...cells: string[]) =>
+      block("table_row", { cells: cells.map((c) => [richText(c)]) });
+    const html = await render([
+      block(
+        "table",
+        { table_width: 2, has_column_header: true, has_row_header: true },
+        { children: [row("H1", "H2"), row("a", "b")] },
+      ),
+    ]);
+    expect(html).toContain("<thead");
+    expect(html).toContain("<th");
+    expect(html).toContain("<tbody");
+    expect(html).toContain('<th scope="row"');
+    expect(html.match(/<tbody/g)).toHaveLength(1);
+    expect(html).toContain('role="region"');
+    expect(html).toContain('aria-label="Table"');
+    expect(html).toContain('tabindex="0"');
+    const noHead = await render([
+      block(
+        "table",
+        { table_width: 1, has_column_header: false, has_row_header: false },
+        { children: [row("x")] },
+      ),
+    ]);
+    expect(noHead).not.toContain("<thead");
+    expect(noHead).toContain("<td");
   });
 });

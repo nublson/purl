@@ -10,6 +10,13 @@ import {
 } from "./layout-blocks";
 import { groupBlocks } from "./group-blocks";
 import { ListBlock } from "./list-blocks";
+import {
+  BookmarkBlock,
+  ImageBlock,
+  LinkToPageBlock,
+  VideoBlock,
+} from "./media-blocks";
+import { TableBlock } from "./table-block";
 import { DividerBlock, ParagraphBlock, QuoteBlock } from "./text-blocks";
 import type { NotionRenderContext } from "./types";
 
@@ -106,6 +113,18 @@ export function renderBlock(
           {children}
         </ColumnBlock>
       );
+    case "image":
+      return <ImageBlock block={block} context={context} />;
+    case "video":
+      return <VideoBlock block={block} context={context} />;
+    case "bookmark":
+    case "embed":
+    case "link_preview":
+      return <BookmarkBlock block={block} context={context} />;
+    case "link_to_page":
+      return <LinkToPageBlock block={block} context={context} />;
+    case "table":
+      return <TableBlock block={block} context={context} />;
     case "synced_block":
       return children;
     default:

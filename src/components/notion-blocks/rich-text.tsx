@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { RichTextItemResponse } from "@notionhq/client";
 import { Typography } from "@/components/typography";
-import { classifyNotionLink } from "@/lib/notion-links";
+import { classifyNotionLink, type NotionLink } from "@/lib/notion-links";
 import { cn } from "@/lib/utils";
 import type { NotionRenderContext } from "./types";
 
@@ -30,6 +30,30 @@ export const NOTION_COLOR_CLASSES: Record<string, string> = {
 
 const LINK_CLASSES =
   "rounded-sm underline underline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+
+/** An anchor with the page's link styling; external links open in a new tab. */
+export function NotionAnchor({
+  link,
+  className,
+  children,
+}: {
+  link: NotionLink;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Typography
+      component="a"
+      href={link.href}
+      {...(link.external
+        ? { target: "_blank", rel: "noopener noreferrer" }
+        : {})}
+      className={cn("text-inherit", LINK_CLASSES, className)}
+    >
+      {children}
+    </Typography>
+  );
+}
 
 function RichTextItem({
   item,
@@ -67,18 +91,7 @@ function RichTextItem({
 
   const link = classifyNotionLink(item.href, context.pageIdToPath);
   if (link) {
-    node = (
-      <Typography
-        component="a"
-        href={link.href}
-        {...(link.external
-          ? { target: "_blank", rel: "noopener noreferrer" }
-          : {})}
-        className={cn("text-inherit", LINK_CLASSES)}
-      >
-        {node}
-      </Typography>
-    );
+    node = <NotionAnchor link={link}>{node}</NotionAnchor>;
   }
 
   return node;
