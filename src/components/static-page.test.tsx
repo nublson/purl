@@ -78,6 +78,38 @@ describe("StaticPage", () => {
     expect(html).not.toContain("flex flex-col gap-4");
   });
 
+  it("renders an intro between the Updated line and the Notion content", async () => {
+    getPageBySlug.mockResolvedValue(
+      page({
+        blocks: [
+          block("paragraph", { rich_text: [richText("Body from Notion")] }),
+        ],
+      }),
+    );
+    const html = await renderToHtml(
+      await StaticPage({ slug: "privacy", intro: <p>Intro from the page</p> }),
+    );
+    const updated = html.indexOf("Updated ");
+    const intro = html.indexOf("Intro from the page");
+    const body = html.indexOf("Body from Notion");
+    expect(updated).toBeGreaterThan(-1);
+    expect(intro).toBeGreaterThan(updated);
+    expect(body).toBeGreaterThan(intro);
+  });
+
+  it("renders the Notion content with no intro by default", async () => {
+    getPageBySlug.mockResolvedValue(
+      page({
+        blocks: [
+          block("paragraph", { rich_text: [richText("Body from Notion")] }),
+        ],
+      }),
+    );
+    const html = await renderToHtml(await StaticPage({ slug: "privacy" }));
+    expect(html).toContain("Body from Notion");
+    expect(html).not.toContain("Intro from the page");
+  });
+
   it("omits the description paragraph when missing", async () => {
     getPageBySlug.mockResolvedValue(page({ description: "" }));
     const html = await renderToHtml(await StaticPage({ slug: "privacy" }));
