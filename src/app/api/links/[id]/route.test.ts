@@ -124,7 +124,6 @@ describe("links/[id] API route", () => {
         contentType: "WEB",
         createdAt,
         folderId: null,
-        readAt: null,
       });
 
       const req = createRequest(`/api/links/${ID}`, { method: "GET" });
@@ -144,7 +143,6 @@ describe("links/[id] API route", () => {
         contentType: "WEB",
         createdAt: createdAt.toISOString(),
         folderId: null,
-        readAt: null,
       });
     });
   });
@@ -172,44 +170,8 @@ describe("links/[id] API route", () => {
 
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({
-        error: "At least one of url, title, description, folderId, or read is required",
+        error: "At least one of url, title, description, or folderId is required",
       });
-    });
-
-    it("returns 400 when read isn't a boolean", async () => {
-      const res = await PATCH(patchRequest({ read: "yes" }), {
-        params: Promise.resolve({ id: ID }),
-      });
-
-      expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ error: "read must be true or false" });
-      expect(updateLink).not.toHaveBeenCalled();
-    });
-
-    it("passes read to updateLink and returns readAt", async () => {
-      const readAt = new Date("2025-06-21T09:00:00Z");
-      vi.mocked(updateLink).mockResolvedValue({
-        id: ID,
-        url: "https://example.com",
-        title: "Example Domain",
-        description: null,
-        favicon: "https://example.com/favicon.ico",
-        thumbnail: null,
-        domain: "example.com",
-        contentType: "WEB",
-        createdAt: new Date("2025-06-20T12:00:00Z"),
-        userId: "user-123",
-        folderId: null,
-        readAt,
-      });
-
-      const res = await PATCH(patchRequest({ read: true }), {
-        params: Promise.resolve({ id: ID }),
-      });
-
-      expect(res.status).toBe(200);
-      expect(updateLink).toHaveBeenCalledWith(ID, { read: true });
-      expect(await res.json()).toMatchObject({ readAt: readAt.toISOString() });
     });
 
     it("returns 400 when url is invalid", async () => {
@@ -390,7 +352,6 @@ describe("links/[id] API route", () => {
         contentType: "WEB",
         createdAt: new Date("2025-06-15T10:00:00Z"),
         folderId: null,
-        readAt: null,
       } as never);
 
       const res = await PATCH(patchRequest({ folderId: null }), {

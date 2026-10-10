@@ -28,7 +28,6 @@ import {
   type LinksMovedDetail,
 } from "@/lib/leaving-links";
 import { coolPreviews } from "@/lib/link-preview-warmth";
-import { settleLinkReadOverrides } from "@/lib/link-read-state";
 import { linkSelection, setSelectableLinks } from "@/lib/link-selection";
 import { isSameLinkUrl, omniboxSaveUrl } from "@/lib/omnibox";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
@@ -121,12 +120,6 @@ export function HomeShell({
     setGroupsTimeZone(timeZone);
   }
 
-  // Fresh server data (first render or navigation back here) already has
-  // every read change confirmed before now; other tabs' changes show again.
-  useEffect(() => {
-    settleLinkReadOverrides(Date.now());
-  }, [initialGroups]);
-
   const groupsRef = useRef(groups);
   useEffect(() => {
     groupsRef.current = groups;
@@ -163,8 +156,6 @@ export function HomeShell({
       // The list now says where every row is: rows faded out by a move
       // before this reload began are gone (or back, after Undo).
       settleLeavingLinks(startedAt);
-      // Read changes the server had confirmed are in this list too.
-      settleLinkReadOverrides(startedAt);
       if (page.timeZone) setGroupsTimeZone(page.timeZone);
       if (typeof page.total === "number") setLinksTotal(page.total);
     } catch {
@@ -441,7 +432,7 @@ export function HomeShell({
   }, [groups, pendingDeletes, leavingLinks]);
 
   // Each loaded link, for the selection bar: its folder ("Remove from
-  // folders") and reading state (Mark read / unread).
+  // folders").
   const linkById = useMemo(
     () =>
       new Map(
@@ -458,7 +449,6 @@ export function HomeShell({
     },
     [linkById],
   );
-  const linkOf = useCallback((linkId: string) => linkById.get(linkId), [linkById]);
 
   // A selection belongs to one list: switching folders or leaving drops it.
   useEffect(() => () => linkSelection.clear(), [folderId]);
@@ -583,7 +573,7 @@ export function HomeShell({
       ) : null}
       {/* Pinned to the bottom, so they come last in the page too: keyboard
           order follows the screen (list, selection bar, search field). */}
-      <LinkSelectionBar folderOf={folderOf} linkOf={linkOf} />
+      <LinkSelectionBar folderOf={folderOf} />
       <LinkOmnibox
         value={query}
         onChange={setQuery}

@@ -114,7 +114,6 @@ describe("registerPurlTools", () => {
       "reorder_folders",
       "move_link",
       "move_links",
-      "mark_links_read",
     ]);
   });
 

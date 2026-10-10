@@ -11,7 +11,6 @@ type LinkLike = {
   contentType?: ContentType;
   createdAt: Date;
   folderId?: string | null;
-  readAt?: Date | null;
 };
 
 export function serializeLink(link: LinkLike) {
@@ -26,6 +25,5 @@ export function serializeLink(link: LinkLike) {
     contentType: link.contentType ?? "WEB",
     createdAt: link.createdAt.toISOString(),
     folderId: link.folderId ?? null,
-    readAt: link.readAt ? link.readAt.toISOString() : null,
   };
 }

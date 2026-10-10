@@ -59,8 +59,6 @@ function toLink(link: PublicLink): Link {
     ...link,
     createdAt: new Date(link.createdAt),
     folderId: null,
-    // Visitors never see the owner's reading state.
-    readAt: null,
   };
 }
 

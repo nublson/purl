@@ -4,7 +4,6 @@ import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { useLongPress } from "@/hooks/use-long-press";
 import { useLeavingLinks } from "@/lib/leaving-links";
-import { setLinksRead, useIsLinkRead } from "@/lib/link-read-state";
 import {
   linkSelection,
   useIsLinkSelected,
@@ -30,8 +29,7 @@ const LinkMenu = dynamic(() => import("./link-menu").then((m) => m.LinkMenu), {
 
 /**
  * A link in the owner's grid: the shared folder's card (same frame and
- * content), plus what the owner's rows do. Opening it marks it read; a
- * read card steps back like a read row. A checkbox in the thumbnail's top
+ * content), plus what the owner's rows do. A checkbox in the thumbnail's top
  * corner selects it (shown on hover or focus, and on every card while
  * selecting, when a click anywhere toggles the card); a long-press does
  * the same on touch. The row menu (`⋯`) sits in the other corner, on hover
@@ -57,11 +55,10 @@ export function LinkCard({
   const { notifyLinksChanged } = useLinksSyncActions();
   const deletePhase = usePendingLinkDeletes().get(link.id);
   const leaving = useLeavingLinks().get(link.id)?.phase === "fading";
-  // The landing page's demo is read-only: no selecting, menu or read marking.
+  // The landing page's demo is read-only: no selecting or menu.
   const demo = useIsDemo();
   const selecting = useIsSelectionActive() && !demo;
   const selected = useIsLinkSelected(link.id);
-  const read = useIsLinkRead(link);
   const folderTag = useFolderTag(link);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const anchorRef = React.useRef<HTMLAnchorElement>(null);
@@ -116,7 +113,7 @@ export function LinkCard({
         href={link.url}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label={`${link.title} (${read ? "read, " : ""}opens in new tab)`}
+        aria-label={`${link.title} (opens in new tab)`}
         aria-describedby={dayHeadingId}
         // While selecting, the checkbox is the keyboard and screen reader
         // control; a click anywhere on the card toggles it.
@@ -131,14 +128,7 @@ export function LinkCard({
           if (selecting) {
             event.preventDefault();
             linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-            return;
           }
-          if (!demo && !read) void setLinksRead([link.id], true);
-        }}
-        onAuxClick={(event) => {
-          // Middle-click opens it in a background tab.
-          if (event.button === 1 && !demo && !read)
-            void setLinksRead([link.id], true);
         }}
       />
       {/* The content is a picture of the link: clicks go to the link. */}
@@ -146,7 +136,6 @@ export function LinkCard({
         <LinkCardContent
           link={link}
           eagerThumbnail={eagerThumbnail}
-          read={read}
           tag={folderTag ? <FolderTag folder={folderTag} inCard /> : null}
         />
       </div>

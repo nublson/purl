@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
-import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import type { Link as LinkType } from "@/utils/links";
 import { LinkIcon } from "./link-icon";
@@ -43,18 +42,14 @@ export function SharedLinkCard({
 /**
  * What a link card shows, shared by both grids: the thumbnail (16:10,
  * full-bleed), then the favicon, the title (two lines) and the domain.
- * `read` (the owner's grid) steps it back like a read row: a regular,
- * muted title and a grey favicon.
  */
 export function LinkCardContent({
   link,
   eagerThumbnail = false,
-  read = false,
   tag,
 }: {
   link: LinkType;
   eagerThumbnail?: boolean;
-  read?: boolean;
   /** Under the domain (the owner's grid: the link's folder tag). */
   tag?: ReactNode;
 }) {
@@ -77,10 +72,7 @@ export function LinkCardContent({
         <span className="flex h-[1lh] translate-y-px items-center text-sm leading-normal">
           {/* Favicons get a faint 1px edge so dark ones read on the card. */}
           <span
-            className={cn(
-              "flex size-4 items-center justify-center overflow-hidden *:size-4 [&_img]:outline [&_img]:-outline-offset-1 [&_img]:outline-black/10 dark:[&_img]:outline-white/10",
-              read && "opacity-50 grayscale",
-            )}
+            className="flex size-4 items-center justify-center overflow-hidden *:size-4 [&_img]:outline [&_img]:-outline-offset-1 [&_img]:outline-black/10 dark:[&_img]:outline-white/10"
           >
             <LinkIcon link={link} size="small" />
           </span>
@@ -88,12 +80,7 @@ export function LinkCardContent({
         <Typography
           component="span"
           size="small"
-          className={cn(
-            "line-clamp-2 wrap-anywhere",
-            read
-              ? "font-normal text-muted-foreground"
-              : "font-medium text-foreground",
-          )}
+          className="line-clamp-2 wrap-anywhere font-medium text-foreground"
         >
           {link.title}
         </Typography>

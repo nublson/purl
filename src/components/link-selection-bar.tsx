@@ -20,8 +20,6 @@ import {
   type SelectionShortcut,
 } from "@/lib/link-selection-shortcuts";
 import { deleteLinksWithUndo } from "@/lib/pending-link-deletes";
-import { isLinkRead, setLinksRead, useLinkReadOverrides } from "@/lib/link-read-state";
-import type { Link } from "@/utils/links";
 import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { EASE_OUT_STRONG } from "@/lib/motion";
 import { isApplePlatform } from "@/lib/platform";
@@ -42,7 +40,6 @@ import { toast } from "sonner";
 import { DialogFolderForm } from "./dialog-folder-form";
 import { FolderEmoji } from "./folder-emoji";
 import { HapticTarget } from "./haptic-target";
-import { ReadToggleIcon } from "./read-toggle-icon";
 import { Typography } from "./typography";
 import { Button } from "./ui/button";
 import {
@@ -78,24 +75,13 @@ const TOUCH_ICON_TARGET =
  *
  * `folderOf` gives a loaded link's folder id (null when unfiled), so Move
  * on Home only offers "Remove from folders" when a selected link is in one.
- * `linkOf` gives a loaded link, so Mark read turns into Mark unread once
- * every selected link is read.
  */
 export function LinkSelectionBar({
   folderOf,
-  linkOf,
 }: {
   folderOf: (linkId: string) => string | null | undefined;
-  linkOf: (linkId: string) => Link | undefined;
 }) {
   const selectedIds = useSelectedLinkIds();
-  const readOverrides = useLinkReadOverrides();
-  const allRead =
-    selectedIds.size > 0 &&
-    [...selectedIds].every((id) => {
-      const link = linkOf(id);
-      return link ? isLinkRead(link, readOverrides) : false;
-    });
   const selectableCount = useSelectableLinkCount();
   const count = selectedIds.size;
   const allSelected = count > 0 && count >= selectableCount;
@@ -148,14 +134,6 @@ export function LinkSelectionBar({
     linkSelection.clear();
   }, [notifyLinksChanged]);
 
-  // Marking read keeps the selection: the rows fade back in place, and the
-  // same links may be moved or marked unread next.
-  const toggleReadSelected = React.useCallback(() => {
-    const ids = linkSelection.selectedIds();
-    if (ids.length === 0) return;
-    void setLinksRead(ids, !allRead);
-  }, [allRead]);
-
   const toggleAll = React.useCallback(() => {
     if (linkSelection.selectedIds().length >= selectableCount) {
       linkSelection.clear();
@@ -179,12 +157,11 @@ export function LinkSelectionBar({
       if (shortcut === "clear") linkSelection.clear();
       else if (shortcut === "selectAll") linkSelection.selectAll();
       else if (shortcut === "delete") deleteSelected();
-      else if (shortcut === "read") toggleReadSelected();
       else setMoveOpen(true);
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [count, deleteSelected, toggleReadSelected]);
+  }, [count, deleteSelected]);
 
   // Toolbar pattern: the bar is one Tab stop (the last button used, the
   // count at first), and arrow keys, Home and End move between its buttons
@@ -373,26 +350,6 @@ export function LinkSelectionBar({
                   setNewFolderOpen(true);
                 }}
               />
-              <ShortcutTooltip
-                label={allRead ? "Mark as unread" : "Mark as read"}
-                shortcut="read"
-                apple={apple}
-              >
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  data-cy="selection-toggle-read"
-                  aria-label={`Mark ${formatLinkCount(shownCount)} as ${allRead ? "unread" : "read"}`}
-                  className={cn("rounded-lg", TOUCH_ICON_TARGET)}
-                  onClick={() => {
-                    haptic("success");
-                    toggleReadSelected();
-                  }}
-                >
-                  <ReadToggleIcon read={allRead} />
-                  <HapticTarget className="-inset-0.5" />
-                </Button>
-              </ShortcutTooltip>
               <BarSeparator />
               <ShortcutTooltip label="Delete" shortcut="delete" apple={apple}>
                 <Button
