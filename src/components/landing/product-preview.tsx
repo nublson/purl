@@ -61,7 +61,8 @@ function indexStyle(index: number) {
 
 /**
  * The panel's frame, shared by the still picture and the live demo: border,
- * rounded top, a bottom fade into the page and the pearl glow behind it.
+ * rounded top, a bottom fade into the page and the pearl glow behind its top
+ * edge.
  * `data-landing-panel` is the arrival animation's hook. `decorative` hides
  * the still picture from assistive tech; the demo is real, interactive UI,
  * named by `label` as a region so its controls read as a demo.
@@ -86,17 +87,25 @@ export function ProductFrame({
       aria-label={label}
       className={cn("relative isolate mx-auto w-full md:px-[6%]", className)}
     >
-      <div
-        className="pearl-glow pointer-events-none absolute inset-x-[-10%] -bottom-24 -z-10 h-[28rem]"
-        aria-hidden="true"
-      />
-      <div
-        data-landing-panel
-        className="relative overflow-hidden rounded-t-2xl border border-b-0 bg-card/80 backdrop-blur-sm"
-        style={FADE_MASK}
-      >
-        {header}
-        {children}
+      {/* The glow sits behind the panel: a box over the panel's top (the
+          panel's mask would clip its own shadow) casting light up from its
+          top edge; short, so the sides don't glow down to where the panel
+          fades out. The panel is opaque, so none shows through it. The
+          arrival hook is on this wrapper, so the glow arrives with it. */}
+      <div data-landing-panel className="relative">
+        <div
+          className="pearl-glow pointer-events-none absolute inset-x-0 top-0 -z-10 h-40 rounded-t-2xl"
+          aria-hidden="true"
+        />
+        {/* The card over the page at 80%, made opaque: the color the
+            translucent panel had. */}
+        <div
+          className="relative overflow-hidden rounded-t-2xl border border-b-0 bg-[color-mix(in_oklab,var(--card)_80%,var(--background))]"
+          style={FADE_MASK}
+        >
+          {header}
+          {children}
+        </div>
       </div>
     </div>
   );

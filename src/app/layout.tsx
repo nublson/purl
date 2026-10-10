@@ -12,6 +12,9 @@ import "./globals.css";
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+  // The optical-size axis: browsers pick the cut from the font size, so
+  // headlines get Inter's tighter display cut instead of the text one.
+  axes: ["opsz"],
 });
 
 const description =

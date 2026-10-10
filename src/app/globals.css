@@ -22,8 +22,8 @@
   --font-sans: var(--font-inter);
   --text-title: 3.375rem;
   --text-title--line-height: 1.1;
-  --text-display: 5.5rem;
-  --text-display--line-height: 1.05;
+  --text-display: 2.875rem;
+  --text-display--line-height: 1.1;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -100,11 +100,7 @@ body {
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  /* Landing: the pearl gradient (the word "pearls") and its glow. */
-  --pearl-1: #7a6c4f;
-  --pearl-2: #8a7b5a;
-  --pearl-3: #4f7396;
-  --pearl-4: #8660a0;
+  /* Landing: the pearl glow behind the product panel. */
   --pearl-glow: rgb(176 161 132 / 0.35);
 }
 
@@ -140,10 +136,6 @@ body {
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-  --pearl-1: #f7f3ea;
-  --pearl-2: #d9cfbd;
-  --pearl-3: #c9d6e3;
-  --pearl-4: #efe6f2;
   --pearl-glow: rgb(247 243 234 / 0.3);
 }
 
@@ -179,33 +171,10 @@ body {
   }
 }
 
-/* The soft pearl light behind the product panel. */
+/* The soft pearl light behind the product panel: a shadow cast up from its
+   top edge, so it spreads along the whole edge instead of pooling in one spot. */
 @utility pearl-glow {
-  background: radial-gradient(
-    closest-side at 50% 50%,
-    var(--pearl-glow),
-    color-mix(in srgb, var(--pearl-glow) 45%, transparent) 40%,
-    color-mix(in srgb, var(--pearl-glow) 12%, transparent) 70%,
-    transparent
-  );
-}
-
-/* The signature word: a slow pearl gradient clipped to the text. The 200%
-   background leaves room for the sheen to slide across (landing hero). */
-@utility pearl-text {
-  background: linear-gradient(
-    100deg,
-    var(--pearl-1),
-    var(--pearl-2) 30%,
-    var(--pearl-3) 55%,
-    var(--pearl-4) 80%,
-    var(--pearl-1)
-  );
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  box-shadow: 0 -40px 120px -40px var(--pearl-glow);
 }
 
 /* Focus rings are box-shadows (`ring-*`) on `outline-none` controls, and
@@ -257,7 +226,7 @@ body {
    visits, which switches all of this off. `both` fill keeps content visible
    whatever happens (no JS, interrupted). Nothing here touches pointer-events.
    Timeline (ms): words 0-740, sub 340-840, actions 420-920, panel 500-1000,
-   rows 600-1270, sheen 700-1500. */
+   rows 600-1270. */
 @keyframes landing-arrive {
   from {
     opacity: 0;
@@ -277,15 +246,6 @@ body {
   from {
     opacity: 0;
     transform: translateY(8px);
-  }
-}
-
-@keyframes landing-sheen {
-  from {
-    background-position: 100% 0;
-  }
-  to {
-    background-position: 0 0;
   }
 }
 
@@ -318,9 +278,6 @@ body {
     [data-landing-row] {
       animation: landing-row 400ms var(--ease-out-strong) both;
       animation-delay: calc(680ms + var(--i) * 45ms);
-    }
-    [data-pearl-word] {
-      animation: landing-sheen 800ms cubic-bezier(0.77, 0, 0.175, 1) 780ms both;
     }
   }
 }

@@ -59,7 +59,7 @@ test.describe("Landing page", () => {
   test.describe("reduced motion", () => {
     test.use({ reducedMotion: "reduce" });
 
-    test("only fades: no blur or movement keyframes, and no sheen", async ({ page }) => {
+    test("only fades: no blur or movement keyframes", async ({ page }) => {
       await page.goto("/");
       const names = await page.evaluate((sel) => {
         return Array.from(document.querySelectorAll(sel)).map((el) => getComputedStyle(el).animationName);
@@ -69,11 +69,6 @@ test.describe("Landing page", () => {
         expect(name).toBe("landing-fade");
         expect(name).not.toBe("landing-arrive");
       }
-      const sheen = await page.evaluate(() => {
-        const el = document.querySelector("[data-pearl-word]");
-        return el ? getComputedStyle(el).animationName : null;
-      });
-      expect(sheen).toBe("none");
     });
   });
 

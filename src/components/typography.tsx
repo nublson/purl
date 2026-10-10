@@ -5,7 +5,7 @@ import * as React from "react";
 const typographyVariants = cva("", {
   variants: {
     variant: {
-      h1: "text-6xl sm:text-7xl md:text-display font-semibold tracking-[-0.035em] text-balance text-foreground",
+      h1: "text-4xl leading-[1.1] md:text-display font-semibold tracking-[-0.03em] text-balance text-foreground",
       h2: "text-4xl leading-[1.1] md:text-title font-semibold tracking-[-0.03em] text-balance text-foreground",
       h3: "text-2xl leading-tight font-semibold tracking-[-0.02em] text-balance text-foreground",
       h4: "text-xl leading-tight font-semibold tracking-[-0.015em] text-balance text-foreground",
