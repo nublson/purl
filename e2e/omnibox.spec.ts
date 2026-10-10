@@ -142,6 +142,45 @@ test.describe("Search field", () => {
     await expect(page.locator('[data-cy="omnibox-add-more"]')).toHaveCount(0);
   });
 
+  test("while a folder's search runs, one skeleton stands for the results and the Add section", async ({ page, seed }) => {
+    await seed.folder({ name: "Dev Tools", slug: "dev-tools" });
+    await seed.link({ url: "https://greptile.example", title: "AI code review agent" });
+    await open(page, "/folders/dev-tools");
+    // Hold the Add section's search, so the skeleton stays up.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/links/search?**", async (route) => {
+      await held;
+      await route.continue();
+    });
+
+    await field(page).fill("code review");
+    await expect(page.getByRole("status").filter({ hasText: "Searching links" })).toBeAttached();
+    // The search's answer isn't in yet: neither "no match" nor the old list.
+    await expect(page.locator('[data-cy="link-group-empty"]')).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Search all links for “code review”" })).toBeVisible();
+
+    release();
+    await expect(page.locator('[data-cy="omnibox-add-row"]')).toHaveCount(1);
+    await expect(page.getByRole("status").filter({ hasText: "Searching links" })).toHaveCount(0);
+  });
+
+  test("in the grid view, the Add section and Search all keep the list's width", async ({ page, seed }) => {
+    await seed.folder({ name: "Dev Tools", slug: "dev-tools" });
+    await seed.link({ url: "https://greptile.example", title: "AI code review agent" });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    expect((await page.request.patch("/api/user/layout", { data: { view: "grid" } })).ok()).toBe(true);
+    await open(page, "/folders/dev-tools");
+
+    await field(page).fill("code review");
+    const section = page.locator('[data-cy="omnibox-add-section"]');
+    await expect(section).toBeVisible();
+    // The list's column: max-w-2xl (672px).
+    expect((await section.boundingBox())!.width).toBeLessThanOrEqual(672);
+    const searchAll = page.getByRole("button", { name: "Search all links for “code review”" });
+    expect((await searchAll.boundingBox())!.width).toBeLessThanOrEqual(672);
+  });
+
   test("a URL saved in another folder offers to move it here", async ({ page, seed }) => {
     await seed.folder({ name: "Dev Tools", slug: "dev-tools" });
     const reading = await seed.folder({ name: "Reading", slug: "reading" });

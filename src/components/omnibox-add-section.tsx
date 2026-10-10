@@ -194,7 +194,8 @@ export function OmniboxAddSection({
     <section
       data-cy="omnibox-add-section"
       aria-labelledby={headingId}
-      className="flex w-full flex-col items-start gap-4"
+      // A list in the list's column, in the grid view too.
+      className="wrapper-private flex flex-col items-start gap-4"
     >
       <h2
         id={headingId}

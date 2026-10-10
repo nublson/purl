@@ -14,6 +14,10 @@ import {
   useOmniboxAddResults,
 } from "@/components/omnibox-add-section";
 import { PasteHandler } from "@/components/paste-handler";
+import {
+  LinkResultsSkeleton,
+  OmniboxAddSkeleton,
+} from "@/components/skeletons/home";
 import { useLinksSyncActions, useLinksSyncState } from "@/hooks/use-links-sync";
 import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
 import { useRealtimeSync } from "@/hooks/use-realtime-sync";
@@ -102,6 +106,10 @@ export function HomeShell({
   // The search `nextCursor` belongs to: a cursor only pages the list it came
   // from, so loadMore never sends an old list's cursor with a new query.
   const cursorQueryRef = useRef("");
+  // The search the list on screen answers ("" for the whole list, as the
+  // server rendered it). Until it catches up with the field, the list shows
+  // a skeleton instead of the previous answer.
+  const [loadedQuery, setLoadedQuery] = useState("");
   const [groups, setGroups] = useState(initialGroups);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [pendingUrl, setPendingUrl] = useState<string | null>(null);
@@ -160,6 +168,7 @@ export function HomeShell({
       setGroups(page.groups);
       setNextCursor(page.nextCursor);
       cursorQueryRef.current = query;
+      setLoadedQuery(query);
       // The list now says where every row is: rows faded out by a move
       // before this reload began are gone (or back, after Undo).
       settleLeavingLinks(startedAt);
@@ -168,7 +177,10 @@ export function HomeShell({
       if (page.timeZone) setGroupsTimeZone(page.timeZone);
       if (typeof page.total === "number") setLinksTotal(page.total);
     } catch {
-      // Keep the current list; the next change or reload will retry.
+      // Keep the current list; the next change or reload will retry. It
+      // stands as this search's answer, rather than a skeleton that never
+      // ends.
+      if (seq === reloadSeq.current) setLoadedQuery(searchQueryRef.current);
     }
   }, [setLinksTotal, folderId]);
 
@@ -464,6 +476,13 @@ export function HomeShell({
   useEffect(() => () => linkSelection.clear(), [folderId]);
 
   const listShown = !((!groups.length || allLinksHidden) && !showSyntheticToday);
+  // Typing, or a search on its way: the folder's matches and (in a folder)
+  // the Add section arrive together, after one skeleton of both, so the
+  // page doesn't jump from the old list to "no match" to the results.
+  const typedQuery = query.trim();
+  const searching =
+    typedQuery !== loadedQuery ||
+    Boolean(folderId && searchQuery && addResults.loading);
   // On a folder page with a search: your other links that match, to add
   // here. Under the folder's matches, a day group's gap below them.
   const addSection =
@@ -483,14 +502,25 @@ export function HomeShell({
         onSaveError={onSaveError}
       />
       {saveUrl ? (
-        <OmniboxSaveRow
-          url={saveUrl}
-          alreadySaved={alreadySaved}
-          folderName={folderId ? currentFolder?.name : undefined}
-          onSave={saveFromField}
-        />
+        // A row, so the list's column in the grid view too.
+        <div className="wrapper-private">
+          <OmniboxSaveRow
+            url={saveUrl}
+            alreadySaved={alreadySaved}
+            folderName={folderId ? currentFolder?.name : undefined}
+            onSave={saveFromField}
+          />
+        </div>
       ) : null}
-      {!listShown ? (
+      {searching ? (
+        <div aria-busy className="flex w-full flex-col gap-8">
+          <span className="sr-only" role="status">
+            Searching links
+          </span>
+          <LinkResultsSkeleton rows={3} cards={4} />
+          {folderId && typedQuery ? <OmniboxAddSkeleton /> : null}
+        </div>
+      ) : !listShown ? (
         // A URL that matches nothing: the Save row above is the answer.
         // In a folder, so are your other links that match (below), once in.
         (searchQuery && saveUrl) ||
@@ -571,15 +601,19 @@ export function HomeShell({
         </div>
       )}
       {/* No folder matches (the list isn't shown): the section is all there is. */}
-      {listShown ? null : addSection}
+      {listShown || searching ? null : addSection}
       {/* A folder searches only itself; this widens it to every link. */}
-      {folderId && searchQuery ? (
-        <OmniboxSearchAllRow
-          query={searchQuery}
-          onSearchAll={() =>
-            router.push(`/home?q=${encodeURIComponent(searchQuery)}`)
-          }
-        />
+      {/* Shown as you type (below the skeleton while the search runs), in
+          the list's column whatever the view. */}
+      {folderId && typedQuery ? (
+        <div className="wrapper-private">
+          <OmniboxSearchAllRow
+            query={typedQuery}
+            onSearchAll={() =>
+              router.push(`/home?q=${encodeURIComponent(typedQuery)}`)
+            }
+          />
+        </div>
       ) : null}
       {/* Pinned to the bottom, so they come last in the page too: keyboard
           order follows the screen (list, selection bar, search field). */}
