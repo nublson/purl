@@ -9,13 +9,14 @@
  * domains (see Serwist / PWA).
  *
  * Vercel Live (preview toolbar / feedback) loads `https://vercel.live` in an iframe; without
- * `frame-src` the policy falls back to `default-src` and the frame is blocked.
+ * `frame-src` the policy falls back to `default-src` and the frame is blocked. The static
+ * pages embed YouTube videos from `https://www.youtube-nocookie.com`, the only other frame host.
  */
 export function buildContentSecurityPolicy(): string {
   const directives = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live",
-    "frame-src 'self' https://vercel.live https://*.vercel.live",
+    "frame-src 'self' https://vercel.live https://*.vercel.live https://www.youtube-nocookie.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https: http:",
     "font-src 'self'",
