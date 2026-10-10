@@ -11,6 +11,9 @@ function isNotionHost(hostname: string): boolean {
   return (
     host === "notion.so" ||
     host === "www.notion.so" ||
+    // Page mentions come back as https://app.notion.com/p/<id>.
+    host === "notion.com" ||
+    host.endsWith(".notion.com") ||
     host.endsWith(".notion.site")
   );
 }

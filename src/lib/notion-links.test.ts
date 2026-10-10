@@ -31,6 +31,15 @@ describe("notionPageIdFromUrl", () => {
     ).toBe("244b17268ab383c3938887a7a5748b73");
   });
 
+  it("reads the id from notion.com urls (page mentions use app.notion.com)", () => {
+    expect(
+      notionPageIdFromUrl("https://app.notion.com/p/244b17268ab383c3938887a7a5748b73"),
+    ).toBe("244b17268ab383c3938887a7a5748b73");
+    expect(
+      notionPageIdFromUrl("https://www.notion.com/Privacy-244b17268ab383c3938887a7a5748b73"),
+    ).toBe("244b17268ab383c3938887a7a5748b73");
+  });
+
   it("returns null for other hosts", () => {
     expect(
       notionPageIdFromUrl("https://example.com/244b17268ab383c3938887a7a5748b73"),
@@ -43,6 +52,12 @@ describe("classifyNotionLink", () => {
     expect(
       classifyNotionLink(
         "https://www.notion.so/Privacy-244b17268ab383c3938887a7a5748b73",
+        map,
+      ),
+    ).toEqual({ href: "/privacy", external: false });
+    expect(
+      classifyNotionLink(
+        "https://app.notion.com/p/244b17268ab383c3938887a7a5748b73",
         map,
       ),
     ).toEqual({ href: "/privacy", external: false });
