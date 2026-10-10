@@ -77,7 +77,7 @@ export async function StaticPage({ slug }: { slug: StaticPageSlug }) {
         </Typography>
       </header>
       <main className="flex w-full flex-1 flex-col md:px-[6%]">
-        <Typography variant="h2" component="h1" className="mt-8 md:mt-10">
+        <Typography variant="h1" component="h1" className="mt-8 md:mt-10">
           {page.title}
         </Typography>
         {page.description ? (
