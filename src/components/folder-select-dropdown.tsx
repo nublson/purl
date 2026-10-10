@@ -376,6 +376,7 @@ export function FolderSelectDropdown() {
                 {canReorder ? (
                   <Typography
                     component="span"
+                    data-current-mark=""
                     aria-hidden="true"
                     className="-my-1.5 -me-1.5 ms-auto hidden size-8 shrink-0 items-center justify-center pointer-coarse:flex"
                   >
