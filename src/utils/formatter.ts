@@ -133,3 +133,13 @@ export function getDateGroupLabel(
 ): string {
   return createDateGroupLabeler(now, timeZone)(date);
 }
+
+const UPDATED_DATE_FORMAT = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "long",
+  timeZone: "UTC",
+});
+
+/** "October 3, 2026" for an ISO timestamp, in UTC so server and client agree. */
+export function formatUpdatedDate(iso: string): string {
+  return UPDATED_DATE_FORMAT.format(new Date(iso));
+}

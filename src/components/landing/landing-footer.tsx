@@ -1,6 +1,8 @@
 import { Logo } from "@/components/logo";
 import { Typography } from "@/components/typography";
+import { getAuthorUrl } from "@/lib/author-url";
 import { STATIC_PAGES } from "@/lib/static-pages";
+import { cn } from "@/lib/utils";
 
 const LINK =
   "inline-flex min-h-8 items-center rounded-sm transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11";
@@ -14,7 +16,11 @@ const NAV = [
   { label: "GitHub", href: "https://github.com/nublson/purl", external: true },
 ];
 
-export function LandingFooter() {
+/**
+ * `currentPath` is the page being shown (a static page's path); its link is
+ * marked current. It's a prop, not `usePathname`, so static pages stay static.
+ */
+export function LandingFooter({ currentPath }: { currentPath?: string }) {
   return (
     <footer className="mt-24 w-full border-t border-border py-6">
       <div className="flex flex-col items-center gap-3 text-center md:flex-row md:justify-between md:gap-6 md:text-left">
@@ -25,7 +31,7 @@ export function LandingFooter() {
             <Typography
               component="a"
               size="small"
-              href="https://github.com/nublson"
+              href={getAuthorUrl()}
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-sm text-foreground hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
@@ -42,7 +48,15 @@ export function LandingFooter() {
                   component="a"
                   size="small"
                   href={href}
-                  className={LINK}
+                  className={cn(
+                    LINK,
+                    !external &&
+                      href === currentPath &&
+                      "font-medium text-foreground",
+                  )}
+                  {...(!external && href === currentPath
+                    ? { "aria-current": "page" as const }
+                    : {})}
                   {...(external
                     ? { target: "_blank", rel: "noopener noreferrer" }
                     : {})}

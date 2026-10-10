@@ -1,4 +1,4 @@
-import { Logo } from "@/components/logo";
+import { BrandMark } from "@/components/brand-mark";
 import { ProviderButtons } from "@/components/provider-buttons";
 import { Typography } from "@/components/typography";
 import type { ProviderId } from "@/lib/auth-providers";
@@ -20,19 +20,8 @@ export function LandingHero({ providers }: { providers: ProviderId[] }) {
     >
       {/* The brand mark, the first beat of the arrival. The wordmark names
           the product, so the pearl itself is decorative. */}
-      <div
-        data-landing-block="mark"
-        className="flex items-center gap-2.5"
-      >
-        <div aria-hidden="true" className="flex">
-          <Logo size={24} />
-        </div>
-        <Typography
-          component="span"
-          className="text-lg font-semibold tracking-[-0.01em] text-foreground"
-        >
-          Purl
-        </Typography>
+      <div data-landing-block="mark">
+        <BrandMark />
       </div>
       <Typography
         component="h1"

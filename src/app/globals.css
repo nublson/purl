@@ -292,3 +292,11 @@ body {
     }
   }
 }
+
+/* Code blocks: shiki emits --shiki-light / --shiki-dark on every token. */
+.shiki span {
+  color: var(--shiki-light);
+}
+.dark .shiki span {
+  color: var(--shiki-dark);
+}

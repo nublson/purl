@@ -1,3 +1,4 @@
+import { getAuthorUrl } from "../src/lib/author-url";
 import { expect, test, waitForHydration } from "./fixtures";
 
 // The landing page: content, the first-visit arrival (CSS only, remembered in
@@ -32,7 +33,7 @@ test.describe("Landing page", () => {
     await expect(page.getByText("Free · 1,000 links · No ads · No AI")).toBeVisible();
 
     const footer = page.getByRole("contentinfo");
-    await expect(footer.getByRole("link", { name: "@nublson" })).toHaveAttribute("href", "https://github.com/nublson");
+    await expect(footer.getByRole("link", { name: "@nublson" })).toHaveAttribute("href", getAuthorUrl());
     for (const { name, href } of FOOTER_LINKS) {
       await expect(footer.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);
     }
