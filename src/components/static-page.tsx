@@ -29,6 +29,9 @@ async function readAtBuild<T>(
 const readStaticPage = (slug: StaticPageSlug) =>
   readAtBuild(() => getPageBySlug(slug), null, `Static page "${slug}"`);
 
+/** The page's one column: every block shares its edge. */
+const COLUMN = "mx-auto w-full max-w-[68ch]";
+
 const MARK_LINK =
   "inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11";
 
@@ -66,7 +69,10 @@ export async function StaticPage({ slug }: { slug: StaticPageSlug }) {
 
   return (
     <div className="wrapper-public flex w-full flex-1 flex-col px-4 md:px-6 lg:px-12">
-      <header className="pt-12 sm:pt-16 md:px-[6%] md:pt-20">
+      {/* Mark, title and content share one centered 68ch column (on the
+          landing demo's axis), text left-aligned; the footer keeps the
+          landing layout. */}
+      <header className={`${COLUMN} pt-12 sm:pt-16 md:pt-20`}>
         <Typography
           component="a"
           href="/"
@@ -76,12 +82,12 @@ export async function StaticPage({ slug }: { slug: StaticPageSlug }) {
           <BrandMark />
         </Typography>
       </header>
-      <main className="flex w-full flex-1 flex-col md:px-[6%]">
+      <main className={`${COLUMN} flex flex-1 flex-col`}>
         <Typography variant="h1" component="h1" className="mt-8 md:mt-10">
           {page.title}
         </Typography>
         {page.description ? (
-          <Typography className="mt-3.5 max-w-[60ch] text-lg text-pretty">
+          <Typography className="mt-3.5 text-lg text-pretty">
             {page.description}
           </Typography>
         ) : null}
@@ -91,9 +97,7 @@ export async function StaticPage({ slug }: { slug: StaticPageSlug }) {
           </time>
         </Typography>
         {page.blocks.length > 0 ? (
-          // The Notion content is one centered 68ch column (on the landing
-          // demo's axis), text left-aligned and every block sharing its edge.
-          <div className="mx-auto mt-10 w-full max-w-[68ch]">
+          <div className="mt-10">
             <NotionBlocks blocks={page.blocks} context={context} />
           </div>
         ) : null}
