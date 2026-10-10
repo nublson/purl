@@ -25,26 +25,27 @@ export function OAuthConsentActions({ consentCode }: { consentCode: string }) {
       const data = (await res.json()) as { redirectURI?: string };
       window.location.href = requireConsentRedirectUri(data);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Unable to submit your choice. Try again.",
-      );
+      console.error("OAuth consent failed:", err);
+      setError("Unable to submit your choice. Try again.");
       setSubmitting(null);
     }
   };
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <Button
-          className="cursor-pointer"
+          size="lg"
+          className="w-full cursor-pointer sm:w-auto sm:px-4 pointer-coarse:min-h-11"
           disabled={submitting !== null}
           onClick={() => void submit(true)}
         >
           {submitting === "allow" ? "Allowing…" : "Allow access"}
         </Button>
         <Button
+          size="lg"
           variant="secondary"
-          className="cursor-pointer"
+          className="w-full cursor-pointer sm:w-auto sm:px-4 pointer-coarse:min-h-11"
           disabled={submitting !== null}
           onClick={() => void submit(false)}
         >
