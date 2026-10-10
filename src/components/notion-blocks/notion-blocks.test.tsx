@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildPageIdToPath } from "@/lib/notion-links";
 import { NotionBlocks, createRenderContext } from ".";
 import { block, renderToHtml, richText } from "./test-utils";
@@ -224,6 +224,8 @@ describe("lists", () => {
 });
 
 describe("media, links and tables", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   const ext = (url: string) => ({ type: "external", external: { url } });
   const IMG = "https://example.com/a.png";
 
@@ -255,7 +257,15 @@ describe("media, links and tables", () => {
     expect(warn).toHaveBeenCalledWith(
       'Static page "terms": skipped uploaded image img-1; link images instead',
     );
-    warn.mockRestore();
+  });
+
+  it("skips images whose URL is not http(s)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    for (const url of ["data:image/png;base64,AAA", "javascript:alert(1)"]) {
+      const html = await render([block("image", { ...ext(url), caption: [] })]);
+      expect(html).not.toContain("<img");
+    }
+    expect(warn).toHaveBeenCalledTimes(2);
   });
 
   it("embeds YouTube videos and links other videos", async () => {

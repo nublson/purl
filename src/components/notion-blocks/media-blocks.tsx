@@ -35,12 +35,27 @@ function LinkLine({ children }: { children: ReactNode }) {
   );
 }
 
+function isHttpUrl(url: string): boolean {
+  try {
+    const { protocol } = new URL(url);
+    return protocol === "http:" || protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function ImageBlock({ block, context }: Props) {
   if (block.type !== "image") return null;
   const image = block.image;
   if (image.type !== "external") {
     console.warn(
       `Static page "${context.pageSlug}": skipped uploaded image ${block.id}; link images instead`,
+    );
+    return null;
+  }
+  if (!isHttpUrl(image.external.url)) {
+    console.warn(
+      `Static page "${context.pageSlug}": skipped image ${block.id} with an unsupported URL`,
     );
     return null;
   }

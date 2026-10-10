@@ -38,7 +38,9 @@ function ItemBody({
           readOnly
           className="mt-1.5 size-4 shrink-0"
         />
-        <span>{checked ? <s>{text}</s> : text}</span>
+        <Typography component="span" className="text-foreground">
+          {checked ? <s>{text}</s> : text}
+        </Typography>
       </label>
     );
   }
