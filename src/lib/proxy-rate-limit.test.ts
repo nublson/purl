@@ -486,5 +486,17 @@ describe("rateLimitApiRequest", () => {
       await rateLimitApiRequest(request);
       expect(limitMock).toHaveBeenCalledWith("oauth-access-token-xyz");
     });
+
+    it("falls back to the raw token when getSession throws (OAuth token rejected by the apiKey hook)", async () => {
+      vi.mocked(getMcpRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: true, reset: 0 });
+      mockGetSession.mockRejectedValue(new Error("Invalid API key."));
+      const request = new NextRequest("http://localhost/api/mcp", {
+        method: "POST",
+        headers: { authorization: "Bearer oauth-access-token-xyz" },
+      });
+      await expect(rateLimitApiRequest(request)).resolves.toBeNull();
+      expect(limitMock).toHaveBeenCalledWith("oauth-access-token-xyz");
+    });
   });
 });

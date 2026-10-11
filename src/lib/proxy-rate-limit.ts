@@ -38,9 +38,18 @@ async function resolveBearerRateLimitKey(
   }
   // Loaded only here (API-key requests): page requests through the proxy
   // never pay for Better Auth on a cold start.
-  const { auth } = await import("@/lib/auth");
-  const session = await auth.api.getSession({ headers: request.headers });
-  return session?.user?.id ?? authHeader.slice(7);
+  const token = authHeader.slice(7);
+  try {
+    const { auth } = await import("@/lib/auth");
+    const session = await auth.api.getSession({ headers: request.headers });
+    return session?.user?.id ?? token;
+  } catch (err) {
+    // A bearer the apiKey plugin rejects makes getSession throw. The route
+    // answers for itself (401, or its OAuth check), so this must never turn
+    // into a 500 here: bucket by the raw token instead.
+    console.error("proxy: getSession threw, rate limiting by raw token:", err);
+    return token;
+  }
 }
 
 function tooManyRequests(reset: number) {
