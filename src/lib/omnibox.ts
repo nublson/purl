@@ -4,6 +4,8 @@
  * field also offers to save it.
  */
 
+import { linkUrlKey } from "@/lib/link-url-key";
+
 /** File extensions that look like a domain ending but aren't one (`notes.txt`). */
 const FILE_EXTENSIONS = new Set([
   "txt", "md", "pdf", "doc", "docx", "csv", "json", "xml", "yml", "yaml",
@@ -50,15 +52,5 @@ export function omniboxSaveUrl(input: string): string | null {
  * scheme, a leading `www.`, a trailing slash and letter case in the host.
  */
 export function isSameLinkUrl(a: string, b: string): boolean {
-  const key = (raw: string) => {
-    try {
-      const url = new URL(raw);
-      const host = url.hostname.toLowerCase().replace(/^www\./, "");
-      const path = url.pathname.replace(/\/+$/, "");
-      return `${host}${path}${url.search}`;
-    } catch {
-      return raw;
-    }
-  };
-  return key(a) === key(b);
+  return linkUrlKey(a) === linkUrlKey(b);
 }
