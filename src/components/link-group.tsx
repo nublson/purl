@@ -9,7 +9,9 @@ import type { ReactNode } from "react";
 import { LinkCard } from "./link-card";
 import { LinkItem } from "./link-item";
 import { MasonryItem, useMasonry } from "./masonry";
+import type { PendingSave } from "@/lib/pending-save";
 import { LinkItemSkeleton } from "./skeletons";
+import { PendingLinkCard } from "./skeletons/pending-link-card";
 import { SharedLinkCardSkeleton } from "./skeletons/shared-folder";
 import { ItemGroup } from "./ui/item";
 
@@ -18,8 +20,8 @@ interface LinkGroupProps {
   links: Link[];
   /** The link just saved: its row plays the arrival (see `LinkItem`). */
   newLinkId?: string | null;
-  /** A URL being saved here: its placeholder comes first. */
-  pendingUrl?: string | null;
+  /** A save in flight here: its placeholder comes first. */
+  pending?: PendingSave | null;
   /** How many of the first links load their favicons (or thumbnails) eagerly. */
   eagerFavicons?: number;
 }
@@ -46,13 +48,13 @@ export const LinkGroup = ({
   label,
   links,
   newLinkId,
-  pendingUrl,
+  pending,
   eagerFavicons = 0,
 }: LinkGroupProps) => {
   const headingId = `link-group-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   // A day whose links are all hidden drops its heading too.
   const visibleLinks = useVisibleLinks(links);
-  if (visibleLinks.length === 0 && !pendingUrl) return null;
+  if (visibleLinks.length === 0 && !pending) return null;
 
   return (
     <section
@@ -67,7 +69,13 @@ export const LinkGroup = ({
         {label}
       </h2>
       <ItemGroup aria-labelledby={headingId} className="w-full gap-0">
-        {pendingUrl ? <LinkItemSkeleton url={pendingUrl} animateIn /> : null}
+        {pending ? (
+          <LinkItemSkeleton
+            url={pending.url}
+            progress={pending.progress}
+            animateIn
+          />
+        ) : null}
         {visibleLinks.map((link, index) => (
           // content-visibility skips layout/paint for off-screen rows; the
           // intrinsic size (one row) keeps the scrollbar stable. Adjacent
@@ -131,10 +139,16 @@ export function LinkGrid({
       </h2>
     );
     const groupCells: { key: string; node: ReactNode; flip?: string }[] = [];
-    if (group.pendingUrl) {
+    if (group.pending) {
       groupCells.push({
         key: `pending-${group.label}`,
-        node: <SharedLinkCardSkeleton />,
+        node: group.pending.progress ? (
+          <PendingLinkCard
+            pending={{ ...group.pending, progress: group.pending.progress }}
+          />
+        ) : (
+          <SharedLinkCardSkeleton />
+        ),
       });
     }
     visible.forEach((link, index) => {

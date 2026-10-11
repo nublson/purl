@@ -13,7 +13,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { ARRIVE } from "@/lib/motion";
+import { ARRIVE, ARRIVE_STAGGERED } from "@/lib/motion";
 import { SHARED_GRID_COLUMNS } from "@/lib/shared-folder-view";
 import { cn } from "@/lib/utils";
 import { SharedLinkCardSkeleton } from "./skeletons/shared-folder";
@@ -32,14 +32,6 @@ const LOAD_MORE_CARDS = 4;
 const STAGGERED_CARDS = 8;
 /** Long enough for the last staggered card's 200ms arrival to finish. */
 const ARRIVAL_WINDOW_MS = 600;
-/**
- * A card arriving: `ARRIVE` after its own delay (`--arrive-delay`), hidden
- * until it starts. Reduced motion: no stagger (ARRIVE is already fade only).
- */
-const CARD_ARRIVE = cn(
-  ARRIVE,
-  "fill-mode-backwards [animation-delay:var(--arrive-delay)] motion-reduce:[animation-delay:0ms]",
-);
 import { useSharedFolderView } from "./shared-folder-view";
 import { MasonryItem, useMasonry } from "./masonry";
 import { SharedLinkItem } from "./shared-link-item";
@@ -228,7 +220,7 @@ export function SharedFolderList({
                   key={link.id}
                   className={
                     arriving
-                      ? CARD_ARRIVE
+                      ? ARRIVE_STAGGERED
                       : undefined
                   }
                   style={

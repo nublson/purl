@@ -1,11 +1,18 @@
 "use client";
 
-import { ARRIVE, ARRIVE_ICON, ARRIVE_LATE } from "@/lib/motion";
+import {
+  ARRIVE,
+  ARRIVE_ICON,
+  ARRIVE_LATE,
+  ARRIVE_STAGGERED,
+  ARRIVE_STAGGER_MS,
+} from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { formatDomain } from "@/utils/formatter";
 import type { Link } from "@/utils/links";
 import { ArrowUpRight, FolderMove, Plus } from "reicon-react";
 import * as React from "react";
+import type { CSSProperties } from "react";
 import { LinkIcon } from "./link-icon";
 import { Typography } from "./typography";
 import { buttonVariants } from "./ui/button";
@@ -14,6 +21,9 @@ import { Skeleton } from "./ui/skeleton";
 /** Shared row shape: the list rows' 48px height, 20px media column and 16px gap. */
 const ROW =
   "grid h-12 w-full grid-cols-[20px_1fr_auto] items-center gap-4 rounded-md p-2 text-start outline-none transition-colors duration-150 hover:bg-accent/40 focus-visible:ring-3 focus-visible:ring-ring";
+
+/** Save rows of a pasted list that enter staggered; later ones start with the last. */
+const STAGGERED_ROWS = 8;
 
 /** Wait for the URL to settle before fetching its preview. */
 const PREVIEW_DEBOUNCE_MS = 300;
@@ -112,9 +122,15 @@ export function OmniboxSaveRow({
   url,
   alreadySaved,
   folderName,
+  arriveIndex,
   onSave,
 }: {
   url: string;
+  /**
+   * One of several pasted links: its position, so the rows enter 40ms apart
+   * (the first eight; later ones start with the last).
+   */
+  arriveIndex?: number;
   /** In the loaded list (on a folder page: already in this folder). */
   alreadySaved: boolean;
   folderName?: string;
@@ -138,8 +154,20 @@ export function OmniboxSaveRow({
     <button
       type="button"
       data-cy="omnibox-save-row"
+      // The rows below glide up when this one goes (see HomeShell's `glide`).
+      data-flip={`save:${url}`}
       aria-label={label}
-      className="group/save grid h-12 w-full cursor-pointer grid-cols-[20px_1fr_auto] items-center gap-4 rounded-md p-2 text-start outline-none transition-none hover:bg-accent/40 focus-visible:ring-3 focus-visible:ring-ring"
+      className={cn(
+        "group/save grid h-12 w-full cursor-pointer grid-cols-[20px_1fr_auto] items-center gap-4 rounded-md p-2 text-start outline-none transition-none hover:bg-accent/40 focus-visible:ring-3 focus-visible:ring-ring",
+        arriveIndex !== undefined && ARRIVE_STAGGERED,
+      )}
+      style={
+        arriveIndex !== undefined
+          ? ({
+              "--arrive-delay": `${Math.min(arriveIndex, STAGGERED_ROWS - 1) * ARRIVE_STAGGER_MS}ms`,
+            } as CSSProperties)
+          : undefined
+      }
       onClick={onSave}
     >
       <Typography

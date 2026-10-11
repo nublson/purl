@@ -9,3 +9,6 @@ export const MAX_FOLDERS = 100;
 
 /** Most link ids one bulk move/delete accepts: every link an account can hold. */
 export const MAX_BULK_LINK_IDS = MAX_SAVED_LINKS;
+
+/** Most links one multi-link paste saves; more asks to paste fewer. */
+export const MAX_PASTED_URLS = 50;

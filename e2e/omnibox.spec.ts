@@ -64,15 +64,14 @@ test.describe("Search field", () => {
     await expect(rows(page)).toHaveCount(2);
   });
 
-  test("an exact URL that's saved says so", async ({ page, seed }) => {
+  test("an exact URL that's already in the list shows just that link, once", async ({ page, seed }) => {
     await seed.link({ url: "https://example.com/post", title: "A post" });
     await open(page, "/home");
     await field(page).fill("https://example.com/post");
-    await expect(saveRow(page)).toContainText("Already saved");
-    // A click anywhere on the row saves (here: refreshes the saved link).
-    await saveRow(page).click({ position: { x: 200, y: 24 } });
-    await expect(field(page)).toHaveValue("");
-    await expect(rows(page)).toHaveCount(1, { timeout: 20_000 });
+    // The saved link is the answer: no second, Save row for it.
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page)).toContainText("A post");
+    await expect(saveRow(page)).toHaveCount(0);
   });
 
   test("a URL saved outside the list on screen still says Already saved", async ({ page, seed }) => {
