@@ -1,3 +1,4 @@
+import { markdownRoute, wantsMarkdown } from "@/lib/markdown-negotiation";
 import { rateLimitApiRequest } from "@/lib/proxy-rate-limit";
 import { STATIC_PAGES } from "@/lib/static-pages";
 import { type NextRequest, NextResponse } from "next/server";
@@ -90,6 +91,16 @@ export async function proxy(request: NextRequest) {
   // route-level CORS handlers can respond correctly.
   if (request.method === "OPTIONS") {
     return NextResponse.next();
+  }
+
+  // Agents asking a public page for Markdown get its Markdown version.
+  if (request.method === "GET" && wantsMarkdown(request.headers.get("accept"))) {
+    const route = markdownRoute(request.nextUrl.pathname);
+    if (route) {
+      const target = request.nextUrl.clone();
+      target.pathname = route;
+      return NextResponse.rewrite(target);
+    }
   }
 
   const rateLimited = await rateLimitApiRequest(request);
