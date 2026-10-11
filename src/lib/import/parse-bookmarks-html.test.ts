@@ -109,4 +109,34 @@ describe("parseBookmarksHtml", () => {
     expect(parseBookmarksHtml("")).toEqual([]);
     expect(parseBookmarksHtml("</DL></DL><A>no href</A>")).toEqual([]);
   });
+
+  describe("hostile input stays linear", () => {
+    const MB5 = 5 * 1024 * 1024;
+    const timed = (html: string) => {
+      const start = performance.now();
+      expect(() => parseBookmarksHtml(html)).not.toThrow();
+      const ms = performance.now() - start;
+      console.info(`pathological input: ${ms.toFixed(0)} ms`);
+      return ms;
+    };
+
+    it.each([
+      ["unterminated <a>", '<a href="x">'],
+      ["tags with no end", "<a "],
+      ["unterminated <h3>", "<h3>"],
+      ["deep <dl>", "<dl>"],
+      ["dl and links", '<dl><a href="x">y</a>'],
+    ])("%s", (_name, unit) => {
+      expect(timed(unit.repeat(Math.ceil(MB5 / unit.length)))).toBeLessThan(2000);
+    });
+
+    it("a long run of < inside one link", () => {
+      const html = '<a href="x">' + "<".repeat(MB5) + "</a>";
+      expect(timed(html)).toBeLessThan(2000);
+    });
+
+    it("a long attribute-less word inside a tag", () => {
+      expect(timed('<a ' + "a".repeat(MB5) + ">x</a>")).toBeLessThan(2000);
+    });
+  });
 });
