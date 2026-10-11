@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import bundleAnalyzer from "@next/bundle-analyzer";
 import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
+import { HOME_LINK_HEADER } from "./src/lib/agent-discovery";
+import { MARKDOWN_PAGES } from "./src/lib/markdown-negotiation";
 import { buildSecurityHeaders } from "./src/lib/security-headers";
 
 function getSerwistRevision(): string {
@@ -85,7 +87,16 @@ const nextConfig: NextConfig = {
   async headers() {
     // X-Frame-Options and friends everywhere; the CSP in production only.
     // See src/lib/security-headers.ts.
-    return [{ source: "/:path*", headers: buildSecurityHeaders() }];
+    return [
+      { source: "/:path*", headers: buildSecurityHeaders() },
+      // Points agents at the API catalog, the docs and llms.txt (RFC 8288).
+      { source: "/", headers: [{ key: "Link", value: HOME_LINK_HEADER }] },
+      // These pages answer in HTML or Markdown by Accept: caches must know.
+      ...Object.keys(MARKDOWN_PAGES).map((source) => ({
+        source,
+        headers: [{ key: "Vary", value: "Accept" }],
+      })),
+    ];
   },
 };
 
