@@ -42,16 +42,21 @@ function isWebUrl(raw: string): boolean {
 /**
  * Drops non-web and unparseable URLs and in-file duplicates, trims titles,
  * nulls implausible dates and sorts newest first (undated items count as
- * `now`; ties keep file order). `skipped` counts everything dropped.
+ * `now`; ties keep file order). `skipped` counts only the dropped non-web or
+ * unparseable URLs; in-file duplicates collapse silently.
  */
 export function cleanImportItems(
   items: ImportItem[],
   now: Date = new Date(),
 ): { items: ImportItem[]; skipped: number } {
   const valid: ImportItem[] = [];
+  let skipped = 0;
   for (const item of items) {
     const url = item.url.trim();
-    if (!isWebUrl(url)) continue;
+    if (!isWebUrl(url)) {
+      skipped++;
+      continue;
+    }
     const date = item.createdAt;
     const plausible =
       date !== null &&
@@ -78,5 +83,5 @@ export function cleanImportItems(
     seen.add(key);
     unique.push(item);
   }
-  return { items: unique, skipped: items.length - unique.length };
+  return { items: unique, skipped };
 }

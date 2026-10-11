@@ -91,7 +91,7 @@ describe("cleanImportItems", () => {
     );
     expect(result.items).toHaveLength(1);
     expect(result.items[0].title).toBe("new");
-    expect(result.skipped).toBe(1);
+    expect(result.skipped).toBe(0);
   });
 
   it("nulls implausible dates", () => {
