@@ -1,5 +1,7 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { DemoProvider } from "@/components/landing/demo-provider";
+import { LandingAbout } from "@/components/landing/landing-about";
 import { LandingDemo } from "@/components/landing/landing-demo";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingIntro } from "@/components/landing/landing-intro";
@@ -14,6 +16,11 @@ import { getDemoFolders } from "@/lib/demo-folders";
 export const dynamic = "force-static";
 export const revalidate = 3600;
 
+export const metadata: Metadata = {
+  title: { absolute: "Purl: save and share the links you find" },
+  alternates: { canonical: "/" },
+};
+
 export default async function Home() {
   const providers = getSignInButtonProviders();
   // At build time (CI has no database) a failed read shows the still panel.
@@ -26,9 +33,29 @@ export default async function Home() {
   });
   // Fixed here so the cached HTML and hydration label days the same way.
   const now = new Date().toISOString();
+  const jsonLd = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Purl",
+    url: process.env.BASE_URL,
+    applicationCategory: "BrowserApplication",
+    operatingSystem: "Web, Chrome",
+    description:
+      "A calm place to save and share the links you find. Keep articles, PDFs, videos and audio in folders, and share any folder with a link.",
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    author: {
+      "@type": "Person",
+      name: "Nubelson Fernandes",
+      url: "https://nublson.com",
+    },
+  }).replace(/</g, "\\u003c");
 
   return (
     <div className="wrapper-public flex w-full flex-1 flex-col overflow-x-clip px-4 md:px-6 lg:px-12">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLd }}
+      />
       <LandingIntro />
       <Suspense fallback={null}>
         <SignInErrorToast />
@@ -46,6 +73,7 @@ export default async function Home() {
         ) : (
           <ProductPreview className="mt-12 sm:mt-16" />
         )}
+        <LandingAbout />
       </main>
       <LandingFooter />
     </div>
