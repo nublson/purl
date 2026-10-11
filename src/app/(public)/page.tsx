@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { DemoProvider } from "@/components/landing/demo-provider";
-import { LandingAbout } from "@/components/landing/landing-about";
 import { LandingDemo } from "@/components/landing/landing-demo";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingIntro } from "@/components/landing/landing-intro";
@@ -73,7 +72,6 @@ export default async function Home() {
         ) : (
           <ProductPreview className="mt-12 sm:mt-16" />
         )}
-        <LandingAbout />
       </main>
       <LandingFooter />
     </div>
