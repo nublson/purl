@@ -16,7 +16,7 @@ describe("parsePocketCsv", () => {
     ]);
   });
 
-  it.each(["", "0", "-5", "abc"])("nulls time_added %j", (value) => {
+  it.each(["", "0", "-5", "abc", "1e13", "99999999999999"])("nulls time_added %j", (value) => {
     const csv = [HEADER, `A,https://example.com/a,${value},,unread`].join("\n");
     expect(parsePocketCsv(csv)[0].createdAt).toBeNull();
   });

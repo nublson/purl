@@ -1,5 +1,5 @@
+import { readCsvTable } from "./csv-table";
 import { flattenFolderPath } from "./normalize";
-import { parseCsv } from "./parse-csv";
 import type { ImportItem } from "./types";
 
 const FOLDER_SEPARATOR = " / ";
@@ -22,28 +22,12 @@ function parseFolder(value: string): string | null {
  * column, so its items are unfiled. Output is unvalidated (see `cleanImportItems`).
  */
 export function parseRaindropCsv(text: string): ImportItem[] {
-  const [header, ...rows] = parseCsv(text);
-  if (!header) return [];
-  const names = header.map((h) => h.trim().toLowerCase());
-  const urlAt = names.indexOf("url");
-  if (urlAt === -1) return [];
-  const titleAt = names.indexOf("title");
-  const folderAt = names.indexOf("folder");
-  const createdAt = names.indexOf("created");
-
-  const cell = (row: string[], index: number) =>
-    index === -1 ? "" : (row[index] ?? "");
-
-  const items: ImportItem[] = [];
-  for (const row of rows) {
-    const url = cell(row, urlAt).trim();
-    if (url === "") continue;
-    items.push({
-      url,
-      title: cell(row, titleAt),
-      folder: parseFolder(cell(row, folderAt)),
-      createdAt: parseCreated(cell(row, createdAt)),
-    });
-  }
-  return items;
+  const table = readCsvTable(text);
+  if (!table) return [];
+  return table.rows.map((row) => ({
+    url: table.cell(row, "url").trim(),
+    title: table.cell(row, "title"),
+    folder: parseFolder(table.cell(row, "folder")),
+    createdAt: parseCreated(table.cell(row, "created")),
+  }));
 }

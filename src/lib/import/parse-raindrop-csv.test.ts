@@ -82,8 +82,10 @@ describe("parseRaindropCsv", () => {
   });
 
   it("ignores a leading BOM", () => {
-    const csv = "﻿" + [FULL_HEADER, row("A", "https://example.com/a", "", "")].join("\n");
-    expect(parseRaindropCsv(csv)).toHaveLength(1);
+    const csv = "\uFEFFurl,title\nhttps://example.com/a,A";
+    expect(parseRaindropCsv(csv)).toEqual([
+      { url: "https://example.com/a", title: "A", folder: null, createdAt: null },
+    ]);
   });
 
   it("falls back to the last segment for a folder over 60 characters", () => {
