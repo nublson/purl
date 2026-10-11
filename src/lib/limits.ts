@@ -12,3 +12,12 @@ export const MAX_BULK_LINK_IDS = MAX_SAVED_LINKS;
 
 /** Most links one multi-link paste saves; more asks to paste fewer. */
 export const MAX_PASTED_URLS = 50;
+
+/** Most links one import request carries; the client sends a file in chunks of this size. */
+export const MAX_IMPORT_CHUNK = 200;
+
+/** Largest bookmarks/CSV file the import reads. */
+export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
+
+/** Longest folder name, in UTF-16 units (`String#length`). */
+export const MAX_FOLDER_NAME_LENGTH = 60;

@@ -4,7 +4,7 @@ import {
   DEFAULT_FOLDER_EMOJI,
   MAX_FOLDER_DESCRIPTION_LENGTH,
 } from "@/lib/folder-display";
-import { MAX_FOLDERS } from "@/lib/limits";
+import { MAX_FOLDERS, MAX_FOLDER_NAME_LENGTH } from "@/lib/limits";
 import prisma, { type Prisma } from "@/lib/prisma";
 
 /** Either the root client or an interactive-transaction client; the folder helpers below accept both. */
@@ -150,7 +150,7 @@ function validateFolderName(name: string): string {
   if (trimmed.length === 0) {
     throw new FolderNameError("empty", "Give your folder a name.");
   }
-  if (trimmed.length > 60) {
+  if (trimmed.length > MAX_FOLDER_NAME_LENGTH) {
     throw new FolderNameError("too_long", "Keep the name to 60 characters or fewer.");
   }
   return trimmed;
