@@ -13,7 +13,9 @@ const mockListLinksForUser = vi.fn();
 const mockReadLinkForUser = vi.fn();
 const mockMoveLinkToFolder = vi.fn();
 const mockMoveLinksToFolder = vi.fn();
+const mockDeleteLinksForUser = vi.fn();
 vi.mock("@/lib/links", () => ({
+  deleteLinksForUser: mockDeleteLinksForUser,
   moveLinksToFolder: mockMoveLinksToFolder,
   createLinkForUser: mockCreateLinkForUser,
   listLinksForUser: mockListLinksForUser,
@@ -76,6 +78,7 @@ const {
   saveLinkTool,
   listSavedItemsTool,
   getLinkTool,
+  deleteLinkTool,
   listFoldersTool,
   createFolderTool,
   updateFolderTool,
@@ -107,6 +110,7 @@ describe("registerPurlTools", () => {
       "save_link",
       "list_saved_items",
       "get_link",
+      "delete_link",
       "list_folders",
       "create_folder",
       "update_folder",
@@ -554,6 +558,26 @@ describe("updateFolderTool", () => {
     });
     expect(missing.isError).toBe(true);
     expect(missing.content[0].text).toBe("Folder not found");
+  });
+});
+
+describe("deleteLinkTool", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("deletes the user's link and broadcasts the change", async () => {
+    mockDeleteLinksForUser.mockResolvedValue(1);
+    const result = await deleteLinkTool("user-1", "link-1");
+    expect(mockDeleteLinksForUser).toHaveBeenCalledWith("user-1", ["link-1"]);
+    expect(mockBroadcast).toHaveBeenCalledWith("user-1");
+    expect(parse(result)).toEqual({ deleted: true, id: "link-1" });
+  });
+
+  it("reports an unknown or foreign link as a tool error, without broadcasting", async () => {
+    mockDeleteLinksForUser.mockResolvedValue(0);
+    const result = await deleteLinkTool("user-1", "someone-elses");
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe("Not found.");
+    expect(mockBroadcast).not.toHaveBeenCalled();
   });
 });
 

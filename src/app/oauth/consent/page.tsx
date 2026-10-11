@@ -1,8 +1,15 @@
-import { OAuthConsentActions } from "@/components/oauth-consent-actions";
+import type { Metadata } from "next";
+import {
+  CONSENT_COLUMN,
+  OAuthConsentCard,
+} from "@/components/oauth-consent-card";
+import { BrandMark } from "@/components/brand-mark";
 import { Typography } from "@/components/typography";
 import prisma from "@/lib/prisma";
 import { getSessionUser } from "@/lib/session";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = { title: "Allow access" };
 
 export default async function OAuthConsentPage({
   searchParams,
@@ -14,7 +21,8 @@ export default async function OAuthConsentPage({
   }>;
 }) {
   // Signed in only: the proxy just looks for a session cookie.
-  if (!(await getSessionUser())) redirect("/");
+  const user = await getSessionUser();
+  if (!user) redirect("/");
 
   const {
     consent_code: consentCode,
@@ -24,13 +32,13 @@ export default async function OAuthConsentPage({
 
   if (!consentCode || !clientId) {
     return (
-      <div className="wrapper-private flex flex-1 flex-col items-center justify-center gap-2 py-12">
-        <Typography variant="h2" component="h1">
-          Invalid authorization request
+      <div className={CONSENT_COLUMN}>
+        <BrandMark />
+        <Typography variant="h3" component="h1" className="mt-8 md:text-3xl">
+          This link is incomplete
         </Typography>
-        <Typography size="small" className="text-muted-foreground">
-          This link is missing required information. Please restart the
-          connection from your MCP client.
+        <Typography className="mt-3 text-pretty">
+          Start the connection again from the app you’re connecting.
         </Typography>
       </div>
     );
@@ -40,22 +48,13 @@ export default async function OAuthConsentPage({
     where: { clientId },
     select: { name: true },
   });
-  const clientName = client?.name ?? "This app";
-  const scopes = scope ? scope.split(" ") : [];
 
   return (
-    <div className="wrapper-private flex flex-1 flex-col items-center justify-center gap-6 py-12">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <Typography variant="h2" component="h1">
-          Authorize {clientName}
-        </Typography>
-        <Typography size="small" className="text-muted-foreground max-w-md text-pretty">
-          {clientName} wants to access your Purl account
-          {scopes.length > 0 ? ` (${scopes.join(", ")})` : ""}. It will be able
-          to search, save, and read your saved content on your behalf.
-        </Typography>
-      </div>
-      <OAuthConsentActions consentCode={consentCode} />
-    </div>
+    <OAuthConsentCard
+      clientName={client?.name ?? "This app"}
+      scopes={scope ? scope.split(" ") : []}
+      user={{ name: user.name, username: user.username, image: user.image }}
+      consentCode={consentCode}
+    />
   );
 }

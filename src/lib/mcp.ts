@@ -19,6 +19,7 @@ import {
 } from "@/lib/folders";
 import {
   createLinkForUser,
+  deleteLinksForUser,
   listLinksForUser,
   moveLinkToFolder,
   moveLinksToFolder,
@@ -281,6 +282,17 @@ export async function getLinkTool(
   return jsonContent(serializeLink(link));
 }
 
+/** Permanently deletes one of the user's links. Someone else's id is "not found". */
+export async function deleteLinkTool(
+  userId: string,
+  id: string,
+): Promise<ToolResult> {
+  const deleted = await deleteLinksForUser(userId, [id]);
+  if (deleted === 0) return errorContent("Not found.");
+  broadcastLinksChanged(userId);
+  return jsonContent({ deleted: true, id });
+}
+
 /** Registers Purl's MCP tools on the given server instance. */
 export function registerPurlTools(server: McpServer): void {
   server.tool(
@@ -329,6 +341,16 @@ export function registerPurlTools(server: McpServer): void {
       id: z.string().describe("The link id"),
     },
     async ({ id }, extra) => getLinkTool(getUserId(extra), id),
+  );
+
+  server.tool(
+    "delete_link",
+    "Permanently delete one saved link by its id. This can't be undone. Use move_link to take a link out of a folder without deleting it.",
+    {
+      id: z.string().describe("The link id"),
+    },
+    { destructiveHint: true, idempotentHint: true },
+    async ({ id }, extra) => deleteLinkTool(getUserId(extra), id),
   );
 
   server.tool(
