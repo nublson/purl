@@ -165,4 +165,30 @@ describe("saveLink", () => {
     );
     expect(successMock).not.toHaveBeenCalled();
   });
+
+  it("shows no toast at all when quiet", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ id: "link-1" }), { status: 201 }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: "Boom" }), { status: 400 }),
+      )
+      .mockRejectedValueOnce(new Error("Network down"));
+    const folder = { id: "folder-1", name: "Books", emoji: "📚" };
+
+    expect(await saveLink("https://a.com", { folder, quiet: true })).toEqual({
+      id: "link-1",
+    });
+    expect(await saveLink("https://b.com", { quiet: true })).toEqual({
+      error: "Boom",
+    });
+    expect(await saveLink("https://c.com", { quiet: true })).toEqual({
+      error: "Network error",
+    });
+    expect(await saveLink("nope", { quiet: true })).toBeNull();
+
+    expect(errorMock).not.toHaveBeenCalled();
+    expect(successMock).not.toHaveBeenCalled();
+  });
 });

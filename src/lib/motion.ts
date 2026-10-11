@@ -12,3 +12,13 @@ export const ARRIVE =
 export const ARRIVE_ICON = `${ARRIVE} zoom-in-90 motion-reduce:[--tw-enter-scale:1]`;
 /** `ARRIVE`, 40ms later (the domain, after the title); hidden until it starts. */
 export const ARRIVE_LATE = `${ARRIVE} delay-40 fill-mode-backwards`;
+
+/**
+ * `ARRIVE` after the element's own delay (`--arrive-delay`, set inline),
+ * hidden until it starts: a group entering 40ms apart (shared folder cards,
+ * the Save rows of a pasted list). Reduced motion: no stagger (`ARRIVE` is
+ * already fade only).
+ */
+export const ARRIVE_STAGGERED = `${ARRIVE} fill-mode-backwards [animation-delay:var(--arrive-delay)] motion-reduce:[animation-delay:0ms]`;
+/** Items staggered in a group (40ms apart); later ones start with the last. */
+export const ARRIVE_STAGGER_MS = 40;
