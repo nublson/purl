@@ -1,18 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  doneSummary,
-  importableCount,
-  previewSummary,
-} from "./import-summary";
+import { doneSummary, previewSummary, runDoneSummary } from "./import-summary";
 import type { ImportLinksResult } from "./types";
-
-describe("importableCount", () => {
-  it("is the smaller of the items and the room, never negative", () => {
-    expect(importableCount(312, 1000)).toBe(312);
-    expect(importableCount(312, 100)).toBe(100);
-    expect(importableCount(312, -5)).toBe(0);
-  });
-});
 
 describe("previewSummary", () => {
   const base = {
@@ -48,9 +36,28 @@ describe("previewSummary", () => {
     ]);
   });
 
-  it("says the newest links are imported when there isn't room", () => {
+  it("estimates the room when the file may not fit, since duplicates don't count", () => {
     expect(previewSummary({ ...base, itemCount: 900 }, 640, []).lines).toContain(
-      "You have room for 640 more, so the 640 newest are imported.",
+      "You have room for 640 more links. The newest are imported first, and links you already have don’t count.",
+    );
+    expect(previewSummary({ ...base, itemCount: 900 }, 1, []).lines).toContain(
+      "You have room for 1 more link. The newest are imported first, and links you already have don’t count.",
+    );
+  });
+
+  it("says when the link limit is already reached", () => {
+    for (const room of [0, -3]) {
+      const { lines } = previewSummary({ ...base, itemCount: 900 }, room, []);
+      expect(lines).toContain(
+        "You’ve reached your 1,000-link limit, so new links can’t be imported.",
+      );
+      expect(lines.some((l) => l.startsWith("You have room"))).toBe(false);
+    }
+  });
+
+  it("says everything fits when the file is exactly the room left", () => {
+    expect(previewSummary({ ...base, itemCount: 640 }, 640, []).lines).toContain(
+      "All 640 fit.",
     );
   });
 
@@ -169,5 +176,55 @@ describe("doneSummary", () => {
       "2 were already saved and were skipped.",
       "4 weren’t imported because you reached your 1,000-link limit.",
     ]);
+  });
+});
+
+describe("runDoneSummary", () => {
+  const none: ImportLinksResult = {
+    imported: 0,
+    duplicates: 0,
+    invalid: 0,
+    overLimit: 0,
+    foldersCreated: 0,
+    unfiledForFolderLimit: 0,
+    limitReached: false,
+  };
+
+  it("counts links left unsent after the limit was reached as over the limit", () => {
+    const summary = runDoneSummary(
+      {
+        itemCount: 1000,
+        sent: 400,
+        totals: { ...none, imported: 100, duplicates: 280, overLimit: 20, limitReached: true },
+      },
+      0,
+    );
+    expect(summary.lines).toContain(
+      "620 weren’t imported because you reached your 1,000-link limit.",
+    );
+  });
+
+  it("doesn't count unsent links as over the limit when the limit wasn't reached", () => {
+    const summary = runDoneSummary(
+      { itemCount: 1000, sent: 400, totals: { ...none, imported: 400 } },
+      0,
+    );
+    expect(summary.lines.some((l) => l.includes("link limit"))).toBe(false);
+  });
+
+  it("reports duplicates, not the limit, for a mostly-saved file that fits after dedupe", () => {
+    // 900 links already saved (the newest in the file) plus 100 new ones, with
+    // room for 100: everything is sent, the server skips the 900 and keeps 100.
+    const summary = runDoneSummary(
+      { itemCount: 1000, sent: 1000, totals: { ...none, imported: 100, duplicates: 900 } },
+      0,
+    );
+    expect(summary).toEqual({
+      title: "Imported 100 links",
+      lines: [
+        "900 were already saved and were skipped.",
+        "Thumbnails and details fill in over the next few minutes.",
+      ],
+    });
   });
 });

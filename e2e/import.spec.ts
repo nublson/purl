@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, test, waitForHydration } from "./fixtures";
@@ -23,6 +24,29 @@ async function expectFolderInMenu(page: Page, name: string) {
   await page.getByRole("button", { name: "Folder: Home" }).click();
   await expect(page.getByRole("menu").getByRole("menuitem", { name: new RegExp(name) })).toBeVisible();
   await page.keyboard.press("Escape");
+}
+
+/**
+ * Drops `fixtureName` on the element matching `selector` the way a drag from
+ * the desktop would (dragenter, dragover, drop). Returns whether the page let
+ * the drop through: `false` means it was cancelled, so the browser won't open
+ * the file and leave the app.
+ */
+async function dropFile(page: Page, selector: string, fixtureName: string) {
+  const text = readFileSync(fixture(fixtureName), "utf8");
+  return page.evaluate(
+    ({ selector, name, text }) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([text], name, { type: "text/csv" }));
+      const target = document.querySelector(selector);
+      if (!target) throw new Error(`No element matches ${selector}`);
+      const init = { bubbles: true, cancelable: true, dataTransfer: transfer };
+      target.dispatchEvent(new DragEvent("dragenter", init));
+      target.dispatchEvent(new DragEvent("dragover", init));
+      return target.dispatchEvent(new DragEvent("drop", init));
+    },
+    { selector, name: fixtureName, text },
+  );
 }
 
 test.describe("Import", () => {
@@ -272,5 +296,74 @@ test.describe("Import", () => {
     expect(after.map((row) => row.createdAt.getTime())).toEqual(
       before.map((row) => row.createdAt.getTime()),
     );
+  });
+
+  test("a file whose newest links are already saved still imports its new ones when room is short", async ({
+    page,
+    testUser,
+  }) => {
+    // 999 links, one of them the Pocket file's newest: room for 1 more. The
+    // whole file is sent; the server skips the saved one, then keeps the other.
+    await pool.query(
+      `INSERT INTO "links" ("id", "url", "title", "favicon", "domain", "userId")
+       SELECT 'e2e-fill-' || $1 || '-' || n, 'https://filler.example/' || n, 'Filler ' || n,
+              'https://filler.example/favicon.ico', 'filler.example', $1
+       FROM generate_series(1, 998) AS n`,
+      [testUser.id],
+    );
+    await pool.query(
+      `INSERT INTO "links" ("id", "url", "title", "favicon", "domain", "userId")
+       VALUES ('e2e-saved-' || $1, 'https://example.com/pocket/mornings', 'Mornings',
+               'https://example.com/favicon.ico', 'example.com', $1)`,
+      [testUser.id],
+    );
+    await openImportTab(page);
+
+    await cy(page, "import-file-input").setInputFiles(fixture("pocket.csv"));
+    await expect(cy(page, "import-preview")).toContainText(
+      "You have room for 1 more link. The newest are imported first, and links you already have don’t count.",
+    );
+    await cy(page, "import-submit").click();
+    const summary = cy(page, "import-summary");
+    await expect(summary).toContainText("Imported 1 link");
+    await expect(summary).toContainText("1 was already saved and was skipped.");
+    await expect(summary).not.toContainText("link limit");
+  });
+
+  test("dropping a file on the preview replaces it without leaving the app", async ({ page }) => {
+    await openImportTab(page);
+    const url = page.url();
+
+    await cy(page, "import-file-input").setInputFiles(fixture("pocket.csv"));
+    await expect(cy(page, "import-preview")).toContainText("Pocket CSV");
+
+    expect(await dropFile(page, '[data-cy="import-preview"]', "raindrop-collection.csv")).toBe(false);
+    await expect(cy(page, "import-preview")).toContainText("Raindrop CSV");
+    await expect(cy(page, "import-preview")).not.toContainText("Pocket CSV");
+    expect(page.url()).toBe(url);
+  });
+
+  test("a file dropped while importing is ignored and never leaves the app", async ({ page }) => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/links/import", async (route) => {
+      await held;
+      await route.continue();
+    });
+    await openImportTab(page);
+    const url = page.url();
+
+    await cy(page, "import-file-input").setInputFiles(fixture("pocket.csv"));
+    await cy(page, "import-submit").click();
+    await expect(cy(page, "import-progress")).toContainText("Importing 0 of 2");
+
+    // Outside the tab's content (the page behind the dialog) and on it.
+    expect(await dropFile(page, "body", "raindrop-collection.csv")).toBe(false);
+    expect(await dropFile(page, '[data-cy="import-progress"]', "raindrop-collection.csv")).toBe(false);
+    await expect(cy(page, "import-progress")).toContainText("Importing 0 of 2");
+    expect(page.url()).toBe(url);
+
+    release();
+    await expect(cy(page, "import-summary")).toContainText("Imported 2 links");
   });
 });

@@ -10,11 +10,6 @@ const FORMAT_LABELS: Record<ImportFormat, string> = {
 const format = (n: number) => n.toLocaleString("en-US");
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
-/** How many of `itemCount` links fit in the `room` left under the link cap. */
-export function importableCount(itemCount: number, room: number): number {
-  return Math.min(itemCount, Math.max(room, 0));
-}
-
 export function previewSummary(
   parsed: {
     format: ImportFormat;
@@ -34,12 +29,19 @@ export function previewSummary(
 
   const lines = [FORMAT_LABELS[parsed.format]];
 
-  const fits = importableCount(itemCount, room);
-  lines.push(
-    fits === itemCount
-      ? `All ${format(itemCount)} fit.`
-      : `You have room for ${format(fits)} more, so the ${format(fits)} newest are imported.`,
-  );
+  // Only an estimate when the file is bigger than the room: the server skips
+  // links already saved before it applies the cap, newest first.
+  if (itemCount <= room) {
+    lines.push(`All ${format(itemCount)} fit.`);
+  } else if (room <= 0) {
+    lines.push(
+      `You’ve reached your ${format(MAX_SAVED_LINKS)}-link limit, so new links can’t be imported.`,
+    );
+  } else {
+    lines.push(
+      `You have room for ${format(room)} more ${plural(room, "link", "links")}. The newest are imported first, and links you already have don’t count.`,
+    );
+  }
 
   if (folders.length === 0) {
     lines.push("This file has no folder information, so links go to Home.");
@@ -126,4 +128,20 @@ export function doneSummary(
   }
 
   return { title, lines };
+}
+
+/**
+ * The done wording for a run that sent `sent` of its `itemCount` links. Links
+ * left unsent because the server reported the limit reached count as over
+ * the limit; a run that stopped for another reason never gets here.
+ */
+export function runDoneSummary(
+  run: { itemCount: number; sent: number; totals: ImportLinksResult },
+  skipped: number,
+): { title: string; lines: string[] } {
+  const unsent = run.totals.limitReached ? run.itemCount - run.sent : 0;
+  return doneSummary(
+    { ...run.totals, overLimit: run.totals.overLimit + unsent },
+    skipped,
+  );
 }

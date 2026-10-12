@@ -11,6 +11,8 @@ export type RunImportOutcome = {
 const RATE_LIMIT_MESSAGE = "Too many requests. Wait a minute and try again.";
 const NETWORK_MESSAGE = "Couldn’t reach Purl. Check your connection and try again.";
 const GENERIC_MESSAGE = "Something went wrong. Try again.";
+/** The server cuts titles at this length too; cut here so less is sent. */
+const MAX_TITLE_LENGTH = 500;
 
 function emptyTotals(): ImportLinksResult {
   return {
@@ -24,10 +26,21 @@ function emptyTotals(): ImportLinksResult {
   };
 }
 
+/** Cuts at `max` UTF-16 units without splitting a surrogate pair. */
+function cutAt(text: string, max: number): string {
+  if (text.length <= max) return text;
+  let out = "";
+  for (const point of text) {
+    if (out.length + point.length > max) break;
+    out += point;
+  }
+  return out;
+}
+
 function toInput(item: ImportItem): ImportLinkInput {
   return {
     url: item.url,
-    title: item.title,
+    title: cutAt(item.title, MAX_TITLE_LENGTH),
     folder: item.folder,
     createdAt: item.createdAt ? item.createdAt.toISOString() : null,
   };

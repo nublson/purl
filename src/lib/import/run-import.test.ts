@@ -175,4 +175,60 @@ describe("runImport", () => {
     expect(outcome.stopped).toBe("aborted");
     expect(outcome.error).toBeUndefined();
   });
+
+  it("sends every item, letting the server skip duplicates before the cap", async () => {
+    // 900 already saved (the newest) plus 100 new, with room for 100. A fake
+    // server: dedupes against the saved URLs, then caps at the room left.
+    const all = items(1000);
+    const saved = new Set(all.slice(0, 900).map((item) => item.url));
+    let room = 100;
+    const sentUrls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const { links } = JSON.parse(init.body as string) as {
+          links: { url: string }[];
+        };
+        sentUrls.push(...links.map((link) => link.url));
+        const fresh = links.filter((link) => !saved.has(link.url));
+        const imported = Math.min(fresh.length, room);
+        room -= imported;
+        const overLimit = fresh.length - imported;
+        return jsonResponse({
+          ...empty,
+          imported,
+          duplicates: links.length - fresh.length,
+          overLimit,
+          limitReached: overLimit > 0,
+        });
+      }),
+    );
+
+    const outcome = await runImport(all);
+
+    expect(sentUrls).toEqual(all.map((item) => item.url));
+    expect(outcome.stopped).toBe("done");
+    expect(outcome.totals).toMatchObject({
+      imported: 100,
+      duplicates: 900,
+      overLimit: 0,
+      limitReached: false,
+    });
+  });
+
+  it("cuts titles to 500 characters before sending, leaving URLs alone", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(empty));
+    vi.stubGlobal("fetch", fetchMock);
+    const longUrl = `https://example.com/${"p".repeat(600)}`;
+
+    await runImport([
+      { url: longUrl, title: `${"a".repeat(499)}😀tail`, folder: null, createdAt: null },
+    ]);
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const [link] = JSON.parse(init.body as string).links;
+    // The emoji would cross 500, so it's dropped whole, not split.
+    expect(link.title).toBe("a".repeat(499));
+    expect(link.url).toBe(longUrl);
+  });
 });

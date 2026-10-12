@@ -6,11 +6,7 @@ import { ChevronDown, Upload } from "reicon-react";
 import { useFolders } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { parseImportFile } from "@/lib/import";
-import {
-  doneSummary,
-  importableCount,
-  previewSummary,
-} from "@/lib/import/import-summary";
+import { previewSummary, runDoneSummary } from "@/lib/import/import-summary";
 import { runImport } from "@/lib/import/run-import";
 import type {
   ImportFormat,
@@ -49,7 +45,10 @@ type ParsedFile = {
 /** One import of a parsed file: what's sent and how far it got. */
 type ImportRun = {
   parsed: ParsedFile;
-  /** The items sent: the newest that fit in the room left. */
+  /**
+   * The items sent: the whole file, newest first. The server skips links
+   * already saved, then applies the cap and reports `limitReached`.
+   */
   items: ImportItem[];
   /** How many of `items` the server has answered for. */
   sent: number;
@@ -89,16 +88,17 @@ function addTotals(a: ImportLinksResult, b: ImportLinksResult): ImportLinksResul
 
 const formatCount = (n: number) => n.toLocaleString("en-US");
 
-/**
- * The done wording. Links never sent (trimmed to the room left, or after the
- * server reported the limit reached) count as over the limit.
- */
+/** The done wording; links left unsent after the limit count as over it. */
 function summaryFor(run: ImportRun) {
-  const trimmed = run.parsed.items.length - run.sent;
-  return doneSummary(
-    { ...run.totals, overLimit: run.totals.overLimit + trimmed },
+  return runDoneSummary(
+    { itemCount: run.items.length, sent: run.sent, totals: run.totals },
     run.parsed.skipped,
   );
+}
+
+/** Whether a drag carries files (not text or a link from the page). */
+function draggingFiles(event: { dataTransfer: DataTransfer | null }): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes("Files");
 }
 
 const BUTTON_ROW = "flex flex-col gap-2 sm:flex-row";
@@ -140,6 +140,20 @@ export function SettingsImport({
   // Closing the dialog unmounts the tab: stop sending (chunks sent stay saved).
   React.useEffect(() => () => controllerRef.current?.abort(), []);
 
+  // A file dropped anywhere outside the tab's content would make the browser
+  // open it, leaving the app: cancel every file drop while the tab is open.
+  React.useEffect(() => {
+    const cancelFileDrop = (event: DragEvent) => {
+      if (draggingFiles(event)) event.preventDefault();
+    };
+    window.addEventListener("dragover", cancelFileDrop);
+    window.addEventListener("drop", cancelFileDrop);
+    return () => {
+      window.removeEventListener("dragover", cancelFileDrop);
+      window.removeEventListener("drop", cancelFileDrop);
+    };
+  }, []);
+
   // Focus the heading of the preview once a file is read, and of the summary
   // once an import is done.
   React.useEffect(() => {
@@ -178,7 +192,13 @@ export function SettingsImport({
       return;
     }
 
-    const result = parseImportFile(text);
+    let result: ReturnType<typeof parseImportFile>;
+    try {
+      result = parseImportFile(text);
+    } catch {
+      setState({ kind: "error", message: UNRECOGNIZED_MESSAGE });
+      return;
+    }
     if (!result.ok) {
       setState({
         kind: "error",
@@ -254,7 +274,7 @@ export function SettingsImport({
     const current = stateRef.current;
     if (current.kind !== "preview") return;
     const { parsed } = current;
-    const items = parsed.items.slice(0, importableCount(parsed.items.length, room));
+    const items = parsed.items;
     setStatus(
       `Importing ${formatCount(items.length)} ${items.length === 1 ? "link" : "links"}.`,
     );
@@ -277,8 +297,31 @@ export function SettingsImport({
     setState({ kind: "idle" });
   };
 
+  // Drops on the tab's content take a new file, replacing the one shown,
+  // except while importing or once an import is done.
+  const takesDrop = () => {
+    const { kind } = stateRef.current;
+    return kind === "idle" || kind === "preview" || kind === "error";
+  };
+
   return (
-    <div ref={rootRef} className="w-full flex-1 flex flex-col gap-4">
+    <div
+      ref={rootRef}
+      className="w-full flex-1 flex flex-col gap-4"
+      onDragOver={(event) => {
+        if (!draggingFiles(event)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = takesDrop() ? "copy" : "none";
+      }}
+      onDrop={(event) => {
+        if (!draggingFiles(event)) return;
+        event.preventDefault();
+        setDragging(false);
+        if (!takesDrop()) return;
+        const file = event.dataTransfer.files?.[0];
+        if (file) void handleFile(file);
+      }}
+    >
       <input
         ref={inputRef}
         type="file"
@@ -316,12 +359,8 @@ export function SettingsImport({
               if (next instanceof Node && event.currentTarget.contains(next)) return;
               setDragging(false);
             }}
-            onDrop={(event) => {
-              event.preventDefault();
-              setDragging(false);
-              const file = event.dataTransfer.files?.[0];
-              if (file) void handleFile(file);
-            }}
+            // The drop itself is taken by the tab's content, around this.
+            onDrop={() => setDragging(false)}
           >
             <Button
               type="button"
@@ -478,7 +517,7 @@ function PreviewView({
     room,
     existingFolderNames,
   );
-  const nothingFits = importableCount(parsed.items.length, room) === 0;
+  const nothingFits = room <= 0;
 
   return (
     <section data-cy="import-preview" className="flex flex-col gap-4">
