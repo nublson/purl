@@ -75,7 +75,7 @@ Every parser returns the same normalized item: `{ url: string; title: string; fo
 - A date before 2000-01-01 or after now is treated as missing.
 - A file over 5 MB is refused before it is read.
 
-The shared "same link" key (`linkUrlKey`) ignores the scheme, a leading `www.`, a trailing slash and host case. It moves out of `src/lib/omnibox.ts` (`isSameLinkUrl`) into `src/lib/link-url-key.ts` so the client and server use one rule; `isSameLinkUrl` keeps working.
+The shared "same link" key (`linkUrlKey`) ignores the scheme, a leading `www.`, a trailing slash and host case, but keeps a non-default port (`:8443` is another service from the same host; `:443` on https is the default and ignored). It moves out of `src/lib/omnibox.ts` (`isSameLinkUrl`) into `src/lib/link-url-key.ts` so the client and server use one rule; `isSameLinkUrl` keeps working.
 
 ### 2. Server import (`POST /api/links/import`)
 

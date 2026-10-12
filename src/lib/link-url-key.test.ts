@@ -14,6 +14,24 @@ describe("linkUrlKey", () => {
     );
   });
 
+  it("keeps a non-default port, so different services on one host stay different links", () => {
+    expect(linkUrlKey("https://example.com:8443/page")).not.toBe(
+      linkUrlKey("https://example.com/page"),
+    );
+    expect(linkUrlKey("https://example.com:8443/page")).toBe(
+      linkUrlKey("http://www.example.com:8443/page/"),
+    );
+  });
+
+  it("ignores a default port", () => {
+    expect(linkUrlKey("https://example.com:443/page")).toBe(
+      linkUrlKey("https://example.com/page"),
+    );
+    expect(linkUrlKey("http://example.com:80/page")).toBe(
+      linkUrlKey("http://example.com/page"),
+    );
+  });
+
   it("returns unparseable input as is", () => {
     expect(linkUrlKey("not a url")).toBe("not a url");
   });

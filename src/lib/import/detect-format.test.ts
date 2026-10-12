@@ -24,6 +24,18 @@ describe("detectImportFormat", () => {
     expect(detectImportFormat(csv)).toBe("raindrop-csv");
   });
 
+  it("detects a Raindrop CSV even when a title or note mentions the HTML marker", () => {
+    const csv =
+      "id,title,note,excerpt,url,folder,tags,created,cover,highlights,favorite\n1,About netscape-bookmark-file,<dt><a href,,https://example.com,Dev,,2024-01-01T00:00:00Z,,,false";
+    expect(detectImportFormat(csv)).toBe("raindrop-csv");
+  });
+
+  it("detects a Pocket CSV even when a title mentions the HTML marker", () => {
+    const csv =
+      "title,url,time_added,tags,status\nNetscape-Bookmark-File format,https://example.com,1700000000,,unread";
+    expect(detectImportFormat(csv)).toBe("pocket-csv");
+  });
+
   it("detects a single-collection Raindrop export (no folder column)", () => {
     const csv =
       "id,title,note,excerpt,url,tags,created,cover,highlights,favorite\n1,A,,,https://example.com,,2024-01-01T00:00:00Z,,,false";

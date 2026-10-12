@@ -107,7 +107,9 @@ export async function enrichFlaggedLinks(): Promise<EnrichResult> {
       // meanwhile: description and thumbnail are only filled in where still
       // empty, and the title only replaced if it's still the one claimed.
       // updateMany by id: a link deleted meanwhile is a no-op, not an error.
-      const where = { id: link.id };
+      // Also by URL: if the user pointed the link somewhere else while the
+      // old page was being looked up, none of the old page's details apply.
+      const where = { id: link.id, url: link.url };
       await prisma.$transaction([
         prisma.link.updateMany({
           where,

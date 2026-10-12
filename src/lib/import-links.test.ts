@@ -154,6 +154,23 @@ describe("importLinksForUser", () => {
     });
   });
 
+  it("does not treat a link on another port as a duplicate of a saved one", async () => {
+    tx.link.count.mockResolvedValue(1);
+    tx.link.findMany.mockResolvedValue([{ url: "https://example.com/page" }]);
+
+    const result = await importLinksForUser(
+      "user-1",
+      [
+        input({ url: "https://example.com:8443/page" }),
+        input({ url: "https://example.com/page" }), // the saved one: a duplicate
+      ],
+      NOW,
+    );
+
+    expect(written().map((l) => l.url)).toEqual(["https://example.com:8443/page"]);
+    expect(result).toMatchObject({ imported: 1, duplicates: 1 });
+  });
+
   it("counts duplicates of existing links and of earlier links in the chunk", async () => {
     tx.link.count.mockResolvedValue(2);
     tx.link.findMany.mockResolvedValue([

@@ -75,6 +75,18 @@ describe("cleanImportItems", () => {
     ]);
   });
 
+  it("keeps links that differ only by port", () => {
+    const result = cleanImportItems(
+      [item("https://example.com:8443/page"), item("https://example.com/page")],
+      now,
+    );
+    expect(result.items.map((i) => i.url).sort()).toEqual([
+      "https://example.com/page",
+      "https://example.com:8443/page",
+    ]);
+    expect(result.skipped).toBe(0);
+  });
+
   it("collapses duplicates by URL key, keeping the first after sorting", () => {
     const result = cleanImportItems(
       [

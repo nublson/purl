@@ -51,6 +51,7 @@ function claimed(n: number, overrides: Partial<Claimed> = {}): Claimed {
 
 /** A stored link, as the database holds it while the cron runs. */
 type Row = {
+  url: string;
   title: string;
   description: string | null;
   thumbnail: string | null;
@@ -71,6 +72,7 @@ let rows: Map<string, Row>;
 
 function storeRow(id: string, row: Partial<Row> = {}) {
   rows.set(id, {
+    url: `https://example.com/${id.replace("link-", "")}`,
     title: "Imported",
     description: null,
     thumbnail: null,
@@ -206,6 +208,7 @@ describe("enrichFlaggedLinks", () => {
 
     expect(resolve).toHaveBeenCalledWith("https://example.com/1");
     expect(rows.get("link-1")).toEqual({
+      url: "https://example.com/1",
       title: "Resolved https://example.com/1",
       description: "About https://example.com/1",
       thumbnail: "https://example.com/og.png",
@@ -220,6 +223,28 @@ describe("enrichFlaggedLinks", () => {
     }
     // One lookup's writes land together.
     expect(transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes nothing when the user changed the link's URL while it waited", async () => {
+    queryRaw.mockResolvedValue([claimed(1)]);
+    storeRow("link-1", {
+      title: "Title 1",
+      url: "https://elsewhere.example.org/new",
+      favicon: "https://elsewhere.example.org/own.ico",
+      domain: "elsewhere.example.org",
+    });
+
+    await expect(enrichFlaggedLinks()).resolves.toMatchObject({ claimed: 1 });
+
+    // The details found belong to the OLD URL: the edited link keeps its own.
+    expect(rows.get("link-1")).toMatchObject({
+      url: "https://elsewhere.example.org/new",
+      title: "Title 1",
+      description: null,
+      thumbnail: null,
+      favicon: "https://elsewhere.example.org/own.ico",
+      domain: "elsewhere.example.org",
+    });
   });
 
   it("keeps an imported title the user chose", async () => {
@@ -252,6 +277,7 @@ describe("enrichFlaggedLinks", () => {
     await expect(enrichFlaggedLinks()).resolves.toMatchObject({ enriched: 1 });
 
     expect(rows.get("link-1")).toEqual({
+      url: "https://example.com/1",
       title: "My own title",
       description: "My own notes",
       thumbnail: "https://example.com/mine.png",
