@@ -14,6 +14,13 @@ import { getUrlDomain } from "@/utils/formatter";
 const MAX_URL_LENGTH = 2048;
 const MAX_TITLE_LENGTH = 500;
 const EARLIEST_DATE = new Date("2000-01-01T00:00:00Z");
+/**
+ * Prisma's interactive-transaction defaults (5 s, 2 s to start) are too short
+ * for a chunk that creates many folders one by one (several round trips
+ * each): such a chunk would roll back on every attempt. The function's
+ * default duration on Vercel is well above 30 s.
+ */
+const IMPORT_TRANSACTION_OPTIONS = { timeout: 30_000, maxWait: 10_000 };
 
 /** Postgres `text` rejects NUL, which would fail the whole chunk's insert. */
 const stripNul = (text: string) => text.replaceAll("\u0000", "");
@@ -164,7 +171,7 @@ export async function importLinksForUser(
     const { count: inserted } = await tx.link.createMany({ data });
     result.imported = inserted;
     return result;
-  });
+  }, IMPORT_TRANSACTION_OPTIONS);
 }
 
 /**

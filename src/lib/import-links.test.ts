@@ -13,7 +13,7 @@ vi.mock("@/lib/prisma", () => {
     $executeRaw: vi.fn(),
     link: { count: vi.fn(), findMany: vi.fn(), createMany: vi.fn() },
     folder: { findMany: vi.fn() },
-    $transaction: vi.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
+    $transaction: vi.fn(async (cb: (t: typeof tx) => unknown, _options?: unknown) => cb(tx)),
   };
   return { default: client };
 });
@@ -104,6 +104,15 @@ describe("importLinksForUser", () => {
     expect(prisma.$executeRaw).not.toHaveBeenCalled();
     expect(prisma.link.createMany).not.toHaveBeenCalled();
     expect(prisma.link.findMany).not.toHaveBeenCalled();
+  });
+
+  it("gives the transaction room for a folder-heavy chunk, past Prisma's 5 s default", async () => {
+    await importLinksForUser("user-1", [input()], NOW);
+
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+      timeout: 30_000,
+      maxWait: 10_000,
+    });
   });
 
   it("writes a valid link with every field, flagged for metadata", async () => {
