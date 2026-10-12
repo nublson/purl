@@ -2,6 +2,7 @@
 
 import { useUsage } from "@/hooks/use-usage";
 import { SettingsAccount } from "./settings-account";
+import { SettingsImport } from "./settings-import";
 import { SettingsIntegrations } from "./settings-integrations";
 import { SettingsTabs } from "./settings-tabs";
 import { SettingsUsage } from "./settings-usage";
@@ -28,6 +29,13 @@ export default function SettingsContent({
           label: "Integrations",
           value: "integrations",
           content: <SettingsIntegrations />,
+        },
+        {
+          label: "Import",
+          value: "import",
+          content: (
+            <SettingsImport usage={usageSummary} closeDialog={closeDialog} />
+          ),
         },
         {
           label: "Account",
