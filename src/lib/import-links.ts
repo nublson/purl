@@ -17,8 +17,8 @@ const EARLIEST_DATE = new Date("2000-01-01T00:00:00Z");
 /**
  * Prisma's interactive-transaction defaults (5 s, 2 s to start) are too short
  * for a chunk that creates many folders one by one (several round trips
- * each): such a chunk would roll back on every attempt. The function's
- * default duration on Vercel is well above 30 s.
+ * each): such a chunk would roll back on every attempt. The import route sets
+ * `maxDuration = 60` so the function outlives this transaction.
  */
 const IMPORT_TRANSACTION_OPTIONS = { timeout: 30_000, maxWait: 10_000 };
 

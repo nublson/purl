@@ -5,6 +5,13 @@ import { LINKS_ORIGIN_HEADER, parseLinksOrigin } from "@/lib/realtime-constants"
 import { getSessionUser } from "@/lib/session";
 import { type NextRequest, NextResponse } from "next/server";
 
+/**
+ * The import transaction may run up to 30 s (plus 10 s waiting to start, see
+ * `IMPORT_TRANSACTION_OPTIONS` in `src/lib/import-links.ts`), so the function
+ * must be allowed longer than that whatever the project's default duration is.
+ */
+export const maxDuration = 60;
+
 async function readJson(request: NextRequest): Promise<unknown> {
   try {
     return await request.json();

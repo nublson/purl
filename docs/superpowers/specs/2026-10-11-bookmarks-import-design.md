@@ -83,7 +83,7 @@ The shared "same link" key (`linkUrlKey`) ignores the scheme, a leading `www.`, 
 
 **Errors:** 400 `INVALID_BODY` (not JSON, wrong shape, empty), 400 `TOO_MANY` (over 200), 401, 429 (rate limit). Reaching a cap is **not** an error: it is a 200 with counts.
 
-**Service** `importLinksForUser(userId, items)` in `src/lib/import-links.ts` (`server-only`), one Prisma transaction per chunk, with `{ timeout: 30_000, maxWait: 10_000 }` (Prisma's interactive defaults are 5 s and 2 s; a chunk that creates ~100 folders one by one takes hundreds of round trips and would roll back on every try):
+**Service** `importLinksForUser(userId, items)` in `src/lib/import-links.ts` (`server-only`), one Prisma transaction per chunk, with `{ timeout: 30_000, maxWait: 10_000 }` (Prisma's interactive defaults are 5 s and 2 s; a chunk that creates ~100 folders one by one takes hundreds of round trips and would roll back on every try; the route exports `maxDuration = 60` so the function outlives the transaction on any project default):
 
 1. Re-validate every item (the client is never trusted): URL `http(s)`, at most 2,048 characters; title trimmed and cut at 500, empty → the domain; folder trimmed, 1–60 characters or `null`; `createdAt` valid and between 2000-01-01 and now, else now. Invalid items are counted as `invalid`.
 2. Take the folder lock (`pg_advisory_xact_lock(hashtext(userId))`, as `createFolder` does), then the links lock (`hashtext('links:' + userId)`, as `insertWithinSaveLimit` does), always in that order. Nothing else takes both, so there is no deadlock, and a concurrent single save cannot push the account over the cap.

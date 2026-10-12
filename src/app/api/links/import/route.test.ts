@@ -46,6 +46,14 @@ function request(body: unknown, headers?: Record<string, string>) {
   });
 }
 
+describe("route config", () => {
+  it("allows 60 s, longer than the 30 s transaction timeout plus its 10 s wait", () => {
+    // Without an explicit limit a legacy 15 s function default would kill a
+    // slow chunk before its transaction could finish, and Try again would loop.
+    expect(route.maxDuration).toBe(60);
+  });
+});
+
 describe("POST /api/links/import", () => {
   beforeEach(() => {
     vi.clearAllMocks();
