@@ -96,7 +96,7 @@ The shared "same link" key (`linkUrlKey`) ignores the scheme, a leading `www.`, 
 
 `createFolderInTx(tx, userId, name, emoji, description)` is extracted from `createFolder` (which then calls it inside its own transaction and lock). Behavior and tests of `createFolder` are unchanged.
 
-**Response (200):** `{ imported, duplicates, invalid, overLimit, foldersCreated, unfiledForFolderLimit, limitReached }`. After a chunk that imported anything, `broadcastLinksChanged(userId, origin)` runs once.
+**Response (200):** `{ imported, duplicates, invalid, overLimit, foldersCreated, unfiledForFolderLimit, limitReached }`. After a chunk that imported anything, `broadcastLinksChanged(userId, origin)` runs once. The route checks the session before reading the body, so nothing is read or parsed for a signed-out caller (the proxy only checks that a cookie exists).
 
 Nothing here fetches a URL, so there is no new SSRF surface; URLs are only stored.
 
@@ -138,11 +138,11 @@ CREATE INDEX "links_needsMetadata_createdAt_idx" ON "links"("needsMetadata", "cr
 Registered in `src/components/dialog-settings.tsx` as the `import` tab (between Integrations and Account; `SETTINGS_TAB_VALUES` and the dialog description updated). One component with four states.
 
 1. **Choose a file.** A button plus a drop area (`accept=".html,.htm,.csv"`, a real `<input type="file">` behind a visible, keyboard-reachable button). Three how-to lines: browsers (bookmark manager → Export), Raindrop (Settings → Backups → CSV; the full backup includes folders, a single collection doesn't), Pocket (the CSV from your export). Under them: "Your file is read in your browser. Only the links, titles, folder names and dates are sent to Purl."
-2. **Preview (no network).** Format found; "312 links in 14 folders"; "All 312 fit" or "You have room for 640 more, so the 312 newest are imported" (room from the Usage data the dialog already has); a note when non-web links were skipped; "This file has no folder information, so links go to Home" when there are no folders; a note when the file's folders exceed the room for new folders (links from the extra folders go to Home); a closed "See folders" list (name and count). Buttons: **Import**, **Choose another file**. The client trims the list to the room left before sending; the server still enforces the cap.
+2. **Preview (no network).** Format found; "312 links in 14 folders"; "All 312 fit" or "You have room for 640 more, so the 640 newest are imported." (room from the Usage data the dialog already has); a note when non-web links were skipped; "This file has no folder information, so links go to Home" when there are no folders; a note when the file's folders exceed the room for new folders (links from the extra folders go to Home); a closed "See folders" list (name and count). Buttons: **Import**, **Choose another file**. The client trims the list to the room left before sending; the server still enforces the cap.
 3. **Importing.** A progress bar (`role="progressbar"`, `aria-valuemin/max/now`, tabular-nums text "Importing 120 of 312") fed by `runImport`. Closing the dialog stops the loop; chunks already sent stay. The bar's width animation is disabled under reduced motion.
-4. **Done.** "Imported 300 links into 12 folders", then the lines that apply — N already saved and skipped; N weren't web links; N over your limit; N links put on Home because of the folder limit — then "Thumbnails and details fill in over the next few minutes." Buttons: **View links** (closes the dialog and goes to `/home`), **Import another file**. The folder list is refreshed (`useFolders().refresh()`).
+4. **Done.** "Imported 300 links", then the lines that apply — "Created 12 folders." (the server returns `foldersCreated`, the folders it made, not the number of folders the links went into); N already saved and skipped; N weren't web links; N over your limit; N links put on Home because of the folder limit — then "Thumbnails and details fill in over the next few minutes." Buttons: **View links** (closes the dialog and goes to `/home`), **Import another file**. The folder list is refreshed (`useFolders().refresh()`).
 
-**Errors:** unrecognized file (names the supported formats); over 5 MB (before reading); no links found; 429 "Too many requests. Wait a minute and try again."; a network or server failure partway shows what was imported so far and **Try again** (safe: duplicates are skipped).
+**Errors:** unrecognized file (names the supported formats); over 5 MB (before reading); no links found; 429 "Too many requests. Wait a minute and try again."; a network failure ("Couldn’t reach Purl. Check your connection and try again.", with typographic apostrophes like all the feature's copy) or server failure partway shows what was imported so far and **Try again** (safe: duplicates are skipped).
 
 **Accessibility.** One polite status at the start and one at the end of an import (not one per chunk); focus moves to the preview heading after a file is read and to the summary when done; errors use `role="alert"`; drag-over is shown with text ("Drop to import"), not color alone; buttons go full width on phones. Copy is sentence case and plain. Components use `Typography`, Reicon (named imports) and the existing Button and Collapsible.
 
@@ -151,7 +151,7 @@ Registered in `src/components/dialog-settings.tsx` as the `import` tab (between 
 ## Files
 
 New: `src/lib/import/` (parsers, `detect-format`, `parse-csv`, `parse-bookmarks-html`, `parse-raindrop-csv`, `parse-pocket-csv`, `normalize`, `run-import`, `import-summary`), `src/lib/link-url-key.ts`, `src/lib/guess-content-type.ts`, `src/lib/import-links.ts`, `src/app/api/links/import/route.ts`, `src/app/api/cron/enrich-links/route.ts`, `src/lib/enrich-links.ts`, `src/components/settings-import.tsx`, a migration, tests and fixtures.
-Changed: `prisma/schema.prisma`, `src/lib/folders.ts` (`createFolderInTx`), `src/lib/omnibox.ts` (uses `linkUrlKey`), rate-limit files, `src/components/dialog-settings.tsx`, `vercel.json`, `.env.example`, `CLAUDE.md`.
+Changed: `prisma/schema.prisma`, `src/lib/folders.ts` (`createFolderInTx`), `src/lib/omnibox.ts` (uses `linkUrlKey`), rate-limit files, `src/components/dialog-settings.tsx`, `src/components/settings-content.tsx`, `vercel.json`, `.env.example`, `CLAUDE.md`.
 
 ## Testing
 
