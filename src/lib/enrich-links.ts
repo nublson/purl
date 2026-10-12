@@ -79,7 +79,10 @@ async function runPool<T>(
  * Fills in the details of imported links (`needsMetadata`). Claims a batch
  * atomically (the flag is cleared at claim time, so overlapping runs never
  * share a link, and a failed lookup isn't retried: the link stays as
- * imported), looks each up, and writes the results by id, never `createdAt`.
+ * imported), looks each up, and writes the results by id, never `createdAt`,
+ * in one transaction per link. Edits made while it waited win: description
+ * and thumbnail are only set where still null, the title only while it's
+ * still the claimed one.
  */
 export async function enrichFlaggedLinks(): Promise<EnrichResult> {
   const claimedLinks = await prisma.$queryRaw<ClaimedLink[]>`
@@ -99,18 +102,38 @@ export async function enrichFlaggedLinks(): Promise<EnrichResult> {
   await runPool(claimedLinks, ENRICH_CONCURRENCY, async (link) => {
     try {
       const resolved = await withTimeout(resolveLinkFromUrl(link.url));
+      const title = enrichedTitle(link.title, link.url, resolved.title);
+      // The link can wait a while for its turn, and the user may edit it
+      // meanwhile: description and thumbnail are only filled in where still
+      // empty, and the title only replaced if it's still the one claimed.
       // updateMany by id: a link deleted meanwhile is a no-op, not an error.
-      await prisma.link.updateMany({
-        where: { id: link.id },
-        data: {
-          title: enrichedTitle(link.title, link.url, resolved.title),
-          description: resolved.description,
-          thumbnail: resolved.thumbnail,
-          favicon: resolved.favicon,
-          domain: resolved.domain,
-          contentType: resolved.contentType,
-        },
-      });
+      const where = { id: link.id };
+      await prisma.$transaction([
+        prisma.link.updateMany({
+          where,
+          data: {
+            favicon: resolved.favicon,
+            domain: resolved.domain,
+            contentType: resolved.contentType,
+          },
+        }),
+        prisma.link.updateMany({
+          where: { ...where, description: null },
+          data: { description: resolved.description },
+        }),
+        prisma.link.updateMany({
+          where: { ...where, thumbnail: null },
+          data: { thumbnail: resolved.thumbnail },
+        }),
+        ...(title === link.title
+          ? []
+          : [
+              prisma.link.updateMany({
+                where: { ...where, title: link.title },
+                data: { title },
+              }),
+            ]),
+      ]);
       enriched += 1;
       enrichedUsers.add(link.userId);
     } catch (error) {
