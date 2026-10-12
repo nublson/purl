@@ -48,7 +48,21 @@ export const PDF_PROXY_MAX_RESPONSE_BYTES = 40 * 1024 * 1024;
 
 const CONNECT_TIMEOUT_MS = 10_000;
 
+/**
+ * Connect budget for the hop to {@link SAFE_OUTBOUND_HTTP_PROXY}. Shorter than
+ * {@link CONNECT_TIMEOUT_MS} on purpose: when the proxy is down, the direct
+ * retry in {@link safeFetch} must still fit inside the shortest request
+ * deadline a caller sets (3 s for Open Graph images, 5 s for content-type
+ * sniffs and thumbnail probes), or those requests abort before the proxy's
+ * connect timeout fires and never retry. A reachable proxy answers in a few
+ * hundred milliseconds.
+ */
+export const PROXY_CONNECT_TIMEOUT_MS = 1_500;
+
 const baseUndiciConnect = buildConnector({ timeout: CONNECT_TIMEOUT_MS });
+const proxyUndiciConnect = buildConnector({
+  timeout: PROXY_CONNECT_TIMEOUT_MS,
+});
 
 export class UnsafeOutboundUrlError extends Error {
   readonly name = "UnsafeOutboundUrlError";
@@ -194,6 +208,7 @@ export async function pickPinnedConnectAddress(hostname: string): Promise<{
 function safeOutboundConnect(
   opts: Parameters<typeof baseUndiciConnect>[0],
   callback: Parameters<typeof baseUndiciConnect>[1],
+  dial: typeof baseUndiciConnect = baseUndiciConnect,
 ): void {
   const originalHostname = opts.hostname;
 
@@ -206,13 +221,21 @@ function safeOutboundConnect(
       if (next.protocol === "https:") {
         next.servername = opts.servername ?? originalHostname;
       }
-      baseUndiciConnect(next, callback);
+      dial(next, callback);
     })
     .catch((err: unknown) => {
       const e =
         err instanceof Error ? err : new Error(String(err));
       callback(e, null);
     });
+}
+
+/** {@link safeOutboundConnect} for the proxy hop: same pinning, {@link PROXY_CONNECT_TIMEOUT_MS}. */
+function safeProxyConnect(
+  opts: Parameters<typeof baseUndiciConnect>[0],
+  callback: Parameters<typeof baseUndiciConnect>[1],
+): void {
+  safeOutboundConnect(opts, callback, proxyUndiciConnect);
 }
 
 const safeOutboundAgent = new Agent({
@@ -275,7 +298,7 @@ function createSafeFetchDispatcher(): {
       clientFactory: (origin, options) =>
         new Pool(origin, {
           ...options,
-          connect: safeOutboundConnect,
+          connect: safeProxyConnect,
         }),
     });
     return { dispatcher, mode: "http_proxy" };
@@ -494,8 +517,10 @@ export async function safeFetch(
   try {
     return await safeFetchWithDispatcher(input, init, safeFetchDispatcher);
   } catch (err) {
+    // No retry once the caller has given up (its deadline or an aborted
+    // lookup): the direct attempt would only fail the same way.
     const proxyFailure =
-      safeOutboundEgressMode === "http_proxy"
+      safeOutboundEgressMode === "http_proxy" && !init.signal?.aborted
         ? describeHttpProxyHopFailure(err)
         : null;
     if (proxyFailure) {

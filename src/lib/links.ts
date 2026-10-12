@@ -7,7 +7,7 @@ import {
   readHtmlForOpenGraph,
 } from "@/lib/og-html";
 import { validateOgThumbnailUrl } from "@/lib/og-thumbnail-probe";
-import prisma from "@/lib/prisma";
+import prisma, { type Prisma } from "@/lib/prisma";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
 import { getSessionUser } from "@/lib/session";
 import { detectContentType } from "@/lib/server-detect-content-type";
@@ -458,8 +458,9 @@ async function refreshExistingLink(
   existing: { id: string },
   resolved: ResolvedLinkFields,
   folderId?: string,
+  db: Pick<Prisma.TransactionClient, "link"> = prisma,
 ): Promise<RefreshLinkResult> {
-  return prisma.link.update({
+  return db.link.update({
     where: { id: existing.id },
     data: {
       title: resolved.title,
@@ -475,31 +476,64 @@ async function refreshExistingLink(
 }
 
 /**
- * Inserts a new link from already-resolved metadata, re-checking the save cap
- * atomically (`insertWithinSaveLimit`) so concurrent saves can't exceed it.
- * A folder deleted since `assertFolderOwned` surfaces as
- * `FolderNotFoundError` (404), not a raw Prisma FK violation (500).
+ * Saves a link from already-resolved metadata under the per-user save lock
+ * (`insertWithinSaveLimit`). The URL is looked up again there: `Link` has no
+ * URL uniqueness, and the lookup that found nothing (or the row since
+ * deleted) happened before seconds of metadata work, so another save of the
+ * same URL may have landed meanwhile. A row found now is refreshed (and
+ * moved when `folderId` says so) instead of duplicated; otherwise the link is
+ * inserted, atomically with the cap check. A folder deleted since
+ * `assertFolderOwned` surfaces as `FolderNotFoundError` (404), not a raw
+ * Prisma FK violation (500).
  */
 async function insertResolvedLink(
   userId: string,
   resolved: ResolvedLinkFields,
   folderId?: string,
-): Promise<CreateLinkResult> {
+): Promise<CreateLinkResult & { moved: boolean }> {
   try {
-    return await insertWithinSaveLimit(userId, (tx) =>
-      tx.link.create({
-        data: {
-          url: resolved.url,
-          title: resolved.title,
-          description: resolved.description,
-          favicon: resolved.favicon,
-          thumbnail: resolved.thumbnail,
-          domain: resolved.domain,
-          contentType: resolved.contentType,
-          userId,
-          ...(folderId !== undefined ? { folderId } : {}),
-        },
+    return await insertWithinSaveLimit(
+      userId,
+      async (tx) => ({
+        ...(await tx.link.create({
+          data: {
+            url: resolved.url,
+            title: resolved.title,
+            description: resolved.description,
+            favicon: resolved.favicon,
+            thumbnail: resolved.thumbnail,
+            domain: resolved.domain,
+            contentType: resolved.contentType,
+            userId,
+            ...(folderId !== undefined ? { folderId } : {}),
+          },
+        })),
+        moved: false,
       }),
+      {
+        reuse: async (tx) => {
+          const row = await tx.link.findFirst({
+            where: { userId, url: resolved.url },
+          });
+          if (!row) return null;
+          const folderChanged =
+            folderId !== undefined && folderId !== row.folderId;
+          try {
+            const refreshed = await refreshExistingLink(
+              row,
+              resolved,
+              folderChanged ? folderId : undefined,
+              tx,
+            );
+            return { ...refreshed, moved: folderChanged };
+          } catch (error) {
+            // Deletes don't take the lock: the row can still go between this
+            // lookup and the write. Then insert after all.
+            if (isRecordNotFoundError(error)) return null;
+            throw error;
+          }
+        },
+      },
     );
   } catch (error) {
     if (isForeignKeyConstraintError(error)) {
@@ -580,8 +614,7 @@ export async function createLinkForUser(
       // does a delete from another device. The user asked for the link, so
       // save it fresh, with the metadata already in hand.
     }
-    const link = await insertResolvedLink(userId, resolved, opts?.folderId);
-    return { ...link, moved: false };
+    return insertResolvedLink(userId, resolved, opts?.folderId);
   }
 
   // Fails fast before scraping; insertResolvedLink re-checks the cap
@@ -589,8 +622,7 @@ export async function createLinkForUser(
   await assertCanSaveLink(userId);
 
   const resolved = await resolveLinkFromUrl(url);
-  const link = await insertResolvedLink(userId, resolved, opts?.folderId);
-  return { ...link, moved: false };
+  return insertResolvedLink(userId, resolved, opts?.folderId);
 }
 
 /** Fetches a single link if it belongs to the current user; otherwise null. Throws UnauthorizedError if not authenticated. */

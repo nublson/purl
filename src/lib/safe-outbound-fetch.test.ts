@@ -1,6 +1,10 @@
 import dns from "node:dns/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { OG_REMOTE_IMAGE_TIMEOUT_MS } from "./og-images";
+import { OG_THUMBNAIL_PROBE_TIMEOUT_MS } from "./og-thumbnail-probe";
+import { SNIFF_TIMEOUT_MS } from "@/utils/link-content-type-shared";
 import {
+  PROXY_CONNECT_TIMEOUT_MS,
   UnsafeOutboundUrlError,
   assertResolvableHostIsPublic,
   assertSafeHttpUrl,
@@ -239,6 +243,74 @@ describe("safeFetch HTTP proxy 407 fallback", () => {
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("UND_ERR_CONNECT_TIMEOUT"),
     );
+  });
+
+  it("retries when the proxy's connect budget runs out before the caller's deadline", async () => {
+    process.env.SAFE_OUTBOUND_HTTP_PROXY =
+      "http://user:pass@127.0.0.1:65535";
+    vi.resetModules();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { safeFetch: proxiedSafeFetch, PROXY_CONNECT_TIMEOUT_MS } =
+      await import("./safe-outbound-fetch");
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    // The proxy hop times out after its (short) budget, scaled down here;
+    // the direct retry then answers at once.
+    const budget = 40;
+    fetchSpy
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) =>
+            setTimeout(() => reject(proxyConnectTimeoutError()), budget),
+          ),
+      )
+      .mockResolvedValueOnce(new Response("recovered", { status: 200 }));
+
+    // The caller's deadline, in the same proportion to the proxy budget as
+    // the shortest real one (3 s for Open Graph images) is to the real
+    // PROXY_CONNECT_TIMEOUT_MS: the retry must land inside it.
+    const deadline = Math.round((budget * OG_REMOTE_IMAGE_TIMEOUT_MS) / PROXY_CONNECT_TIMEOUT_MS);
+    const signal = AbortSignal.timeout(deadline);
+    const res = await proxiedSafeFetch("https://example.com/article", {
+      signal,
+    });
+    expect(await res.text()).toBe("recovered");
+    expect(signal.aborted).toBe(false);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("leaves the proxy connect budget well inside every caller's request deadline", () => {
+    const shortestDeadline = Math.min(
+      OG_REMOTE_IMAGE_TIMEOUT_MS,
+      OG_THUMBNAIL_PROBE_TIMEOUT_MS,
+      SNIFF_TIMEOUT_MS,
+    );
+    // Half the shortest deadline at most, so a dead proxy still leaves the
+    // direct retry as long as the proxy attempt had.
+    expect(PROXY_CONNECT_TIMEOUT_MS).toBeLessThanOrEqual(shortestDeadline / 2);
+  });
+
+  it("does not retry once the caller's signal has aborted", async () => {
+    process.env.SAFE_OUTBOUND_HTTP_PROXY =
+      "http://user:pass@127.0.0.1:65535";
+    vi.resetModules();
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const err = proxyConnectTimeoutError();
+    fetchSpy.mockRejectedValueOnce(err);
+    const controller = new AbortController();
+    controller.abort();
+
+    const { safeFetch: proxiedSafeFetch } = await import(
+      "./safe-outbound-fetch"
+    );
+
+    await expect(
+      proxiedSafeFetch("https://example.com/article", {
+        signal: controller.signal,
+      }),
+    ).rejects.toBe(err);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
 
   it("does not retry an origin-side failure through the proxy", async () => {

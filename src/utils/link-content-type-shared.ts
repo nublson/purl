@@ -7,7 +7,7 @@ import { isYouTubeUrl } from "@/utils/youtube";
 const USER_AGENT =
   "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)";
 
-const SNIFF_TIMEOUT_MS = 5000;
+export const SNIFF_TIMEOUT_MS = 5000;
 
 export type HeadFetchFn = (
   input: string | URL,

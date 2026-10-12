@@ -79,4 +79,42 @@ describe("insertWithinSaveLimit", () => {
     expect(err).toBeInstanceOf(SaveLimitError);
     expect(insert).not.toHaveBeenCalled();
   });
+
+  it("returns what `reuse` finds under the lock, without counting or inserting", async () => {
+    const order: string[] = [];
+    vi.mocked(prisma.$executeRaw).mockImplementation((async () => {
+      order.push("lock");
+      return 1;
+    }) as never);
+    // Even at the cap: a row that already exists isn't a new save.
+    vi.mocked(prisma.link.count).mockResolvedValue(MAX_SAVED_LINKS);
+    const insert = vi.fn();
+    const reuse = vi.fn(async () => {
+      order.push("reuse");
+      return { id: "link-existing" };
+    });
+
+    await expect(
+      insertWithinSaveLimit("user-1", insert, { reuse }),
+    ).resolves.toEqual({ id: "link-existing" });
+
+    expect(order).toEqual(["lock", "reuse"]);
+    expect(reuse).toHaveBeenCalledWith(prisma);
+    expect(prisma.link.count).not.toHaveBeenCalled();
+    expect(insert).not.toHaveBeenCalled();
+  });
+
+  it("counts and inserts as usual when `reuse` finds nothing", async () => {
+    vi.mocked(prisma.link.count).mockResolvedValue(MAX_SAVED_LINKS - 1);
+    const insert = vi.fn(async () => ({ id: "link-1" }));
+    const reuse = vi.fn(async () => null);
+
+    await expect(
+      insertWithinSaveLimit("user-1", insert, { reuse }),
+    ).resolves.toEqual({ id: "link-1" });
+
+    expect(reuse).toHaveBeenCalledTimes(1);
+    expect(prisma.link.count).toHaveBeenCalledTimes(1);
+    expect(insert).toHaveBeenCalledWith(prisma);
+  });
 });

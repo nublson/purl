@@ -8,7 +8,7 @@ const OGS_PROBE_UA =
   "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)";
 
 /** Single probe budget; keeps metadata scrape responsive. */
-const OG_THUMBNAIL_PROBE_TIMEOUT_MS = 5000;
+export const OG_THUMBNAIL_PROBE_TIMEOUT_MS = 5000;
 
 const OG_THUMBNAIL_PROBE_MAX_SNIFF_BYTES = 16 * 1024;
 
