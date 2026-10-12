@@ -12,6 +12,7 @@ import { safeFetch } from "@/lib/safe-outbound-fetch";
 import { getSessionUser } from "@/lib/session";
 import { detectContentType } from "@/lib/server-detect-content-type";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
+import { timeoutSignal } from "@/utils/abort-signal";
 import { getUrlDomain } from "@/utils/formatter";
 import type { Link } from "@/utils/links";
 import { isPdfUrl } from "@/utils/pdf";
@@ -106,6 +107,7 @@ function formatFileSize(bytes: number | null): string | null {
 async function scrapePdfMetadata(
   url: string,
   domain: string,
+  signal?: AbortSignal,
 ): Promise<{
   title: string;
   description: string | null;
@@ -121,7 +123,7 @@ async function scrapePdfMetadata(
         "User-Agent":
           "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
       },
-      signal: AbortSignal.timeout(8000),
+      signal: timeoutSignal(8000, signal),
     });
     await headResponse.body?.cancel();
     contentLengthBytes = Number(
@@ -155,6 +157,7 @@ async function scrapePdfMetadata(
 async function scrapeYouTubeMetadata(
   url: string,
   defaultFavicon: string,
+  signal?: AbortSignal,
 ): Promise<{
   title: string;
   description: string | null;
@@ -169,7 +172,7 @@ async function scrapeYouTubeMetadata(
         "User-Agent":
           "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
       },
-      signal: AbortSignal.timeout(8000),
+      signal: timeoutSignal(8000, signal),
       maxRedirects: 4,
       maxResponseBytes: YOUTUBE_OEMBED_MAX_BYTES,
     });
@@ -217,7 +220,17 @@ function mapRowToLink(row: LinkRow): Link {
   };
 }
 
-export async function scrapeLinkMetadata(url: string): Promise<{
+/**
+ * Options for a lookup (`scrapeLinkMetadata`, `resolveLinkFromUrl`): `signal`
+ * cancels every outbound request the lookup makes, on top of each request's
+ * own timeout (the background enrichment job aborts a lookup that runs long).
+ */
+export type LookupOptions = { signal?: AbortSignal };
+
+export async function scrapeLinkMetadata(
+  url: string,
+  { signal }: LookupOptions = {},
+): Promise<{
   title: string;
   description: string | null;
   favicon: string;
@@ -226,7 +239,7 @@ export async function scrapeLinkMetadata(url: string): Promise<{
   const domain = getUrlDomain(url);
   const defaultFavicon = getDefaultFaviconUrl(domain);
   if (isPdfUrl(url)) {
-    const pdfMetadata = await scrapePdfMetadata(url, domain);
+    const pdfMetadata = await scrapePdfMetadata(url, domain, signal);
     return {
       title: pdfMetadata.title,
       description: pdfMetadata.description,
@@ -236,7 +249,7 @@ export async function scrapeLinkMetadata(url: string): Promise<{
   }
 
   if (isYouTubeUrl(url)) {
-    const yt = await scrapeYouTubeMetadata(url, defaultFavicon);
+    const yt = await scrapeYouTubeMetadata(url, defaultFavicon, signal);
     if (yt) return yt;
   }
 
@@ -247,7 +260,7 @@ export async function scrapeLinkMetadata(url: string): Promise<{
         "User-Agent":
           "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)",
       },
-      signal: AbortSignal.timeout(OGS_FETCH_TIMEOUT_MS),
+      signal: timeoutSignal(OGS_FETCH_TIMEOUT_MS, signal),
       // Cap declared size; body is streamed only until </head> (see readHtmlForOpenGraph).
       maxResponseBytes: OG_HTML_READ_MAX_BYTES * 8,
     });
@@ -287,7 +300,7 @@ export async function scrapeLinkMetadata(url: string): Promise<{
       pageResponse.url,
       result.ogUrl,
     );
-    if (thumbnail && !(await validateOgThumbnailUrl(thumbnail))) {
+    if (thumbnail && !(await validateOgThumbnailUrl(thumbnail, signal))) {
       thumbnail = null;
     }
     const favicon = result.favicon
@@ -323,11 +336,15 @@ export type ResolvedLinkFields = {
 /** Resolves domain, content type, and scraped metadata for a URL (shared by create/update and preview API). */
 export async function resolveLinkFromUrl(
   url: string,
+  options: LookupOptions = {},
 ): Promise<ResolvedLinkFields> {
   const domain = getUrlDomain(url);
   // Independent network work: run the HEAD/sniff and the page scrape in parallel.
   const [detected, { title, description, favicon, thumbnail }] =
-    await Promise.all([detectContentType(url), scrapeLinkMetadata(url)]);
+    await Promise.all([
+      detectContentType(url, options),
+      scrapeLinkMetadata(url, options),
+    ]);
   const contentType = detected as ContentType;
   return {
     url,

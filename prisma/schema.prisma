@@ -64,9 +64,12 @@ model Link {
   folder      Folder?     @relation(fields: [folderId], references: [id], onDelete: SetNull)
   /// When the link was read (opened or marked read); null = unread.
   readAt      DateTime?
+  /// Saved without metadata (bulk import); the background top-up fills it in.
+  needsMetadata Boolean @default(false)
 
   @@index([userId, createdAt])
   @@index([userId, folderId, createdAt])
+  @@index([needsMetadata, createdAt])
   @@map("links")
 }
 

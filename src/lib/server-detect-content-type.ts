@@ -7,6 +7,7 @@ import type { Link } from "@/utils/links";
 /** Server-only content-type detection (HEAD sniff uses SSRF-safe fetch). */
 export async function detectContentType(
   url: string,
+  options: { signal?: AbortSignal } = {},
 ): Promise<Link["contentType"]> {
-  return detectContentTypeWithFetch(url, safeFetch);
+  return detectContentTypeWithFetch(url, safeFetch, options.signal);
 }

@@ -4,7 +4,7 @@ import {
   DEFAULT_FOLDER_EMOJI,
   MAX_FOLDER_DESCRIPTION_LENGTH,
 } from "@/lib/folder-display";
-import { MAX_FOLDERS } from "@/lib/limits";
+import { MAX_FOLDERS, MAX_FOLDER_NAME_LENGTH } from "@/lib/limits";
 import prisma, { type Prisma } from "@/lib/prisma";
 
 /** Either the root client or an interactive-transaction client; the folder helpers below accept both. */
@@ -150,7 +150,7 @@ function validateFolderName(name: string): string {
   if (trimmed.length === 0) {
     throw new FolderNameError("empty", "Give your folder a name.");
   }
-  if (trimmed.length > 60) {
+  if (trimmed.length > MAX_FOLDER_NAME_LENGTH) {
     throw new FolderNameError("too_long", "Keep the name to 60 characters or fewer.");
   }
   return trimmed;
@@ -340,6 +340,53 @@ export async function getFolderBySlug(
 }
 
 /**
+ * Creates a folder inside the caller's transaction: validates the name, emoji
+ * and description, enforces `MAX_FOLDERS`, checks the name is free, generates
+ * the slug and appends the folder last.
+ *
+ * Takes no lock: the caller must already hold the per-user folder advisory
+ * lock (`pg_advisory_xact_lock(hashtext(userId))`) on `tx`, or concurrent
+ * creates could overshoot the cap.
+ */
+export async function createFolderInTx(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  name: string,
+  emoji?: string | null,
+  description?: string | null,
+): Promise<FolderSummary> {
+  const trimmed = validateFolderName(name);
+  const normalizedEmoji = normalizeFolderEmoji(emoji);
+  const normalizedDescription = normalizeFolderDescription(description);
+
+  const count = await tx.folder.count({ where: { userId } });
+  if (count >= MAX_FOLDERS) {
+    throw new FolderLimitError(`You can have up to ${MAX_FOLDERS} folders.`);
+  }
+
+  await assertNameAvailable(userId, trimmed, undefined, tx);
+  const slug = await generateUniqueSlug(userId, trimmed, undefined, tx);
+  // New folders go last, so the user's order (and digit shortcuts) stay put.
+  const { _max } = await tx.folder.aggregate({
+    where: { userId },
+    _max: { position: true },
+  });
+
+  const created = await tx.folder.create({
+    data: {
+      userId,
+      name: trimmed,
+      slug,
+      emoji: normalizedEmoji,
+      description: normalizedDescription,
+      position: (_max.position ?? 0) + 1,
+    },
+    include: { _count: { select: { links: true } } },
+  });
+  return toSummary(created as FolderRowWithCount);
+}
+
+/**
  * Creates a folder for `userId`, enforcing the name rules, the folder cap, and slug uniqueness.
  *
  * The cap check and the insert run in one interactive transaction that first
@@ -353,9 +400,10 @@ export async function createFolder(
   emoji?: string | null,
   description?: string | null,
 ): Promise<FolderSummary> {
-  const trimmed = validateFolderName(name);
-  const normalizedEmoji = normalizeFolderEmoji(emoji);
-  const normalizedDescription = normalizeFolderDescription(description);
+  // Fail on bad input before opening a transaction.
+  validateFolderName(name);
+  normalizeFolderEmoji(emoji);
+  normalizeFolderDescription(description);
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -363,34 +411,7 @@ export async function createFolder(
       // into the SQL text. `$executeRaw` (not `$queryRaw`) because the lock
       // function returns `void`, which Prisma can't deserialize as a column.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
-
-      const count = await tx.folder.count({ where: { userId } });
-      if (count >= MAX_FOLDERS) {
-        throw new FolderLimitError(
-          `You can have up to ${MAX_FOLDERS} folders.`,
-        );
-      }
-
-      await assertNameAvailable(userId, trimmed, undefined, tx);
-      const slug = await generateUniqueSlug(userId, trimmed, undefined, tx);
-      // New folders go last, so the user's order (and digit shortcuts) stay put.
-      const { _max } = await tx.folder.aggregate({
-        where: { userId },
-        _max: { position: true },
-      });
-
-      const created = await tx.folder.create({
-        data: {
-          userId,
-          name: trimmed,
-          slug,
-          emoji: normalizedEmoji,
-          description: normalizedDescription,
-          position: (_max.position ?? 0) + 1,
-        },
-        include: { _count: { select: { links: true } } },
-      });
-      return toSummary(created as FolderRowWithCount);
+      return createFolderInTx(tx, userId, name, emoji, description);
     });
   } catch (error) {
     if (isUniqueConstraintError(error)) {
