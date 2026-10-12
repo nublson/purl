@@ -13,7 +13,7 @@ vi.mock("@/lib/prisma", () => {
     $executeRaw: vi.fn(),
     link: { count: vi.fn(), findMany: vi.fn(), createMany: vi.fn() },
     folder: { findMany: vi.fn() },
-    $transaction: vi.fn(async (cb: (t: typeof tx) => unknown, _options?: unknown) => cb(tx)),
+    $transaction: vi.fn(async (cb: (t: typeof tx) => unknown) => cb(tx)),
   };
   return { default: client };
 });
