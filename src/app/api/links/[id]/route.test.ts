@@ -198,6 +198,7 @@ describe("links/[id] API route", () => {
         userId: "user-123",
         folderId: null,
         readAt: null,
+        needsMetadata: false,
       });
 
       const res = await PATCH(
@@ -228,6 +229,7 @@ describe("links/[id] API route", () => {
         userId: "user-123",
         folderId: null,
         readAt: null,
+        needsMetadata: false,
       });
 
       await PATCH(patchRequest({ description: null }), {
@@ -449,6 +451,7 @@ describe("links/[id] API route", () => {
           userId: "user-123",
           folderId: "folder-1",
           readAt: null,
+          needsMetadata: false,
         });
 
         const res = await PATCH(
@@ -497,6 +500,7 @@ describe("links/[id] API route", () => {
           userId: "user-123",
           folderId: null,
           readAt: null,
+          needsMetadata: false,
         });
 
         const res = await PATCH(
