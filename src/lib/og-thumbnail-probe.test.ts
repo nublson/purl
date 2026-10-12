@@ -43,6 +43,36 @@ describe("validateOgThumbnailUrl", () => {
     vi.mocked(limitReadableStreamByBytes).mockReset();
   });
 
+  describe("cancellation", () => {
+    it("aborts both probes when the caller's signal aborts", async () => {
+      // HEAD is inconclusive (405), so the GET probe runs too.
+      vi.mocked(safeFetch)
+        .mockResolvedValueOnce(makeResponse(405, null, null))
+        .mockResolvedValueOnce(makeResponse(200, "image/png", null));
+      const outer = new AbortController();
+
+      await validateOgThumbnailUrl("https://cdn.example.com/a.png", outer.signal);
+
+      const signals = vi
+        .mocked(safeFetch)
+        .mock.calls.map((call) => call[1]!.signal!);
+      expect(signals).toHaveLength(2);
+      expect(signals.every((signal) => !signal.aborted)).toBe(true);
+      outer.abort();
+      expect(signals.every((signal) => signal.aborted)).toBe(true);
+    });
+
+    it("keeps each probe's own timeout without a caller signal", async () => {
+      vi.mocked(safeFetch).mockResolvedValueOnce(
+        makeResponse(200, "image/png", null),
+      );
+      await validateOgThumbnailUrl("https://cdn.example.com/a.png");
+      expect(vi.mocked(safeFetch).mock.calls[0]![1]!.signal).toBeInstanceOf(
+        AbortSignal,
+      );
+    });
+  });
+
   describe("HEAD probe – known content types", () => {
     it("returns true immediately when HEAD returns an image content-type", async () => {
       vi.mocked(safeFetch).mockResolvedValueOnce(

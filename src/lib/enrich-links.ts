@@ -1,6 +1,6 @@
 import "server-only";
 
-import { resolveLinkFromUrl } from "@/lib/links";
+import { resolveLinkFromUrl, type ResolvedLinkFields } from "@/lib/links";
 import prisma from "@/lib/prisma";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { getUrlDomain } from "@/utils/formatter";
@@ -9,8 +9,14 @@ import { getUrlDomain } from "@/utils/formatter";
 export const ENRICH_BATCH_SIZE = 20;
 /** Metadata lookups running at once. */
 export const ENRICH_CONCURRENCY = 5;
-/** A lookup that takes longer counts as failed. */
+/** A lookup that takes longer is aborted and counts as failed. */
 export const ENRICH_LINK_TIMEOUT_MS = 20_000;
+/**
+ * After aborting a lookup, how long its pool slot waits for the cancelled
+ * requests to unwind before moving on regardless (a step that ignores the
+ * signal must not hold the whole run).
+ */
+export const ENRICH_ABORT_GRACE_MS = 2_000;
 
 export type EnrichResult = { claimed: number; enriched: number; failed: number };
 
@@ -44,17 +50,52 @@ class EnrichTimeoutError extends Error {
   }
 }
 
-/** Races `promise` against the timeout, clearing the timer either way. */
-async function withTimeout<T>(promise: Promise<T>): Promise<T> {
+/** Resolves when `promise` settles, or after `ms`, whichever comes first. */
+async function settledOrAfter(promise: Promise<unknown>, ms: number): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new EnrichTimeoutError()), ENRICH_LINK_TIMEOUT_MS);
+  const grace = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, ms);
   });
   try {
-    return await Promise.race([promise, timeout]);
+    await Promise.race([promise.then(noop, noop), grace]);
   } finally {
     clearTimeout(timer);
   }
+}
+
+function noop(): void {}
+
+/**
+ * Looks a link up, giving the whole lookup `ENRICH_LINK_TIMEOUT_MS`. When
+ * that runs out the lookup's requests are ABORTED (not just abandoned, which
+ * would leave them running beside the next lookups and break the concurrency
+ * bound), and the pool slot is only released once they've unwound, or after
+ * `ENRICH_ABORT_GRACE_MS` at most. An aborted lookup can still come back with
+ * fallback data (the scrapers swallow errors): that is not a result, so a
+ * timed-out lookup always counts as failed.
+ */
+async function lookUp(url: string): Promise<ResolvedLinkFields> {
+  const controller = new AbortController();
+  let timedOut = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const lookup = resolveLinkFromUrl(url, { signal: controller.signal });
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+      reject(new EnrichTimeoutError());
+    }, ENRICH_LINK_TIMEOUT_MS);
+  });
+  try {
+    const resolved = await Promise.race([lookup, timeout]);
+    if (!timedOut) return resolved;
+  } catch (error) {
+    if (!timedOut) throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+  await settledOrAfter(lookup, ENRICH_ABORT_GRACE_MS);
+  throw new EnrichTimeoutError();
 }
 
 /** Runs `task` over `items`, at most `limit` at a time. */
@@ -101,7 +142,7 @@ export async function enrichFlaggedLinks(): Promise<EnrichResult> {
 
   await runPool(claimedLinks, ENRICH_CONCURRENCY, async (link) => {
     try {
-      const resolved = await withTimeout(resolveLinkFromUrl(link.url));
+      const resolved = await lookUp(link.url);
       const title = enrichedTitle(link.title, link.url, resolved.title);
       // The link can wait a while for its turn, and the user may edit it
       // meanwhile: description and thumbnail are only filled in where still

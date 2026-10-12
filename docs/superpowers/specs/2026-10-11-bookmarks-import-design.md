@@ -126,7 +126,7 @@ CREATE INDEX "links_needsMetadata_createdAt_idx" ON "links"("needsMetadata", "cr
    RETURNING "id", "userId", "url", "title", "domain";
    ```
    Nothing flagged → respond `{ claimed: 0 }` immediately (an idle minute is one indexed query). Overlapping runs can't take the same link.
-2. Look each claimed link up with the existing `resolveLinkFromUrl`, five at a time, each capped at 20 seconds.
+2. Look each claimed link up with the existing `resolveLinkFromUrl`, five at a time, each capped at 20 seconds. At the cap the lookup is **aborted**: an `AbortSignal` goes through `resolveLinkFromUrl` → `scrapeLinkMetadata` / `detectContentType` → `safeFetch` (every request combines it with its own timeout), the pool slot waits up to 2 s for the cancelled requests to unwind, and a timed-out lookup always counts as failed (even if the abort made a scraper fall back to defaults), so no more than five requests are really in flight.
 3. Write by id, in one transaction per link (guarded `updateMany` calls, so a link deleted meanwhile is a no-op): `favicon`, `domain`, `contentType` always; `description` and `thumbnail` only where still null; `title` only when the claimed title is empty or equals the raw URL or the domain, **and** the stored title still equals the claimed one (compare-and-set). A link can wait ~25 minutes or more for its turn, so an edit made meanwhile in the Edit link dialog wins. **`createdAt` is never touched** (`refreshExistingLink` bumps it to now, so it is not reused).
 4. One `broadcastLinksChanged` per distinct affected account.
 5. Respond `{ claimed, enriched, failed }`.

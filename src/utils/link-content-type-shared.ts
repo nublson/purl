@@ -1,3 +1,4 @@
+import { timeoutSignal } from "@/utils/abort-signal";
 import { isAudioUrl } from "@/utils/audio";
 import type { Link } from "@/utils/links";
 import { isPdfUrl } from "@/utils/pdf";
@@ -21,6 +22,7 @@ function parseMimeType(contentType: string | null): string {
 export async function sniffContentTypeFromHeadWithFetch(
   url: string,
   fetchImpl: HeadFetchFn,
+  signal?: AbortSignal,
 ): Promise<Link["contentType"]> {
   try {
     const response = await fetchImpl(url, {
@@ -28,7 +30,7 @@ export async function sniffContentTypeFromHeadWithFetch(
       headers: {
         "User-Agent": USER_AGENT,
       },
-      signal: AbortSignal.timeout(SNIFF_TIMEOUT_MS),
+      signal: timeoutSignal(SNIFF_TIMEOUT_MS, signal),
     });
     const mimeType = parseMimeType(response.headers.get("content-type"));
     await response.body?.cancel();
@@ -52,8 +54,9 @@ export function detectContentTypeFromUrlRules(
 export async function detectContentTypeWithFetch(
   url: string,
   fetchImpl: HeadFetchFn,
+  signal?: AbortSignal,
 ): Promise<Link["contentType"]> {
   const fromRules = detectContentTypeFromUrlRules(url);
   if (fromRules !== null) return fromRules;
-  return sniffContentTypeFromHeadWithFetch(url, fetchImpl);
+  return sniffContentTypeFromHeadWithFetch(url, fetchImpl, signal);
 }

@@ -17,6 +17,7 @@ const prisma = (await import("@/lib/prisma")).default;
 const { resolveLinkFromUrl } = await import("@/lib/links");
 const { broadcastLinksChanged } = await import("@/lib/realtime-broadcast");
 const {
+  ENRICH_ABORT_GRACE_MS,
   ENRICH_BATCH_SIZE,
   ENRICH_CONCURRENCY,
   ENRICH_LINK_TIMEOUT_MS,
@@ -206,7 +207,9 @@ describe("enrichFlaggedLinks", () => {
       failed: 0,
     });
 
-    expect(resolve).toHaveBeenCalledWith("https://example.com/1");
+    expect(resolve).toHaveBeenCalledWith("https://example.com/1", {
+      signal: expect.any(AbortSignal),
+    });
     expect(rows.get("link-1")).toEqual({
       url: "https://example.com/1",
       title: "Resolved https://example.com/1",
@@ -322,12 +325,77 @@ describe("enrichFlaggedLinks", () => {
         : Promise.resolve(resolved(url)),
     );
 
-    const run = enrichFlaggedLinks();
+    let finished = false;
+    const run = enrichFlaggedLinks().then((result) => {
+      finished = true;
+      return result;
+    });
     await vi.advanceTimersByTimeAsync(ENRICH_LINK_TIMEOUT_MS);
+    // This lookup ignores its signal and never settles: it is given a short
+    // grace to unwind, not waited for forever.
+    expect(finished).toBe(false);
+    await vi.advanceTimersByTimeAsync(ENRICH_ABORT_GRACE_MS);
 
     await expect(run).resolves.toEqual({ claimed: 2, enriched: 1, failed: 1 });
     expect(writtenIds()).toEqual(["link-2"]);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("aborts a lookup's requests when its timer fires, and counts it failed", async () => {
+    vi.useFakeTimers();
+    queryRaw.mockResolvedValue([claimed(1)]);
+    let signal!: AbortSignal;
+    // Aborting makes this lookup "succeed" at once (like a scraper that falls
+    // back to defaults): that must not be mistaken for a result.
+    resolve.mockImplementation((url: string, options) => {
+      signal = options!.signal!;
+      return new Promise((done) =>
+        signal.addEventListener("abort", () => done(resolved(url))),
+      );
+    });
+
+    const run = enrichFlaggedLinks();
+    await vi.advanceTimersByTimeAsync(ENRICH_LINK_TIMEOUT_MS - 1);
+    expect(signal.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(signal.aborted).toBe(true);
+
+    await expect(run).resolves.toEqual({ claimed: 1, enriched: 0, failed: 1 });
+    expect(updateMany).not.toHaveBeenCalled();
+    expect(broadcast).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("keeps a timed-out lookup's slot until its requests have really stopped", async () => {
+    vi.useFakeTimers();
+    const total = ENRICH_CONCURRENCY + 3;
+    queryRaw.mockResolvedValue(Array.from({ length: total }, (_, i) => claimed(i)));
+    const UNWIND_MS = 100;
+    let activeRequests = 0;
+    let peak = 0;
+    resolve.mockImplementation((_url: string, options) => {
+      activeRequests += 1;
+      peak = Math.max(peak, activeRequests);
+      return new Promise((_done, fail) => {
+        options!.signal!.addEventListener("abort", () => {
+          // The aborted requests take a moment to actually close.
+          setTimeout(() => {
+            activeRequests -= 1;
+            fail(new Error("aborted"));
+          }, UNWIND_MS);
+        });
+      });
+    });
+
+    const run = enrichFlaggedLinks();
+    await vi.advanceTimersByTimeAsync(ENRICH_LINK_TIMEOUT_MS + UNWIND_MS);
+    await vi.advanceTimersByTimeAsync(ENRICH_LINK_TIMEOUT_MS + UNWIND_MS);
+
+    await expect(run).resolves.toEqual({ claimed: total, enriched: 0, failed: total });
+    // Timed-out lookups were still closing when the next ones would have
+    // started, so the real number of requests in flight never passed the pool.
+    expect(peak).toBe(ENRICH_CONCURRENCY);
+    expect(activeRequests).toBe(0);
   });
 
   it("clears the timeout once a lookup settles", async () => {
