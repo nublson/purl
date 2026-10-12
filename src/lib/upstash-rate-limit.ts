@@ -39,6 +39,8 @@ function makeLimiter(
 
 const authLimiter = () => makeLimiter("auth", 30, "1 m");
 const linksPostLimiter = () => makeLimiter("links_post", 30, "1 m");
+// A bookmarks import sends a chunk of up to 200 links per request.
+const linksImportLimiter = () => makeLimiter("links_import", 30, "1 m");
 const feedbackPostLimiter = () => makeLimiter("feedback_post", 10, "1 m");
 // The availability check runs (debounced) as the user types a new username;
 // a change is rare, so it gets a much tighter budget.
@@ -55,6 +57,7 @@ const mcpLimiter = () => makeLimiter("mcp", 60, "1 m");
 
 let cachedAuth: Ratelimit | null | undefined;
 let cachedLinksPost: Ratelimit | null | undefined;
+let cachedLinksImport: Ratelimit | null | undefined;
 let cachedV1: Ratelimit | null | undefined;
 let cachedV1Post: Ratelimit | null | undefined;
 let cachedFeedbackPost: Ratelimit | null | undefined;
@@ -72,6 +75,13 @@ export function getAuthRateLimiter(): Ratelimit | null {
 export function getLinksPostRateLimiter(): Ratelimit | null {
   if (cachedLinksPost === undefined) cachedLinksPost = linksPostLimiter();
   return cachedLinksPost;
+}
+
+export function getLinksImportRateLimiter(): Ratelimit | null {
+  if (cachedLinksImport === undefined) {
+    cachedLinksImport = linksImportLimiter();
+  }
+  return cachedLinksImport;
 }
 
 export function getV1RateLimiter(): Ratelimit | null {

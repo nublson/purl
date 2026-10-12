@@ -17,6 +17,7 @@ vi.mock("@/lib/upstash-rate-limit", () => ({
   getAuthRateLimiter: vi.fn(),
   getFeedbackPostRateLimiter: vi.fn(),
   getLinksPostRateLimiter: vi.fn(),
+  getLinksImportRateLimiter: vi.fn(),
   getUsernameCheckRateLimiter: vi.fn(),
   getLinkPreviewRateLimiter: vi.fn(),
   getPublicFolderRateLimiter: vi.fn(),
@@ -29,6 +30,7 @@ const {
   getAuthRateLimiter,
   getFeedbackPostRateLimiter,
   getLinksPostRateLimiter,
+  getLinksImportRateLimiter,
   getUsernameCheckRateLimiter,
   getLinkPreviewRateLimiter,
   getPublicFolderRateLimiter,
@@ -63,6 +65,7 @@ describe("rateLimitApiRequest", () => {
     limitMock.mockReset();
     vi.mocked(getAuthRateLimiter).mockReset();
     vi.mocked(getLinksPostRateLimiter).mockReset();
+    vi.mocked(getLinksImportRateLimiter).mockReset();
     vi.mocked(getFeedbackPostRateLimiter).mockReset();
     vi.mocked(getUsernameCheckRateLimiter).mockReset();
     vi.mocked(getLinkPreviewRateLimiter).mockReset();
@@ -174,6 +177,54 @@ describe("rateLimitApiRequest", () => {
         makeRequest("/api/links", "GET"),
       );
       expect(result).toBeNull();
+      expect(getLinksPostRateLimiter).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("POST /api/links/import", () => {
+    it("limits by client IP and returns 429 with Retry-After when exceeded", async () => {
+      vi.mocked(getLinksImportRateLimiter).mockReturnValue(
+        mockLimiter() as never,
+      );
+      limitMock.mockResolvedValue({
+        success: false,
+        reset: Date.now() + 30_000,
+      });
+
+      const result = await rateLimitApiRequest(
+        makeRequest("/api/links/import", "POST", {
+          "x-forwarded-for": "1.2.3.4",
+        }),
+      );
+
+      expect(limitMock).toHaveBeenCalledWith("1.2.3.4");
+      expect(result!.status).toBe(429);
+      expect(Number(result!.headers.get("Retry-After"))).toBeGreaterThan(0);
+    });
+
+    it("returns null when under the limit", async () => {
+      vi.mocked(getLinksImportRateLimiter).mockReturnValue(
+        mockLimiter() as never,
+      );
+      limitMock.mockResolvedValue({ success: true, reset: Date.now() + 60_000 });
+
+      const result = await rateLimitApiRequest(
+        makeRequest("/api/links/import", "POST"),
+      );
+      expect(result).toBeNull();
+    });
+
+    it("does not limit GET /api/links/import", async () => {
+      const result = await rateLimitApiRequest(
+        makeRequest("/api/links/import", "GET"),
+      );
+      expect(result).toBeNull();
+      expect(getLinksImportRateLimiter).not.toHaveBeenCalled();
+    });
+
+    it("does not use the plain links POST limiter", async () => {
+      vi.mocked(getLinksImportRateLimiter).mockReturnValue(null);
+      await rateLimitApiRequest(makeRequest("/api/links/import", "POST"));
       expect(getLinksPostRateLimiter).not.toHaveBeenCalled();
     });
   });
