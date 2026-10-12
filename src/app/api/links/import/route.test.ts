@@ -62,6 +62,17 @@ describe("POST /api/links/import", () => {
     expect(mockBroadcast).not.toHaveBeenCalled();
   });
 
+  it.each([
+    ["an invalid body", JSON.stringify({ links: "nope" })],
+    ["invalid JSON", "{nope"],
+  ])("returns 401, not 400, for %s without a session", async (_n, raw) => {
+    mockGetSessionUser.mockResolvedValue(null);
+    const res = await route.POST(request(raw));
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "Unauthorized" });
+    expect(mockImport).not.toHaveBeenCalled();
+  });
+
   it("returns 400 INVALID_BODY for invalid JSON", async () => {
     const res = await route.POST(request("{nope"));
     expect(res.status).toBe(400);

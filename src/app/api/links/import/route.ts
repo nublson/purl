@@ -19,6 +19,13 @@ async function readJson(request: NextRequest): Promise<unknown> {
  * and skipped (`ImportLinksResult`); bad rows are counted, not errors.
  */
 export async function POST(request: NextRequest) {
+  // Session first: the proxy only checks a cookie exists, so the body is not
+  // read or parsed for anyone who isn't signed in.
+  const user = await getSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await readJson(request);
   if (body === undefined) {
     return NextResponse.json(
@@ -32,11 +39,6 @@ export async function POST(request: NextRequest) {
       { error: parsed.error, code: parsed.code },
       { status: 400 },
     );
-  }
-
-  const user = await getSessionUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const result = await importLinksForUser(user.id, parsed.links);
