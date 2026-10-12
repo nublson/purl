@@ -324,6 +324,47 @@ export function isHttpProxyTunnelFailure(err: unknown): boolean {
   return false;
 }
 
+/**
+ * Error codes that, with an HTTP CONNECT proxy, can only come from the hop to
+ * the proxy itself: the app opens no other TCP connection in that mode (the
+ * origin is dialled by the proxy). A proxy that is down, gone from DNS or
+ * firewalled off fails every scrape with one of these after
+ * {@link CONNECT_TIMEOUT_MS}, so they are worth a direct retry.
+ */
+const PROXY_HOP_ERROR_CODES = new Set([
+  "UND_ERR_CONNECT_TIMEOUT",
+  "ECONNREFUSED",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+]);
+
+/**
+ * Why a request through {@link SAFE_OUTBOUND_HTTP_PROXY} failed at the proxy
+ * rather than at the origin, or null when the failure isn't the proxy's (an
+ * origin error, an abort, a blocked address): the CONNECT tunnel refused
+ * (any `Proxy response (NNN)`, 407 included) or the proxy unreachable
+ * ({@link PROXY_HOP_ERROR_CODES}).
+ */
+export function describeHttpProxyHopFailure(err: unknown): string | null {
+  let current: unknown = err;
+  const seen = new Set<unknown>();
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    const msg = current instanceof Error ? current.message : "";
+    const tunnel = /Proxy response \((\d{3})\)/.exec(msg);
+    if (tunnel) return `CONNECT ${tunnel[1]}`;
+    const code = (current as { code?: unknown }).code;
+    if (typeof code === "string" && PROXY_HOP_ERROR_CODES.has(code)) {
+      return code;
+    }
+    current =
+      "cause" in current ? (current as { cause: unknown }).cause : undefined;
+  }
+  return null;
+}
+
 function unwrapUnsafeOutboundCause(err: unknown): never {
   if (
     err instanceof TypeError &&
@@ -440,9 +481,11 @@ async function safeFetchWithDispatcher(
  * Fetch with manual redirects; each request uses the configured egress dispatcher
  * (direct pinned connect, HTTP proxy with pinned connect to the proxy, or SOCKS5).
  *
- * When {@link SAFE_OUTBOUND_HTTP_PROXY} is set but CONNECT fails with HTTP 407,
- * retries once via direct pinned egress so article OG scrapes are not wedged by
- * a misconfigured YouTube-oriented proxy.
+ * When {@link SAFE_OUTBOUND_HTTP_PROXY} is set but the proxy itself fails —
+ * the CONNECT tunnel refused (407 from bad credentials, 502 and the like) or
+ * the proxy unreachable (connect timeout, refused, not in DNS) — retries once
+ * via direct pinned egress, so metadata scrapes are not wedged by a dead or
+ * misconfigured proxy (see {@link describeHttpProxyHopFailure}).
  */
 export async function safeFetch(
   input: string | URL,
@@ -451,12 +494,13 @@ export async function safeFetch(
   try {
     return await safeFetchWithDispatcher(input, init, safeFetchDispatcher);
   } catch (err) {
-    if (
-      safeOutboundEgressMode === "http_proxy" &&
-      isHttpProxyTunnelFailure(err)
-    ) {
+    const proxyFailure =
+      safeOutboundEgressMode === "http_proxy"
+        ? describeHttpProxyHopFailure(err)
+        : null;
+    if (proxyFailure) {
       console.warn(
-        "[safeFetch] HTTP proxy CONNECT failed (407); retrying with direct egress",
+        `[safeFetch] HTTP proxy failed (${proxyFailure}); retrying with direct egress`,
       );
       try {
         return await safeFetchWithDispatcher(input, init, safeOutboundAgent);

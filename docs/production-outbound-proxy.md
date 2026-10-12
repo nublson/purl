@@ -8,6 +8,8 @@ Vercel functions use datacenter IPs. YouTube often omits caption tracks in playe
 
 **Proxy:** [`safeFetch`](../src/lib/safe-outbound-fetch.ts) reads `SAFE_OUTBOUND_HTTP_PROXY` at process startup and routes outbound HTTP(S) through HTTP CONNECT when set, including YouTube oEmbed and caption requests.
 
+**If the proxy fails:** a refused CONNECT tunnel (407 from bad or expired credentials, 502, …) or an unreachable proxy host (connect timeout, connection refused, not in DNS) makes `safeFetch` log `[safeFetch] HTTP proxy failed (<reason>); retrying with direct egress` and retry that request once without the proxy. The retry only starts after the proxy's 10 s connect timeout, so every save and preview takes 10 s longer while the proxy is down: if the proxy isn't needed any more, remove the variable and redeploy instead of relying on the fallback.
+
 ## 1. Get a proxy URL (HTTP CONNECT)
 
 **Recommended starter: [Webshare](https://www.webshare.io)** — free tier includes residential-style proxies suitable for low-volume caption fetch.
