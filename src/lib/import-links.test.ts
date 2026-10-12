@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const tx = vi.hoisted(() => ({
   $executeRaw: vi.fn(),
   link: { count: vi.fn(), findMany: vi.fn(), createMany: vi.fn() },
-  folder: { findMany: vi.fn() },
+  folder: { findMany: vi.fn(), findFirst: vi.fn() },
 }));
 
 vi.mock("@/lib/prisma", () => {
@@ -18,12 +18,13 @@ vi.mock("@/lib/prisma", () => {
   return { default: client };
 });
 
-vi.mock("@/lib/folders", () => ({
+vi.mock("@/lib/folders", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/folders")>()),
   createFolderInTx: vi.fn(),
 }));
 
 const prisma = (await import("@/lib/prisma")).default;
-const { createFolderInTx } = await import("@/lib/folders");
+const { createFolderInTx, FolderLimitError, FolderNameError } = await import("@/lib/folders");
 const { importLinksForUser } = await import("./import-links");
 const { suggestFolderEmoji } = await import("./emoji-suggestion");
 const { getDefaultFaviconUrl } = await import("@/utils/default-favicon");
@@ -74,6 +75,7 @@ beforeEach(() => {
     count: data.length,
   }));
   tx.folder.findMany.mockResolvedValue([]);
+  tx.folder.findFirst.mockResolvedValue(null);
   vi.mocked(createFolderInTx).mockImplementation((async (
     _tx: unknown,
     _userId: string,
@@ -349,6 +351,68 @@ describe("importLinksForUser", () => {
       expect(result.foldersCreated).toBe(1);
     });
 
+    it("uses the folder the database matched when creating reports the name taken", async () => {
+      vi.mocked(createFolderInTx).mockRejectedValue(
+        new FolderNameError("taken", "You already have a folder with that name. Choose another."),
+      );
+      tx.folder.findFirst.mockResolvedValue({ id: "db-match" });
+
+      const result = await importLinksForUser(
+        "user-1",
+        [
+          input({ url: "https://example.com/1", folder: "İstanbul" }),
+          input({ url: "https://example.com/2", folder: "i̇stanbul" }),
+        ],
+        NOW,
+      );
+
+      expect(tx.folder.findFirst).toHaveBeenCalledWith({
+        where: { userId: "user-1", name: { equals: "İstanbul", mode: "insensitive" } },
+        select: { id: true },
+      });
+      expect(written().map((l) => l.folderId)).toEqual(["db-match", "db-match"]);
+      expect(result).toMatchObject({ imported: 2, foldersCreated: 0, unfiledForFolderLimit: 0 });
+    });
+
+    it("writes links unfiled when the name is taken but no folder is found", async () => {
+      vi.mocked(createFolderInTx).mockRejectedValue(
+        new FolderNameError("taken", "You already have a folder with that name. Choose another."),
+      );
+
+      const result = await importLinksForUser(
+        "user-1",
+        [
+          input({ url: "https://example.com/1", folder: "50%_off" }),
+          input({ url: "https://example.com/2", folder: "50%_OFF" }),
+        ],
+        NOW,
+      );
+
+      expect(createFolderInTx).toHaveBeenCalledTimes(1);
+      expect(written().map((l) => l.folderId)).toEqual([null, null]);
+      expect(result).toMatchObject({ imported: 2, foldersCreated: 0, unfiledForFolderLimit: 2 });
+    });
+
+    it("writes links unfiled when creating hits the folder cap", async () => {
+      vi.mocked(createFolderInTx).mockRejectedValue(
+        new FolderLimitError("You can have up to 100 folders."),
+      );
+
+      const result = await importLinksForUser("user-1", [input({ folder: "New" })], NOW);
+
+      expect(tx.folder.findFirst).not.toHaveBeenCalled();
+      expect(written()[0].folderId).toBeNull();
+      expect(result).toMatchObject({ imported: 1, foldersCreated: 0, unfiledForFolderLimit: 1 });
+    });
+
+    it("rethrows other folder errors", async () => {
+      vi.mocked(createFolderInTx).mockRejectedValue(new Error("connection lost"));
+
+      await expect(
+        importLinksForUser("user-1", [input({ folder: "New" })], NOW),
+      ).rejects.toThrow("connection lost");
+    });
+
     it("does not create folders for links that are over the limit", async () => {
       tx.link.count.mockResolvedValue(999);
 
@@ -365,6 +429,26 @@ describe("importLinksForUser", () => {
       expect(vi.mocked(createFolderInTx).mock.calls[0][2]).toBe("Kept");
       expect(result).toMatchObject({ imported: 1, overLimit: 1, foldersCreated: 1 });
     });
+  });
+
+  it("strips NUL characters from titles and folder names and rejects URLs with one", async () => {
+    const result = await importLinksForUser(
+      "user-1",
+      [
+        input({ url: "https://example.com/1", title: "Ti\u0000tle", folder: "De\u0000v" }),
+        input({ url: "https://example.com/2", folder: "\u0000\u0000" }),
+        input({ url: "https://example.com/3\u0000x" }),
+      ],
+      NOW,
+    );
+
+    expect(createFolderInTx).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(createFolderInTx).mock.calls[0][2]).toBe("Dev");
+    const links = written();
+    expect(links.map((l) => l.title)).toEqual(["Title", "Example"]);
+    expect(links.map((l) => l.folderId)).toEqual(["folder-1", null]);
+    expect(JSON.stringify(links)).not.toContain("\\u0000");
+    expect(result).toMatchObject({ imported: 2, invalid: 1, unfiledForFolderLimit: 0 });
   });
 
   it("does not write anything when every link is a duplicate or invalid", async () => {

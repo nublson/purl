@@ -1,7 +1,7 @@
 import "server-only";
 
 import { suggestFolderEmoji } from "@/lib/emoji-suggestion";
-import { createFolderInTx } from "@/lib/folders";
+import { createFolderInTx, FolderLimitError, FolderNameError } from "@/lib/folders";
 import { guessContentType } from "@/lib/guess-content-type";
 import { truncateFolderName } from "@/lib/import/normalize";
 import type { ImportLinkInput, ImportLinksResult } from "@/lib/import/types";
@@ -15,6 +15,9 @@ const MAX_URL_LENGTH = 2048;
 const MAX_TITLE_LENGTH = 500;
 const EARLIEST_DATE = new Date("2000-01-01T00:00:00Z");
 
+/** Postgres `text` rejects NUL, which would fail the whole chunk's insert. */
+const stripNul = (text: string) => text.replaceAll("\u0000", "");
+
 type ValidLink = {
   url: string;
   title: string;
@@ -25,7 +28,7 @@ type ValidLink = {
 function validUrl(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const url = raw.trim();
-  if (url.length === 0 || url.length > MAX_URL_LENGTH) return null;
+  if (url.length === 0 || url.length > MAX_URL_LENGTH || url.includes("\u0000")) return null;
   try {
     const { protocol } = new URL(url);
     return protocol === "http:" || protocol === "https:" ? url : null;
@@ -46,7 +49,7 @@ function cutAt(text: string, max: number): string {
 }
 
 function validTitle(raw: unknown, url: string): string {
-  const title = typeof raw === "string" ? cutAt(raw.trim(), MAX_TITLE_LENGTH).trim() : "";
+  const title = typeof raw === "string" ? cutAt(stripNul(raw).trim(), MAX_TITLE_LENGTH).trim() : "";
   return title.length > 0 ? title : getUrlDomain(url);
 }
 
@@ -59,7 +62,7 @@ function validDate(raw: unknown, now: Date): Date {
 
 function validFolder(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
-  const name = raw.trim();
+  const name = stripNul(raw).trim();
   if (name.length === 0) return null;
   // Shortened here so `createFolderInTx` never rejects it as too long.
   return name.length > MAX_FOLDER_NAME_LENGTH ? truncateFolderName(name) : name;
@@ -198,10 +201,44 @@ async function resolveFolders(
       unavailable.add(key);
       continue;
     }
-    const created = await createFolderInTx(tx, userId, name, suggestFolderEmoji(name));
-    ids.set(key, created.id);
-    folderCount++;
-    result.foldersCreated++;
+    const id = await createOrFindFolder(tx, userId, name);
+    if (id === null) {
+      unavailable.add(key);
+    } else if (id.created) {
+      ids.set(key, id.id);
+      folderCount++;
+      result.foldersCreated++;
+    } else {
+      ids.set(key, id.id);
+    }
   }
   return ids;
+}
+
+/**
+ * Creates `name`, or, when the database already has it under a name the JS
+ * match missed (Postgres's case-insensitive compare differs from
+ * `toLowerCase` for some characters), uses that one. `null` when it can't be
+ * created: its links go in unfiled. These errors are thrown in JS after
+ * plain reads, so the transaction is still usable.
+ */
+async function createOrFindFolder(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  name: string,
+): Promise<{ id: string; created: boolean } | null> {
+  try {
+    const created = await createFolderInTx(tx, userId, name, suggestFolderEmoji(name));
+    return { id: created.id, created: true };
+  } catch (error) {
+    if (error instanceof FolderNameError && error.reason === "taken") {
+      const existing = await tx.folder.findFirst({
+        where: { userId, name: { equals: name, mode: "insensitive" } },
+        select: { id: true },
+      });
+      return existing ? { id: existing.id, created: false } : null;
+    }
+    if (error instanceof FolderLimitError) return null;
+    throw error;
+  }
 }
