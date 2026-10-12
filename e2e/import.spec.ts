@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, test, waitForHydration } from "./fixtures";
+import { pool } from "./support/db";
 
 // Importing a bookmarks file from Settings → Import. The file is read in the
 // browser and the links are saved without fetching their pages, so no network
@@ -123,5 +124,153 @@ test.describe("Import", () => {
 
     release();
     await expect(cy(page, "import-summary")).toContainText("Imported 2 links");
+  });
+  test("a file with unknown headers or no bookmarks is not recognized", async ({ page }) => {
+    await openImportTab(page);
+
+    await cy(page, "import-file-input").setInputFiles({
+      name: "people.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from("name,email\nAda,ada@example.com\n"),
+    });
+    await expect(cy(page, "import-error")).toContainText(
+      "We couldn’t recognize this file. Use a bookmarks export from your browser, or a CSV from Raindrop or Pocket.",
+    );
+
+    await cy(page, "import-choose-another").click();
+    await cy(page, "import-file-input").setInputFiles({
+      name: "page.html",
+      mimeType: "text/html",
+      buffer: Buffer.from("<html><body><p>Just a page, no bookmarks.</p></body></html>"),
+    });
+    await expect(cy(page, "import-error")).toContainText("We couldn’t recognize this file.");
+  });
+
+  test("a single-collection Raindrop export previews that links go to Home", async ({ page }) => {
+    await openImportTab(page);
+
+    await cy(page, "import-file-input").setInputFiles(fixture("raindrop-collection.csv"));
+    await expect(cy(page, "import-preview")).toContainText(
+      "This file has no folder information, so links go to Home.",
+    );
+  });
+
+  test("clicking Import twice quickly imports each link once", async ({ page, testUser }) => {
+    await openImportTab(page);
+
+    await cy(page, "import-file-input").setInputFiles(fixture("raindrop-backup.csv"));
+    await expect(cy(page, "import-preview")).toBeVisible();
+    // Two clicks in the same frame, before React has re-rendered.
+    await cy(page, "import-submit").evaluate((button: HTMLElement) => {
+      button.click();
+      button.click();
+    });
+    await expect(cy(page, "import-summary")).toContainText("Imported 4 links");
+
+    const { rows } = await pool.query<{ count: string }>(
+      `SELECT count(*) FROM "links" WHERE "userId" = $1`,
+      [testUser.id],
+    );
+    expect(Number(rows[0].count)).toBe(4);
+  });
+
+  test("imported links appear under their original dates, not Today", async ({ page }) => {
+    await openImportTab(page);
+
+    await cy(page, "import-file-input").setInputFiles(fixture("pocket.csv"));
+    await cy(page, "import-submit").click();
+    await expect(cy(page, "import-summary")).toContainText("Imported 2 links");
+    await cy(page, "import-view-links").click();
+
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(2);
+    await expect(page.getByRole("heading", { name: "September 2025" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "August 2025" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Today" })).toHaveCount(0);
+  });
+
+  test("a file over 5 MB is refused without sending anything", async ({ page }) => {
+    let sent = 0;
+    await page.route("**/api/links/import", async (route) => {
+      sent += 1;
+      await route.continue();
+    });
+    await openImportTab(page);
+
+    await cy(page, "import-file-input").setInputFiles({
+      name: "huge.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.alloc(5 * 1024 * 1024 + 1, "a"),
+    });
+    await expect(cy(page, "import-error")).toContainText(
+      "This file is over 5 MB. Export fewer bookmarks and try again.",
+    );
+    expect(sent).toBe(0);
+  });
+
+  test("a failed request shows the error, and Try again finishes the import", async ({ page }) => {
+    const failing = (route: import("@playwright/test").Route) =>
+      route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "The import service is down." }),
+      });
+    await page.route("**/api/links/import", failing);
+    await openImportTab(page);
+
+    await cy(page, "import-file-input").setInputFiles(fixture("pocket.csv"));
+    await cy(page, "import-submit").click();
+    const error = cy(page, "import-error");
+    await expect(error).toContainText("The import service is down.");
+    await expect(cy(page, "import-retry")).toHaveText("Try again");
+
+    await page.unroute("**/api/links/import", failing);
+    await cy(page, "import-retry").click();
+    await expect(cy(page, "import-summary")).toContainText("Imported 2 links");
+  });
+
+  test("the cron job fills in imported links without touching their titles or dates", async ({
+    page,
+    request,
+    testUser,
+  }) => {
+    test.skip(!process.env.CRON_SECRET, "CRON_SECRET is not set");
+    await openImportTab(page);
+
+    await cy(page, "import-file-input").setInputFiles(fixture("pocket.csv"));
+    await cy(page, "import-submit").click();
+    await expect(cy(page, "import-summary")).toContainText("Imported 2 links");
+
+    type Row = { title: string; needsMetadata: boolean; createdAt: Date };
+    const load = async () =>
+      (
+        await pool.query<Row>(
+          `SELECT "title", "needsMetadata", "createdAt" FROM "links" WHERE "userId" = $1 ORDER BY "createdAt" DESC`,
+          [testUser.id],
+        )
+      ).rows;
+
+    const before = await load();
+    expect(before.map((row) => row.needsMetadata)).toEqual([true, true]);
+
+    // Each run claims the newest 20 flagged links of every user, so other
+    // workers' imports can come first: run it until ours are claimed.
+    await expect
+      .poll(
+        async () => {
+          const response = await request.get("/api/cron/enrich-links", {
+            headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
+          });
+          expect(response.status()).toBe(200);
+          return (await load()).every((row) => !row.needsMetadata);
+        },
+        { timeout: 60_000 },
+      )
+      .toBe(true);
+
+    const after = await load();
+    expect(after.map((row) => row.title)).toEqual(before.map((row) => row.title));
+    expect(after.map((row) => row.createdAt.getTime())).toEqual(
+      before.map((row) => row.createdAt.getTime()),
+    );
   });
 });
