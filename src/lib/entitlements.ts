@@ -26,14 +26,22 @@ export async function assertCanSaveLink(userId: string): Promise<void> {
  * per-user advisory lock (released at commit/rollback) serializes concurrent
  * saves, so two requests at 999 links can't both insert. Keep `insert` short —
  * the lock is held for the whole transaction.
+ *
+ * `reuse`, when given, runs first under the same lock: if it returns a value,
+ * that is the result and nothing is inserted or counted against the cap. It
+ * lets a save that found no row before its (slow) metadata work check again
+ * once it holds the lock, so two concurrent saves of one URL end as one row.
  */
 export async function insertWithinSaveLimit<T>(
   userId: string,
   insert: (tx: Prisma.TransactionClient) => Promise<T>,
+  options: { reuse?: (tx: Prisma.TransactionClient) => Promise<T | null> } = {},
 ): Promise<T> {
   return prisma.$transaction(async (tx) => {
     // Separate key space from the folder lock in folders.ts.
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`links:${userId}`}))`;
+    const reused = options.reuse ? await options.reuse(tx) : null;
+    if (reused !== null) return reused;
     const n = await tx.link.count({ where: { userId } });
     if (n >= MAX_SAVED_LINKS) throw limitError();
     return insert(tx);
