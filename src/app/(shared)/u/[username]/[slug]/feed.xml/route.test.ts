@@ -59,9 +59,8 @@ describe("GET /@username/slug/feed.xml", () => {
     expect(res.headers.get("Content-Type")).toBe(
       "application/atom+xml; charset=utf-8",
     );
-    expect(res.headers.get("Cache-Control")).toBe(
-      "public, s-maxage=300, stale-while-revalidate=3600",
-    );
+    // Never shared: unsharing a folder must end its feed at once.
+    expect(res.headers.get("Cache-Control")).toBe("private, max-age=60");
     expect(res.headers.get("X-Robots-Tag")).toBe("noindex");
     const body = await res.text();
     expect(body).toContain("🎨 Design by @nublson");

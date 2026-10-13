@@ -39,7 +39,10 @@ export async function GET(
   return new NextResponse(xml, {
     headers: {
       "Content-Type": "application/atom+xml; charset=utf-8",
-      "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600",
+      // Never a shared cache: making the folder private must end the feed at
+      // once (a CDN would keep serving its links until the entry expired).
+      // Visitors' own browsers may reuse it briefly, like the load-more API.
+      "Cache-Control": "private, max-age=60",
       "X-Robots-Tag": "noindex",
     },
   });

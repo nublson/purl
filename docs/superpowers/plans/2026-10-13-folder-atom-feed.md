@@ -19,7 +19,7 @@
 - **Absolute URLs** come from `process.env.BASE_URL`, falling back to the request's origin; never the `Host` header when `BASE_URL` is set.
 - **Feed title** equals the page's: `${emoji} ${name} by @${username}`.
 - **Entry id:** `tag:purl.live,2026:link:<link id>`. Feed `<id>` is the absolute folder page URL.
-- **Caching/robots:** 200 responses send `Cache-Control: public, s-maxage=300, stale-while-revalidate=3600` and `X-Robots-Tag: noindex`; 404/308 are not cached.
+- **Caching/robots:** 200 responses send `Cache-Control: private, max-age=60` (changed after review: a shared cache would keep a folder's feed readable after it is made private) and `X-Robots-Tag: noindex`; 404/308 are not cached.
 - **Private or missing folder → 404; renamed username/slug → 308 to the current *feed* URL.**
 - No new rate-limit bucket: `/@…` is already public and limited as `public_folder` in the proxy.
 - Raw HTML tags are not involved (no UI changes beyond `<head>` metadata). Reicon/Typography rules don't apply.
@@ -80,7 +80,7 @@
 - Produces: `export async function GET(request: NextRequest, context: { params: Promise<{ username: string; slug: string }> }): Promise<Response>`
 
 - [ ] **Step 1: Write the failing route tests** (mock `@/lib/public-folders` with `resolvePublicFolder` and `listPublicFolderLinks`, `vi.mock("server-only", () => ({}))`, `vi.stubEnv("BASE_URL", "https://purl.live")`, same style as `src/app/api/public/folders/[username]/[slug]/route.test.ts`):
-  - folder → 200, `Content-Type` `application/atom+xml; charset=utf-8`, `Cache-Control` `public, s-maxage=300, stale-while-revalidate=3600`, `X-Robots-Tag` `noindex`, body contains the folder title and a link's tag id; `listPublicFolderLinks` called with the resolved `ids`
+  - folder → 200, `Content-Type` `application/atom+xml; charset=utf-8`, `Cache-Control` `private, max-age=60`, `X-Robots-Tag` `noindex`, body contains the folder title and a link's tag id; `listPublicFolderLinks` called with the resolved `ids`
   - `resolvePublicFolder` → `null`: 404, no `Cache-Control` header set to the public value, body has no folder data
   - `{ kind: "redirect", username: "new", slug: "renamed" }` → 308 with `Location` ending `/@new/renamed/feed.xml`
   - with `BASE_URL` unset the feed's `<id>` uses the request origin
