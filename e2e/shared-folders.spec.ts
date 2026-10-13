@@ -1,5 +1,5 @@
 import { expect, test, waitForHydration } from "./fixtures";
-import { setFolderPublic } from "./support/db";
+import { pool, setFolderPublic } from "./support/db";
 
 // Public folders at /@username/slug: readable by anyone (no session),
 // never indexed, 404 when private, and old URLs redirect after a rename.
@@ -298,6 +298,99 @@ test.describe("Shared folders, visited signed out", () => {
     expect((await page.goto(`/@${testUser.username}/hidden`))?.status()).toBe(404);
     expect((await page.goto(`/@${testUser.username}/nope`))?.status()).toBe(404);
     expect((await page.goto(`/@no-such-user-xyz/hidden`))?.status()).toBe(404);
+  });
+
+  test("a public folder serves an Atom feed, linked from its page", async ({
+    page,
+    seed,
+    testUser,
+  }) => {
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    await seed.link({ url: "https://a.example/one", title: "Tom & Jerry <3", folderId: design });
+    await seed.link({ url: "https://b.example/two", title: "Second", folderId: design });
+
+    const path = `/@${testUser.username}/design/feed.xml`;
+    const response = await page.request.get(path);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toContain("application/atom+xml");
+    const text = await response.text();
+
+    await page.goto(`/@${testUser.username}/design`);
+    const parsed = await page.evaluate((xml) => {
+      const doc = new DOMParser().parseFromString(xml, "application/xml");
+      const entries = Array.from(doc.getElementsByTagName("entry"));
+      return {
+        parserError: doc.getElementsByTagName("parsererror").length,
+        entryCount: entries.length,
+        feedId: doc.querySelector("feed > id")?.textContent ?? null,
+        titles: entries.map((entry) => entry.querySelector("title")?.textContent ?? null),
+        hrefs: entries.map(
+          (entry) => entry.querySelector('link[rel="alternate"]')?.getAttribute("href") ?? null,
+        ),
+      };
+    }, text);
+    expect(parsed.parserError).toBe(0);
+    expect(parsed.entryCount).toBe(2);
+    expect(parsed.feedId).toMatch(new RegExp(`/@${testUser.username}/design$`));
+    expect(parsed.titles).toContain("Tom & Jerry <3");
+    expect(parsed.hrefs).toContain("https://a.example/one");
+    expect(parsed.hrefs).toContain("https://b.example/two");
+
+    await expect(
+      page.locator('link[rel="alternate"][type="application/atom+xml"]'),
+    ).toHaveAttribute("href", new RegExp(`/@${testUser.username}/design/feed\\.xml$`));
+  });
+
+  test("an empty public folder's feed has no entries; private and unknown are 404", async ({
+    page,
+    seed,
+    testUser,
+  }) => {
+    await seed.folder({ name: "Empty", slug: "empty", isPublic: true });
+    await seed.folder({ name: "Hidden", slug: "hidden" });
+
+    const empty = await page.request.get(`/@${testUser.username}/empty/feed.xml`);
+    expect(empty.status()).toBe(200);
+    const text = await empty.text();
+    await page.goto("/");
+    const counts = await page.evaluate((xml) => {
+      const doc = new DOMParser().parseFromString(xml, "application/xml");
+      return {
+        parserError: doc.getElementsByTagName("parsererror").length,
+        entries: doc.getElementsByTagName("entry").length,
+      };
+    }, text);
+    expect(counts).toEqual({ parserError: 0, entries: 0 });
+
+    expect((await page.request.get(`/@${testUser.username}/hidden/feed.xml`)).status()).toBe(404);
+    expect((await page.request.get(`/@${testUser.username}/nope/feed.xml`)).status()).toBe(404);
+  });
+
+  test("the feed path is case-insensitive", async ({ page, seed, testUser }) => {
+    await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    const response = await page.request.get(
+      `/@${testUser.username.toUpperCase()}/Design/feed.xml`,
+    );
+    expect(response.status()).toBe(200);
+  });
+
+  test("a renamed slug's feed redirects (308) to the current feed on the public host", async ({
+    page,
+    seed,
+    testUser,
+  }) => {
+    const folderId = await seed.folder({ name: "New", slug: "new", isPublic: true });
+    await pool.query(
+      `INSERT INTO folder_slug_redirects (id, "userId", slug, "folderId") VALUES ($1, $2, $3, $4)`,
+      [`e2e-${folderId}`, testUser.id, "old", folderId],
+    );
+    const response = await page.request.get(`/@${testUser.username}/old/feed.xml`, {
+      maxRedirects: 0,
+    });
+    expect(response.status()).toBe(308);
+    expect(response.headers()["location"]).toMatch(
+      new RegExp(`^https?://[^/]+/@${testUser.username}/new/feed\\.xml$`),
+    );
   });
 
   test("/u/... redirects to the /@ URL, and load more is public", async ({
