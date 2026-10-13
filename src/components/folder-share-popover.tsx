@@ -6,7 +6,7 @@ import { useCurrentFolder, useFolderActions } from "@/hooks/use-folders";
 import { haptic } from "@/lib/haptics";
 import { publicFolderFeedPath, publicFolderPath } from "@/lib/public-folder-path";
 import { cn } from "@/lib/utils";
-import { Check, Copy3, Feed, Globe, Lock } from "reicon-react";
+import { Check, Copy3, Globe, Lock } from "reicon-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { HapticTarget } from "./haptic-target";
@@ -257,8 +257,8 @@ function CopyButton({
 }
 
 /**
- * The feed's button: its own words, so it needs no label row. The feed icon
- * cross-fades to a check once it has copied; the words swap instantly.
+ * The feed's button: its own words, so it needs no label row. Its copy icon
+ * (the link button's) cross-fades to a check once it has copied; the words swap instantly.
  */
 function CopyFeedButton({
   copied,
@@ -280,7 +280,7 @@ function CopyFeedButton({
     >
       {copied ? "Feed link copied" : "Copy feed link"}
       <span data-icon="inline-end" className="relative flex size-4">
-        <Feed aria-hidden className={cn(ICON_SWAP, copied ? ICON_OUT : ICON_IN)} />
+        <Copy3 aria-hidden className={cn(ICON_SWAP, copied ? ICON_OUT : ICON_IN)} />
         <Check
           aria-hidden
           className={cn(
