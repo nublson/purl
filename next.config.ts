@@ -77,12 +77,23 @@ const nextConfig: NextConfig = {
         destination: "/@:username/:slug",
         permanent: true,
       },
+      {
+        source: "/u/:username/:slug/feed.xml",
+        destination: "/@:username/:slug/feed.xml",
+        permanent: true,
+      },
     ];
   },
   async rewrites() {
     // App directory segments can't start with "@" (that's parallel routes),
     // so the public /@username/slug URL is served by /u/[username]/[slug].
-    return [{ source: "/@:username/:slug", destination: "/u/:username/:slug" }];
+    return [
+      { source: "/@:username/:slug", destination: "/u/:username/:slug" },
+      {
+        source: "/@:username/:slug/feed.xml",
+        destination: "/u/:username/:slug/feed.xml",
+      },
+    ];
   },
   async headers() {
     // X-Frame-Options and friends everywhere; the CSP in production only.

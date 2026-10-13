@@ -166,5 +166,8 @@ export const config = {
   // robots/sitemap, and asset extensions.
   matcher: [
     "/((?!_next/static|_next/image|_vercel|favicon.ico|sw.js|manifest.json|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|js|mjs|css|map|txt|xml|json|webmanifest|woff|woff2)$).*)",
+    // The main entry skips every .xml; a shared folder's Atom feed still needs
+    // the public_folder rate limit.
+    "/@:username/:slug/feed.xml",
   ],
 };

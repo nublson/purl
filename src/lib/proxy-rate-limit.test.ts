@@ -264,6 +264,7 @@ describe("rateLimitApiRequest", () => {
   describe("shared folders", () => {
     it.each([
       "/@nublson/design",
+      "/@nublson/design/feed.xml",
       "/api/public/folders/nublson/design",
       "/u/nublson/design/opengraph-image-1a2b3c",
     ])(
