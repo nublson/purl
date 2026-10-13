@@ -10,6 +10,10 @@ import { Separator } from "@/components/ui/separator";
 import { SharedFolderFooter } from "@/components/shared-folder-footer";
 import { SharedFolderSkeleton } from "@/components/skeletons/shared-folder";
 import {
+  publicFolderFeedPath,
+  publicFolderTitle,
+} from "@/lib/public-folder-path";
+import {
   listPublicFolderLinks,
   publicFolderPath,
   resolvePublicFolder,
@@ -51,11 +55,23 @@ export async function generateMetadata({
   if (!page || page.kind !== "folder") return { robots };
   // "🎨 Design by @nublson · Purl": the app's "%s · Purl" template adds
   // the suffix to the tab title; link previews get it spelled out.
-  const title = `${page.folder.emoji} ${page.folder.name} by @${page.owner.username}`;
+  const title = publicFolderTitle(
+    page.folder.emoji,
+    page.folder.name,
+    page.owner.username,
+  );
   return {
     title,
     description: page.folder.description ?? undefined,
     robots,
+    alternates: {
+      types: {
+        "application/atom+xml": publicFolderFeedPath(
+          page.owner.username,
+          page.folder.slug,
+        ),
+      },
+    },
     openGraph: {
       title: `${title} · Purl`,
       description: page.folder.description ?? undefined,
