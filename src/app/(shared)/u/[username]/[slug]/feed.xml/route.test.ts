@@ -90,6 +90,12 @@ describe("GET /@username/slug/feed.xml", () => {
     expect(res.headers.get("Cache-Control") ?? "").not.toContain("public");
   });
 
+  it("redirects on BASE_URL, not the request host", async () => {
+    mockResolve.mockResolvedValue({ kind: "redirect", username: "new", slug: "renamed" });
+    const res = await get("https://internal.example.com/u/old/renamed/feed.xml");
+    expect(res.headers.get("Location")).toBe("https://purl.live/@new/renamed/feed.xml");
+  });
+
   it("falls back to the request's origin without BASE_URL", async () => {
     vi.stubEnv("BASE_URL", "");
     mockResolve.mockResolvedValue({

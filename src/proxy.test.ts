@@ -424,4 +424,13 @@ describe("proxy matcher", () => {
   ])("skips %s", (path) => {
     expect(matcher.test(path)).toBe(false);
   });
+
+  it("runs on a shared folder's Atom feed through its own entry", () => {
+    const feedEntry = config.matcher[1];
+    expect(feedEntry).toBe("/@:username/:slug/feed.xml");
+    const feedMatcher = new RegExp(`^${feedEntry.replace(/:\w+/g, "[^/]+")}$`);
+    expect(feedMatcher.test("/@nublson/design/feed.xml")).toBe(true);
+    // The main entry still skips .xml; only the feed entry matches it.
+    expect(matcher.test("/@nublson/design/feed.xml")).toBe(false);
+  });
 });

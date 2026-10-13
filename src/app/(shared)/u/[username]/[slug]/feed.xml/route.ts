@@ -21,7 +21,10 @@ export async function GET(
   if (!page) return new NextResponse("Not found", { status: 404 });
   if (page.kind === "redirect") {
     return NextResponse.redirect(
-      new URL(publicFolderFeedPath(page.username, page.slug), request.url),
+      new URL(
+        publicFolderFeedPath(page.username, page.slug),
+        process.env.BASE_URL || request.nextUrl.origin,
+      ),
       308,
     );
   }

@@ -12,7 +12,7 @@ import type {
 // Anything outside XML 1.0's Char production (lone surrogates included: with
 // the `u` flag they are code points outside this set).
 const FORBIDDEN_XML_CHARS =
-  /[^\x09\x0A\x0D\x20-퟿-�\u{10000}-\u{10FFFF}]/gu;
+  /[^\x09\x0A\x0D\x20-\uD7FF\uE000-\uFFFD\u{10000}-\u{10FFFF}]/gu;
 
 /** Drops characters XML 1.0 forbids, then escapes `& < > " '`. */
 export function escapeXml(text: string): string {
@@ -50,7 +50,7 @@ export function buildAtomFeed(input: {
     return [
       "  <entry>",
       `    <id>tag:purl.live,2026:link:${escapeXml(link.id)}</id>`,
-      `    <title>${escapeXml(link.title || link.url)}</title>`,
+      `    <title>${escapeXml(link.title).trim() || escapeXml(link.url)}</title>`,
       `    <link rel="alternate" href="${escapeXml(link.url)}"/>`,
       `    <published>${created}</published>`,
       `    <updated>${created}</updated>`,

@@ -113,6 +113,20 @@ describe("buildAtomFeed", () => {
     expect(xml).toContain("<title>https://example.com/z</title>");
   });
 
+  it.each([["whitespace-only", "   "], ["only forbidden characters", "\u0000"]])(
+    "falls back to the URL for a %s title",
+    (_name, title) => {
+      const xml = buildAtomFeed({
+        origin,
+        owner,
+        folder,
+        links: [link({ title, url: "https://example.com/z" })],
+        now,
+      });
+      expect(xml).toContain("<title>https://example.com/z</title>");
+    },
+  );
+
   it("escapes titles", () => {
     const xml = buildAtomFeed({
       origin,
