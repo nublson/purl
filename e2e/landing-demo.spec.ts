@@ -187,6 +187,13 @@ test.describe("Landing demo", () => {
         const origin = new URL(page.url()).origin;
         expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${origin}/@purl/reading-list`);
       }
+
+      await page.getByRole("button", { name: "Copy feed link" }).click();
+      await expect(page.getByRole("button", { name: "Feed link copied" })).toBeVisible();
+      if (browserName === "chromium") {
+        const origin = new URL(page.url()).origin;
+        expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(`${origin}/@purl/reading-list/feed.xml`);
+      }
     });
 
     test("account menu: Grid shows cards without saving; account items are disabled", async ({ page }) => {

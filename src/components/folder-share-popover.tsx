@@ -4,7 +4,7 @@ import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCurrentFolder, useFolderActions } from "@/hooks/use-folders";
 import { haptic } from "@/lib/haptics";
-import { publicFolderPath } from "@/lib/public-folder-path";
+import { publicFolderFeedPath, publicFolderPath } from "@/lib/public-folder-path";
 import { cn } from "@/lib/utils";
 import { Check, Copy3, Globe, Lock } from "reicon-react";
 import * as React from "react";
@@ -35,8 +35,9 @@ const ICON_OUT = "scale-25 opacity-0 blur-[4px]";
 /**
  * The header's Share button on a folder page (lock when private, globe when
  * public) and its popover: a Public switch and the folder's public link
- * (`/@username/slug`) with a copy button. The link only works while the
- * folder is public, so copying is off until then.
+ * (`/@username/slug`) with a copy button, and a row below it that copies the
+ * folder's Atom feed (`/@username/slug/feed.xml`). Neither link works while
+ * the folder is private, so copying is off until it's public.
  */
 export function FolderSharePopover() {
   const folder = useCurrentFolder();
@@ -47,7 +48,8 @@ export function FolderSharePopover() {
   const [saving, setSaving] = React.useState(false);
   // Shown right away; the server's answer (or a failure) settles it.
   const [optimistic, setOptimistic] = React.useState<boolean | null>(null);
-  const [copied, setCopied] = React.useState(false);
+  // Which copy button shows its check (one at a time, one shared timer).
+  const [copied, setCopied] = React.useState<CopyKind | null>(null);
   const copiedTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const switchId = React.useId();
 
@@ -61,6 +63,10 @@ export function FolderSharePopover() {
   if (!folder || !user) return null;
   const isPublic = isDemo || (optimistic ?? folder.isPublic);
   const path = publicFolderPath(user.username, folder.slug);
+  const feedPath = publicFolderFeedPath(user.username, folder.slug);
+  // Only once sharing is saved: the switch moves right away, but the links
+  // work only after the server confirms.
+  const canCopy = (isDemo || folder.isPublic) && !saving;
 
   async function setPublic(next: boolean) {
     if (!folder) return;
@@ -76,18 +82,24 @@ export function FolderSharePopover() {
     if (!result.ok) toast.error(result.error);
   }
 
-  async function copyLink() {
+  async function copy(kind: CopyKind, targetPath: string) {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}${path}`);
+      await navigator.clipboard.writeText(
+        `${window.location.origin}${targetPath}`,
+      );
     } catch {
-      toast.error("Unable to copy the link. Select it and copy it instead.");
+      toast.error(
+        kind === "link"
+          ? "Unable to copy the link. Select it and copy it instead."
+          : "Unable to copy the feed link.",
+      );
       return;
     }
     // Android: a success only once it's copied (iOS ticks on the tap).
     haptic("success");
-    setCopied(true);
+    setCopied(kind);
     if (copiedTimer.current) clearTimeout(copiedTimer.current);
-    copiedTimer.current = setTimeout(() => setCopied(false), COPIED_MS);
+    copiedTimer.current = setTimeout(() => setCopied(null), COPIED_MS);
   }
 
   return (
@@ -165,35 +177,77 @@ export function FolderSharePopover() {
               <HostPrefix />
               {path}
             </Typography>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              // Only once sharing is saved: the switch moves right away, but
-              // the link works only after the server confirms.
-              disabled={(!isDemo && !folder.isPublic) || saving}
-              aria-label={copied ? "Link copied" : "Copy link"}
-              onClick={() => void copyLink()}
-              // Concentric with the field: its radius minus the 4px inset.
-              className="relative cursor-pointer rounded-[calc(var(--radius-md)-4px)] text-muted-foreground"
+            <CopyButton
+              kind="link"
+              copied={copied === "link"}
+              disabled={!canCopy}
+              onCopy={() => void copy("link", path)}
+            />
+          </div>
+          <div className="flex h-8 items-center justify-between gap-2 ps-3 pe-1">
+            <Typography
+              component="span"
+              size="small"
+              className={cn(
+                "transition-colors duration-150",
+                isPublic && "text-foreground",
+              )}
             >
-              {/* Cross-fade: both icons stay mounted. */}
-              <Copy3
-                aria-hidden
-                className={cn(ICON_SWAP, copied ? ICON_OUT : ICON_IN)}
-              />
-              <Check
-                aria-hidden
-                className={cn("absolute", ICON_SWAP, copied ? ICON_IN : ICON_OUT)}
-              />
-              <HapticTarget />
-            </Button>
+              Feed
+            </Typography>
+            <CopyButton
+              kind="feed"
+              copied={copied === "feed"}
+              disabled={!canCopy}
+              onCopy={() => void copy("feed", feedPath)}
+            />
           </div>
           <span aria-live="polite" className="sr-only">
-            {copied ? "Link copied" : ""}
+            {copied === "link"
+              ? "Link copied"
+              : copied === "feed"
+                ? "Feed link copied"
+                : ""}
           </span>
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+type CopyKind = "link" | "feed";
+
+/** A ghost copy button that cross-fades to a check once it has copied. */
+function CopyButton({
+  kind,
+  copied,
+  disabled,
+  onCopy,
+}: {
+  kind: CopyKind;
+  copied: boolean;
+  disabled: boolean;
+  onCopy: () => void;
+}) {
+  const noun = kind === "link" ? "link" : "feed link";
+  return (
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      disabled={disabled}
+      aria-label={copied ? `${noun[0].toUpperCase()}${noun.slice(1)} copied` : `Copy ${noun}`}
+      onClick={onCopy}
+      // Concentric with the field: its radius minus the 4px inset.
+      className="relative cursor-pointer rounded-[calc(var(--radius-md)-4px)] text-muted-foreground"
+    >
+      {/* Cross-fade: both icons stay mounted. */}
+      <Copy3 aria-hidden className={cn(ICON_SWAP, copied ? ICON_OUT : ICON_IN)} />
+      <Check
+        aria-hidden
+        className={cn("absolute", ICON_SWAP, copied ? ICON_IN : ICON_OUT)}
+      />
+      <HapticTarget />
+    </Button>
   );
 }
 
