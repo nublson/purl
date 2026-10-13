@@ -198,7 +198,9 @@ export function FolderSharePopover() {
               )}
             >
               <div className="-m-1 min-h-0 overflow-hidden p-1">
-                <div className="pt-3">
+                {/* Right-aligned: inset 5px (the field's border and padding)
+                    so its icon sits under the copy button's icon above. */}
+                <div className="flex justify-end pe-[5px] pt-3">
                   <CopyFeedButton
                     copied={copied === "feed"}
                     disabled={!canCopy}
@@ -273,9 +275,11 @@ function CopyFeedButton({
       size="sm"
       disabled={disabled}
       onClick={onCopy}
-      className="relative cursor-pointer text-muted-foreground hover:text-foreground"
+      // 8px at the icon's end, like the copy button's 32px box around its 16px icon.
+      className="relative cursor-pointer text-muted-foreground hover:text-foreground has-data-[icon=inline-end]:pr-2"
     >
-      <span data-icon="inline-start" className="relative flex size-4">
+      {copied ? "Feed link copied" : "Copy feed link"}
+      <span data-icon="inline-end" className="relative flex size-4">
         <Feed aria-hidden className={cn(ICON_SWAP, copied ? ICON_OUT : ICON_IN)} />
         <Check
           aria-hidden
@@ -286,7 +290,6 @@ function CopyFeedButton({
           )}
         />
       </span>
-      {copied ? "Feed link copied" : "Copy feed link"}
       <HapticTarget />
     </Button>
   );
