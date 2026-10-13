@@ -6,7 +6,7 @@ import { useCurrentFolder, useFolderActions } from "@/hooks/use-folders";
 import { haptic } from "@/lib/haptics";
 import { publicFolderFeedPath, publicFolderPath } from "@/lib/public-folder-path";
 import { cn } from "@/lib/utils";
-import { Check, Copy3, Globe, Lock } from "reicon-react";
+import { Check, Copy3, Feed, Globe, Lock } from "reicon-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { HapticTarget } from "./haptic-target";
@@ -35,9 +35,10 @@ const ICON_OUT = "scale-25 opacity-0 blur-[4px]";
 /**
  * The header's Share button on a folder page (lock when private, globe when
  * public) and its popover: a Public switch and the folder's public link
- * (`/@username/slug`) with a copy button, and a row below it that copies the
- * folder's Atom feed (`/@username/slug/feed.xml`). Neither link works while
- * the folder is private, so copying is off until it's public.
+ * (`/@username/slug`) with a copy button. While the folder is public, a
+ * "Copy feed link" button below it copies its Atom feed
+ * (`/@username/slug/feed.xml`); it opens with Public, since there's no feed
+ * to copy before then. Copying waits until sharing is saved.
  */
 export function FolderSharePopover() {
   const folder = useCurrentFolder();
@@ -91,7 +92,7 @@ export function FolderSharePopover() {
       toast.error(
         kind === "link"
           ? "Unable to copy the link. Select it and copy it instead."
-          : "Unable to copy the feed link.",
+          : "Unable to copy the feed link. Try again.",
       );
       return;
     }
@@ -162,45 +163,50 @@ export function FolderSharePopover() {
               onCheckedChange={(next) => void setPublic(next)}
             />
           </div>
-          <div
-            className="flex h-10 items-center gap-2 rounded-md border bg-input/30 ps-3 pe-1"
-          >
-            <Typography
-              component="span"
-              size="small"
+          <div>
+            <div className="flex h-10 items-center gap-2 rounded-md border bg-input/30 ps-3 pe-1">
+              <Typography
+                component="span"
+                size="small"
+                className={cn(
+                  "min-w-0 flex-1 truncate select-all transition-colors duration-150",
+                  isPublic && "text-foreground",
+                )}
+              >
+                {/* Origin without the scheme, like the design: purl.live/@you/folder */}
+                <HostPrefix />
+                {path}
+              </Typography>
+              <CopyButton
+                copied={copied === "link"}
+                disabled={!canCopy}
+                onCopy={() => void copy("link", path)}
+              />
+            </div>
+            {/* Opens with Public (height and opacity; none under reduced
+                motion). `invisible` while private keeps it out of the tab
+                order and the accessibility tree, and, as a discrete
+                property, flips only once the close has finished. The inner
+                box's 4px padding and matching negative margin leave room for
+                the focus ring inside the clip. */}
+            <div
               className={cn(
-                "min-w-0 flex-1 truncate select-all transition-colors duration-150",
-                isPublic && "text-foreground",
+                "grid transition-[grid-template-rows,opacity,visibility] duration-200 ease-out motion-reduce:transition-none",
+                isPublic
+                  ? "grid-rows-[1fr] opacity-100"
+                  : "invisible grid-rows-[0fr] opacity-0",
               )}
             >
-              {/* Origin without the scheme, like the design: purl.live/@you/folder */}
-              <HostPrefix />
-              {path}
-            </Typography>
-            <CopyButton
-              kind="link"
-              copied={copied === "link"}
-              disabled={!canCopy}
-              onCopy={() => void copy("link", path)}
-            />
-          </div>
-          <div className="flex h-8 items-center justify-between gap-2 ps-3 pe-1">
-            <Typography
-              component="span"
-              size="small"
-              className={cn(
-                "transition-colors duration-150",
-                isPublic && "text-foreground",
-              )}
-            >
-              Feed
-            </Typography>
-            <CopyButton
-              kind="feed"
-              copied={copied === "feed"}
-              disabled={!canCopy}
-              onCopy={() => void copy("feed", feedPath)}
-            />
+              <div className="-m-1 min-h-0 overflow-hidden p-1">
+                <div className="pt-3">
+                  <CopyFeedButton
+                    copied={copied === "feed"}
+                    disabled={!canCopy}
+                    onCopy={() => void copy("feed", feedPath)}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
           <span aria-live="polite" className="sr-only">
             {copied === "link"
@@ -217,25 +223,22 @@ export function FolderSharePopover() {
 
 type CopyKind = "link" | "feed";
 
-/** A ghost copy button that cross-fades to a check once it has copied. */
+/** The link field's icon button; it cross-fades to a check once it has copied. */
 function CopyButton({
-  kind,
   copied,
   disabled,
   onCopy,
 }: {
-  kind: CopyKind;
   copied: boolean;
   disabled: boolean;
   onCopy: () => void;
 }) {
-  const noun = kind === "link" ? "link" : "feed link";
   return (
     <Button
       variant="ghost"
       size="icon-sm"
       disabled={disabled}
-      aria-label={copied ? `${noun[0].toUpperCase()}${noun.slice(1)} copied` : `Copy ${noun}`}
+      aria-label={copied ? "Link copied" : "Copy link"}
       onClick={onCopy}
       // Concentric with the field: its radius minus the 4px inset.
       className="relative cursor-pointer rounded-[calc(var(--radius-md)-4px)] text-muted-foreground"
@@ -246,6 +249,44 @@ function CopyButton({
         aria-hidden
         className={cn("absolute", ICON_SWAP, copied ? ICON_IN : ICON_OUT)}
       />
+      <HapticTarget />
+    </Button>
+  );
+}
+
+/**
+ * The feed's button: its own words, so it needs no label row. The feed icon
+ * cross-fades to a check once it has copied; the words swap instantly.
+ */
+function CopyFeedButton({
+  copied,
+  disabled,
+  onCopy,
+}: {
+  copied: boolean;
+  disabled: boolean;
+  onCopy: () => void;
+}) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      disabled={disabled}
+      onClick={onCopy}
+      className="relative cursor-pointer text-muted-foreground hover:text-foreground"
+    >
+      <span data-icon="inline-start" className="relative flex size-4">
+        <Feed aria-hidden className={cn(ICON_SWAP, copied ? ICON_OUT : ICON_IN)} />
+        <Check
+          aria-hidden
+          className={cn(
+            "absolute inset-0",
+            ICON_SWAP,
+            copied ? ICON_IN : ICON_OUT,
+          )}
+        />
+      </span>
+      {copied ? "Feed link copied" : "Copy feed link"}
       <HapticTarget />
     </Button>
   );

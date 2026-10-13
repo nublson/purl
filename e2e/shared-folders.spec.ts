@@ -559,7 +559,7 @@ test.describe("Share popover", () => {
 });
 
 test.describe("Share popover: feed link", () => {
-  test("Copy feed link waits for sharing, then copies the feed URL", async ({
+  test("Copy feed link appears with Public, then copies the feed URL", async ({
     page,
     seed,
     testUser,
@@ -575,10 +575,12 @@ test.describe("Share popover: feed link", () => {
 
     const dialog = page.getByRole("dialog");
     const feed = dialog.getByRole("button", { name: "Copy feed link" });
-    await expect(dialog.getByText("Feed", { exact: true })).toBeVisible();
-    await expect(feed).toBeDisabled();
+    // No feed to copy before sharing: the button isn't there, and it opens
+    // with Public.
+    await expect(feed).toBeHidden();
 
     await dialog.getByRole("switch", { name: "Public" }).click();
+    await expect(feed).toBeVisible();
     await expect(feed).toBeEnabled();
     await feed.click();
     await expect(dialog.getByRole("button", { name: "Feed link copied" })).toBeVisible();
