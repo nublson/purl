@@ -558,43 +558,6 @@ test.describe("Share popover", () => {
   });
 });
 
-test.describe("Share popover: feed link", () => {
-  test("Copy feed link appears with Public, then copies the feed URL", async ({
-    page,
-    seed,
-    testUser,
-    browserName,
-  }) => {
-    await seed.folder({ name: "Design", slug: "design" });
-    if (browserName === "chromium") {
-      await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
-    }
-    await page.goto("/folders/design");
-    await waitForHydration(page, 'button[aria-label^="Folder:"]');
-    await page.getByRole("button", { name: "Share" }).click();
-
-    const dialog = page.getByRole("dialog");
-    const feed = dialog.getByRole("button", { name: "Copy feed link" });
-    // No feed to copy before sharing: the button isn't there, and it opens
-    // with Public.
-    await expect(feed).toBeHidden();
-
-    await dialog.getByRole("switch", { name: "Public" }).click();
-    await expect(feed).toBeVisible();
-    await expect(feed).toBeEnabled();
-    await feed.click();
-    await expect(dialog.getByRole("button", { name: "Feed link copied" })).toBeVisible();
-    // The link button is untouched by the feed's copy.
-    await expect(dialog.getByRole("button", { name: "Copy link" })).toBeVisible();
-    if (browserName === "chromium") {
-      const origin = new URL(page.url()).origin;
-      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
-        `${origin}/@${testUser.username}/design/feed.xml`,
-      );
-    }
-  });
-});
-
 test.describe("The header's Share button", () => {
   for (const isPublic of [false, true]) {
     const name = isPublic ? "Public, sharing settings" : "Share";

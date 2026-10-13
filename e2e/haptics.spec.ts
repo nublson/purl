@@ -464,22 +464,6 @@ test.describe("Haptics: row menu and Copy link", () => {
     await expect.poll(() => ticks(page)).toBe(1);
     expect(await vibrations(page)).toEqual([[10, 60, 10]]);
   });
-
-  test("Copy feed link ticks like Copy link once it's public", async ({ page, seed }) => {
-    await page.addInitScript(() => {
-      Object.defineProperty(navigator, "clipboard", {
-        configurable: true,
-        value: { writeText: () => Promise.resolve() },
-      });
-    });
-    await seed.folder({ name: "Design", slug: "design", isPublic: true });
-    await openShare(page);
-    await resetProbes(page);
-    await tapOn(page, page.getByRole("button", { name: "Copy feed link" }));
-    await expect(page.getByRole("button", { name: "Feed link copied" })).toBeVisible();
-    await expect.poll(() => ticks(page)).toBe(1);
-    expect(await vibrations(page)).toEqual([[10, 60, 10]]);
-  });
 });
 
 test.describe("Haptics: desktop", () => {
