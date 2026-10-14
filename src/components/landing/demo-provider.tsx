@@ -53,9 +53,8 @@ export function DemoProvider({
     [data.owner],
   );
 
-  const [folderId, setFolderId] = useState(
-    () => (folders.find((f) => f.slug === "reading-list") ?? folders[0])?.id,
-  );
+  // Opens on the owner's first folder, as ordered in their folder menu.
+  const [folderId, setFolderId] = useState(() => folders[0]?.id);
   const current = folders.find((f) => f.id === folderId) ?? folders[0];
   const mode = useMemo(() => ({ selectFolder: setFolderId }), []);
 

@@ -121,7 +121,7 @@ test.describe("Landing demo", () => {
       if (userId) await deleteTestUser(userId);
     });
 
-    test("opens on Reading list with its links; Secret never appears", async ({ page }) => {
+    test("opens on the owner's first folder with its links; Secret never appears", async ({ page }) => {
       await openDemo(page);
       await expect(rows(page)).toHaveCount(4);
       await expect(page.getByText("Reading 1")).toBeVisible();
