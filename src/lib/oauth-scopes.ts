@@ -1,6 +1,15 @@
 /** The scope for save-only tokens: they can save links and nothing else. */
 export const SAVE_SCOPE = "links:save";
 
+/** Every scope the discovery documents advertise. */
+export const ADVERTISED_SCOPES = [
+  "openid",
+  "profile",
+  "email",
+  "offline_access",
+  SAVE_SCOPE,
+] as const;
+
 /**
  * What a connected app can do without the save-only scope: the MCP server's
  * tools, not gated by other scopes.
