@@ -3,10 +3,26 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 type Tab = { id?: number; url?: string };
 
 let click: (tab: Tab) => Promise<void>;
+let tabUpdated: (tabId: number, changeInfo: { url?: string }) => Promise<void>;
+let tabRemoved: (tabId: number) => Promise<void>;
 const executeScript = vi.fn();
 const setBadgeText = vi.fn();
 const setBadgeBackgroundColor = vi.fn();
 const setTitle = vi.fn();
+const tabsCreate = vi.fn();
+const tabsUpdate = vi.fn();
+const tabsRemove = vi.fn();
+// chrome.storage.session, in memory.
+let stored: Record<string, unknown> = {};
+const storage = {
+  get: vi.fn(async (key: string) => (key in stored ? { [key]: stored[key] } : {})),
+  set: vi.fn(async (items: Record<string, unknown>) => {
+    Object.assign(stored, items);
+  }),
+  remove: vi.fn(async (key: string) => {
+    delete stored[key];
+  }),
+};
 
 beforeAll(async () => {
   Object.assign(globalThis, {
@@ -23,6 +39,22 @@ beforeAll(async () => {
         setTitle,
       },
       scripting: { executeScript },
+      tabs: {
+        create: tabsCreate,
+        update: tabsUpdate,
+        remove: tabsRemove,
+        onUpdated: {
+          addListener: (listener: typeof tabUpdated) => {
+            tabUpdated = listener;
+          },
+        },
+        onRemoved: {
+          addListener: (listener: typeof tabRemoved) => {
+            tabRemoved = listener;
+          },
+        },
+      },
+      storage: { session: storage },
     },
   });
   await import("./background");
@@ -53,6 +85,10 @@ beforeEach(() => {
   setBadgeText.mockReset().mockResolvedValue(undefined);
   setBadgeBackgroundColor.mockReset().mockResolvedValue(undefined);
   setTitle.mockReset().mockResolvedValue(undefined);
+  tabsCreate.mockReset().mockResolvedValue({ id: 99 });
+  tabsUpdate.mockReset().mockResolvedValue(undefined);
+  tabsRemove.mockReset().mockResolvedValue(undefined);
+  stored = {};
 });
 
 afterEach(() => {
@@ -80,7 +116,6 @@ describe("saving a page", () => {
   });
 
   it.each([
-    [401, {}, "Log in to Purl first"],
     [403, { code: "LIMIT_REACHED", feature: "SAVE_LIMIT" }, "Link limit reached"],
     [403, { error: "Forbidden" }, "Something went wrong"],
     [403, "not json", "Something went wrong"],
@@ -116,6 +151,128 @@ describe("saving a page", () => {
     await vi.advanceTimersByTimeAsync(15_000);
     await done;
     expect(lastToast()).toEqual(["error", "Request timed out"]);
+  });
+});
+
+describe("when the user is signed out", () => {
+  it("opens Purl in a new tab and says to log in", async () => {
+    const fetchMock = respond(401);
+    await click(PAGE);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(tabsCreate).toHaveBeenCalledWith({ url: "https://purl.live" });
+    expect(lastToast()).toEqual(["error", "Log in to Purl to save this page"]);
+  });
+
+  it("saves the page once the login tab reaches /home, then closes it", async () => {
+    respond(401);
+    await click(PAGE);
+
+    const fetchMock = respond(201);
+    await tabUpdated(99, { url: "https://purl.live/home" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ url: PAGE.url });
+    expect(tabsUpdate).toHaveBeenCalledWith(7, { active: true });
+    expect(tabsRemove).toHaveBeenCalledWith(99);
+    expect(lastToast()).toEqual(["saved", null]);
+  });
+
+  it("saves only once", async () => {
+    respond(401);
+    await click(PAGE);
+    const fetchMock = respond(201);
+    await tabUpdated(99, { url: "https://purl.live/home" });
+    await tabUpdated(99, { url: "https://purl.live/home?x=1" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [99, "https://purl.live/"],
+    [99, "https://accounts.google.com/o/oauth2/auth"],
+    [99, "https://evil.example/home"],
+    [5, "https://purl.live/home"],
+  ])("ignores tab %i going to %s", async (tabId, url) => {
+    respond(401);
+    await click(PAGE);
+    const fetchMock = respond(201);
+    await tabUpdated(tabId, { url });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(tabsRemove).not.toHaveBeenCalled();
+  });
+
+  it("ignores tab updates without a new address", async () => {
+    respond(401);
+    await click(PAGE);
+    const fetchMock = respond(201);
+    await tabUpdated(99, {});
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("forgets the save when the login tab is closed", async () => {
+    respond(401);
+    await click(PAGE);
+    await tabRemoved(99);
+    const fetchMock = respond(201);
+    await tabUpdated(99, { url: "https://purl.live/home" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the save when another tab is closed", async () => {
+    respond(401);
+    await click(PAGE);
+    await tabRemoved(5);
+    const fetchMock = respond(201);
+    await tabUpdated(99, { url: "https://purl.live/home" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a save older than 10 minutes", async () => {
+    vi.useFakeTimers();
+    respond(401);
+    await click(PAGE);
+    vi.setSystemTime(Date.now() + 10 * 60_000 + 1);
+    const fetchMock = respond(201);
+    await tabUpdated(99, { url: "https://purl.live/home" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("a newer save replaces the pending one", async () => {
+    respond(401);
+    await click(PAGE);
+    tabsCreate.mockResolvedValue({ id: 100 });
+    await click({ id: 8, url: "https://example.com/other" });
+
+    const fetchMock = respond(201);
+    await tabUpdated(99, { url: "https://purl.live/home" });
+    expect(fetchMock).not.toHaveBeenCalled();
+    await tabUpdated(100, { url: "https://purl.live/home" });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({
+      url: "https://example.com/other",
+    });
+  });
+
+  it("doesn't open another tab if the retry is still signed out", async () => {
+    respond(401);
+    await click(PAGE);
+    respond(401);
+    await tabUpdated(99, { url: "https://purl.live/home" });
+
+    expect(tabsCreate).toHaveBeenCalledTimes(1);
+    expect(lastToast()).toEqual(["error", "Log in to Purl first"]);
+  });
+
+  it("still saves when the original tab is gone", async () => {
+    respond(401);
+    await click(PAGE);
+    tabsUpdate.mockRejectedValue(new Error("No tab with id: 7"));
+    executeScript.mockRejectedValue(new Error("No tab with id: 7"));
+    const fetchMock = respond(201);
+    await tabUpdated(99, { url: "https://purl.live/home" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(tabsRemove).toHaveBeenCalledWith(99);
   });
 });
 
@@ -189,7 +346,7 @@ describe("when the toast can't be shown", () => {
   });
 
   it("shows failures on the icon, with the reason as its title", async () => {
-    respond(401);
+    respond(500);
     await click(PAGE);
     expect(setBadgeBackgroundColor).toHaveBeenCalledWith({
       tabId: 7,
@@ -198,7 +355,7 @@ describe("when the toast can't be shown", () => {
     expect(setBadgeText).toHaveBeenCalledWith({ tabId: 7, text: "!" });
     expect(setTitle).toHaveBeenCalledWith({
       tabId: 7,
-      title: "Log in to Purl first",
+      title: "Something went wrong",
     });
   });
 
