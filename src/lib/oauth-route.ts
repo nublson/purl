@@ -48,8 +48,11 @@ export function withTokenCors(
   });
 }
 
+/** The nublson.com portfolio's registered OAuth client. */
+export const PORTFOLIO_CLIENT_ID = "nublson-com";
+
 /** Registered clients that may only ever receive save-only tokens. */
-export const SAVE_ONLY_CLIENT_IDS = new Set(["nublson-com"]);
+export const SAVE_ONLY_CLIENT_IDS = new Set([PORTFOLIO_CLIENT_ID]);
 
 const SAVE_ONLY_ALLOWED_SCOPES = new Set([SAVE_SCOPE, "offline_access"]);
 

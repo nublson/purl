@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { createAuthMiddleware } from "better-auth/api";
 import { mcp } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { apiKey } from "@better-auth/api-key";
@@ -10,7 +11,7 @@ import {
   getEnabledProviders,
   getSocialProviders,
 } from "@/lib/auth-providers";
-import { assignUsernameOnCreate } from "@/lib/auth-hooks";
+import { assignUsernameOnCreate, revokePortfolioOnSignOut } from "@/lib/auth-hooks";
 import { ADVERTISED_SCOPES, SAVE_SCOPE } from "@/lib/oauth-scopes";
 import { API_KEY_PREFIX, getPurlApiKey } from "@/lib/api-key-getter";
 
@@ -94,6 +95,11 @@ export const auth = betterAuth({
       // added that old caches wouldn't have and code assumes is present.
       version: "2",
     },
+  },
+  hooks: {
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === "/sign-out") await revokePortfolioOnSignOut(ctx);
+    }),
   },
   databaseHooks: {
     user: {
