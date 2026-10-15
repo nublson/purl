@@ -5,7 +5,7 @@ name: Publish to MCP Registry
 # authorized because this workflow runs in a repo owned by `nublson`.
 #
 # server.json's `version` field is the source of truth (bumped automatically by
-# auto-bump-mcp-version.yml whenever MCP behavior changes). The "Tag MCP release" step
+# auto-bump-versions.yml whenever MCP behavior changes). The "Tag MCP release" step
 # in release.yml tags whatever version is committed there, and that tag push is what
 # triggers this workflow — so the tag always mirrors server.json, never the reverse.
 #
