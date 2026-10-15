@@ -11,6 +11,7 @@ import {
   getSocialProviders,
 } from "@/lib/auth-providers";
 import { assignUsernameOnCreate } from "@/lib/auth-hooks";
+import { ADVERTISED_SCOPES, SAVE_SCOPE } from "@/lib/oauth-scopes";
 import { API_KEY_PREFIX, getPurlApiKey } from "@/lib/api-key-getter";
 
 export const auth = betterAuth({
@@ -34,6 +35,13 @@ export const auth = betterAuth({
         // duplicated here only to satisfy the installed Better Auth version's types.
         loginPage: AUTH_LOGIN_PAGE,
         consentPage: "/oauth/consent",
+        // Authorize and token accept the save-only scope (merged with the
+        // plugin's openid/profile/email/offline_access).
+        scopes: [SAVE_SCOPE],
+        // Advertised in the protected-resource document. The authorization
+        // server document is patched in its route (the plugin's top-level
+        // `metadata` option isn't typed in this version).
+        metadata: { scopes_supported: [...ADVERTISED_SCOPES] },
       },
     }),
   ],

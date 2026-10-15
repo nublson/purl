@@ -199,6 +199,36 @@ describe("verifyToken", () => {
     });
   });
 
+  it.each(["links:save offline_access", "openid links:save"])(
+    "rejects an OAuth token whose scopes include links:save (%s)",
+    async (scopes) => {
+      mockVerifyApiKey.mockResolvedValue({ valid: false, key: null });
+      mockGetMcpSession.mockResolvedValue({
+        accessToken: "save-only-token",
+        clientId: "client-1",
+        userId: "user-2",
+        scopes,
+        accessTokenExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+      });
+      expect(
+        await verifyToken(reqWithBearer("save-only-token"), "save-only-token"),
+      ).toBeUndefined();
+    },
+  );
+
+  it("still accepts an OAuth token with scopes openid offline_access", async () => {
+    mockVerifyApiKey.mockResolvedValue({ valid: false, key: null });
+    mockGetMcpSession.mockResolvedValue({
+      accessToken: "mcp-token",
+      clientId: "client-1",
+      userId: "user-2",
+      scopes: "openid offline_access",
+      accessTokenExpiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const info = await verifyToken(reqWithBearer("mcp-token"), "mcp-token");
+    expect(info).toMatchObject({ extra: { userId: "user-2" } });
+  });
+
   it("returns undefined when no OAuth session is found", async () => {
     mockVerifyApiKey.mockResolvedValue({ valid: false, key: null });
     mockGetMcpSession.mockResolvedValue(null);
