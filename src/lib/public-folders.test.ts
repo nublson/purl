@@ -18,7 +18,13 @@ vi.mock("@/lib/prisma", () => ({
 const mockListLinks = vi.fn();
 vi.mock("@/lib/links", () => ({ listLinksForUser: mockListLinks }));
 
-const { getPublicFolderPage, publicFolderPath } = await import("./public-folders");
+const {
+  getPublicFolderPage,
+  listPublicFolderLinks,
+  publicFolderPath,
+  PUBLIC_FOLDER_PAGE_SIZE,
+  resolvePublicFolder,
+} = await import("./public-folders");
 
 const OWNER = { id: "u1", name: "Nubelson", image: "https://img/a.png", username: "nublson" };
 const FOLDER = {
@@ -120,6 +126,83 @@ describe("getPublicFolderPage", () => {
     mockFolderFindFirst.mockResolvedValue(null);
     mockSlugRedirect.mockResolvedValue({ folder: { ...FOLDER, isPublic: false } });
     expect(await getPublicFolderPage("nublson", "design")).toBeNull();
+  });
+});
+
+describe("resolvePublicFolder", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockUserFindUnique.mockResolvedValue(OWNER);
+    mockFolderFindFirst.mockResolvedValue(FOLDER);
+    mockUsernameRedirect.mockResolvedValue(null);
+    mockSlugRedirect.mockResolvedValue(null);
+  });
+
+  it("returns folder metadata and server ids without loading links", async () => {
+    const resolved = await resolvePublicFolder("NUBLSON", "Design");
+    expect(mockListLinks).not.toHaveBeenCalled();
+    expect(resolved).toEqual({
+      kind: "folder",
+      owner: { name: "Nubelson", image: "https://img/a.png", username: "nublson" },
+      folder: { name: "Design", slug: "design", emoji: "🦪", description: "Good stuff" },
+      ids: { userId: "u1", folderId: "f1" },
+    });
+  });
+
+  it("redirects when only the slug changed, without listing links", async () => {
+    mockFolderFindFirst.mockResolvedValue(null);
+    mockSlugRedirect.mockResolvedValue({ folder: { ...FOLDER, slug: "design-v2" } });
+    expect(await resolvePublicFolder("nublson", "design")).toEqual({
+      kind: "redirect",
+      username: "nublson",
+      slug: "design-v2",
+    });
+    expect(mockListLinks).not.toHaveBeenCalled();
+  });
+});
+
+describe("listPublicFolderLinks", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockListLinks.mockResolvedValue({ links: [LINK_ROW], nextCursor: null });
+  });
+
+  it("defaults to PUBLIC_FOLDER_PAGE_SIZE and strips private fields", async () => {
+    const { links, nextCursor } = await listPublicFolderLinks({
+      userId: "u1",
+      folderId: "f1",
+    });
+    expect(mockListLinks).toHaveBeenCalledWith("u1", {
+      limit: PUBLIC_FOLDER_PAGE_SIZE,
+      cursor: null,
+      contentType: null,
+      folderId: "f1",
+    });
+    expect(links).toEqual([
+      {
+        id: "l1",
+        url: "https://a.example",
+        title: "A",
+        description: "About A",
+        thumbnail: "https://a.example/og.png",
+        domain: "a.example",
+        favicon: "https://a.example/favicon.ico",
+        contentType: "WEB",
+        createdAt: new Date("2026-10-01T00:00:00Z"),
+      },
+    ]);
+    expect(nextCursor).toBeNull();
+  });
+
+  it("clamps custom limits between 1 and twice the page size", async () => {
+    await listPublicFolderLinks({ userId: "u1", folderId: "f1" }, { limit: 0 });
+    expect(mockListLinks.mock.calls[0][1].limit).toBe(1);
+
+    await listPublicFolderLinks({ userId: "u1", folderId: "f1" }, { limit: 999 });
+    expect(mockListLinks.mock.calls[1][1].limit).toBe(PUBLIC_FOLDER_PAGE_SIZE * 2);
+
+    await listPublicFolderLinks({ userId: "u1", folderId: "f1" }, { limit: 12.9 });
+    expect(mockListLinks.mock.calls[2][1].limit).toBe(12);
   });
 });
 
