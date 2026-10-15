@@ -26,6 +26,7 @@ import {
   readLinkForUser,
 } from "@/lib/links";
 import { MAX_BULK_LINK_IDS } from "@/lib/limits";
+import { SAVE_SCOPE } from "@/lib/oauth-scopes";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { serializeLink } from "@/lib/serialize-link";
 import { isValidUrl } from "@/utils/url";
@@ -483,8 +484,14 @@ async function verifyApiKeyToken(
   };
 }
 
-/** Verifies an OAuth access token issued by Better Auth's mcp plugin. */
-async function verifyOAuthToken(req: Request): Promise<AuthInfo | undefined> {
+/**
+ * Reads the OAuth access token behind a request (Better Auth's mcp plugin):
+ * the user, client and scopes, or undefined when it is missing or expired.
+ * No scope policy: callers decide what a token's scopes allow.
+ */
+export async function readOAuthSession(
+  req: Request,
+): Promise<AuthInfo | undefined> {
   let session: Awaited<ReturnType<typeof auth.api.getMcpSession>>;
   try {
     session = await auth.api.getMcpSession({
@@ -525,5 +532,9 @@ export async function verifyToken(
   if (!bearerToken) return undefined;
   const apiKeyInfo = await verifyApiKeyToken(req, bearerToken);
   if (apiKeyInfo) return apiKeyInfo;
-  return verifyOAuthToken(req);
+  const info = await readOAuthSession(req);
+  // Save-only tokens (links:save, alone or mixed with other scopes) are for
+  // the save endpoint; they must never reach the MCP tools.
+  if (info?.scopes.includes(SAVE_SCOPE)) return undefined;
+  return info;
 }
