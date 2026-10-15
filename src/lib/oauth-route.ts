@@ -48,6 +48,11 @@ export function withTokenCors(
   });
 }
 
+/** Registered clients that may only ever receive save-only tokens. */
+export const SAVE_ONLY_CLIENT_IDS = new Set(["nublson-com"]);
+
+const SAVE_ONLY_ALLOWED_SCOPES = new Set([SAVE_SCOPE, "offline_access"]);
+
 function invalidRequest(description: string): Response {
   return Response.json(
     { error: "invalid_request", error_description: description },
@@ -66,8 +71,22 @@ export function guardSaveAuthorize(request: Request): Request | Response {
   if (request.method !== "GET") return request;
   const url = new URL(request.url);
   if (!url.pathname.endsWith("/mcp/authorize")) return request;
-  const scopes = (url.searchParams.get("scope") ?? "").split(/\s+/);
-  if (!scopes.includes(SAVE_SCOPE)) return request;
+  const scopes = (url.searchParams.get("scope") ?? "")
+    .split(/\s+/)
+    .filter(Boolean);
+  const clientId = url.searchParams.get("client_id") ?? "";
+  if (SAVE_ONLY_CLIENT_IDS.has(clientId)) {
+    if (
+      !scopes.includes(SAVE_SCOPE) ||
+      !scopes.every((s) => SAVE_ONLY_ALLOWED_SCOPES.has(s))
+    ) {
+      return invalidRequest(
+        "This client may only request the links:save scope (and offline_access).",
+      );
+    }
+  } else if (!scopes.includes(SAVE_SCOPE)) {
+    return request;
+  }
 
   const method = url.searchParams.get("code_challenge_method");
   if (

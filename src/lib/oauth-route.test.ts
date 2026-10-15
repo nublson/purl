@@ -119,6 +119,35 @@ describe("guardSaveAuthorize", () => {
     expect(res.method).toBe("GET");
     expect(res.headers.get("cookie")).toBe("a=b");
   });
+  describe("save-only client", () => {
+    const S256 = "code_challenge=abc&code_challenge_method=S256";
+    it("rejects scope=openid", () => {
+      const res = guardSaveAuthorize(get(`client_id=nublson-com&scope=openid&${S256}`));
+      expect((res as Response).status).toBe(400);
+    });
+    it("rejects a missing scope", () => {
+      const res = guardSaveAuthorize(get(`client_id=nublson-com&${S256}`));
+      expect((res as Response).status).toBe(400);
+    });
+    it("rejects links:save mixed with openid", () => {
+      const res = guardSaveAuthorize(
+        get(`client_id=nublson-com&scope=links:save%20openid&${S256}`),
+      );
+      expect((res as Response).status).toBe(400);
+    });
+    it("accepts links:save offline_access with S256, forcing consent", () => {
+      const res = guardSaveAuthorize(
+        get(`client_id=nublson-com&scope=links:save%20offline_access&${S256}`),
+      ) as Request;
+      expect(res).toBeInstanceOf(Request);
+      expect(new URL(res.url).searchParams.get("prompt")).toBe("consent");
+    });
+    it("leaves another client's non-save scopes untouched", () => {
+      const a = get("client_id=other&scope=openid");
+      expect(guardSaveAuthorize(a)).toBe(a);
+    });
+  });
+
   it("leaves other requests untouched", () => {
     const a = get("scope=openid%20profile&prompt=none");
     expect(guardSaveAuthorize(a)).toBe(a);
