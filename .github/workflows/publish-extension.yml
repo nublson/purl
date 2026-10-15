@@ -1,0 +1,123 @@
+name: Publish Chrome Extension
+
+# Builds extension/ and submits it to the Chrome Web Store (API v2). Google still
+# reviews every version; the item goes live when the review passes.
+#
+# extension/public/manifest.json's `version` is the source of truth: a run whose
+# version isn't higher than the store's (published, or already submitted) does
+# nothing, so every release can trigger this safely. release.yml dispatches it on
+# main after Build Validation (a push made with GITHUB_TOKEN triggers no
+# workflows); it can also be run by hand from the Actions tab, on main.
+#
+# Auth is keyless: GitHub OIDC → Google Workload Identity Federation → the
+# service account linked to the publisher in the developer dashboard (Account).
+# The provider only accepts nublson/purl on refs/heads/main.
+# Secrets: GCP_WORKLOAD_IDENTITY_PROVIDER, GCP_SERVICE_ACCOUNT, PUBLISHER_ID,
+# EXTENSION_ID.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: publish-extension
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write # GitHub OIDC token for Workload Identity Federation
+    env:
+      ITEM_URL: https://chromewebstore.googleapis.com/v2/publishers/${{ secrets.PUBLISHER_ID }}/items/${{ secrets.EXTENSION_ID }}
+      UPLOAD_URL: https://chromewebstore.googleapis.com/upload/v2/publishers/${{ secrets.PUBLISHER_ID }}/items/${{ secrets.EXTENSION_ID }}:upload
+    defaults:
+      run:
+        working-directory: extension
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Authenticate to Google
+        id: google
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+
+      - name: Compare with the store's version
+        id: check
+        env:
+          TOKEN: ${{ steps.google.outputs.access_token }}
+        run: |
+          VERSION=$(jq -r .version public/manifest.json)
+          STATUS=$(curl -sS --fail-with-body -H "Authorization: Bearer $TOKEN" "$ITEM_URL:fetchStatus")
+          PUBLISHED=$(jq -r '.publishedItemRevisionStatus.distributionChannels[0].crxVersion // ""' <<<"$STATUS")
+          SUBMITTED=$(jq -r '.submittedItemRevisionStatus.distributionChannels[0].crxVersion // ""' <<<"$STATUS")
+          SUBMITTED_STATE=$(jq -r '.submittedItemRevisionStatus.state // ""' <<<"$STATUS")
+          echo "manifest: $VERSION, published: ${PUBLISHED:-none}, submitted: ${SUBMITTED:-none} ${SUBMITTED_STATE}"
+
+          # Highest of the two versions, by dotted number (sort -V).
+          newest() { printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1; }
+          if [ -n "$PUBLISHED" ] && [ "$(newest "$PUBLISHED" "$VERSION")" = "$PUBLISHED" ]; then
+            echo "::notice::Extension $VERSION is already published (store has $PUBLISHED). Bump version in extension/public/manifest.json to publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          elif [ "$SUBMITTED" = "$VERSION" ] && [ "$SUBMITTED_STATE" != "REJECTED" ] && [ "$SUBMITTED_STATE" != "CANCELLED" ]; then
+            echo "::notice::Extension $VERSION is already submitted ($SUBMITTED_STATE)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        if: steps.check.outputs.skip == 'false'
+        run: npm ci && npm run build
+
+      - name: Upload to the Chrome Web Store
+        if: steps.check.outputs.skip == 'false'
+        env:
+          TOKEN: ${{ steps.google.outputs.access_token }}
+        run: |
+          RESULT=$(curl -sS --fail-with-body -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/zip" \
+            --data-binary @purl-extension.zip "$UPLOAD_URL")
+          echo "$RESULT"
+          STATE=$(jq -r .uploadState <<<"$RESULT")
+
+          # Large packages are processed asynchronously: poll for up to ~2 minutes.
+          for _ in $(seq 24); do
+            [ "$STATE" = "IN_PROGRESS" ] || break
+            sleep 5
+            STATE=$(curl -sS --fail-with-body -H "Authorization: Bearer $TOKEN" "$ITEM_URL:fetchStatus" \
+              | jq -r .lastAsyncUploadState)
+          done
+
+          if [ "$STATE" != "SUCCEEDED" ]; then
+            echo "::error::Upload ended in state $STATE. Check the developer dashboard."
+            exit 1
+          fi
+
+      - name: Submit for review
+        if: steps.check.outputs.skip == 'false'
+        env:
+          TOKEN: ${{ steps.google.outputs.access_token }}
+        run: |
+          RESULT=$(curl -sS --fail-with-body -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{}' "$ITEM_URL:publish")
+          echo "$RESULT"
+          VERSION=$(jq -r .version public/manifest.json)
+          echo "::notice::Extension $VERSION submitted: $(jq -r .state <<<"$RESULT"). It goes live once Google's review passes."
