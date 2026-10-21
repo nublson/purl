@@ -17,7 +17,7 @@ Settled with the user during brainstorming:
 - **Approach: resource templates with `list` callbacks**: one for All links (literal URI), one for folders. Registering a resource per folder isn't possible, because `createMcpHandler` builds the server before the caller is known. `list_changed` notifications are skipped: requests are stateless Streamable HTTP with no stream to push on, and Claude re-lists when the picker opens.
 - **URIs use folder ids, not slugs**, so renames keep a URI working.
 
-Out of scope: page content/extraction, change notifications, write operations through resources, per-link resources, and pagination of a resource.
+Out of scope: page content/extraction, change notifications and subscriptions (an attached resource is a snapshot; the footer points to `list_saved_items` for live data), write operations through resources, per-link resources, and pagination of a resource.
 
 ## Resources
 
@@ -70,6 +70,10 @@ Articles to read this week
   - `· PDF`, `· YouTube` or `· Audio` for those content types (nothing for `WEB`);
   - in **All links only**, `· <folder emoji> <folder name>` for filed links (nothing for unfiled ones);
   - if there's a description, a second line indented two spaces: whitespace collapsed to single spaces, cut to 200 characters with `…` appended when cut.
+- **Snapshot footer:** every read (folders, All links, empty ones too) ends with a blank line and one italic line, so Claude and the user know the attached copy doesn't update itself and how to refresh it:
+  - folder: `_Snapshot from YYYY-MM-DD HH:MM UTC. For the latest links, use list_saved_items with folderId <id>._`
+  - All links: `_Snapshot from YYYY-MM-DD HH:MM UTC. For the latest links, use list_saved_items._`
+  The time is the read's time, in UTC.
 - **Escaping:** the title has whitespace (including newlines) collapsed to single spaces and `\`, `[` and `]` backslash-escaped. A missing or blank title uses the URL. A URL containing `(`, `)` or whitespace is wrapped in `<…>` so the link target can't break. A missing domain is omitted, along with its `·`.
 
 ## Data
@@ -90,8 +94,8 @@ For a folder resource, the header (name, emoji, description, count) comes from a
 
 A new pure module, `src/lib/mcp-resources.ts` (no Prisma, no `server-only` side effects):
 
-- `renderFolderResource(folder: FolderSummary, links: ResourceLink[]): string`
-- `renderAllLinksResource(links: ResourceLink[]): string`
+- `renderFolderResource(folder: FolderSummary, links: ResourceLink[], now: Date): string`
+- `renderAllLinksResource(links: ResourceLink[], now: Date): string` (`now` is passed in, for the snapshot footer, so tests are deterministic)
 - `folderResourceUri(id)` and `ALL_LINKS_URI` (the template hands the read callback its `folderId`, so no URI parser is needed)
 - `folderResourceDescription(folder)` and `allLinksDescription(count)` for the list entries, reusing `formatFolderLabel` and `formatLinkCount` from `src/lib/folder-display.ts`
 

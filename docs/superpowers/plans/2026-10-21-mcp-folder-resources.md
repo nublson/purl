@@ -22,6 +22,7 @@
 - `RESOURCE_NOT_FOUND = -32002`, message `Folder not found`, identical for missing and foreign ids. URIs matching no template get the SDK's own `-32602`.
 - Read-only: no resource handler writes or calls `broadcastLinksChanged`.
 - Count copy uses `formatLinkCount` (`1 link` / `N links`) from `src/lib/folder-display.ts`.
+- Every read ends with the snapshot footer: `_Snapshot from YYYY-MM-DD HH:MM UTC. For the latest links, use list_saved_items with folderId <id>._` (All links: `…use list_saved_items._`).
 - Never commit to `develop`. Work on `feat/mcp-folder-resources`.
 
 ## Review Focus
@@ -96,8 +97,8 @@ git commit -m "feat: data helpers for folder MCP resources"
   - `folderResourceUri(id: string): string`
   - `folderResourceDescription(folder: FolderSummary): string` → `"<description> · N links"`, or `"N links"` with no description
   - `allLinksDescription(count: number): string` → `"Every link you've saved, newest first (N links)"`
-  - `renderFolderResource(folder: FolderSummary, links: ResourceLink[]): string`
-  - `renderAllLinksResource(links: ResourceLink[]): string`
+  - `renderFolderResource(folder: FolderSummary, links: ResourceLink[], now: Date): string`
+  - `renderAllLinksResource(links: ResourceLink[], now: Date): string`
 
 The module has no runtime import of anything `server-only`. Type imports are fine.
 
@@ -106,8 +107,9 @@ The module has no runtime import of anything `server-only`. Type imports are fin
 Use a `link(overrides)` factory. Assert on exact strings. Cases:
 - `renders a folder header with description`: a folder `📚 Reading` with description `Articles` and 2 links → starts `"# 📚 Reading\n\nArticles\n\n2 links, newest first.\n\n## "`.
 - `renders a folder header without description`: no description line, and `"1 link, newest first."` is singular.
-- `renders an empty folder`: exactly `"# 📚 Reading\n\nNo links in this folder yet.\n"` (with description: the description paragraph before it).
-- `renders empty All links`: `"# 🏠 All links\n\nNo links saved yet.\n"`.
+- `renders an empty folder` (folder id `f-1`, `now = 2026-10-21T14:32:59Z`): exactly `"# 📚 Reading\n\nNo links in this folder yet.\n\n_Snapshot from 2026-10-21 14:32 UTC. For the latest links, use list_saved_items with folderId f-1._\n"` (with description: the description paragraph before the empty text).
+- `renders empty All links`: `"# 🏠 All links\n\nNo links saved yet.\n\n_Snapshot from 2026-10-21 14:32 UTC. For the latest links, use list_saved_items._\n"`.
+- `ends with the snapshot footer`: a folder with links ends with `"\n\n_Snapshot from 2026-10-21 14:32 UTC. For the latest links, use list_saved_items with folderId f-1._\n"`; seconds are dropped and the time is UTC (`now = 2026-10-21T23:59:00-02:00` → `2026-10-22 01:59 UTC`).
 - `groups by UTC day`: links at `2026-10-20T00:30:00Z` and `2026-10-19T23:30:00Z` → `## 2026-10-20` precedes `## 2026-10-19`, each with its own link.
 - `formats a bullet`: `- [Title](https://example.com/a) · example.com`; with `contentType: "PDF"` it ends `· PDF`, `YOUTUBE` → `· YouTube`, `AUDIO` → `· Audio`, `WEB` adds nothing.
 - `description cut`: a 201-character description → the second line is two spaces plus the first 200 characters plus `…`. Exactly 200 → no `…`. `"a\n\n  b"` → `  a b`. A null or blank description → no second line.
@@ -125,7 +127,7 @@ Expected: FAIL. The module doesn't exist.
 
 - [ ] **Step 3: Implement `src/lib/mcp-resources.ts`**
 
-One private `renderLinks(links, { withFolder })` shared by both renderers. Escape titles by collapsing `\s+` to a space, trimming, then backslash-escaping `\`, `[`, `]` (in that order). Wrap the URL in `<…>` when it matches `/[()\s]/`. Every document ends with one trailing `\n`.
+One private `renderLinks(links, { withFolder })` shared by both renderers. Escape titles by collapsing `\s+` to a space, trimming, then backslash-escaping `\`, `[`, `]` (in that order). Wrap the URL in `<…>` when it matches `/[()\s]/`. Every document ends with the snapshot footer line and one trailing `\n`.
 
 - [ ] **Step 4: Run tests to verify they pass**
 
@@ -157,15 +159,15 @@ Registration (SDK 1.31.0). Both are `ResourceTemplate`s, because the SDK's `reso
 - `server.registerResource("all_links", new ResourceTemplate(ALL_LINKS_URI, { list: listAll }), { title: ALL_LINKS_NAME, mimeType: "text/markdown" }, readAll)`. `listAll` returns `{ resources: [{ uri: ALL_LINKS_URI, name: ALL_LINKS_NAME, title: ALL_LINKS_NAME, description: allLinksDescription(await countLinksForUser(userId)), mimeType }] }`.
 - `server.registerResource("folder", new ResourceTemplate(FOLDER_URI_TEMPLATE, { list: listFolders }), { title: "Purl folder", mimeType: "text/markdown" }, readFolder)`. `listFolders` returns one `{ uri: folderResourceUri(id), name: label, title: label, description: folderResourceDescription(folder), mimeType }` per folder from `listFoldersForUser`, where `label = formatFolderLabel(folder)`.
 
-Reads return `{ contents: [{ uri: uri.href, mimeType: "text/markdown", text }] }`. `readFolder(uri, { folderId }, extra)`: `getFolderById(userId, String(folderId))`; for a `null` result, `throw new McpError(RESOURCE_NOT_FOUND, "Folder not found")` without listing links; otherwise `renderFolderResource(folder, await listLinksForResource(userId, { folderId }))`.
+Reads return `{ contents: [{ uri: uri.href, mimeType: "text/markdown", text }] }`. `readFolder(uri, { folderId }, extra)`: `getFolderById(userId, String(folderId))`; for a `null` result, `throw new McpError(RESOURCE_NOT_FOUND, "Folder not found")` without listing links; otherwise `renderFolderResource(folder, await listLinksForResource(userId, { folderId }), new Date())`.
 
 - [ ] **Step 1: Write the failing tests**
 
 Capture handlers with a mock server `{ registerResource: vi.fn((...args) => calls.push(args)) }`, the same way the tool tests capture `tool`. `extra = { authInfo: { extra: { userId: "user-1" } } }`.
 - `registers All links before the folder template`: names `["all_links", "folder"]`, both `ResourceTemplate`s, with `uriTemplate.toString()` `"purl://links"` and `"purl://folders/{folderId}"`.
 - `lists All links first, then folders in order`: with `countLinksForUser` → 3 and `listFoldersForUser` → `[A (📚 Reading, desc "Articles", 2 links), B (🎧 Pods, no desc, 0 links)]`, concatenating the two `list` callbacks' `resources` in registration order equals `[{ uri: "purl://links", name: "🏠 All links", description: "Every link you've saved, newest first (3 links)", … }, { uri: "purl://folders/A", name: "📚 Reading", description: "Articles · 2 links", mimeType: "text/markdown", … }, { uri: "purl://folders/B", name: "🎧 Pods", description: "0 links", … }]`. The empty folder is listed.
-- `reads a folder`: `getFolderById` → folder A, `listLinksForResource` → one link; the result's `contents[0]` has `uri: "purl://folders/A"`, `mimeType: "text/markdown"` and `text` equal to `renderFolderResource(A, [link])` (import the real builder). `listLinksForResource` called with `("user-1", { folderId: "A" })`.
-- `reads All links`: `contents[0].text` equals `renderAllLinksResource(links)`, and `listLinksForResource` was called with `("user-1", {})`.
+- `reads a folder`: `getFolderById` → folder A, `listLinksForResource` → one link; the result's `contents[0]` has `uri: "purl://folders/A"`, `mimeType: "text/markdown"` and `text` equal to `renderFolderResource(A, [link], now)` (import the real builder; `vi.useFakeTimers()` + `vi.setSystemTime(now)` so the handler's `new Date()` matches). `listLinksForResource` called with `("user-1", { folderId: "A" })`.
+- `reads All links`: `contents[0].text` equals `renderAllLinksResource(links, now)`, and `listLinksForResource` was called with `("user-1", {})`.
 - `rejects a foreign folder`: `getFolderById` → `null`; rejects with an `McpError` whose `code` is `-32002` and message contains `Folder not found`; `listLinksForResource` not called.
 - `rejects requests without authInfo`: every captured list/read handler, called with `{}` as extra, rejects with `Unauthorized`.
 
