@@ -18,7 +18,13 @@ import { formatDomain } from "@/utils/formatter";
 import { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
-import { FolderTag, useFolderTag } from "./folder-tag";
+import {
+  FolderBadge,
+  FolderLinkButton,
+  FolderTagLabel,
+  useFolderBadgeArrival,
+  useFolderTag,
+} from "./folder-tag";
 import { HapticTarget } from "./haptic-target";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
@@ -77,6 +83,7 @@ export const LinkItem = React.forwardRef<
   const selecting = useIsSelectionActive() && !demo;
   const selected = useIsLinkSelected(link.id);
   const folderTag = useFolderTag(link);
+  const badgeArrives = useFolderBadgeArrival(folderTag);
   const longPressRef = React.useRef<{
     timer: ReturnType<typeof setTimeout>;
     x: number;
@@ -99,6 +106,7 @@ export const LinkItem = React.forwardRef<
   // Whether the current preview was opened by hover (vs keyboard focus).
   const openedByPointerRef = React.useRef(false);
   const descriptionId = React.useId();
+  const folderLabelId = React.useId();
   const anchorRef = React.useRef<HTMLAnchorElement>(null);
   const hoveringActionsRef = React.useRef(false);
   const hoveringPreviewRef = React.useRef(false);
@@ -182,7 +190,13 @@ export const LinkItem = React.forwardRef<
       className={cn(
         // border-0: Item's 1px border is for its outline variant and its own
         // focus ring; this row uses neither (the link draws the focus ring).
-        "w-full border-0 p-2 gap-4 grid grid-cols-[20px_1fr_auto] relative max-md:grid-cols-[24px_1fr_auto] max-md:py-3 transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
+        "w-full border-0 p-2 gap-4 grid min-h-12 grid-cols-[20px_1fr_auto] relative max-md:min-h-14 max-md:grid-cols-[24px_1fr_auto] max-md:py-3 transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
+        // With a pointer that hovers, the actions float over the row's end
+        // (see ItemActions), so the text takes the whole width at rest.
+        "[@media(hover:hover)]:grid-cols-[20px_1fr] [@media(hover:hover)]:max-md:grid-cols-[24px_1fr]",
+        // The row's color, opaque (its tints are translucent over the page),
+        // for what sits on it: the floating actions and the folder badge.
+        "[--row-bg:var(--color-background)] hover:[--row-bg:color-mix(in_oklab,var(--color-accent)_40%,var(--color-background))] data-[state=open]:[--row-bg:color-mix(in_oklab,var(--color-accent)_40%,var(--color-background))] has-data-[state=open]:[--row-bg:color-mix(in_oklab,var(--color-accent)_40%,var(--color-background))]",
         // Touch: a long-press selects the row, so it must not also start a
         // text selection (which then spreads to the headings around it).
         "[@media(pointer:coarse)]:select-none",
@@ -247,7 +261,12 @@ export const LinkItem = React.forwardRef<
         ref={anchorRef}
         href={link.url}
         aria-label={`${link.title} (opens in new tab)`}
-        aria-describedby={link.description ? descriptionId : undefined}
+        // The description, then the folder (the badge is only its emoji).
+        aria-describedby={
+          [link.description && descriptionId, folderTag && folderLabelId]
+            .filter(Boolean)
+            .join(" ") || undefined
+        }
         target="_blank"
         rel="noopener noreferrer"
         // While selecting, the row's checkbox is the keyboard and screen
@@ -316,6 +335,15 @@ export const LinkItem = React.forwardRef<
             ) : (
               <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
             )}
+            {/* Home, with folder tags on: the link's folder on the favicon's
+                corner. Fades with the favicon when the checkbox shows. */}
+            {folderTag ? (
+              <FolderBadge
+                key={folderTag.id}
+                folder={folderTag}
+                arrive={badgeArrives || arriving}
+              />
+            ) : null}
           </div>
           {demo ? null : (
             <>
@@ -384,17 +412,24 @@ export const LinkItem = React.forwardRef<
           >
             {formatDomain(link.domain)}
           </Typography>
-          {/* Home, with folder tags on: the link's folder, right after the
-              domain (after the title on phones, which hide the domain). */}
-          {folderTag ? <FolderTag folder={folderTag} /> : null}
+          {/* The favicon's folder badge, named for screen readers (and the
+              link's description). */}
+          {folderTag ? (
+            <FolderTagLabel id={folderLabelId} folder={folderTag} />
+          ) : null}
         </ItemTitle>
       </ItemContent>
-      {/* Stays in the layout while selecting (hidden and inert): its 32px
-          button sets the row's 48px height, so the row can't shift. */}
+      {/* Touch: always shown, in the row's last column. A pointer that
+          hovers: shown on hover, keyboard focus or with the menu open, and
+          floated over the row's end instead of holding a column, so hidden
+          actions take no width from the title. Its backing is the row's
+          color, fading in over 24px, so it covers the text's end cleanly
+          while shown. Hidden (and inert) while selecting. */}
       <ItemActions
         inert={selecting}
         className={cn(
           (selecting || demo) && "invisible",
+          "[@media(hover:hover)]:absolute [@media(hover:hover)]:inset-y-0 [@media(hover:hover)]:end-0 [@media(hover:hover)]:rounded-e-md [@media(hover:hover)]:bg-(--row-bg) [@media(hover:hover)]:ps-6 [@media(hover:hover)]:pe-2 [@media(hover:hover)]:[mask-image:linear-gradient(to_right,transparent,black_24px)]",
           "z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100",
         )}
         onPointerEnter={(event) => {
@@ -412,7 +447,10 @@ export const LinkItem = React.forwardRef<
         {demo ? (
           <div className="size-8" aria-hidden />
         ) : (
-          <LinkMenu link={link} onDelete={deleteRow} />
+          <>
+            {folderTag ? <FolderLinkButton folder={folderTag} /> : null}
+            <LinkMenu link={link} onDelete={deleteRow} />
+          </>
         )}
       </ItemActions>
       {/* While selecting, a tap anywhere on the row toggles it, with a
@@ -430,6 +468,7 @@ export const LinkItem = React.forwardRef<
       eagerThumbnail={Boolean(eagerFavicon)}
       placement={demo ? "below" : "beside"}
       pdfThumbnail={!demo}
+      folder={folderTag}
       open={previewOpen}
       onOpenChange={() => {
         // HoverCardTrigger is still present, but we fully control `open` from LinkItem mouse events.

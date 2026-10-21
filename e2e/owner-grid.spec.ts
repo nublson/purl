@@ -143,8 +143,9 @@ test.describe("Owner grid view", () => {
     await seed.link({ url: "https://alpha.example", title: "Alpha", folderId: reading });
     await seed.link({ url: "https://bravo.example", title: "Bravo" });
     await openHome(page);
-    const tags = page.locator('[data-cy="folder-tag"]:visible');
-    await expect(tags).toHaveCount(0);
+    // A row: the folder's emoji as a badge on the favicon's corner.
+    const badges = page.locator('[data-cy="folder-badge"]:visible');
+    await expect(badges).toHaveCount(0);
 
     // On: the menu stays open, and the filed link gets its folder's tag.
     await page.getByRole("button", { name: "Account menu" }).click();
@@ -157,25 +158,32 @@ test.describe("Owner grid view", () => {
     expect((await saved).ok()).toBe(true);
     await expect(toggle).toHaveAttribute("aria-checked", "true");
     await page.keyboard.press("Escape");
-    await expect(tags).toHaveCount(1);
-    await expect(page.locator('[data-cy="link-item"]').filter({ hasText: "Alpha" })).toContainText("Reading");
+    await expect(badges).toHaveCount(1);
+    // No chip in the row; the name is the link's description.
+    const alpha = page.locator('[data-cy="link-item"]').filter({ hasText: "Alpha" });
+    await expect(alpha.locator('[data-cy="folder-tag"]')).toHaveCount(0);
+    await expect(alpha.getByRole("link", { name: /^Alpha/ })).toHaveAccessibleDescription(/In Reading/);
     await page.mouse.move(0, 0);
     await page.screenshot({ path: testInfo.outputPath("tags-list.png") });
 
     // Saved: still on after a reload, in the grid too.
     await page.reload();
     await waitForHydration(page, '[data-cy="link-item"]');
-    await expect(tags).toHaveCount(1);
+    await expect(badges).toHaveCount(1);
     await chooseView(page, "Grid");
-    await expect(card(page, "Alpha").locator('[data-cy="folder-tag"]:visible')).toHaveCount(1);
+    await expect(card(page, "Alpha").locator('[data-cy="folder-badge"]:visible')).toHaveCount(1);
     await page.mouse.move(0, 0);
     await page.waitForTimeout(400);
     await page.screenshot({ path: testInfo.outputPath("tags-grid.png") });
 
+    // Beside the card's ⋯, on hover: a link straight to its folder.
+    await card(page, "Alpha").hover();
+    await card(page, "Alpha").getByRole("link", { name: "Go to Reading" }).click();
+    await expect(page).toHaveURL(/\/folders\/reading$/);
+
     // A folder page shows no tags: every link there is in that folder.
-    await page.goto("/folders/reading");
     await waitForHydration(page, '[data-cy="link-card"]');
-    await expect(tags).toHaveCount(0);
+    await expect(page.locator('[data-cy="folder-tag"]:visible, [data-cy="folder-badge"]:visible')).toHaveCount(0);
   });
 });
 
@@ -237,7 +245,7 @@ test.describe("Layout saves", () => {
 test.describe("Folder tags on phones", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test("a row shows only the folder's icon (its name in a tooltip on tap); a card, the whole tag", async ({ page, seed }, testInfo) => {
+  test("a row and a card show the folder's emoji on their favicon", async ({ page, seed }, testInfo) => {
     const folder = await seed.folder({ name: "Design Engineer", slug: "design", emoji: "🧑‍🎨" });
     await seed.link({ url: "https://alpha.example", title: "Alpha", folderId: folder });
     await page.goto("/home");
@@ -246,69 +254,43 @@ test.describe("Folder tags on phones", () => {
     await page.getByRole("menuitemcheckbox", { name: "Folder tags" }).tap();
     await page.keyboard.press("Escape");
 
-    const popups: unknown[] = [];
-    page.on("popup", (popup) => popups.push(popup));
-
-    // A row: the icon only; the name isn't drawn next to it.
-    const tag = page.getByRole("button", { name: "Folder: Design Engineer" });
-    await expect(tag).toBeVisible();
-    await expect(tag).not.toContainText("Design Engineer");
-    await expect(page.locator('span[data-cy="folder-tag"]')).toBeHidden();
-    await tag.tap();
-    await expect(page.getByRole("tooltip")).toContainText("Design Engineer");
+    // A row: the emoji on the favicon's corner, nothing beside the title;
+    // the name is the link's description.
+    const row = page.locator('[data-cy="link-item"]').filter({ hasText: "Alpha" });
+    await expect(row.locator('[data-cy="folder-badge"]')).toBeVisible();
+    await expect(row.locator('[data-cy="folder-tag"]')).toHaveCount(0);
+    await expect(row.getByRole("link", { name: /^Alpha/ })).toHaveAccessibleDescription(/In Design Engineer/);
+    // No "Go to" button on touch: the ⋯ is always shown there.
+    await expect(row.getByRole("link", { name: "Go to Design Engineer" })).toBeHidden();
     await page.screenshot({ path: testInfo.outputPath("tag-list.png") });
-    await page.touchscreen.tap(195, 700);
-    await expect(page.getByRole("tooltip")).toHaveCount(0);
-    // The taps never opened the link (or selected it).
-    expect(popups).toHaveLength(0);
-    await expect(page.getByRole("toolbar", { name: "Selected links" })).toHaveCount(0);
 
-    // A card: the whole tag, emoji and name, on its own line; no icon button.
+    // A card: the same badge on its favicon, no tag line; the name is the
+    // link's description.
     await page.getByRole("button", { name: "Account menu" }).tap();
     await page.getByRole("menuitem", { name: "View mode" }).tap();
     await page.getByRole("menuitemradio", { name: "Grid" }).tap();
     await waitForHydration(page, '[data-cy="link-card"]');
-    const chip = card(page, "Alpha").locator('span[data-cy="folder-tag"]');
-    await expect(chip).toBeVisible();
-    await expect(chip).toContainText("Design Engineer");
-    await expect(card(page, "Alpha").getByRole("button", { name: "Folder: Design Engineer" })).toHaveCount(0);
-    // Whole, not cut short: the name fits the card.
-    const name = chip.locator("span[title]");
-    expect(await name.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+    const alphaCard = card(page, "Alpha");
+    await expect(alphaCard.locator('[data-cy="folder-badge"]')).toBeVisible();
+    await expect(alphaCard.locator('[data-cy="folder-tag"]')).toHaveCount(0);
+    await expect(alphaCard.getByRole("link", { name: /^Alpha/ })).toHaveAccessibleDescription(/In Design Engineer/);
     await page.screenshot({ path: testInfo.outputPath("tag-grid.png") });
-
-    // The emoji sits centered under the favicon, the name where the title starts.
-    const offsets = await card(page, "Alpha").evaluate((el) => {
-      const chip = el.querySelector('span[data-cy="folder-tag"]')!;
-      const emoji = chip.firstElementChild!.getBoundingClientRect();
-      const name = chip.lastElementChild!.getBoundingClientRect();
-      const info = chip.closest("span.grid")!;
-      const fav = info.firstElementChild!.firstElementChild!.getBoundingClientRect();
-      const title = info.children[1]!.getBoundingClientRect();
-      return {
-        emoji: emoji.left + emoji.width / 2 - (fav.left + fav.width / 2),
-        name: name.left - title.left,
-      };
-    });
-    expect(Math.abs(offsets.emoji)).toBeLessThan(0.5);
-    expect(Math.abs(offsets.name)).toBeLessThan(0.5);
   });
 
-  test("the server's HTML already shows only the icon, before any script runs", async ({ page, seed }) => {
+  test("the server's HTML already shows the badge, before any script runs", async ({ page, seed }) => {
     const folder = await seed.folder({ name: "Design Engineer", slug: "design", emoji: "🧑‍🎨" });
     await seed.link({ url: "https://alpha.example", title: "Alpha", folderId: folder });
     const saved = await page.request.patch("/api/user/layout", { data: { folderTags: true } });
     expect(saved.ok()).toBe(true);
     // No app scripts: what shows is the server's HTML and the CSS alone (the
-    // tag used to be chosen after hydration, so phones first drew the full
-    // chip, then swapped it for the icon).
+    // row's tag must never depend on hydration).
     await page.route("**/*", (route) =>
       route.request().resourceType() === "script" ? route.abort() : route.continue(),
     );
     await page.goto("/home");
     const row = page.locator('[data-cy="link-item"]').filter({ hasText: "Alpha" });
-    await expect(row.getByRole("button", { name: "Folder: Design Engineer" })).toBeVisible();
-    await expect(row.locator('span[data-cy="folder-tag"]')).toBeHidden();
+    await expect(row.locator('[data-cy="folder-badge"]')).toBeVisible();
+    await expect(row.locator('[data-cy="folder-tag"]')).toHaveCount(0);
   });
 
   test("a card's menu closes on one tap outside, with Move to folder open", async ({ page, seed }) => {

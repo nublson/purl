@@ -317,7 +317,7 @@ export function OmniboxAddSection({
                   <Typography component="span" size="small" className="hidden shrink-0 md:block">
                     {formatDomain(link.domain)}
                   </Typography>
-                  {source ? <FolderTag folder={source} inButton /> : null}
+                  {source ? <FolderTag folder={source} /> : null}
                 </Typography>
                 {/* The row menu's "Move to folder" icon, in the 32px slot a
                     saved row's ⋯ takes (as the Save row's +). */}

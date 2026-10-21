@@ -17,7 +17,13 @@ import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
-import { FolderTag, useFolderTag } from "./folder-tag";
+import {
+  FolderBadge,
+  FolderLinkButton,
+  FolderTagLabel,
+  useFolderBadgeArrival,
+  useFolderTag,
+} from "./folder-tag";
 import { HapticTarget } from "./haptic-target";
 import { LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
 import { Checkbox } from "./ui/checkbox";
@@ -60,6 +66,8 @@ export function LinkCard({
   const selecting = useIsSelectionActive() && !demo;
   const selected = useIsLinkSelected(link.id);
   const folderTag = useFolderTag(link);
+  const badgeArrives = useFolderBadgeArrival(folderTag);
+  const folderLabelId = React.useId();
   const [menuOpen, setMenuOpen] = React.useState(false);
   const anchorRef = React.useRef<HTMLAnchorElement>(null);
   const { handlers: longPress, consumeLongPress } = useLongPress(() => {
@@ -114,7 +122,11 @@ export function LinkCard({
         target="_blank"
         rel="noopener noreferrer"
         aria-label={`${link.title} (opens in new tab)`}
-        aria-describedby={dayHeadingId}
+        // The day, then the folder (the favicon's badge is only its emoji).
+        aria-describedby={
+          [dayHeadingId, folderTag && folderLabelId].filter(Boolean).join(" ") ||
+          undefined
+        }
         // While selecting, the checkbox is the keyboard and screen reader
         // control; a click anywhere on the card toggles it.
         aria-hidden={selecting || undefined}
@@ -136,9 +148,19 @@ export function LinkCard({
         <LinkCardContent
           link={link}
           eagerThumbnail={eagerThumbnail}
-          tag={folderTag ? <FolderTag folder={folderTag} inCard /> : null}
+          badge={
+            folderTag ? (
+              <FolderBadge
+                key={folderTag.id}
+                folder={folderTag}
+                inCard
+                arrive={badgeArrives}
+              />
+            ) : null
+          }
         />
       </div>
+      {folderTag ? <FolderTagLabel id={folderLabelId} folder={folderTag} /> : null}
       {demo ? null : (
         <>
           <Checkbox
@@ -167,7 +189,7 @@ export function LinkCard({
           <div
             inert={selecting}
             className={cn(
-              "absolute top-1.5 right-1.5 z-10 rounded-md bg-background/80 backdrop-blur-sm transition-opacity duration-150 ease-out-strong",
+              "absolute top-1.5 right-1.5 z-10 flex gap-2 rounded-md bg-background/80 backdrop-blur-sm transition-opacity duration-150 ease-out-strong",
               selecting
                 ? "invisible opacity-0"
                 : menuOpen
@@ -176,6 +198,7 @@ export function LinkCard({
             )}
             data-card-menu
           >
+            {folderTag ? <FolderLinkButton folder={folderTag} /> : null}
             <LinkMenu
               link={link}
               onOpenChange={setMenuOpen}
