@@ -73,6 +73,15 @@ describe("renderFolderResource", () => {
     expect(out.startsWith("# 📚 Reading\n\n1 link, newest first.\n\n## ")).toBe(true);
   });
 
+  it("counts the listed links, not folder.linkCount", () => {
+    const out = renderFolderResource(
+      folder({ linkCount: 5 }),
+      [link(), link({ url: "https://example.com/b" })],
+      NOW,
+    );
+    expect(out).toContain("\n\n2 links, newest first.\n\n");
+  });
+
   it("renders an empty folder", () => {
     expect(renderFolderResource(folder({ linkCount: 0 }), [], NOW)).toBe(
       `# 📚 Reading\n\nNo links in this folder yet.\n\n${FOOTER_F1}`,

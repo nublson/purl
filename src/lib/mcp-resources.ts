@@ -90,7 +90,7 @@ export function renderFolderResource(
   if (links.length === 0) {
     parts.push("No links in this folder yet.");
   } else {
-    parts.push(`${formatLinkCount(folder.linkCount)}, newest first.`);
+    parts.push(`${formatLinkCount(links.length)}, newest first.`);
     parts.push(renderLinks(links, { withFolder: false }));
   }
   parts.push(snapshotFooter(now, folder.id));
