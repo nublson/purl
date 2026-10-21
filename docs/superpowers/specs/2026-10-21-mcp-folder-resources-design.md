@@ -14,7 +14,7 @@ Settled with the user during brainstorming:
 - **Whole folder, kept lean.** Every link in the folder (at most `MAX_SAVED_LINKS` = 1,000), newest first, with descriptions cut to 200 characters. A full account is about 50k tokens, and a typical folder a few thousand. Nothing is silently dropped.
 - **Picker entries: "🏠 All links" first, then every folder** in the user's menu order. All links covers unfiled links, which folders alone couldn't attach.
 - **Read-only, per user.** It uses the existing connector OAuth. Users see only their own folders, public and private alike. Saving and moving stay tools.
-- **Approach: one resource template with a `list` callback** plus one fixed resource. Registering a resource per folder isn't possible, because `createMcpHandler` builds the server before the caller is known. `list_changed` notifications are skipped: requests are stateless Streamable HTTP with no stream to push on, and Claude re-lists when the picker opens.
+- **Approach: resource templates with `list` callbacks**: one for All links (literal URI), one for folders. Registering a resource per folder isn't possible, because `createMcpHandler` builds the server before the caller is known. `list_changed` notifications are skipped: requests are stateless Streamable HTTP with no stream to push on, and Claude re-lists when the picker opens.
 - **URIs use folder ids, not slugs**, so renames keep a URI working.
 
 Out of scope: page content/extraction, change notifications, write operations through resources, per-link resources, and pagination of a resource.
@@ -23,16 +23,16 @@ Out of scope: page content/extraction, change notifications, write operations th
 
 | URI | Kind | Name |
 |-----|------|------|
-| `purl://links` | fixed resource | `🏠 All links` |
+| `purl://links` | `ResourceTemplate` with a literal URI and a `list` callback (a fixed resource would be listed twice next to a template entry, and couldn't carry a per-user count) | `🏠 All links` |
 | `purl://folders/{folderId}` | `ResourceTemplate` with a `list` callback | the folder's emoji and name, e.g. `📚 Reading` |
 
 Both are `mimeType: "text/markdown"`, registered in a new `registerPurlResources(server)` in `src/lib/mcp.ts`, called next to `registerPurlTools` in `src/app/api/[transport]/route.ts`. Handlers resolve the user with the existing `getUserId(extra)`.
 
 ### `resources/list`
 
-The fixed resource comes first, then the template's `list` callback output:
+All links' template is registered first, so its entry comes first, then the folder template's `list` output:
 
-- **All links:** description `Every link you've saved, newest first (N links)` (`N` from one `count` query; `1 link` in the singular).
+- **All links:** description `Every link you've saved, newest first (N links)` (`N` from a new `countLinksForUser(userId)` in `src/lib/links.ts`; `1 link` in the singular).
 - **Each folder**, from `listFoldersForUser(userId)` (order: `position`, then name, the same as the folder menu, digit shortcuts and `list_folders`):
   - `uri`: `purl://folders/<id>`
   - `name` and `title`: `<emoji> <name>`. `FolderSummary.emoji` already falls back to `DEFAULT_FOLDER_EMOJI` (🦪).
@@ -92,8 +92,8 @@ A new pure module, `src/lib/mcp-resources.ts` (no Prisma, no `server-only` side 
 
 - `renderFolderResource(folder: FolderSummary, links: ResourceLink[]): string`
 - `renderAllLinksResource(links: ResourceLink[]): string`
-- `folderResourceUri(id)`, `parseFolderResourceUri(uri)` → id or `null`, `ALL_LINKS_URI`
-- `folderResourceDescription(folder)` and `allLinksDescription(count)` for the list entries
+- `folderResourceUri(id)` and `ALL_LINKS_URI` (the template hands the read callback its `folderId`, so no URI parser is needed)
+- `folderResourceDescription(folder)` and `allLinksDescription(count)` for the list entries, reusing `formatFolderLabel` and `formatLinkCount` from `src/lib/folder-display.ts`
 
 ## Errors
 
@@ -101,7 +101,7 @@ A new pure module, `src/lib/mcp-resources.ts` (no Prisma, no `server-only` side 
 |------|--------|
 | No token, invalid token or save-only (`links:save`) token | Already handled: `withMcpAuth(..., { required: true })` and `verifyToken` answer 401. No change. |
 | `folderId` unknown, deleted or another user's | `McpError` with code `-32002` (resource not found), message `Folder not found`. Identical for foreign and missing folders, so nothing leaks. |
-| Malformed URI (wrong scheme, empty id) | The same `-32002`. |
+| URI that matches no resource (wrong scheme, unknown path) | Never reaches Purl's code: the SDK answers `-32602` `Resource <uri> not found`. `purl://folders/` (empty id) matches no template either. A folder URI with an unknown id gets `-32002` from Purl. |
 | `extra.authInfo` without `userId` | `getUserId` throws `Unauthorized`, the same as tools. |
 | Database error | Propagates. The SDK answers with an internal error, the same as tools. |
 
@@ -111,8 +111,8 @@ SDK 1.31.0 exports no constant for it, so `mcp-resources.ts` defines `RESOURCE_N
 
 Vitest, following the existing patterns (Prisma mocked, `src/vitest.setup.ts` untouched):
 
-- **`src/lib/mcp-resources.test.ts`** (pure): day grouping across UTC midnight, newest first; the description cut at exactly 200 with `…` and no cut at ≤200; whitespace collapsing; title escaping (`[`, `]`, `\`, newlines); a blank title falling back to the URL; a URL with parentheses wrapped in `<…>`; content-type labels (none for WEB); the folder suffix only in All links and only for filed links; the empty-folder and no-links texts; the header with and without a description; singular and plural counts; URI round-trip and malformed URIs → `null`.
-- **`src/lib/mcp.test.ts`**: the list returns All links first, then folders in the order `listFoldersForUser` gives, with the expected `name`/`description`/`mimeType`; an empty folder is listed; reading a folder and All links returns the rendered Markdown with `mimeType: "text/markdown"`; an unknown or foreign folder id and a malformed URI give `-32002`; a missing `userId` throws Unauthorized.
+- **`src/lib/mcp-resources.test.ts`** (pure): day grouping across UTC midnight, newest first; the description cut at exactly 200 with `…` and no cut at ≤200; whitespace collapsing; title escaping (`[`, `]`, `\`, newlines); a blank title falling back to the URL; a URL with parentheses wrapped in `<…>`; content-type labels (none for WEB); the folder suffix only in All links and only for filed links; the empty-folder and no-links texts; the header with and without a description; singular and plural counts.
+- **`src/lib/mcp.test.ts`**: the list returns All links first, then folders in the order `listFoldersForUser` gives, with the expected `name`/`description`/`mimeType`; an empty folder is listed; reading a folder and All links returns the rendered Markdown with `mimeType: "text/markdown"`; an unknown or foreign folder id gives `-32002`; a missing `userId` throws Unauthorized.
 - **`listLinksForResource`**: the `where` is scoped to the user (and folder), the order is newest first, `take` is `MAX_SAVED_LINKS`, the `select` contains only the listed fields, and `getFolderById` returns `null` for a foreign or missing id.
 
 **Manual check:** the MCP Inspector against `pnpm dev` (list and read, with a real OAuth token). Then, after merging to `develop`, Claude's Add → Purl on dev.purl.live: confirm the picker lists the entries and attaching one puts the Markdown in the chat. How claude.ai displays custom-connector resources (search, how many it shows) hasn't been verified and gets checked at this step.
