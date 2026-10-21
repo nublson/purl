@@ -262,6 +262,12 @@ test.describe("Folder tags on phones", () => {
     await expect(row.getByRole("link", { name: /^Alpha/ })).toHaveAccessibleDescription(/In Design Engineer/);
     // No "Go to" button on touch: the ⋯ is always shown there.
     await expect(row.getByRole("link", { name: "Go to Design Engineer" })).toBeHidden();
+    // The menu has it instead, first.
+    await row.getByRole("button", { name: "Open link menu" }).tap();
+    const goTo = page.getByRole("menuitem", { name: "Go to Design Engineer" });
+    await expect(goTo).toHaveAttribute("href", "/folders/design");
+    await expect(page.getByRole("menuitem").first()).toHaveText(/Go to Design Engineer/);
+    await page.keyboard.press("Escape");
     await page.screenshot({ path: testInfo.outputPath("tag-list.png") });
 
     // A card: the same badge on its favicon, no tag line; the name is the

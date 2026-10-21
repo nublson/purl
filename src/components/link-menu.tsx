@@ -1,9 +1,11 @@
 "use client";
 
+import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { copyToClipboard } from "@/lib/clipboard";
 import { haptic } from "@/lib/haptics";
 import type { Link as LinkType } from "@/utils/links";
+import NextLink from "next/link";
 import {
   Export5,
   Link,
@@ -14,8 +16,10 @@ import {
 import { toast } from "sonner";
 import { EditDialog } from "./dialog-edit-link";
 import { DropdownWrapper } from "./dropdown-wrapper";
+import { FolderEmoji } from "./folder-emoji";
 import { HapticTarget } from "./haptic-target";
 import { LinkFolderSubmenu } from "./link-folder-submenu";
+import { Typography } from "./typography";
 import { Button } from "./ui/button";
 import {
   DropdownMenuGroup,
@@ -36,6 +40,13 @@ interface LinkMenuProps {
 
 export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
   const isPhone = useIsPhone();
+  const { folders } = useFolders();
+  // Off a folder page (every link there is in it): the link's folder, for
+  // "Go to …". The quick way there on every screen, touch included (the
+  // row's own Go to folder button shows only with a pointer that hovers).
+  const linkFolder = useCurrentFolder()
+    ? null
+    : (folders.find((folder) => folder.id === link.folderId) ?? null);
 
   async function handleOpenInNewTab() {
     window.open(link.url, "_blank");
@@ -70,6 +81,24 @@ export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
       className={isPhone ? "w-60" : "w-full"}
     >
       <DropdownMenuGroup>
+        {linkFolder ? (
+          <>
+            {/* A real link: Cmd/Ctrl-click opens the folder in a new tab. */}
+            <DropdownMenuItem asChild>
+              <NextLink href={`/folders/${linkFolder.slug}`}>
+                <FolderEmoji emoji={linkFolder.emoji} />
+                <Typography
+                  component="span"
+                  size="small"
+                  className="min-w-0 flex-1 truncate text-foreground"
+                >
+                  Go to {linkFolder.name}
+                </Typography>
+              </NextLink>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         <DropdownMenuItem
           onSelect={() => {
             void handleOpenInNewTab();
