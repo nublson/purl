@@ -1,4 +1,6 @@
-import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -330,6 +332,78 @@ describe("registerPurlResources", () => {
         r.read(new URL("purl://links"), { folderId: "A" }, {}),
       ).rejects.toThrow("Unauthorized");
     }
+  });
+});
+
+describe("registerPurlResources through a real server", () => {
+  async function connect() {
+    const server = new McpServer({ name: "purl", version: "test" });
+    registerPurlResources(server);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const originalSend = clientTransport.send.bind(clientTransport);
+    clientTransport.send = (message, options) =>
+      originalSend(message, {
+        ...options,
+        authInfo: { token: "t", clientId: "c", scopes: [], extra: { userId: "user-1" } },
+      });
+    const client = new Client({ name: "test-client", version: "test" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    return { client, server };
+  }
+
+  const folder = (id: string, name: string) => ({
+    id,
+    name,
+    slug: name.toLowerCase(),
+    emoji: "📚",
+    description: null,
+    isPublic: false,
+    position: 1,
+    linkCount: 0,
+  });
+
+  beforeEach(() => {
+    mockCountLinksForUser.mockResolvedValue(3);
+    mockListFoldersForUser.mockResolvedValue([folder("A", "Reading"), folder("B", "Pods")]);
+    mockListLinksForResource.mockResolvedValue([]);
+  });
+
+  it("lists all links first, then folders in order", async () => {
+    const { client } = await connect();
+    const { resources } = await client.listResources();
+    expect(resources.map((r) => r.uri)).toEqual([
+      "purl://links",
+      "purl://folders/A",
+      "purl://folders/B",
+    ]);
+    expect(resources[0].name).toBe("🏠 All links");
+    await client.close();
+  });
+
+  it("reads all links as Markdown", async () => {
+    const { client } = await connect();
+    const result = await client.readResource({ uri: "purl://links" });
+    const content = result.contents[0] as { text: string };
+    expect(content.text.startsWith("# 🏠 All links")).toBe(true);
+    await client.close();
+  });
+
+  it("rejects a missing folder with -32002", async () => {
+    mockGetFolderById.mockResolvedValue(null);
+    const { client } = await connect();
+    await expect(client.readResource({ uri: "purl://folders/missing" })).rejects.toMatchObject({
+      code: -32002,
+    });
+    await client.close();
+  });
+
+  it("rejects an unmatched URI with -32602", async () => {
+    const { client } = await connect();
+    await expect(client.readResource({ uri: "purl://folders/" })).rejects.toMatchObject({
+      code: -32602,
+    });
+    await client.close();
   });
 });
 

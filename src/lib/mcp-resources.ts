@@ -63,9 +63,10 @@ function renderLinks(links: ResourceLink[], { withFolder }: { withFolder: boolea
     lines.push(line);
     const description = link.description?.replace(/\s+/g, " ").trim();
     if (description) {
+      const chars = Array.from(description);
       const cut =
-        description.length > DESCRIPTION_MAX
-          ? `${description.slice(0, DESCRIPTION_MAX)}…`
+        chars.length > DESCRIPTION_MAX
+          ? `${chars.slice(0, DESCRIPTION_MAX).join("")}…`
           : description;
       lines.push(`  ${cut}`);
     }
@@ -86,7 +87,8 @@ export function renderFolderResource(
   now: Date,
 ): string {
   const parts = [`# ${formatFolderLabel(folder)}`];
-  if (folder.description) parts.push(folder.description);
+  const description = folder.description?.replace(/\s+/g, " ").trim();
+  if (description) parts.push(description);
   if (links.length === 0) {
     parts.push("No links in this folder yet.");
   } else {

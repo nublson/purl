@@ -148,6 +148,29 @@ describe("renderFolderResource", () => {
     expect(lineAfter("  \n ")).toBe("");
   });
 
+  it("cuts descriptions by code point, never splitting a surrogate pair", () => {
+    const d = `${"a".repeat(199)}😀bbb`;
+    const lines = renderFolderResource(folder(), [link({ description: d })], NOW).split("\n");
+    const i = lines.findIndex((x) => x.startsWith("- "));
+    expect(lines[i + 1]).toBe(`  ${"a".repeat(199)}😀…`);
+  });
+
+  it("collapses a folder description so it cannot inject a heading", () => {
+    const md = renderFolderResource(
+      folder({ description: "x\n\n## 2026-01-01" }),
+      [],
+      NOW,
+    );
+    const lines = md.split("\n");
+    expect(lines).toContain("x ## 2026-01-01");
+    expect(lines).not.toContain("## 2026-01-01");
+  });
+
+  it("omits a whitespace-only folder description", () => {
+    const md = renderFolderResource(folder({ description: " \n " }), [], NOW);
+    expect(md.split("\n\n")[1]).toBe("No links in this folder yet.");
+  });
+
   it("escapes titles", () => {
     expect(bullet(link({ title: "Foo]\n[bar\\" }))).toBe(
       "- [Foo\\] \\[bar\\\\](https://example.com/a) · example.com",
