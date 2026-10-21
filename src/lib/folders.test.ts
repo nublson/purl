@@ -30,6 +30,7 @@ const {
   listFoldersForUser,
   getFolderBySlug,
   createFolder,
+  createFolderInTx,
   updateFolder,
   deleteFolder,
   normalizeFolderEmoji,
@@ -305,6 +306,42 @@ describe("createFolder", () => {
     expect(err).toBeInstanceOf(FolderLimitError);
     expect(txExecuteRaw).toHaveBeenCalledTimes(1);
     expect(prisma.folder.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("createFolderInTx", () => {
+  beforeEach(resetMocks);
+
+  it("creates through the given tx without taking the lock", async () => {
+    vi.mocked(prisma.folder.count).mockResolvedValue(1);
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.folder.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.folder.create).mockResolvedValue({
+      id: "new-id",
+      name: "Books",
+      slug: "books",
+      position: 1,
+      _count: { links: 0 },
+    } as never);
+
+    const result = await createFolderInTx(tx as never, "user-1", "Books");
+
+    expect(result).toMatchObject({ id: "new-id", slug: "books" });
+    expect(prisma.folder.create).toHaveBeenCalledTimes(1);
+    expect(txExecuteRaw).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("throws FolderLimitError at the folder cap", async () => {
+    vi.mocked(prisma.folder.count).mockResolvedValue(MAX_FOLDERS);
+
+    const err = await createFolderInTx(tx as never, "user-1", "Late").catch(
+      (e: unknown) => e,
+    );
+
+    expect(err).toBeInstanceOf(FolderLimitError);
+    expect(prisma.folder.create).not.toHaveBeenCalled();
+    expect(txExecuteRaw).not.toHaveBeenCalled();
   });
 });
 

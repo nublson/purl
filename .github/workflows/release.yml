@@ -138,6 +138,21 @@ jobs:
             -f context="release/build-validation" \
             -f description="Release workflow Build Validation"
 
+  # Dispatched rather than triggered by the push to main, which GitHub suppresses
+  # for GITHUB_TOKEN. The workflow skips itself when the manifest version isn't
+  # newer than the store's, so it runs on every release.
+  publish-extension:
+    name: Publish Chrome extension
+    runs-on: ubuntu-latest
+    needs: validate-build
+    permissions:
+      actions: write
+    steps:
+      - name: Trigger Chrome Web Store publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run publish-extension.yml --repo "${{ github.repository }}" --ref main
+
   tag-mcp-release:
     name: Tag MCP release
     runs-on: ubuntu-latest

@@ -884,6 +884,129 @@ describe("createLinkForUser – folders", () => {
     ).rejects.toThrow(FolderNotFoundError);
   });
 
+  // The app sends a link's DELETE a few seconds after the row leaves the list
+  // (the Undo window), so re-saving a URL right after deleting it can find the
+  // row, scrape, and then update a row that is gone (Prisma P2025).
+  it("saves the URL fresh when the existing link was deleted during the scrape", async () => {
+    const existing = makeRow({ folderId: "folder-1" });
+    // Found before the scrape; gone again when looked up under the save lock.
+    vi.mocked(prisma.link.findFirst)
+      .mockResolvedValueOnce(existing as never)
+      .mockResolvedValueOnce(null);
+    vi.mocked(prisma.link.update).mockRejectedValue(
+      Object.assign(new Error("No record was found for an update."), {
+        code: "P2025",
+      }),
+    );
+    const created = makeRow({ id: "link-2", folderId: "folder-2" });
+    vi.mocked(prisma.link.create).mockResolvedValue(created as never);
+
+    const result = await createLinkForUser("user-123", "https://example.com", {
+      folderId: "folder-2",
+    });
+
+    expect(result).toEqual({ ...created, moved: false });
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(prisma.link.create)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        url: "https://example.com",
+        userId: "user-123",
+        folderId: "folder-2",
+        title: "Example Domain",
+      }),
+    });
+    // The metadata already resolved is reused: one scrape, not two.
+    expect(vi.mocked(ogs)).toHaveBeenCalledTimes(1);
+    // The fresh insert still goes through the atomic save-cap check.
+    expect(vi.mocked(prisma.link.count)).toHaveBeenCalled();
+  });
+
+  it("saves the URL fresh, unfiled, when a folder-less re-save hits a deleted link", async () => {
+    vi.mocked(prisma.link.findFirst)
+      .mockResolvedValueOnce(makeRow() as never)
+      .mockResolvedValueOnce(null);
+    vi.mocked(prisma.link.update).mockRejectedValue(
+      Object.assign(new Error("No record was found for an update."), {
+        code: "P2025",
+      }),
+    );
+    const created = makeRow({ id: "link-2" });
+    vi.mocked(prisma.link.create).mockResolvedValue(created as never);
+
+    const result = await createLinkForUser("user-123", "https://example.com");
+
+    expect(result).toEqual({ ...created, moved: false });
+    expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith({
+      data: expect.not.objectContaining({ folderId: expect.anything() }),
+    });
+  });
+
+  it("reuses the row a concurrent save restored instead of inserting a duplicate", async () => {
+    const existing = makeRow({ id: "link-1" });
+    // Another save of the same URL inserted "link-3" between this request's
+    // failed refresh and its turn under the save lock.
+    const restored = makeRow({ id: "link-3", folderId: "folder-1" });
+    vi.mocked(prisma.link.findFirst)
+      .mockResolvedValueOnce(existing as never)
+      .mockResolvedValueOnce(restored as never);
+    const refreshed = makeRow({ id: "link-3", folderId: "folder-2", title: "Example Domain" });
+    vi.mocked(prisma.link.update)
+      .mockRejectedValueOnce(
+        Object.assign(new Error("No record was found for an update."), {
+          code: "P2025",
+        }),
+      )
+      .mockResolvedValueOnce(refreshed as never);
+
+    const result = await createLinkForUser("user-123", "https://example.com", {
+      folderId: "folder-2",
+    });
+
+    expect(result).toEqual({ ...refreshed, moved: true });
+    expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(prisma.link.update)).toHaveBeenLastCalledWith({
+      where: { id: "link-3" },
+      data: expect.objectContaining({ title: "Example Domain", folderId: "folder-2" }),
+    });
+    // An existing row isn't a new save: no cap check for it.
+    expect(vi.mocked(prisma.link.count)).not.toHaveBeenCalled();
+  });
+
+  it("a new URL saved twice at once ends as one row: the second save refreshes the first's", async () => {
+    // Nothing found before the scrape; the other request's row is there
+    // once this one holds the save lock.
+    const other = makeRow({ id: "link-9" });
+    vi.mocked(prisma.link.findFirst)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(other as never);
+    const refreshed = makeRow({ id: "link-9", title: "Example Domain" });
+    vi.mocked(prisma.link.update).mockResolvedValue(refreshed as never);
+
+    const result = await createLinkForUser("user-123", "https://example.com");
+
+    expect(result).toEqual({ ...refreshed, moved: false });
+    expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledTimes(1);
+  });
+
+  it("still rejects when the fresh save after a deleted link is over the cap", async () => {
+    vi.mocked(prisma.link.findFirst)
+      .mockResolvedValueOnce(makeRow() as never)
+      .mockResolvedValueOnce(null);
+    vi.mocked(prisma.link.update).mockRejectedValue(
+      Object.assign(new Error("No record was found for an update."), {
+        code: "P2025",
+      }),
+    );
+    vi.mocked(prisma.link.count).mockResolvedValue(MAX_SAVED_LINKS);
+
+    await expect(
+      createLinkForUser("user-123", "https://example.com"),
+    ).rejects.toThrow(SaveLimitError);
+    expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
+  });
+
   it("re-saving an existing URL with no folderId keeps its folder and returns moved: false", async () => {
     const existing = makeRow({ folderId: "folder-1" });
     vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);

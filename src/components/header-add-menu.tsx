@@ -5,6 +5,7 @@ import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
 import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { isApplePlatform } from "@/lib/platform";
+import { parsePastedUrls } from "@/lib/pasted-urls";
 import { requestSaveUrl, saveLink } from "@/lib/save-link";
 import { Additem, Chrome, ClipboardImport, Export5, Plus } from "reicon-react";
 import { usePathname } from "next/navigation";
@@ -87,6 +88,12 @@ export function HeaderAddMenu() {
     // folder page this files into the page's own folder (by id): the page's
     // PasteHandler sits inside its CurrentFolderProvider, this header doesn't.
     if (requestSaveUrl(text)) return;
+
+    // Several links need the page's paste flow (progress, one summary toast).
+    if (parsePastedUrls(text).urls.length >= 2) {
+      toast.error("Unable to save these links yet. Try again in a moment.");
+      return;
+    }
 
     // Fallback (no page handler mounted yet, e.g. the folder page is still
     // streaming): `currentFolder` here comes from the URL slug. On a folder

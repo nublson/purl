@@ -37,6 +37,8 @@ import { isSameLinkUrl, omniboxSaveUrl } from "@/lib/omnibox";
 import { captureFlip, playFlip, type FlipSnapshot } from "@/lib/flip";
 import { cn } from "@/lib/utils";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
+import { parsePastedUrls } from "@/lib/pasted-urls";
+import type { PendingSave } from "@/lib/pending-save";
 import { requestSaveUrl } from "@/lib/save-link";
 import {
   countGroupedLinks,
@@ -126,7 +128,7 @@ export function HomeShell({
   const [loadedQuery, setLoadedQuery] = useState("");
   const [groups, setGroups] = useState(initialGroups);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
-  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
+  const [pendingSave, setPendingSave] = useState<PendingSave | null>(null);
   // The link just saved, while its row plays the arrival.
   const [arrivingId, setArrivingId] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -149,12 +151,33 @@ export function HomeShell({
   }, [groups]);
   const reloadSeq = useRef(0);
 
+  // FLIP (src/lib/flip.ts): record where every `[data-flip]` element is, let
+  // the change render, then (layout effect, before paint) glide each from
+  // where it was. `glide()` goes right before a state update that moves rows:
+  // a batch's link landing under its indicator, the indicator leaving, a
+  // pasted link's Save row going, a link joining a folder from the Add
+  // section.
+  const flipRef = useRef<FlipSnapshot | null>(null);
+  const [flipCount, setFlipCount] = useState(0);
+  useLayoutEffect(() => {
+    const before = flipRef.current;
+    flipRef.current = null;
+    // A microtask later: the grid's masonry places its cards in a mutation
+    // observer, which runs after this commit's layout effects, so reading
+    // the rows now would see them before they're placed. Still before paint.
+    if (before) queueMicrotask(() => playFlip(before));
+  }, [flipCount]);
+  const glide = useCallback(() => {
+    flipRef.current = captureFlip();
+    setFlipCount((count) => count + 1);
+  }, []);
+
   /**
    * Re-fetches exactly as many links as are loaded, so pages stay consistent
    * after inserts/deletes; `fresh` starts over from the first page (a new
    * search). Follows the current search.
    */
-  const reload = useCallback(async ({ fresh = false } = {}) => {
+  const reload = useCallback(async ({ fresh = false, glide: glideRows = false, endsBatch = false } = {}) => {
     const seq = ++reloadSeq.current;
     const startedAt = Date.now();
     const limit = fresh
@@ -173,6 +196,12 @@ export function HomeShell({
         await new Promise((resolve) => setTimeout(resolve, wait));
         if (seq !== reloadSeq.current) return;
       }
+      // `glideRows`: the rows already on screen slide to their new places
+      // (a batch's link landing under its indicator) instead of jumping.
+      if (glideRows) glide();
+      // A batch's last link lands where its indicator was: they go in one
+      // update, so the rows below stay put (no drop and spring back).
+      if (endsBatch) setPendingSave(null);
       setGroups(page.groups);
       setNextCursor(page.nextCursor);
       cursorQueryRef.current = query;
@@ -188,7 +217,7 @@ export function HomeShell({
       // ends.
       if (seq === reloadSeq.current) setLoadedQuery(searchQueryRef.current);
     }
-  }, [setLinksTotal, folderId]);
+  }, [setLinksTotal, folderId, glide]);
 
   // A folder page: links moved out of it fade out (like a delete) before
   // the reload drops them.
@@ -238,6 +267,15 @@ export function HomeShell({
   // When the field holds a URL: the URL to save, and whether it's already
   // in the list.
   const saveUrl = omniboxSaveUrl(query);
+  // Several links pasted into the field (the browser flattens the lines to
+  // spaces): one Save row each, and Enter saves them all. Over the cap, no
+  // rows (and no previews); Enter explains.
+  const pasted = useMemo(() => parsePastedUrls(query), [query]);
+  const pastedUrls = useMemo(
+    () => (pasted.urls.length >= 2 ? pasted.urls : []),
+    [pasted.urls],
+  );
+  const savableUrls = pasted.tooMany ? [] : pastedUrls;
   const alreadySaved =
     saveUrl !== null &&
     groups.some((group) =>
@@ -292,26 +330,37 @@ export function HomeShell({
   // screen: if it takes a moment (300ms), a skeleton stands in for its
   // answer, and once shown stays at least as long, so it never blinks.
   // Refining a search keeps the previous results (dimmed) instead.
-  const wantsSkeleton = pending && settled.query === "" && typedQuery !== "";
-  const [skeletonShown, setSkeletonShown] = useState(false);
+  // The same going back: clearing the field after an answer with no list
+  // (a pasted URL's Save rows, a search that matched nothing) has no rows to
+  // keep on screen either. There the skeleton is on screen from the first
+  // frame (its rows just left, so waiting would show an empty page).
+  const returningToList = typedQuery === "" && settled.groups.length === 0;
+  const wantsSkeleton =
+    pending &&
+    ((settled.query === "" && typedQuery !== "") || returningToList);
+  const [skeletonHeld, setSkeletonHeld] = useState(false);
+  const skeletonShown = skeletonHeld || (wantsSkeleton && returningToList);
   const skeletonSinceRef = useRef(0);
   useEffect(() => {
-    if (wantsSkeleton && !skeletonShown) {
-      const timer = setTimeout(() => {
-        skeletonSinceRef.current = Date.now();
-        setSkeletonShown(true);
-      }, SEARCH_SKELETON_DELAY_MS);
+    if (wantsSkeleton && !skeletonHeld) {
+      const timer = setTimeout(
+        () => {
+          skeletonSinceRef.current = Date.now();
+          setSkeletonHeld(true);
+        },
+        returningToList ? 0 : SEARCH_SKELETON_DELAY_MS,
+      );
       return () => clearTimeout(timer);
     }
-    if (!pending && skeletonShown) {
+    if (!pending && skeletonHeld) {
       const shownFor = Date.now() - skeletonSinceRef.current;
       const timer = setTimeout(
-        () => setSkeletonShown(false),
+        () => setSkeletonHeld(false),
         Math.max(0, SEARCH_SKELETON_MIN_MS - shownFor),
       );
       return () => clearTimeout(timer);
     }
-  }, [wantsSkeleton, pending, skeletonShown]);
+  }, [wantsSkeleton, pending, skeletonHeld, returningToList]);
   // The previous answer, while the next one loads: stepped back after a
   // beat (no flicker when it's quick), back at once when it lands.
   const dimClass = cn(
@@ -323,17 +372,9 @@ export function HomeShell({
   // in the section while everything it displaces slides into place (FLIP:
   // positions recorded here, played once that render is on screen). The
   // reload that follows the move confirms it; a failed move takes it out.
-  const flipRef = useRef<FlipSnapshot | null>(null);
-  const [flipCount, setFlipCount] = useState(0);
-  useLayoutEffect(() => {
-    const before = flipRef.current;
-    flipRef.current = null;
-    if (before) playFlip(before);
-  }, [flipCount]);
   const onAddingFromSearch = useCallback(
     (link: Link) => {
-      flipRef.current = captureFlip();
-      setFlipCount((count) => count + 1);
+      glide();
       // A reload already on its way predates this: its list mustn't drop
       // the link again (the move's own reload replaces it).
       reloadSeq.current++;
@@ -353,8 +394,7 @@ export function HomeShell({
       // Undo the revert's own reload follows once it's saved (reloading now
       // would still find the link here); a failed move reloads at once.
       return ({ reload: reloadNow }: { reload: boolean }) => {
-        flipRef.current = captureFlip();
-        setFlipCount((count) => count + 1);
+        glide();
         reloadSeq.current++;
         setGroups((current) =>
           current
@@ -367,9 +407,22 @@ export function HomeShell({
         if (reloadNow) void reload();
       };
     },
-    [folderId, groupsTimeZone, reload],
+    [folderId, groupsTimeZone, reload, glide],
   );
   const saveFromField = useCallback(() => {
+    if (pastedUrls.length > 0) {
+      // Every link in the field, as one batch (one summary toast). Over the
+      // cap nothing is saved: the field stays, so you can trim it.
+      for (const url of pastedUrls) forgetLinkPreview(url);
+      if (!pasted.tooMany) {
+        setQuery("");
+        setSearchQuery("");
+      }
+      if (!requestSaveUrl(pastedUrls.join("\n"))) {
+        toast.error("Unable to save the links yet. Try again in a moment.");
+      }
+      return;
+    }
     if (!saveUrl) return;
     // Its preview's "saved" is about to be wrong.
     forgetLinkPreview(saveUrl);
@@ -379,7 +432,26 @@ export function HomeShell({
     if (!requestSaveUrl(saveUrl)) {
       toast.error("Unable to save the link yet. Try again in a moment.");
     }
-  }, [saveUrl]);
+  }, [saveUrl, pastedUrls, pasted.tooMany]);
+
+  // + on one of several pasted links: saves it and leaves the rest in the
+  // field, each still with its row.
+  const saveOneFromField = useCallback(
+    (url: string) => {
+      forgetLinkPreview(url);
+      // Its row goes: the rows below glide up.
+      glide();
+      setQuery((current) =>
+        parsePastedUrls(current)
+          .urls.filter((other) => !isSameLinkUrl(other, url))
+          .join(" "),
+      );
+      if (!requestSaveUrl(url)) {
+        toast.error("Unable to save the link yet. Try again in a moment.");
+      }
+    },
+    [glide],
+  );
 
   // Coming back after a while (e.g. an installed app resumed on iOS, whose
   // Realtime connection may have dropped while suspended) quietly reloads
@@ -486,37 +558,62 @@ export function HomeShell({
     return () => observer.disconnect();
   }, [nextCursor, loadMore]);
 
-  const onPasteStart = useCallback((url: string) => {
-    setPendingUrl(url);
-  }, []);
+  const onPasteStart = useCallback(
+    (url: string, progress?: PendingSave["progress"]) => {
+      setPendingSave({ url, progress });
+    },
+    [],
+  );
 
-  const onSaveSuccess = useCallback(async (newLinkId?: string) => {
-    // Set before the reload, so the real row mounts already arriving.
-    if (newLinkId) setArrivingId(newLinkId);
-    await reload();
-    setPendingUrl(null);
-    // Once the row is in, give the arrival (200ms + the domain's 40ms) time
-    // to play, then stop marking it (unless a newer save took over).
-    if (newLinkId) {
-      setTimeout(
-        () => setArrivingId((id) => (id === newLinkId ? null : id)),
-        500,
-      );
-    }
-    // The new row is only visual; announce the save for screen readers too.
-    // On a folder page, `saveLink` (via PasteHandler's own
-    // `useCurrentFolder()`, which inside the page's CurrentFolderProvider
-    // always resolves to this `folderId`) already toasted "Saved to
-    // {name}"/"Moved to {name}" — skip the generic toast so it isn't doubled.
-    if (!folderId) toast.success("Link saved");
-    // A save here files the link into this folder (a re-saved URL moves in
-    // from elsewhere), so folder counts change. `reload()` above only
-    // refreshes this list, not the folder list behind the header's counts.
-    else refreshFolders();
-  }, [reload, folderId, refreshFolders]);
+  const onSaveSuccess = useCallback(
+    async (
+      newLinkId?: string,
+      opts?: { quiet?: boolean; last?: boolean },
+    ) => {
+      // Set before the reload, so the real row mounts already arriving.
+      if (newLinkId) setArrivingId(newLinkId);
+      // In a batch the indicator stays put and the link lands under it: the
+      // rows below glide down a row instead of jumping.
+      await reload({ glide: opts?.quiet, endsBatch: opts?.last });
+      // One link of a multi-link paste: the batch's indicator stays until the
+      // last one is in (`onBatchDone`), so it doesn't blink between links.
+      if (!opts?.quiet) setPendingSave(null);
+      // Once the row is in, give the arrival (200ms + the domain's 40ms) time
+      // to play, then stop marking it (unless a newer save took over).
+      if (newLinkId) {
+        setTimeout(
+          () => setArrivingId((id) => (id === newLinkId ? null : id)),
+          500,
+        );
+      }
+      // One link of a multi-link paste: the batch toasts and refreshes the
+      // folder counts once, when it's done (`onBatchDone`).
+      if (opts?.quiet) return;
+      // The new row is only visual; announce the save for screen readers too.
+      // On a folder page, `saveLink` (via PasteHandler's own
+      // `useCurrentFolder()`, which inside the page's CurrentFolderProvider
+      // always resolves to this `folderId`) already toasted "Saved to
+      // {name}"/"Moved to {name}" — skip the generic toast so it isn't doubled.
+      if (!folderId) toast.success("Link saved");
+      // A save here files the link into this folder (a re-saved URL moves in
+      // from elsewhere), so folder counts change. `reload()` above only
+      // refreshes this list, not the folder list behind the header's counts.
+      else refreshFolders();
+    },
+    [reload, folderId, refreshFolders],
+  );
+
+  const onBatchDone = useCallback(() => {
+    // Normally the last link's landing already took the indicator's place.
+    // When it didn't (the last link failed), the rows below glide up into
+    // the gap instead.
+    glide();
+    setPendingSave(null);
+    if (folderId) refreshFolders();
+  }, [folderId, refreshFolders, glide]);
 
   const onSaveError = useCallback(() => {
-    setPendingUrl(null);
+    setPendingSave(null);
   }, []);
 
   const { view } = useLinkView();
@@ -525,8 +622,7 @@ export function HomeShell({
   const todayGroup = shownGroups.find((g) => g.label === "Today");
 
   // Optimistic row only for a URL this tab is saving.
-  const showSkeleton = pendingUrl !== null;
-  const skeletonUrl = pendingUrl ?? "";
+  const showSkeleton = pendingSave !== null;
   const showSyntheticToday = showSkeleton && !todayGroup;
   // Every loaded link deleted (awaiting Undo) and nothing left to load reads
   // as empty, so the empty state shows instead of a blank list.
@@ -590,6 +686,12 @@ export function HomeShell({
 
   const listShown = !((!shownGroups.length || allLinksHidden) && !showSyntheticToday);
   const shownQuery = settled.query;
+  // Whether the answer on screen was one with Save rows (a URL or several):
+  // judged on the settled query, not the field's text, so clearing the field
+  // doesn't flash "no links match" while the whole list loads.
+  const settledOffersSave =
+    Boolean(omniboxSaveUrl(shownQuery)) ||
+    parsePastedUrls(shownQuery).urls.length >= 2;
   // On a folder page with a search: your other links that match, to add
   // here. Under the folder's matches, a day group's gap below them.
   const addSection =
@@ -607,13 +709,29 @@ export function HomeShell({
         onPasteStart={onPasteStart}
         onSaveSuccess={onSaveSuccess}
         onSaveError={onSaveError}
+        onBatchDone={onBatchDone}
       />
-      {saveUrl ? (
-        // A row, so the list's column in the grid view too.
+      {savableUrls.length > 0 ? (
+        <div className="wrapper-private flex flex-col">
+          {savableUrls.map((url, index) => (
+            <OmniboxSaveRow
+              key={url}
+              url={url}
+              arriveIndex={index}
+              alreadySaved={false}
+              folderName={folderId ? currentFolder?.name : undefined}
+              onSave={() => saveOneFromField(url)}
+            />
+          ))}
+        </div>
+      ) : saveUrl && !alreadySaved ? (
+        // A row, so the list's column in the grid view too. A URL that's
+        // already in the list below isn't offered again: the link is the
+        // answer (a second row for it read as a duplicate).
         <div className="wrapper-private">
           <OmniboxSaveRow
             url={saveUrl}
-            alreadySaved={alreadySaved}
+            alreadySaved={false}
             folderName={folderId ? currentFolder?.name : undefined}
             onSave={saveFromField}
           />
@@ -630,7 +748,7 @@ export function HomeShell({
       ) : !listShown ? (
         // A URL that matches nothing: the Save row above is the answer.
         // In a folder, so are your other links that match (below).
-        (shownQuery && saveUrl) ||
+        (shownQuery && settledOffersSave) ||
         (folderId && shownQuery && addResults.links.length > 0) ? null : (
           <div className={dimClass}>
             <LinkGroupEmpty
@@ -652,33 +770,36 @@ export function HomeShell({
               newLinkId={arrivingId}
               groups={[
                 ...(showSyntheticToday
-                  ? [{ label: "Today", links: [], pendingUrl: skeletonUrl }]
+                  ? [{ label: "Today", links: [], pending: pendingSave }]
                   : []),
                 ...shownGroups.map((group, groupIndex) => ({
                   label: group.label,
                   links: group.links,
-                  pendingUrl:
-                    group.label === "Today" && showSkeleton ? skeletonUrl : null,
+                  pending: group.label === "Today" ? pendingSave : null,
                   eagerFavicons: eagerFaviconsByGroup[groupIndex],
                 })),
               ]}
             />
           ) : null}
-          {view !== "grid" && showSyntheticToday && (
-            <LinkGroup label="Today" links={[]} pendingUrl={skeletonUrl} />
-          )}
-          {view !== "grid" && shownGroups.map((group, groupIndex) => (
-            <LinkGroup
-              key={group.label}
-              label={group.label}
-              links={group.links}
-              newLinkId={arrivingId}
-              pendingUrl={
-                group.label === "Today" && showSkeleton ? skeletonUrl : null
-              }
-              eagerFavicons={eagerFaviconsByGroup[groupIndex]}
-            />
-          ))}
+          {/* One keyed list, with the synthetic "Today" (nothing saved today
+              yet) first: when the first link lands the group becomes the real
+              one under the same key, so a batch's indicator isn't remounted. */}
+          {view !== "grid" &&
+            (showSyntheticToday
+              ? [{ label: "Today", links: [] as Link[] }, ...shownGroups]
+              : shownGroups
+            ).map((group, groupIndex) => (
+              <LinkGroup
+                key={group.label}
+                label={group.label}
+                links={group.links}
+                newLinkId={arrivingId}
+                pending={group.label === "Today" ? pendingSave : null}
+                eagerFavicons={
+                  eagerFaviconsByGroup[groupIndex - (showSyntheticToday ? 1 : 0)]
+                }
+              />
+            ))}
           {/* Once every folder match is loaded (until then, it waits
               below the loader). */}
           {nextCursor ? null : addSection}
@@ -740,7 +861,7 @@ export function HomeShell({
         value={query}
         onChange={setQuery}
         onSave={saveFromField}
-        saveUrl={saveUrl}
+        canSave={Boolean(saveUrl) || pastedUrls.length > 0}
         placeholder={
           folderId
             ? `Search ${currentFolder?.name ?? "this folder"} or paste a link`

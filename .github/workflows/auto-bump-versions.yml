@@ -1,0 +1,126 @@
+name: Auto Bump Versions
+
+# Bumps a component's version whenever code that changes it lands on develop, so
+# a release has something new to ship. Mirrors the auto-changeset pattern from
+# nublson/quiver, adapted for single-manifest components (no @changesets/cli):
+#   - MCP server: server.json's `version` (release.yml tags it, publish-mcp.yml
+#     publishes it)
+#   - Chrome extension: extension/public/manifest.json's `version`
+#     (publish-extension.yml submits it to the Chrome Web Store)
+#
+# The bump size comes from the conventional-commit subjects of the pushed commits
+# that touch the component (merge commits skipped, since PRs land as merges):
+# any `type!:` → major, any `feat:` → minor, else patch. A version already
+# changed in the push (a manual bump) is left alone. Both bumps go in one commit,
+# so the two never race to push.
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  auto-bump:
+    name: 📦 Bump versions
+    runs-on: ubuntu-latest
+    # Skip if this push was made by the bot itself (prevents a commit loop).
+    if: github.actor != 'github-actions[bot]'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bump changed components
+        id: bump
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          # `before` is all-zeros on a branch's first push — nothing to diff against.
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            exit 0
+          fi
+
+          # bump <label> <json file> <pathspec...>
+          # bash steps run under `set -e -o pipefail`; if $BEFORE is unreachable
+          # (e.g. history rewritten), git fails safe to "nothing changed".
+          bump() {
+            local LABEL=$1 FILE=$2
+            shift 2
+
+            local CHANGED
+            CHANGED=$( (git diff --name-only "$BEFORE" "$AFTER" -- "$@" 2>/dev/null || true) | head -1 )
+            if [ -z "$CHANGED" ]; then
+              echo "$LABEL: no changes."
+              return
+            fi
+
+            local OLD NEW
+            OLD=$(git show "${BEFORE}:${FILE}" 2>/dev/null | jq -r .version 2>/dev/null || echo "")
+            NEW=$(jq -r .version "$FILE")
+            if [ -n "$OLD" ] && [ "$OLD" != "$NEW" ]; then
+              echo "$LABEL: already bumped to $NEW in this push."
+              return
+            fi
+
+            local SUBJECTS LEVEL
+            SUBJECTS=$(git log --no-merges --format=%s "$BEFORE..$AFTER" -- "$@" 2>/dev/null || true)
+            if printf '%s\n' "$SUBJECTS" | grep -qE '^[a-z]+(\([^)]*\))?!:'; then
+              LEVEL="major"
+            elif printf '%s\n' "$SUBJECTS" | grep -qE '^feat(\([^)]*\))?:'; then
+              LEVEL="minor"
+            else
+              LEVEL="patch"
+            fi
+
+            local MAJOR MINOR PATCH
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$NEW"
+            case "$LEVEL" in
+              major) MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+              minor) MINOR=$((MINOR + 1)); PATCH=0 ;;
+              patch) PATCH=$((PATCH + 1)) ;;
+            esac
+            local VERSION="${MAJOR}.${MINOR}.${PATCH}"
+
+            # Rewrite only the first "version" line (the top-level one in both
+            # files), keeping the rest of the file's formatting as written.
+            awk -v v="$VERSION" '!done && /"version": *"[^"]*"/ {
+              sub(/"version": *"[^"]*"/, "\"version\": \"" v "\""); done = 1
+            } { print }' "$FILE" > "$FILE.tmp" && mv "$FILE.tmp" "$FILE"
+            if [ "$(jq -r .version "$FILE")" != "$VERSION" ]; then
+              echo "::error::Could not set $FILE's version to $VERSION."
+              exit 1
+            fi
+            git add "$FILE"
+            echo "$LABEL: $NEW -> $VERSION ($LEVEL)"
+            BUMPED+=("$LABEL to v$VERSION")
+          }
+
+          BUMPED=()
+          bump "MCP server" server.json \
+            'src/lib/mcp.ts' \
+            ':(literal)src/app/api/[transport]'
+          bump "extension" extension/public/manifest.json \
+            'extension/' \
+            ':(exclude)extension/**/*.test.ts' \
+            ':(exclude)extension/scripts/' \
+            ':(exclude)extension/.env.example'
+
+          if [ ${#BUMPED[@]} -gt 0 ]; then
+            MESSAGE="chore: bump $(printf '%s and ' "${BUMPED[@]}" | sed 's/ and $//')"
+            echo "message=${MESSAGE}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push version bump
+        if: steps.bump.outputs.message != ''
+        env:
+          MESSAGE: ${{ steps.bump.outputs.message }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "$MESSAGE"
+          git push origin develop

@@ -196,16 +196,13 @@ async function isLimitReached(res: Response): Promise<boolean> {
   }
 }
 
-chrome.action.onClicked.addListener(async (tab) => {
-  if (!tab.id) return;
-  const tabId = tab.id;
+type SaveOutcome = "done" | "unauthorized";
 
-  // No address means Chrome gave us no access to the page (its own pages).
-  if (!tab.url || !isWebUrl(tab.url)) {
-    await report(tabId, "error", "Can't save this page");
-    return;
-  }
-
+/**
+ * Saves `url` and tells the user how it went in tab `tabId`. A 401 isn't
+ * reported: the caller decides whether to start a sign-in or give up.
+ */
+async function savePage(tabId: number, url: string): Promise<SaveOutcome> {
   await report(tabId, "saving");
 
   const controller = new AbortController();
@@ -216,30 +213,22 @@ chrome.action.onClicked.addListener(async (tab) => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ url: tab.url }),
+      body: JSON.stringify({ url }),
       signal: controller.signal,
     });
     clearTimeout(timeout);
 
-    if (res.status === 401) {
-      await report(tabId, "error", "Log in to Purl first");
-      return;
-    }
+    if (res.status === 401) return "unauthorized";
     if (res.status === 403 && (await isLimitReached(res))) {
       await report(tabId, "error", "Link limit reached");
-      return;
-    }
-    if (res.status === 429) {
+    } else if (res.status === 429) {
       // Saves are limited to 30 a minute.
       await report(tabId, "error", "Too many saves, try again in a minute");
-      return;
-    }
-    if (!res.ok) {
+    } else if (!res.ok) {
       await report(tabId, "error", "Something went wrong");
-      return;
+    } else {
+      await report(tabId, "saved");
     }
-
-    await report(tabId, "saved");
   } catch (e) {
     clearTimeout(timeout);
     const msg =
@@ -247,6 +236,95 @@ chrome.action.onClicked.addListener(async (tab) => {
         ? "Request timed out"
         : "Could not reach Purl";
     await report(tabId, "error", msg);
+  }
+  return "done";
+}
+
+// A save that's waiting for the user to sign in. It lives in session storage
+// because Chrome can stop this worker while they're on the provider's pages.
+type PendingSave = {
+  url: string;
+  tabId: number; // the page being saved
+  loginTabId: number; // the Purl tab we opened
+  at: number;
+};
+
+const PENDING_KEY = "pendingSave";
+const PENDING_TTL_MS = 10 * 60_000;
+
+async function readPending(): Promise<PendingSave | null> {
+  const stored = await chrome.storage.session.get(PENDING_KEY);
+  return (stored[PENDING_KEY] as PendingSave | undefined) ?? null;
+}
+
+/** Opens Purl so the user can sign in; the save resumes in `resumeAfterSignIn`. */
+async function startSignIn(tabId: number, url: string): Promise<void> {
+  const loginTab = await chrome.tabs.create({ url: PURL_URL });
+  if (loginTab.id !== undefined) {
+    const pending: PendingSave = {
+      url,
+      tabId,
+      loginTabId: loginTab.id,
+      at: Date.now(),
+    };
+    await chrome.storage.session.set({ [PENDING_KEY]: pending });
+  }
+  await report(tabId, "error", "Log in to Purl to save this page");
+}
+
+/** Sign-in sends the user to /home, so reaching it means they're in. */
+function isSignedInLanding(url: string): boolean {
+  try {
+    const landing = new URL(url);
+    return (
+      landing.origin === new URL(PURL_URL).origin && landing.pathname === "/home"
+    );
+  } catch {
+    return false;
+  }
+}
+
+async function resumeAfterSignIn(pending: PendingSave): Promise<void> {
+  // Back to the page, and the login tab out of the way; either tab may be gone.
+  await chrome.tabs.update(pending.tabId, { active: true }).catch(() => {});
+  await chrome.tabs.remove(pending.loginTabId).catch(() => {});
+
+  // Still unauthorized: say so rather than sending them round again.
+  if ((await savePage(pending.tabId, pending.url)) === "unauthorized") {
+    await report(pending.tabId, "error", "Log in to Purl first");
+  }
+}
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
+  if (!changeInfo.url) return;
+  const pending = await readPending();
+  if (!pending || pending.loginTabId !== tabId) return;
+  if (!isSignedInLanding(changeInfo.url)) return;
+
+  await chrome.storage.session.remove(PENDING_KEY);
+  if (Date.now() - pending.at > PENDING_TTL_MS) return;
+  await resumeAfterSignIn(pending);
+});
+
+chrome.tabs.onRemoved.addListener(async (tabId) => {
+  const pending = await readPending();
+  if (pending?.loginTabId === tabId) {
+    await chrome.storage.session.remove(PENDING_KEY);
+  }
+});
+
+chrome.action.onClicked.addListener(async (tab) => {
+  if (!tab.id) return;
+  const tabId = tab.id;
+
+  // No address means Chrome gave us no access to the page (its own pages).
+  if (!tab.url || !isWebUrl(tab.url)) {
+    await report(tabId, "error", "Can't save this page");
+    return;
+  }
+
+  if ((await savePage(tabId, tab.url)) === "unauthorized") {
+    await startSignIn(tabId, tab.url);
   }
 });
 

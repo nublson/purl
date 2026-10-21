@@ -1,0 +1,5 @@
+id,title,note,excerpt,url,folder,tags,created,cover,highlights,favorite
+101,"Grids, type and colour",,A made-up excerpt.,https://example.com/design/grids,Design Engineer / Artists,,2026-09-20T10:15:00.000Z,,,false
+102,Études for interfaces,,,https://example.org/design/etudes,Design Engineer / Artists,,2026-09-18T08:00:00.000Z,,,true
+103,Reading about rivers,,,https://example.net/reading/rivers,Reading List,,2026-09-15T12:30:00.000Z,,,false
+104,An unsorted note,,,https://example.com/unsorted-note,Unsorted,,2026-09-10T09:45:00.000Z,,,false

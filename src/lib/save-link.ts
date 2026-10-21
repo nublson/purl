@@ -16,12 +16,14 @@ export type SaveLinkFolder = { id: string; name: string; emoji: string };
 
 export async function saveLink(
   rawUrl: string,
-  opts?: { folder?: SaveLinkFolder },
+  /** `quiet` skips every toast: a multi-link paste reports once, at the end. */
+  opts?: { folder?: SaveLinkFolder; quiet?: boolean },
 ): Promise<SaveLinkResult> {
   const url = rawUrl.trim();
+  const say = opts?.quiet ? null : toast;
 
   if (!isValidUrl(url)) {
-    toast.error("Enter a full URL, like https://example.com.");
+    say?.error("Enter a full URL, like https://example.com.");
     return null;
   }
 
@@ -49,14 +51,14 @@ export async function saveLink(
       const msg = data?.error
         ? data.error.replace(/(\w)'(\w)/g, "$1’$2")
         : "Unable to save the link. Try again.";
-      toast.error(msg);
+      say?.error(msg);
       const hitLimit = data?.code === "LIMIT_REACHED";
       return hitLimit ? { error: msg, limit: true } : { error: msg };
     }
 
     const id = data?.id as string | undefined;
     if (!id) {
-      toast.error("Unable to save the link. Try again.");
+      say?.error("Unable to save the link. Try again.");
       return { error: "Invalid response" };
     }
 
@@ -66,12 +68,12 @@ export async function saveLink(
 
     if (folder) {
       const label = formatFolderLabel(folder);
-      toast.success(data.moved ? `Moved to ${label}` : `Saved to ${label}`);
+      say?.success(data.moved ? `Moved to ${label}` : `Saved to ${label}`);
     }
 
     return { id };
   } catch {
-    toast.error("Unable to save the link. Check your connection and try again.");
+    say?.error("Unable to save the link. Check your connection and try again.");
     return { error: "Network error" };
   }
 }

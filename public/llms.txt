@@ -1,0 +1,16 @@
+# Purl
+
+> A calm place to save and share the links you find. Free, no ads, no AI.
+
+## What it does
+- Save web pages, PDFs, YouTube videos and audio. Purl fetches the title, favicon, description and thumbnail.
+- Organize links into folders (up to 100) and share any folder at a public link, purl.live/@username/folder.
+- Free for everyone: up to 1,000 saved links per account.
+- Save from a Chrome extension, a REST API or an MCP server.
+
+## Pages
+- Support: https://purl.live/support
+- API: https://purl.live/docs/api
+- MCP: https://purl.live/docs/mcp
+- Privacy: https://purl.live/privacy
+- Terms: https://purl.live/terms

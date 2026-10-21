@@ -14,22 +14,22 @@ const FOCUS_KEY = "/";
 /**
  * The search field pinned to the bottom of Home and folder pages. Typing
  * filters the list (the page owns the query); when the text is a URL
- * (`saveUrl`), Enter saves it instead. `/` or ⌘/Ctrl+K focuses it, Esc
+ * (or several: `canSave`), Enter saves it instead. `/` or ⌘/Ctrl+K focuses it, Esc
  * clears it (and leaves it when already empty).
  */
 export function LinkOmnibox({
   value,
   onChange,
   onSave,
-  saveUrl,
+  canSave,
   placeholder,
   className,
 }: {
   value: string;
   onChange: (value: string) => void;
-  /** Saves `saveUrl`; called on Enter when there is one. */
+  /** Saves what the field holds; called on Enter when `canSave`. */
   onSave: () => void;
-  saveUrl: string | null;
+  canSave: boolean;
   placeholder: string;
   className?: string;
 }) {
@@ -72,7 +72,7 @@ export function LinkOmnibox({
         )}
         onSubmit={(event) => {
           event.preventDefault();
-          if (saveUrl) onSave();
+          if (canSave) onSave();
           else inputRef.current?.blur();
         }}
       >
@@ -81,7 +81,7 @@ export function LinkOmnibox({
           ref={inputRef}
           type="search"
           // "Go" on phone keyboards: Enter saves a URL or ends the search.
-          enterKeyHint={saveUrl ? "go" : "search"}
+          enterKeyHint={canSave ? "go" : "search"}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="none"

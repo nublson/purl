@@ -36,4 +36,21 @@ describe("OAuth discovery routes", () => {
     expect(json).toContain(CONFIGURED_ORIGIN);
     expect(json).not.toContain("evil.example");
   });
+
+  it.each([
+    ["oauth-authorization-server", authorizationServer],
+    ["oauth-protected-resource", protectedResource],
+  ] as const)("%s: advertises the save-only scope", async (path, GET) => {
+    const res = await GET(new Request(`https://purl.live/.well-known/${path}`));
+    const { scopes_supported } = await res.json();
+    expect(scopes_supported).toEqual(
+      expect.arrayContaining([
+        "openid",
+        "profile",
+        "email",
+        "offline_access",
+        "links:save",
+      ]),
+    );
+  });
 });

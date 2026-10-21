@@ -2,12 +2,13 @@ import {
   limitReadableStreamByBytes,
   safeFetch,
 } from "@/lib/safe-outbound-fetch";
+import { timeoutSignal } from "@/utils/abort-signal";
 
 const OGS_PROBE_UA =
   "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)";
 
 /** Single probe budget; keeps metadata scrape responsive. */
-const OG_THUMBNAIL_PROBE_TIMEOUT_MS = 5000;
+export const OG_THUMBNAIL_PROBE_TIMEOUT_MS = 5000;
 
 const OG_THUMBNAIL_PROBE_MAX_SNIFF_BYTES = 16 * 1024;
 
@@ -112,12 +113,15 @@ async function readSniffBuffer(stream: ReadableStream<Uint8Array>): Promise<Uint
 
 type HeadProbeResult = "valid" | "invalid" | "inconclusive";
 
-async function probeHead(url: string): Promise<HeadProbeResult> {
+async function probeHead(
+  url: string,
+  signal?: AbortSignal,
+): Promise<HeadProbeResult> {
   try {
     const res = await safeFetch(url, {
       method: "HEAD",
       headers: { "User-Agent": OGS_PROBE_UA },
-      signal: AbortSignal.timeout(OG_THUMBNAIL_PROBE_TIMEOUT_MS),
+      signal: timeoutSignal(OG_THUMBNAIL_PROBE_TIMEOUT_MS, signal),
       maxRedirects: 4,
     });
     try {
@@ -143,7 +147,7 @@ async function probeHead(url: string): Promise<HeadProbeResult> {
   }
 }
 
-async function probeGet(url: string): Promise<boolean> {
+async function probeGet(url: string, signal?: AbortSignal): Promise<boolean> {
   let res: Response;
   try {
     res = await safeFetch(url, {
@@ -152,7 +156,7 @@ async function probeGet(url: string): Promise<boolean> {
         "User-Agent": OGS_PROBE_UA,
         Accept: "image/avif,image/webp,image/*,*/*;q=0.8",
       },
-      signal: AbortSignal.timeout(OG_THUMBNAIL_PROBE_TIMEOUT_MS),
+      signal: timeoutSignal(OG_THUMBNAIL_PROBE_TIMEOUT_MS, signal),
       maxRedirects: 4,
     });
   } catch {
@@ -183,9 +187,12 @@ async function probeGet(url: string): Promise<boolean> {
  * True when the URL responds like a real image (Content-Type and/or magic bytes).
  * Swallows errors — callers treat false as “do not store this thumbnail”.
  */
-export async function validateOgThumbnailUrl(url: string): Promise<boolean> {
-  const head = await probeHead(url);
+export async function validateOgThumbnailUrl(
+  url: string,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const head = await probeHead(url, signal);
   if (head === "valid") return true;
   if (head === "invalid") return false;
-  return probeGet(url);
+  return probeGet(url, signal);
 }

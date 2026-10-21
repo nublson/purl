@@ -97,6 +97,7 @@ test.describe("Landing demo", () => {
 
   test.describe("with the purl account", () => {
     let userId: string;
+    let startedId: string;
 
     test.beforeAll(async () => {
       if (await purlExists()) throw new Error("A `purl` user already exists; refusing to touch it.");
@@ -105,6 +106,7 @@ test.describe("Landing demo", () => {
       await pool.query(`UPDATE "users" SET "username" = 'purl' WHERE "id" = $1`, [userId]);
       const reading = await seedFolder(userId, { name: "Reading list", slug: "reading-list", emoji: "📚", isPublic: true });
       const started = await seedFolder(userId, { name: "Getting started", slug: "getting-started", emoji: "🚀", isPublic: true });
+      startedId = started;
       await seedFolder(userId, { name: "Design engineering", slug: "design-engineering", emoji: "🎨", isPublic: true });
       const secret = await seedFolder(userId, { name: "Secret", slug: "secret", emoji: "🔒", isPublic: false });
       for (const n of [1, 2, 3]) {
@@ -121,7 +123,7 @@ test.describe("Landing demo", () => {
       if (userId) await deleteTestUser(userId);
     });
 
-    test("opens on Reading list with its links; Secret never appears", async ({ page }) => {
+    test("opens on the owner's first folder with its links; Secret never appears", async ({ page }) => {
       await openDemo(page);
       await expect(rows(page)).toHaveCount(4);
       await expect(page.getByText("Reading 1")).toBeVisible();
@@ -131,6 +133,28 @@ test.describe("Landing demo", () => {
       const menu = page.getByRole("menu");
       await expect(menu.getByRole("menuitem", { name: /Reading list/ })).toBeVisible();
       await expect(menu.getByRole("menuitem", { name: /Secret/ })).toHaveCount(0);
+    });
+
+    test("opens on whichever public folder the owner put first, not on Reading list by name", async ({ page }) => {
+      const saved = await pool.query<{ position: number }>(
+        `SELECT "position" FROM "folders" WHERE "id" = $1`,
+        [startedId],
+      );
+      const original = saved.rows[0].position;
+      // Ahead of every other folder of the account, Reading list included.
+      await pool.query(
+        `UPDATE "folders" SET "position" = (SELECT MIN("position") - 1 FROM "folders" WHERE "userId" = $2) WHERE "id" = $1`,
+        [startedId, userId],
+      );
+      try {
+        await openDemo(page);
+        await expect(page.getByRole("button", { name: "Folder: Getting started" })).toBeVisible();
+        await expect(rows(page)).toHaveCount(2);
+        await expect(page.getByText("Started 1")).toBeVisible();
+        await expect(page.getByText("Reading 1")).toHaveCount(0);
+      } finally {
+        await pool.query(`UPDATE "folders" SET "position" = $2 WHERE "id" = $1`, [startedId, original]);
+      }
     });
 
     test("choosing a folder switches in place and disables everything that writes", async ({ page }) => {

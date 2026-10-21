@@ -1,7 +1,10 @@
 import "server-only";
 
+import { revokeConnectedApp } from "@/lib/connected-apps";
+import { PORTFOLIO_CLIENT_ID } from "@/lib/oauth-route";
 import prisma from "@/lib/prisma";
 import { generateUsername } from "@/lib/usernames";
+import { getSessionFromCtx } from "better-auth/api";
 
 /**
  * Better Auth `databaseHooks.user.create.before` handler: generates a
@@ -21,4 +24,24 @@ export async function assignUsernameOnCreate<
     return existing !== null;
   });
   return { data: { ...user, username } };
+}
+
+/**
+ * Better Auth `hooks.before` handler for `/sign-out`: revokes the nublson.com
+ * portfolio's connection (its tokens and consent) for the user signing out,
+ * so the portfolio's next save gets a 401 and runs the connect flow, which
+ * asks them to sign in again. Only that client: other connected apps (Claude
+ * and other MCP clients) stay connected. It runs before the sign-out so the
+ * session is still readable, and never blocks the sign-out itself.
+ */
+export async function revokePortfolioOnSignOut(
+  ctx: Parameters<typeof getSessionFromCtx>[0],
+): Promise<void> {
+  try {
+    const session = await getSessionFromCtx(ctx);
+    if (!session) return;
+    await revokeConnectedApp(session.user.id, PORTFOLIO_CLIENT_ID);
+  } catch (err) {
+    console.error("sign-out: revoking the portfolio connection failed:", err);
+  }
 }

@@ -8,8 +8,8 @@ import { connectErrorMessage } from "@/lib/sign-in-errors";
 import { DialogWrapper } from "./dialog-wrapper";
 import { Skeleton } from "./ui/skeleton";
 
-// Loaded when the dialog first opens: the tabs (usage, integrations, account)
-// stay off /home's initial bundle.
+// Loaded when the dialog first opens: the tabs (usage, integrations, import,
+// account) stay off /home's initial bundle.
 const SettingsContent = dynamic(() => import("./settings-content"), {
   loading: () => (
     <div className="flex flex-col gap-4 px-6">
@@ -19,7 +19,7 @@ const SettingsContent = dynamic(() => import("./settings-content"), {
   ),
 });
 
-export const SETTINGS_TAB_VALUES = ["usage", "integrations", "account"] as const;
+export const SETTINGS_TAB_VALUES = ["usage", "integrations", "import", "account"] as const;
 export type SettingsTabValue = (typeof SETTINGS_TAB_VALUES)[number];
 
 function isSettingsTabValue(value: string | null): value is SettingsTabValue {
@@ -49,7 +49,7 @@ export function SettingsDialog({
       open={open}
       onOpenChange={onOpenChange}
       title="Settings"
-      description="Usage, integrations, and account"
+      description="Usage, integrations, import, and account"
       content={
         <SettingsContent
           closeDialog={() => onOpenChange(false)}

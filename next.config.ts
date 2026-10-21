@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import bundleAnalyzer from "@next/bundle-analyzer";
 import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
+import { HOME_LINK_HEADER } from "./src/lib/agent-discovery";
+import { MARKDOWN_PAGES } from "./src/lib/markdown-negotiation";
 import { buildSecurityHeaders } from "./src/lib/security-headers";
 
 function getSerwistRevision(): string {
@@ -75,17 +77,37 @@ const nextConfig: NextConfig = {
         destination: "/@:username/:slug",
         permanent: true,
       },
+      {
+        source: "/u/:username/:slug/feed.xml",
+        destination: "/@:username/:slug/feed.xml",
+        permanent: true,
+      },
     ];
   },
   async rewrites() {
     // App directory segments can't start with "@" (that's parallel routes),
     // so the public /@username/slug URL is served by /u/[username]/[slug].
-    return [{ source: "/@:username/:slug", destination: "/u/:username/:slug" }];
+    return [
+      { source: "/@:username/:slug", destination: "/u/:username/:slug" },
+      {
+        source: "/@:username/:slug/feed.xml",
+        destination: "/u/:username/:slug/feed.xml",
+      },
+    ];
   },
   async headers() {
     // X-Frame-Options and friends everywhere; the CSP in production only.
     // See src/lib/security-headers.ts.
-    return [{ source: "/:path*", headers: buildSecurityHeaders() }];
+    return [
+      { source: "/:path*", headers: buildSecurityHeaders() },
+      // Points agents at the API catalog, the docs and llms.txt (RFC 8288).
+      { source: "/", headers: [{ key: "Link", value: HOME_LINK_HEADER }] },
+      // These pages answer in HTML or Markdown by Accept: caches must know.
+      ...Object.keys(MARKDOWN_PAGES).map((source) => ({
+        source,
+        headers: [{ key: "Vary", value: "Accept" }],
+      })),
+    ];
   },
 };
 
