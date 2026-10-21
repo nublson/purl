@@ -3,9 +3,11 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
+import type { FolderSummary } from "@/lib/folders";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import type { Link } from "@/utils/links";
 import type { ReactNode } from "react";
+import { FolderEmoji } from "./folder-emoji";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
 import { PdfThumbnail } from "./pdf-thumbnail";
 
@@ -25,6 +27,8 @@ type LinkPreviewProps = {
   placement?: "beside" | "below";
   /** Render PDFs through the signed-in PDF proxy (off in the demo). */
   pdfThumbnail?: boolean;
+  /** The row's folder badge, named in full (the badge is only its emoji). */
+  folder?: FolderSummary | null;
 };
 
 export function LinkPreview({
@@ -37,6 +41,7 @@ export function LinkPreview({
   onPreviewMouseLeave,
   placement = "beside",
   pdfThumbnail = true,
+  folder = null,
 }: LinkPreviewProps) {
   return (
     <HoverCard
@@ -59,6 +64,7 @@ export function LinkPreview({
           link={link}
           eagerThumbnail={eagerThumbnail}
           pdfThumbnail={pdfThumbnail}
+          folder={folder}
         />
       </HoverCardContent>
     </HoverCard>
@@ -67,17 +73,19 @@ export function LinkPreview({
 
 /**
  * What a preview card shows: the thumbnail (or favicon), title and
- * description. `pdfThumbnail: false` skips the PDF render (it needs the
+ * description, then the folder when given. `pdfThumbnail: false` skips the PDF render (it needs the
  * signed-in PDF proxy) for the regular thumbnail.
  */
 export function LinkPreviewBody({
   link,
   eagerThumbnail = false,
   pdfThumbnail = true,
+  folder = null,
 }: {
   link: Link;
   eagerThumbnail?: boolean;
   pdfThumbnail?: boolean;
+  folder?: FolderSummary | null;
 }) {
   const thumbnailSrc = link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
   return (
@@ -100,6 +108,12 @@ export function LinkPreviewBody({
             {link.description}
           </p>
         )}
+        {folder ? (
+          <p className="flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs font-normal">
+            <FolderEmoji emoji={folder.emoji} className="size-auto text-xs" />
+            <span className="truncate">{folder.name}</span>
+          </p>
+        ) : null}
       </div>
     </>
   );

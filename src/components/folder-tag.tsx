@@ -3,11 +3,14 @@
 import { useLinkView } from "@/contexts/link-view-context";
 import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
 import type { FolderSummary } from "@/lib/folders";
+import { ARRIVE_ICON } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
+import NextLink from "next/link";
 import * as React from "react";
 import { FolderEmoji } from "./folder-emoji";
 import { Typography } from "./typography";
+import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 /**
@@ -21,6 +24,25 @@ export function useFolderTag(link: Pick<Link, "folderId">): FolderSummary | null
   const currentFolder = useCurrentFolder();
   if (!folderTags || currentFolder || !link.folderId) return null;
   return folders.find((folder) => folder.id === link.folderId) ?? null;
+}
+
+/**
+ * Whether `folder`'s badge should play its arrival: true once the badge
+ * appears on, or changes on, a row or card that was already showing (a
+ * move from Home, Folder tags turned on), never on that row's first
+ * render (a page load, back to Home, more links, a view switch), so a
+ * list of badges never shimmers in. React's "adjust state when a prop
+ * changes" pattern: no effect, no ref read during render.
+ */
+export function useFolderBadgeArrival(folder: FolderSummary | null): boolean {
+  const id = folder?.id ?? null;
+  const [shownId, setShownId] = React.useState(id);
+  const [arrive, setArrive] = React.useState(false);
+  if (id !== shownId) {
+    setShownId(id);
+    setArrive(id !== null);
+  }
+  return arrive;
 }
 
 /**
@@ -46,38 +68,16 @@ const EMOJI_IN_CHIP =
   "size-auto w-3 justify-start text-xs leading-none supports-[font:-apple-system-body]:text-[0.6rem]";
 
 /**
- * A link's folder, as a small muted chip: the folder's emoji and name
- * (a long name truncates). Decorative next to the row's own text; the
- * name is in the accessibility tree as plain text. In a row on a phone,
- * just the emoji, with the name in a tooltip (`FolderTagIcon`); a card
- * always shows the whole chip (it has a line of its own for it).
+ * A link's folder, as a small muted chip: the folder's emoji and name (a
+ * long name truncates), after the title in the search field's "Add to
+ * folder" rows; on a phone only its emoji (the row's own name says the
+ * folder). List rows and grid cards use `FolderBadge` instead.
  *
- * In rows both are rendered and CSS picks one (the `phone:` variant), so the
+ * Both are rendered and CSS picks one (the `phone:` variant), so the
  * server's HTML is already right: deciding in JS (`useIsPhone`, false until
- * hydration) drew the full chip on phones for the first moments, then
- * swapped it for the emoji.
+ * hydration) would draw the full chip on phones for the first moments.
  */
-export function FolderTag({
-  folder,
-  inCard = false,
-  inButton = false,
-  className,
-}: {
-  folder: FolderSummary;
-  /**
-   * In a grid card: the emoji sits in the favicon's column (a 16px slot,
-   * the chip pulled left by its own padding) and the name starts where
-   * the title does (the card's column gap), so the icons stack.
-   */
-  inCard?: boolean;
-  /**
-   * Inside a button (the search field's "Add to folder" rows): the phone's
-   * emoji is a plain chip, not a button of its own (buttons can't nest);
-   * the row's own name says the folder.
-   */
-  inButton?: boolean;
-  className?: string;
-}) {
+export function FolderTag({ folder }: { folder: FolderSummary }) {
   return (
     <>
       <Typography
@@ -88,91 +88,141 @@ export function FolderTag({
           // The emoji's side gets 1px less padding than the name's: a solid
           // color shape weighs more than the text's light edge, so equal
           // padding reads heavier on the emoji's side.
-          "inline-flex h-5 min-w-0 shrink-0 items-center rounded-md bg-muted ps-[5px] pe-1.5 font-normal",
-          inCard
-            ? "-ms-[5px] max-w-full gap-2 md:gap-3"
-            : // In a row, next to the title and domain: 1px down puts the
-              // chip's smaller text on their baseline (centered on their
-              // line box it sat 0.7–1.5px higher). On a phone, just the
-              // emoji instead (`FolderTagIcon`).
-              "max-w-40 translate-y-px gap-[3px] phone:hidden",
-          className,
+          "inline-flex h-5 min-w-0 max-w-40 shrink-0 items-center gap-[3px] rounded-md bg-muted ps-[5px] pe-1.5 font-normal",
+          // After a title: 1px down puts the chip's smaller text on its
+          // baseline (centered on the line box it sat 0.7–1.5px higher).
+          "translate-y-px phone:hidden",
         )}
       >
-        <FolderEmoji
-          emoji={folder.emoji}
-          // A card: the 12px emoji centered in the favicon's 16px column.
-          className={cn(EMOJI_IN_CHIP, inCard && "mx-0.5")}
-        />
+        <FolderEmoji emoji={folder.emoji} className={EMOJI_IN_CHIP} />
         {/* A long name truncates; the native tooltip shows it whole. */}
         <Typography component="span" size="mini" className="truncate" title={folder.name}>
           {folder.name}
         </Typography>
       </Typography>
-      {/* A card has its own line for the tag, room for the name on every
-          screen; a phone's row doesn't. */}
-      {inCard ? null : inButton ? (
-        <Typography
-          component="span"
-          aria-hidden
-          data-cy="folder-tag"
-          className={cn(
-            "hidden size-5 shrink-0 items-center justify-center rounded-md bg-muted",
-            className,
-            "phone:flex",
-          )}
-        >
-          <FolderEmoji emoji={folder.emoji} className={EMOJI_IN_CHIP} />
-        </Typography>
-      ) : (
-        <FolderTagIcon folder={folder} className={className} />
-      )}
+      <Typography
+        component="span"
+        aria-hidden
+        data-cy="folder-tag"
+        className="hidden size-5 shrink-0 items-center justify-center rounded-md bg-muted phone:flex"
+      >
+        <FolderEmoji emoji={folder.emoji} className={EMOJI_IN_CHIP} />
+      </Typography>
     </>
   );
 }
 
 /**
- * A row on a phone: the tag is only the folder's emoji (a square chip), and
- * a tap shows the folder's name in a tooltip (there's no hover). It's a
- * button of its own, above the row's link, so the tap doesn't open the link; a
- * 28px hit area around the 20px chip. Named "Folder: …" for screen
- * readers.
+ * A link's folder in a list row or grid card: its emoji as a small badge on
+ * the favicon's bottom-end corner, on a disc of the surface behind it (so it
+ * reads as cut out of the favicon, not stacked on it). Takes no space, so a
+ * row or card reads exactly as with tags off. Decorative: the name is in
+ * `FolderTagLabel` (and a row's hover preview).
+ *
+ * A row's disc is the row's color (`--row-bg`, set by `LinkItem`: the page,
+ * or its tint while hovered or its menu is open), its favicon 20px (24px on
+ * phones). A
+ * card's is the card, its favicon 16px, so the badge is a size smaller.
+ *
+ * Sized optically: Chromium draws Apple Color Emoji at ~0.9em, WebKit at
+ * ~1.1em (see `EMOJI_IN_CHIP`), so WebKit gets a smaller size to draw the
+ * same ~9px (11px on phones' row favicon, ~7px on a card's).
  */
-function FolderTagIcon({
+export function FolderBadge({
   folder,
-  className,
+  inCard = false,
+  arrive = false,
 }: {
   folder: FolderSummary;
-  className?: string;
+  inCard?: boolean;
+  /** Play the icon arrival (`useFolderBadgeArrival`); only on mount. */
+  arrive?: boolean;
 }) {
-  const [open, setOpen] = React.useState(false);
   return (
-    <Tooltip open={open} onOpenChange={setOpen}>
+    <span
+      aria-hidden
+      data-cy="folder-badge"
+      className={cn(
+        "pointer-events-none absolute flex items-center justify-center rounded-full",
+        inCard
+          ? "-end-1 -bottom-1 size-3 bg-card"
+          : "-end-1.5 -bottom-1.5 size-3.5 bg-(--row-bg,var(--color-background)) max-md:size-4",
+        arrive && ARRIVE_ICON,
+      )}
+    >
+      <FolderEmoji
+        emoji={folder.emoji}
+        className={cn(
+          "size-auto",
+          inCard
+            ? "text-[8px] supports-[font:-apple-system-body]:text-[6.5px]"
+            : "text-[10px] supports-[font:-apple-system-body]:text-[8px] max-md:text-xs max-md:supports-[font:-apple-system-body]:text-[10px]",
+        )}
+      />
+    </span>
+  );
+}
+
+/**
+ * The badge's folder name, for screen readers ("In Reading list"); the
+ * row's link points `aria-describedby` at it, so it's read with the link
+ * (after the link's description, as a sentence of its own).
+ */
+export function FolderTagLabel({
+  id,
+  folder,
+}: {
+  id: string;
+  folder: FolderSummary;
+}) {
+  return (
+    <span id={id} className="sr-only">
+      In {folder.name}
+    </span>
+  );
+}
+
+/**
+ * Beside a link's `⋯` (rows and cards, shown with it): its folder's emoji,
+ * a link to that folder's page, the quick way there from Home. Pointers
+ * that hover only: on touch the `⋯` is always shown, and a second button on
+ * every filed row would be the clutter the badge replaced. A real link,
+ * so Cmd/Ctrl-click opens it in a new tab. Named and tooltipped "Go to …",
+ * which says the folder's name the badge doesn't.
+ *
+ * Its hit area grows 6px up, down and toward the start like the `⋯`'s, but
+ * only 2px toward it: in a row the `⋯`'s own 6px takes the rest of the 8px
+ * gap, so the two never overlap. On a card's corner the two touch (no gap),
+ * so it sits above the `⋯` (`z-[1]`): its own 32px stays its own, and only
+ * the `⋯`'s outside extension is covered.
+ *
+ * The tooltip closes when the pointer leaves the button
+ * (`disableHoverableContent`): it's portaled outside the row, so hovering
+ * it left the row, which hid the button and left the tooltip pointing at
+ * nothing. It only repeats the button's name, so there's nothing in it to
+ * hover over.
+ */
+export function FolderLinkButton({ folder }: { folder: FolderSummary }) {
+  return (
+    <Tooltip disableHoverableContent>
       <TooltipTrigger asChild>
-        <button
-          type="button"
-          data-cy="folder-tag"
-          aria-label={`Folder: ${folder.name}`}
-          className={cn(
-            "pointer-events-auto relative z-10 hidden size-5 shrink-0 items-center justify-center rounded-md bg-muted outline-none after:absolute after:-inset-1 focus-visible:ring-2 focus-visible:ring-ring",
-            className,
-            // Only on phones (after `className`, so it can't be overridden).
-            "phone:flex",
-          )}
-          onClick={(event) => {
-            // Not the row's (or card's) link underneath. Opens (Radix
-            // closes it on the trigger's own press, so no toggle); a tap
-            // anywhere else closes it.
-            event.preventDefault();
-            event.stopPropagation();
-            setOpen(true);
-          }}
+        <Button
+          asChild
+          variant="ghost"
+          size="icon-sm"
+          className="relative z-[1] after:absolute after:-inset-y-1.5 after:-start-1.5 after:-end-0.5 [@media(hover:none)]:hidden"
         >
-          <FolderEmoji emoji={folder.emoji} className={EMOJI_IN_CHIP} />
-        </button>
+          <NextLink
+            href={`/folders/${folder.slug}`}
+            aria-label={`Go to ${folder.name}`}
+            data-cy="folder-link"
+          >
+            <FolderEmoji emoji={folder.emoji} />
+          </NextLink>
+        </Button>
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={6}>
-        {folder.name}
+        Go to {folder.name}
       </TooltipContent>
     </Tooltip>
   );

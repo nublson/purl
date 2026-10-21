@@ -46,12 +46,12 @@ export function SharedLinkCard({
 export function LinkCardContent({
   link,
   eagerThumbnail = false,
-  tag,
+  badge,
 }: {
   link: LinkType;
   eagerThumbnail?: boolean;
-  /** Under the domain (the owner's grid: the link's folder tag). */
-  tag?: ReactNode;
+  /** On the favicon's corner (the owner's grid: the link's folder badge). */
+  badge?: ReactNode;
 }) {
   const thumbnailSrc = link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
   return (
@@ -70,11 +70,14 @@ export function LinkCardContent({
             (text-sm leading-normal, so 1lh = that line), nudged 1px down
             to the lowercase letters' middle, where the eye reads it. */}
         <span className="flex h-[1lh] translate-y-px items-center text-sm leading-normal">
-          {/* Favicons get a faint 1px edge so dark ones read on the card. */}
-          <span
-            className="flex size-4 items-center justify-center overflow-hidden *:size-4 [&_img]:outline [&_img]:-outline-offset-1 [&_img]:outline-black/10 dark:[&_img]:outline-white/10"
-          >
-            <LinkIcon link={link} size="small" />
+          <span className="relative size-4">
+            {/* Favicons get a faint 1px edge so dark ones read on the card. */}
+            <span
+              className="flex size-4 items-center justify-center overflow-hidden *:size-4 [&_img]:outline [&_img]:-outline-offset-1 [&_img]:outline-black/10 dark:[&_img]:outline-white/10"
+            >
+              <LinkIcon link={link} size="small" />
+            </span>
+            {badge}
           </span>
         </span>
         <Typography
@@ -91,8 +94,6 @@ export function LinkCardContent({
         >
           {formatDomain(link.domain)}
         </Typography>
-        {/* Both columns: the tag lines its own icon up with the favicon. */}
-        {tag ? <span className="col-span-2 mt-1 flex min-w-0">{tag}</span> : null}
       </span>
     </>
   );
