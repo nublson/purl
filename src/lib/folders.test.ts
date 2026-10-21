@@ -29,6 +29,7 @@ const {
   FolderLimitError,
   listFoldersForUser,
   getFolderBySlug,
+  getFolderById,
   createFolder,
   createFolderInTx,
   updateFolder,
@@ -1119,6 +1120,41 @@ describe("getFolderBySlug", () => {
       name: "Books",
       slug: "books",
       emoji: "📚",
+      description: null,
+      isPublic: false,
+      position: 0,
+      linkCount: 4,
+    });
+  });
+});
+
+describe("getFolderById", () => {
+  beforeEach(resetMocks);
+
+  it("returns null when not found", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
+    const result = await getFolderById("user-1", "f-1");
+    expect(result).toBeNull();
+    expect(prisma.folder.findFirst).toHaveBeenCalledWith({
+      where: { id: "f-1", userId: "user-1" },
+      include: { _count: { select: { links: true } } },
+    });
+  });
+
+  it("returns the folder summary when found", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue({
+      id: "f-1",
+      name: "Books",
+      slug: "books",
+      emoji: null,
+      _count: { links: 4 },
+    } as never);
+    const result = await getFolderById("user-1", "f-1");
+    expect(result).toEqual({
+      id: "f-1",
+      name: "Books",
+      slug: "books",
+      emoji: DEFAULT_FOLDER_EMOJI,
       description: null,
       isPublic: false,
       position: 0,

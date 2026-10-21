@@ -67,6 +67,8 @@ const {
   deleteLinksForUser,
   searchLinksForUser,
   listLinksForUser,
+  listLinksForResource,
+  countLinksForUser,
   isUrlSavedForUser,
   scrapeLinkMetadata,
   UnauthorizedError,
@@ -1693,5 +1695,62 @@ describe("deleteLink", () => {
     expect(vi.mocked(prisma.link.findFirst)).toHaveBeenCalledWith({
       where: { id: "link-1", userId: "user-123" },
     });
+  });
+});
+
+describe("listLinksForResource", () => {
+  beforeEach(() => {
+    vi.mocked(prisma.link.findMany).mockReset().mockResolvedValue([] as never);
+  });
+
+  it("scopes to the user and orders newest first", async () => {
+    await listLinksForResource("user-1", {});
+    expect(prisma.link.findMany).toHaveBeenCalledWith({
+      where: { userId: "user-1" },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: MAX_SAVED_LINKS,
+      select: {
+        url: true,
+        title: true,
+        description: true,
+        domain: true,
+        contentType: true,
+        createdAt: true,
+        folder: { select: { name: true, emoji: true } },
+      },
+    });
+  });
+
+  it("filters by folder", async () => {
+    await listLinksForResource("user-1", { folderId: "f-1" });
+    expect(prisma.link.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { userId: "user-1", folderId: "f-1" } }),
+    );
+  });
+
+  it("normalizes the folder emoji", async () => {
+    const base = {
+      url: "https://a.test",
+      title: "A",
+      description: null,
+      domain: "a.test",
+      contentType: "WEB",
+      createdAt: new Date(0),
+    };
+    vi.mocked(prisma.link.findMany).mockResolvedValue([
+      { ...base, folder: { name: "Reading", emoji: null } },
+      { ...base, folder: null },
+    ] as never);
+    const result = await listLinksForResource("user-1", {});
+    expect(result[0].folder).toEqual({ name: "Reading", emoji: "🦪" });
+    expect(result[1].folder).toBeNull();
+  });
+});
+
+describe("countLinksForUser", () => {
+  it("counts the user's links", async () => {
+    vi.mocked(prisma.link.count).mockResolvedValue(7 as never);
+    await expect(countLinksForUser("user-1")).resolves.toBe(7);
+    expect(prisma.link.count).toHaveBeenCalledWith({ where: { userId: "user-1" } });
   });
 });
