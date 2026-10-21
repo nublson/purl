@@ -12,14 +12,17 @@ import {
   FolderNameError,
   FolderNotFoundError,
   FolderUpdateEmptyError,
+  getFolderById,
   InvalidFolderOrderError,
   reorderFolders,
   listFoldersForUser,
   updateFolder,
 } from "@/lib/folders";
 import {
+  countLinksForUser,
   createLinkForUser,
   deleteLinksForUser,
+  listLinksForResource,
   listLinksForUser,
   moveLinkToFolder,
   moveLinksToFolder,
@@ -31,7 +34,23 @@ import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { serializeLink } from "@/lib/serialize-link";
 import { isValidUrl } from "@/utils/url";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { formatFolderLabel } from "@/lib/folder-display";
+import {
+  ALL_LINKS_NAME,
+  ALL_LINKS_URI,
+  FOLDER_URI_TEMPLATE,
+  RESOURCE_NOT_FOUND,
+  allLinksDescription,
+  folderResourceDescription,
+  folderResourceUri,
+  renderAllLinksResource,
+  renderFolderResource,
+} from "@/lib/mcp-resources";
+import {
+  ResourceTemplate,
+  type McpServer,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 const contentTypeSchema = z
@@ -537,4 +556,90 @@ export async function verifyToken(
   // the save endpoint; they must never reach the MCP tools.
   if (info?.scopes.includes(SAVE_SCOPE)) return undefined;
   return info;
+}
+
+const MARKDOWN = "text/markdown";
+
+/**
+ * Publishes "All links" and one resource per folder, read-only, for clients'
+ * attach menus. Both are templates (a fixed resource and a template with the
+ * same URI would be listed twice); All links is registered first so it lists
+ * first.
+ */
+export function registerPurlResources(server: McpServer): void {
+  server.registerResource(
+    "all_links",
+    new ResourceTemplate(ALL_LINKS_URI, {
+      list: async (extra) => {
+        const userId = getUserId(extra);
+        const count = await countLinksForUser(userId);
+        return {
+          resources: [
+            {
+              uri: ALL_LINKS_URI,
+              name: ALL_LINKS_NAME,
+              title: ALL_LINKS_NAME,
+              description: allLinksDescription(count),
+              mimeType: MARKDOWN,
+            },
+          ],
+        };
+      },
+    }),
+    { title: ALL_LINKS_NAME, mimeType: MARKDOWN },
+    async (uri, _variables, extra) => {
+      const userId = getUserId(extra);
+      const links = await listLinksForResource(userId, {});
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: MARKDOWN,
+            text: renderAllLinksResource(links, new Date()),
+          },
+        ],
+      };
+    },
+  );
+
+  server.registerResource(
+    "folder",
+    new ResourceTemplate(FOLDER_URI_TEMPLATE, {
+      list: async (extra) => {
+        const userId = getUserId(extra);
+        const folders = await listFoldersForUser(userId);
+        return {
+          resources: folders.map((folder) => {
+            const label = formatFolderLabel(folder);
+            return {
+              uri: folderResourceUri(folder.id),
+              name: label,
+              title: label,
+              description: folderResourceDescription(folder),
+              mimeType: MARKDOWN,
+            };
+          }),
+        };
+      },
+    }),
+    { title: "Purl folder", mimeType: MARKDOWN },
+    async (uri, { folderId }, extra) => {
+      const userId = getUserId(extra);
+      const id = String(folderId);
+      const folder = await getFolderById(userId, id);
+      if (!folder) {
+        throw new McpError(RESOURCE_NOT_FOUND, "Folder not found");
+      }
+      const links = await listLinksForResource(userId, { folderId: id });
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: MARKDOWN,
+            text: renderFolderResource(folder, links, new Date()),
+          },
+        ],
+      };
+    },
+  );
 }

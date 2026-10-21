@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpError } from "@modelcontextprotocol/sdk/types.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -14,7 +16,11 @@ const mockReadLinkForUser = vi.fn();
 const mockMoveLinkToFolder = vi.fn();
 const mockMoveLinksToFolder = vi.fn();
 const mockDeleteLinksForUser = vi.fn();
+const mockListLinksForResource = vi.fn();
+const mockCountLinksForUser = vi.fn();
 vi.mock("@/lib/links", () => ({
+  listLinksForResource: mockListLinksForResource,
+  countLinksForUser: mockCountLinksForUser,
   deleteLinksForUser: mockDeleteLinksForUser,
   moveLinksToFolder: mockMoveLinksToFolder,
   createLinkForUser: mockCreateLinkForUser,
@@ -24,6 +30,7 @@ vi.mock("@/lib/links", () => ({
 }));
 
 const mockListFoldersForUser = vi.fn();
+const mockGetFolderById = vi.fn();
 const mockCreateFolder = vi.fn();
 const mockUpdateFolder = vi.fn();
 const mockDeleteFolder = vi.fn();
@@ -41,6 +48,7 @@ class MockInvalidFolderOrderError extends Error {
 }
 vi.mock("@/lib/folders", () => ({
   listFoldersForUser: mockListFoldersForUser,
+  getFolderById: mockGetFolderById,
   createFolder: mockCreateFolder,
   updateFolder: mockUpdateFolder,
   deleteFolder: mockDeleteFolder,
@@ -75,6 +83,7 @@ const {
   verifyToken,
   getUserId,
   registerPurlTools,
+  registerPurlResources,
   saveLinkTool,
   listSavedItemsTool,
   getLinkTool,
@@ -87,6 +96,9 @@ const {
   moveLinkTool,
   moveLinksTool,
 } = await import("./mcp");
+const { renderAllLinksResource, renderFolderResource } = await import(
+  "./mcp-resources"
+);
 
 function parse(result: { content: { text: string }[] }) {
   return JSON.parse(result.content[0].text);
@@ -138,6 +150,185 @@ describe("registerPurlTools", () => {
 
     for (const handler of handlers) {
       await expect(handler({}, {})).rejects.toThrow("Unauthorized");
+    }
+  });
+});
+
+describe("registerPurlResources", () => {
+  const extra = { authInfo: { extra: { userId: "user-1" } } };
+  const now = new Date("2026-10-21T12:00:00Z");
+  const folderA = {
+    id: "A",
+    name: "Reading",
+    slug: "reading",
+    emoji: "📚",
+    description: "Articles",
+    isPublic: false,
+    position: 1,
+    linkCount: 2,
+  };
+  const folderB = {
+    ...folderA,
+    id: "B",
+    name: "Pods",
+    slug: "pods",
+    emoji: "🎧",
+    description: null,
+    position: 2,
+    linkCount: 0,
+  };
+  const link = {
+    url: "https://example.com/a",
+    title: "A link",
+    description: "About it",
+    domain: "example.com",
+    contentType: "WEB" as const,
+    createdAt: new Date("2026-10-20T10:00:00Z"),
+    folder: { name: "Reading", emoji: "📚" },
+  };
+
+  type Handler = (...args: unknown[]) => Promise<{
+    resources: unknown[];
+    contents: Array<{ uri: string; mimeType: string; text: string }>;
+  }>;
+  type Registered = {
+    name: string;
+    template: {
+      uriTemplate: { toString(): string };
+      listCallback: Handler | undefined;
+    };
+    read: Handler;
+  };
+
+  function register(): Registered[] {
+    const calls: unknown[][] = [];
+    const server = {
+      registerResource: vi.fn((...args: unknown[]) => {
+        calls.push(args);
+      }),
+    };
+    registerPurlResources(server as never);
+    return calls.map((args) => ({
+      name: args[0] as string,
+      template: args[1] as Registered["template"],
+      read: args[3] as Handler,
+    }));
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    mockGetFolderById.mockReset();
+    mockListLinksForResource.mockReset();
+    mockCountLinksForUser.mockReset();
+    mockListFoldersForUser.mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("registers All links before the folder template", () => {
+    const registered = register();
+    expect(registered.map((r) => r.name)).toEqual(["all_links", "folder"]);
+    for (const r of registered) {
+      expect(r.template).toBeInstanceOf(ResourceTemplate);
+    }
+    expect(registered.map((r) => r.template.uriTemplate.toString())).toEqual([
+      "purl://links",
+      "purl://folders/{folderId}",
+    ]);
+  });
+
+  it("lists All links first, then folders in order", async () => {
+    mockCountLinksForUser.mockResolvedValue(3);
+    mockListFoldersForUser.mockResolvedValue([folderA, folderB]);
+    const registered = register();
+    const resources = [];
+    for (const r of registered) {
+      const result = await r.template.listCallback!(extra);
+      resources.push(...result.resources);
+    }
+    expect(resources).toEqual([
+      {
+        uri: "purl://links",
+        name: "🏠 All links",
+        title: "🏠 All links",
+        description: "Every link you've saved, newest first (3 links)",
+        mimeType: "text/markdown",
+      },
+      {
+        uri: "purl://folders/A",
+        name: "📚 Reading",
+        title: "📚 Reading",
+        description: "Articles · 2 links",
+        mimeType: "text/markdown",
+      },
+      {
+        uri: "purl://folders/B",
+        name: "🎧 Pods",
+        title: "🎧 Pods",
+        description: "0 links",
+        mimeType: "text/markdown",
+      },
+    ]);
+  });
+
+  it("reads a folder", async () => {
+    mockGetFolderById.mockResolvedValue(folderA);
+    mockListLinksForResource.mockResolvedValue([link]);
+    const [, folder] = register();
+    const result = await folder.read(
+      new URL("purl://folders/A"),
+      { folderId: "A" },
+      extra,
+    );
+    expect(mockGetFolderById).toHaveBeenCalledWith("user-1", "A");
+    expect(mockListLinksForResource).toHaveBeenCalledWith("user-1", {
+      folderId: "A",
+    });
+    expect(result.contents).toEqual([
+      {
+        uri: "purl://folders/A",
+        mimeType: "text/markdown",
+        text: renderFolderResource(folderA, [link], now),
+      },
+    ]);
+  });
+
+  it("reads All links", async () => {
+    mockListLinksForResource.mockResolvedValue([link]);
+    const [all] = register();
+    const result = await all.read(new URL("purl://links"), {}, extra);
+    expect(mockListLinksForResource).toHaveBeenCalledWith("user-1", {});
+    expect(result.contents[0]).toEqual({
+      uri: "purl://links",
+      mimeType: "text/markdown",
+      text: renderAllLinksResource([link], now),
+    });
+  });
+
+  it("rejects a foreign folder", async () => {
+    mockGetFolderById.mockResolvedValue(null);
+    const [, folder] = register();
+    const err = await folder
+      .read(new URL("purl://folders/nope"), { folderId: "nope" }, extra)
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(McpError);
+    expect((err as McpError).code).toBe(-32002);
+    expect((err as McpError).message).toContain("Folder not found");
+    expect(mockListLinksForResource).not.toHaveBeenCalled();
+  });
+
+  it("rejects requests without authInfo", async () => {
+    const registered = register();
+    for (const r of registered) {
+      await expect(r.template.listCallback!({})).rejects.toThrow(
+        "Unauthorized",
+      );
+      await expect(
+        r.read(new URL("purl://links"), { folderId: "A" }, {}),
+      ).rejects.toThrow("Unauthorized");
     }
   });
 });
