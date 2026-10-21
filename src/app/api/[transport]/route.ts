@@ -1,4 +1,4 @@
-import { registerPurlTools, verifyToken } from "@/lib/mcp";
+import { registerPurlResources, registerPurlTools, verifyToken } from "@/lib/mcp";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 
 export const maxDuration = 60;
@@ -6,6 +6,7 @@ export const maxDuration = 60;
 const handler = createMcpHandler(
   (server) => {
     registerPurlTools(server);
+    registerPurlResources(server);
   },
   {
     serverInfo: { name: "purl", version: "1.0.0" },

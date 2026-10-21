@@ -1,7 +1,9 @@
 import type { ContentType } from "@/generated/prisma/enums";
 import type { MoveLinksResult } from "@/lib/bulk-links";
 import { assertCanSaveLink, insertWithinSaveLimit } from "@/lib/entitlements";
+import { DEFAULT_FOLDER_EMOJI } from "@/lib/folder-display";
 import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
+import { MAX_SAVED_LINKS } from "@/lib/limits";
 import {
   OG_HTML_READ_MAX_BYTES,
   readHtmlForOpenGraph,
@@ -963,6 +965,49 @@ function parseLinksCursor(
   const createdAt = new Date(datePart);
   if (isNaN(createdAt.getTime())) return null;
   return { createdAt, id };
+}
+
+/** A link as an MCP resource shows it: only the fields a client reads, with its folder's emoji filled in. */
+export type ResourceLink = {
+  url: string;
+  title: string;
+  description: string | null;
+  domain: string;
+  contentType: ContentType;
+  createdAt: Date;
+  folder: { name: string; emoji: string } | null;
+};
+
+/** Newest-first links for MCP resources, capped at the save limit. No ownership check: callers load the folder first; the query is scoped by `userId`. */
+export async function listLinksForResource(
+  userId: string,
+  opts: { folderId?: string },
+): Promise<ResourceLink[]> {
+  const rows = await prisma.link.findMany({
+    where: { userId, ...(opts.folderId !== undefined && { folderId: opts.folderId }) },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: MAX_SAVED_LINKS,
+    select: {
+      url: true,
+      title: true,
+      description: true,
+      domain: true,
+      contentType: true,
+      createdAt: true,
+      folder: { select: { name: true, emoji: true } },
+    },
+  });
+  return rows.map((row) => ({
+    ...row,
+    folder: row.folder
+      ? { name: row.folder.name, emoji: row.folder.emoji || DEFAULT_FOLDER_EMOJI }
+      : null,
+  }));
+}
+
+/** Counts all of a user's saved links. */
+export async function countLinksForUser(userId: string): Promise<number> {
+  return prisma.link.count({ where: { userId } });
 }
 
 /** Lists links for an explicit user id. Used where the caller has already resolved the user (e.g. the MCP server via bearer token). */

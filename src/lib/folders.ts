@@ -339,6 +339,18 @@ export async function getFolderBySlug(
   return row ? toSummary(row as FolderRowWithCount) : null;
 }
 
+/** Looks up one of the user's folders by id (null when missing or not theirs). */
+export async function getFolderById(
+  userId: string,
+  folderId: string,
+): Promise<FolderSummary | null> {
+  const row = await prisma.folder.findFirst({
+    where: { id: folderId, userId },
+    include: { _count: { select: { links: true } } },
+  });
+  return row ? toSummary(row as FolderRowWithCount) : null;
+}
+
 /**
  * Creates a folder inside the caller's transaction: validates the name, emoji
  * and description, enforces `MAX_FOLDERS`, checks the name is free, generates
