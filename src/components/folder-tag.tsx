@@ -191,8 +191,10 @@ export function FolderTagLabel({
  * which says the folder's name the badge doesn't.
  *
  * Its hit area grows 6px up, down and toward the start like the `⋯`'s, but
- * only 2px toward it: the `⋯`'s own 6px takes the rest of the 8px gap, so
- * the two never overlap.
+ * only 2px toward it: in a row the `⋯`'s own 6px takes the rest of the 8px
+ * gap, so the two never overlap. On a card's corner the two touch (no gap),
+ * so it sits above the `⋯` (`z-[1]`): its own 32px stays its own, and only
+ * the `⋯`'s outside extension is covered.
  *
  * The tooltip closes when the pointer leaves the button
  * (`disableHoverableContent`): it's portaled outside the row, so hovering
@@ -208,7 +210,7 @@ export function FolderLinkButton({ folder }: { folder: FolderSummary }) {
           asChild
           variant="ghost"
           size="icon-sm"
-          className="relative after:absolute after:-inset-y-1.5 after:-start-1.5 after:-end-0.5 [@media(hover:none)]:hidden"
+          className="relative z-[1] after:absolute after:-inset-y-1.5 after:-start-1.5 after:-end-0.5 [@media(hover:none)]:hidden"
         >
           <NextLink
             href={`/folders/${folder.slug}`}

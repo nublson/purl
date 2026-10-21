@@ -189,7 +189,7 @@ export function LinkCard({
           <div
             inert={selecting}
             className={cn(
-              "absolute top-1.5 right-1.5 z-10 flex gap-2 rounded-md bg-background/80 backdrop-blur-sm transition-opacity duration-150 ease-out-strong",
+              "absolute top-1.5 right-1.5 z-10 flex rounded-md bg-background/80 backdrop-blur-sm transition-opacity duration-150 ease-out-strong",
               selecting
                 ? "invisible opacity-0"
                 : menuOpen
