@@ -190,10 +190,9 @@ export const LinkItem = React.forwardRef<
       className={cn(
         // border-0: Item's 1px border is for its outline variant and its own
         // focus ring; this row uses neither (the link draws the focus ring).
-        "w-full border-0 p-2 gap-4 grid min-h-12 grid-cols-[20px_1fr_auto] relative max-md:min-h-14 max-md:grid-cols-[24px_1fr_auto] max-md:py-3 transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
-        // With a pointer that hovers, the actions float over the row's end
-        // (see ItemActions), so the text takes the whole width at rest.
-        "[@media(hover:hover)]:grid-cols-[20px_1fr] [@media(hover:hover)]:max-md:grid-cols-[24px_1fr]",
+        // Two columns: the actions float over the row's end (see
+        // ItemActions), so the text takes the whole width.
+        "w-full border-0 p-2 gap-4 grid min-h-12 grid-cols-[20px_1fr] relative max-md:min-h-14 max-md:grid-cols-[24px_1fr] max-md:py-3 transition-none hover:bg-accent/40 data-[state=open]:bg-accent/40 has-data-[state=open]:bg-accent/40",
         // The row's color, opaque (its tints are translucent over the page),
         // for what sits on it: the floating actions and the folder badge.
         "[--row-bg:var(--color-background)] hover:[--row-bg:color-mix(in_oklab,var(--color-accent)_40%,var(--color-background))] data-[state=open]:[--row-bg:color-mix(in_oklab,var(--color-accent)_40%,var(--color-background))] has-data-[state=open]:[--row-bg:color-mix(in_oklab,var(--color-accent)_40%,var(--color-background))]",
@@ -419,17 +418,17 @@ export const LinkItem = React.forwardRef<
           ) : null}
         </ItemTitle>
       </ItemContent>
-      {/* Touch: always shown, in the row's last column. A pointer that
-          hovers: shown on hover, keyboard focus or with the menu open, and
-          floated over the row's end instead of holding a column, so hidden
-          actions take no width from the title. Its backing is the row's
-          color, fading in over 24px, so it covers the text's end cleanly
-          while shown. Hidden (and inert) while selecting. */}
+      {/* Floated over the row's end instead of holding a column, so the
+          title takes the whole width. Always shown on touch (covering the
+          title's end); with a pointer that hovers, only on hover, keyboard
+          focus or with the menu open. Its backing is the row's color,
+          fading in over 24px, so it covers the text's end cleanly. Hidden
+          (and inert) while selecting. */}
       <ItemActions
         inert={selecting}
         className={cn(
           (selecting || demo) && "invisible",
-          "[@media(hover:hover)]:absolute [@media(hover:hover)]:inset-y-0 [@media(hover:hover)]:end-0 [@media(hover:hover)]:rounded-e-md [@media(hover:hover)]:bg-(--row-bg) [@media(hover:hover)]:ps-6 [@media(hover:hover)]:pe-2 [@media(hover:hover)]:[mask-image:linear-gradient(to_right,transparent,black_24px)]",
+          "absolute inset-y-0 end-0 rounded-e-md bg-(--row-bg) ps-6 pe-2 [mask-image:linear-gradient(to_right,transparent,black_24px)]",
           "z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100",
         )}
         onPointerEnter={(event) => {
