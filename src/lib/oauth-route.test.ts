@@ -24,6 +24,21 @@ describe("oauthCorsOrigin", () => {
     expect(oauthCorsOrigin("https://nublson.com", "")).toBeNull();
     expect(oauthCorsOrigin("https://nublson.com", undefined)).toBeNull();
   });
+  it("allows browser extensions, configured or not", () => {
+    for (const origin of [
+      "chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+      "safari-web-extension://8BE7D49B-29C3-403E-AB76-93CDB49CBB2A",
+    ]) {
+      expect(oauthCorsOrigin(origin, undefined)).toBe(origin);
+      expect(oauthCorsOrigin(origin, ALLOWED)).toBe(origin);
+    }
+  });
+  it("rejects look-alike extension origins", () => {
+    expect(oauthCorsOrigin("chrome-extension://abc.evil.com", undefined)).toBeNull();
+    expect(oauthCorsOrigin("chrome-extension://abc/path", undefined)).toBeNull();
+    expect(oauthCorsOrigin("moz-extension://abc", undefined)).toBeNull();
+    expect(oauthCorsOrigin("https://chrome-extension.evil.com", undefined)).toBeNull();
+  });
   it("treats * literally", () => {
     expect(oauthCorsOrigin("https://evil.com", "*")).toBeNull();
     expect(oauthCorsOrigin("*", "*")).toBe("*");

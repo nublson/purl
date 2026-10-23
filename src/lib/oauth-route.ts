@@ -1,13 +1,23 @@
 import { SAVE_SCOPE } from "@/lib/oauth-scopes";
 
+// Browser extensions' own pages and workers. Their ids differ per install
+// (Safari's per profile), so they can't be listed: any of them may call the
+// token endpoint, which needs no cookie and gives nothing without a code and
+// its PKCE verifier, or a refresh token. Without this, Safari blocks the
+// extension from reading the answer unless it was granted access to Purl's
+// site, and a refresh reads as a network failure.
+const EXTENSION_ORIGIN = /^(chrome-extension|safari-web-extension):\/\/[A-Za-z0-9-]+$/;
+
 /**
- * The origin when it is on the `OAUTH_CORS_ORIGINS` list (comma-separated,
- * trimmed, exact match; no wildcard semantics), else null.
+ * The origin when it is a browser extension's or on the `OAUTH_CORS_ORIGINS`
+ * list (comma-separated, trimmed, exact match; no wildcard semantics), else
+ * null.
  */
 export function oauthCorsOrigin(
   origin: string | null,
   env: string | undefined = process.env.OAUTH_CORS_ORIGINS,
 ): string | null {
+  if (origin && EXTENSION_ORIGIN.test(origin)) return origin;
   if (!origin || !env) return null;
   const allowed = env
     .split(",")
