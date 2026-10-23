@@ -2,6 +2,7 @@
 
 import { FolderSelectDropdown } from "@/components/folder-select-dropdown";
 import { FolderSharePopover } from "@/components/folder-share-popover";
+import { HeaderAddMenu } from "@/components/header-add-menu";
 import { LinkGrid } from "@/components/link-group";
 import { LinkItem } from "@/components/link-item";
 import { Logo } from "@/components/logo";
@@ -32,7 +33,7 @@ const ARRIVING_ROWS = 6;
 
 /**
  * The landing page's live demo: the product frame holding the app's own
- * header controls (folder menu, share, account menu; no "+" menu) and the
+ * header controls (folder menu, share, "+" menu, account menu) and the
  * current folder's links by day, in the list or grid view. Read-only: no
  * selection bar, search field or save flow is mounted. Rendered inside
  * `DemoProvider`. `now` is fixed by the server so "Today" and "Yesterday"
@@ -84,6 +85,7 @@ export function LandingDemo({
           </div>
           <div className="flex shrink-0 items-center justify-end gap-2">
             <FolderSharePopover />
+            <HeaderAddMenu />
             <User />
           </div>
         </div>
