@@ -48,6 +48,16 @@ const publicRoutes: PublicRoute[] = [
   ...STATIC_PAGES.map(
     ({ path }): PublicRoute => ({ path, whenAuthenticated: "next" }),
   ),
+  // Link-preview images: the site's, and each static page's own (Next adds
+  // a hash to the nested ones: /docs/api/opengraph-image-vc1w9x).
+  { path: "/opengraph-image", match: "startsWith", whenAuthenticated: "next" },
+  ...STATIC_PAGES.map(
+    ({ path }): PublicRoute => ({
+      path: `${path}/opengraph-image`,
+      match: "startsWith",
+      whenAuthenticated: "next",
+    }),
+  ),
 ];
 
 /**

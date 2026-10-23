@@ -52,10 +52,6 @@ export function LandingHero({ providers }: { providers: ProviderId[] }) {
           providers={providers}
           className="max-w-none sm:w-auto sm:flex-row sm:flex-wrap"
         />
-        {/* One line: it moves under the buttons whole rather than breaking. */}
-        <Typography size="small" className="whitespace-nowrap">
-          Free · 1,000 links · No ads · No AI
-        </Typography>
       </div>
     </section>
   );

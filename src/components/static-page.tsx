@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { BrandMark } from "@/components/brand-mark";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { NotionBlocks, createRenderContext } from "@/components/notion-blocks";
+import { renderSiteOgImage } from "@/components/site-og-image";
 import { Typography } from "@/components/typography";
 import { getPageBySlug, getPublishedPages } from "@/lib/notion";
 import { buildPageIdToPath } from "@/lib/notion-links";
@@ -51,6 +52,27 @@ export async function staticPageMetadata(
     openGraph: { title, ...text, url: path },
     twitter: { title, ...text },
   };
+}
+
+function staticPageLabel(slug: StaticPageSlug) {
+  return STATIC_PAGES.find((p) => p.slug === slug)!.label;
+}
+
+/**
+ * The page's preview image: the site's frame with its title and description,
+ * without the landing page's link cards.
+ */
+export async function staticPageOgImage(slug: StaticPageSlug) {
+  const page = await readStaticPage(slug);
+  return renderSiteOgImage({
+    title: page?.title || staticPageLabel(slug),
+    description: page?.description,
+  });
+}
+
+/** The preview image's alt text. */
+export function staticPageOgAlt(slug: StaticPageSlug) {
+  return `Purl: ${staticPageLabel(slug)}`;
 }
 
 /**
