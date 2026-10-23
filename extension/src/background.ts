@@ -226,8 +226,18 @@ const writeTokens = (tokens: Tokens) =>
 const clearTokens = () => chrome.storage.local.remove(TOKENS_KEY);
 
 /**
- * Calls the token endpoint. Resolves to null when Purl refuses (an expired or
- * revoked grant); a network failure throws, like any other request.
+ * The token endpoint failed in a way that says nothing about the grant (a
+ * server error, a rate limit, an unreadable answer): try again later, and
+ * keep the tokens.
+ */
+class TokenEndpointError extends Error {
+  name = "TokenEndpointError";
+}
+
+/**
+ * Calls the token endpoint. Resolves to null only when Purl rejects the grant
+ * (a 4xx: expired, revoked or unknown); other failures throw, like a network
+ * failure, so a refresh never disconnects on a passing error.
  */
 async function requestTokens(
   params: Record<string, string>,
@@ -241,13 +251,18 @@ async function requestTokens(
     body: new URLSearchParams({ ...params, client_id: CLIENT_ID }),
     signal,
   });
+  if (res.status === 429 || res.status >= 500) {
+    throw new TokenEndpointError(`Token endpoint answered ${res.status}`);
+  }
   if (!res.ok) return null;
   const body = (await res.json().catch(() => null)) as {
     access_token?: unknown;
     refresh_token?: unknown;
     expires_in?: unknown;
   } | null;
-  if (typeof body?.access_token !== "string") return null;
+  if (typeof body?.access_token !== "string") {
+    throw new TokenEndpointError("Token endpoint sent no access token");
+  }
   const expiresIn = typeof body.expires_in === "number" ? body.expires_in : 3600;
   return {
     accessToken: body.access_token,
@@ -312,6 +327,14 @@ async function errorCode(res: Response): Promise<string | null> {
 
 type SaveOutcome = "done" | "unauthorized";
 
+/** What to tell the user when a request to Purl threw. */
+function requestErrorMessage(e: unknown): string {
+  if (e instanceof TokenEndpointError) return "Something went wrong";
+  return e instanceof Error && e.name === "AbortError"
+    ? "Request timed out"
+    : "Could not reach Purl";
+}
+
 const postSave = (accessToken: string, url: string, signal: AbortSignal) =>
   fetch(SAVE_URL, {
     method: "POST",
@@ -373,11 +396,7 @@ async function savePage(tabId: number, url: string): Promise<SaveOutcome> {
       await report(tabId, "saved");
     }
   } catch (e) {
-    const msg =
-      e instanceof Error && e.name === "AbortError"
-        ? "Request timed out"
-        : "Could not reach Purl";
-    await report(tabId, "error", msg);
+    await report(tabId, "error", requestErrorMessage(e));
   } finally {
     clearTimeout(timeout);
   }
@@ -416,12 +435,21 @@ const PURL_ORIGINS = [
 // Checked when the worker starts, so a click that finds access already
 // granted asks nothing.
 let hasPurlAccess = false;
-void chrome.permissions
-  .contains({ origins: PURL_ORIGINS })
-  .then((has) => {
-    hasPurlAccess ||= has;
-  })
-  .catch(() => {});
+const checkPurlAccess = () =>
+  chrome.permissions
+    .contains({ origins: PURL_ORIGINS })
+    .then((has) => {
+      hasPurlAccess = has;
+    })
+    .catch(() => {});
+void checkPurlAccess();
+// The user can take access away (or give it) in the browser's settings while
+// this worker runs: check again, so a reconnect asks when it has to.
+chrome.permissions.onRemoved?.addListener(() => {
+  hasPurlAccess = false;
+  void checkPurlAccess();
+});
+chrome.permissions.onAdded?.addListener(() => void checkPurlAccess());
 
 /**
  * Asks for access to Purl's site unless the extension has it. Call it
@@ -506,8 +534,8 @@ async function finishConnect(
       },
       AbortSignal.timeout(15_000),
     );
-  } catch {
-    await report(pending.tabId, "error", "Could not reach Purl");
+  } catch (e) {
+    await report(pending.tabId, "error", requestErrorMessage(e));
     return;
   }
   if (!tokens) {

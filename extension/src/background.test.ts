@@ -16,6 +16,8 @@ const tabsRemove = vi.fn();
 // Site access to Purl: granted at install unless a test says otherwise (Chrome).
 const permissionsContains = vi.fn(async () => true);
 const permissionsRequest = vi.fn();
+// The worker's permissions.onRemoved listener (the latest worker's).
+let permissionsRemoved: () => void;
 // The extension's own base address: Chrome's, unless a test says Safari.
 let extensionBase = "chrome-extension://abcdef/";
 
@@ -48,7 +50,16 @@ beforeAll(async () => {
         setBadgeBackgroundColor,
         setTitle,
       },
-      permissions: { contains: permissionsContains, request: permissionsRequest },
+      permissions: {
+        contains: permissionsContains,
+        request: permissionsRequest,
+        onRemoved: {
+          addListener: (listener: () => void) => {
+            permissionsRemoved = listener;
+          },
+        },
+        onAdded: { addListener: () => {} },
+      },
       runtime: { getURL: (path: string) => `${extensionBase}${path}` },
       scripting: { executeScript },
       tabs: {
@@ -223,6 +234,35 @@ describe("saving a page", () => {
 });
 
 describe("keeping the connection", () => {
+  it.each([429, 500, 503])(
+    "keeps the tokens when a refresh gets %i, and says so",
+    async (status) => {
+      connect(Date.now() - 1);
+      const fetchMock = server({ token: [{ status }] });
+      await click(PAGE);
+      expect(requestsTo(fetchMock, SAVE_URL)).toHaveLength(0);
+      expect(local.tokens).toMatchObject({ refreshToken: "refresh" });
+      expect(tabsCreate).not.toHaveBeenCalled();
+      expect(lastToast()).toEqual(["error", "Something went wrong"]);
+    },
+  );
+
+  it("keeps the tokens when a refresh's answer has no token", async () => {
+    connect(Date.now() - 1);
+    server({ token: [{ status: 200, body: {} }] });
+    await click(PAGE);
+    expect(local.tokens).toMatchObject({ refreshToken: "refresh" });
+    expect(tabsCreate).not.toHaveBeenCalled();
+  });
+
+  it("disconnects when the refresh grant is rejected (400 invalid_grant)", async () => {
+    connect(Date.now() - 1);
+    server({ token: [{ status: 400, body: { error: "invalid_grant" } }] });
+    await click(PAGE);
+    expect(local.tokens).toBeUndefined();
+    expect(tabsCreate).toHaveBeenCalledTimes(1);
+  });
+
   it("refreshes an expired token before saving, and keeps the new one", async () => {
     connect(Date.now() - 1);
     const fetchMock = server();
@@ -567,6 +607,19 @@ describe("without access to Purl's site (Safari, until the user allows it)", () 
     await click(PAGE);
     expect(requestsTo(fetchMock, SAVE_URL)).toHaveLength(1);
     expect(lastToast()).toEqual(["saved", null]);
+  });
+
+  it("asks again once the user takes access away", async () => {
+    connect();
+    server();
+    await click(PAGE);
+    expect(permissionsRequest).toHaveBeenCalledTimes(1);
+
+    permissionsContains.mockResolvedValue(false);
+    permissionsRemoved();
+    await new Promise((resolve) => setTimeout(resolve));
+    await click(PAGE);
+    expect(permissionsRequest).toHaveBeenCalledTimes(2);
   });
 
   it("asks only until it's granted", async () => {
