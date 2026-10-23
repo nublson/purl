@@ -37,9 +37,11 @@ Tested only on `http://localhost`. Since even `SameSite=None; Secure` cookies we
 - Host access is granted by the user in Safari (Settings → Websites → the extension, or the prompt on first use). It isn't automatic at install like in Chrome, so first-run copy should say so.
 - `Allow unsigned extensions` turns off on every Safari quit. That's expected, and only affects development.
 
-## Decision needed: how the Safari extension authenticates
+## Decision: how the Safari extension authenticates
 
-The cookie route is closed. Options:
+**Decided 2026-10-23: option 1, for Chrome and Safari alike,** with one OAuth client per browser (`purl-extension-chrome` "Purl for Chrome", `purl-extension-safari` "Purl for Safari") so Connected apps says where each connection comes from, and signing out of Purl disconnects them. Built on the same branch and verified in Safari (connect, save, sign-out → reconnect).
+
+The cookie route is closed. Options considered:
 
 1. **Save-only OAuth token (recommended).** The extension gets a `links:save` token and saves with `POST /api/v1/links/save` (`Authorization: Bearer`). It already exists for the portfolio: Bearer-only, 201 with the link, same cap and errors. Safari has no `identity.launchWebAuthFlow`, but the extension doesn't need it: the spike showed it can open a Purl tab and watch `tabs.onUpdated` for a URL. So it opens `/api/auth/oauth2/authorize?…` (PKCE S256) in a tab, catches the redirect to a registered `https://purl.live/…` callback (the code is in the URL) before the page acts on it, closes the tab and exchanges the code. Tokens go in `chrome.storage.local`. Server work:
    - register a new public client (e.g. `purl-safari`), save-only like `nublson-com`, in `SAVE_ONLY_CLIENT_IDS`;

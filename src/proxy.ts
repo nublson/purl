@@ -42,6 +42,8 @@ const publicRoutes: PublicRoute[] = [
   { path: "/@", match: "startsWith", whenAuthenticated: "next" },
   { path: "/u", match: "prefix", whenAuthenticated: "next" },
   { path: "/api/public", match: "prefix", whenAuthenticated: "next" },
+  // The browser extension's OAuth callback: the extension closes it.
+  { path: "/extension/connected", whenAuthenticated: "next" },
   // The Notion-backed static pages (Privacy, Terms, API and MCP docs).
   ...STATIC_PAGES.map(
     ({ path }): PublicRoute => ({ path, whenAuthenticated: "next" }),

@@ -51,8 +51,24 @@ export function withTokenCors(
 /** The nublson.com portfolio's registered OAuth client. */
 export const PORTFOLIO_CLIENT_ID = "nublson-com";
 
-/** Registered clients that may only ever receive save-only tokens. */
-export const SAVE_ONLY_CLIENT_IDS = new Set([PORTFOLIO_CLIENT_ID]);
+/**
+ * The Purl browser extension's registered OAuth clients, one per browser so
+ * Connected apps names where each connection comes from ("Purl for Chrome",
+ * "Purl for Safari"). Chromium browsers (Edge, Brave, …) use Chrome's.
+ */
+export const EXTENSION_CLIENT_IDS = [
+  "purl-extension-chrome",
+  "purl-extension-safari",
+] as const;
+
+/**
+ * Registered clients that may only ever receive save-only tokens. Signing out
+ * of Purl disconnects them all (`revokeSaveOnlyAppsOnSignOut`).
+ */
+export const SAVE_ONLY_CLIENT_IDS = new Set([
+  PORTFOLIO_CLIENT_ID,
+  ...EXTENSION_CLIENT_IDS,
+]);
 
 const SAVE_ONLY_ALLOWED_SCOPES = new Set([SAVE_SCOPE, "offline_access"]);
 

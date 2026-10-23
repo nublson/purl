@@ -142,6 +142,19 @@ describe("guardSaveAuthorize", () => {
       expect(res).toBeInstanceOf(Request);
       expect(new URL(res.url).searchParams.get("prompt")).toBe("consent");
     });
+    it.each(["purl-extension-chrome", "purl-extension-safari"])(
+      "holds the extension's client %s to the same rules",
+      (clientId) => {
+        const rejected = guardSaveAuthorize(
+          get(`client_id=${clientId}&scope=openid&${S256}`),
+        );
+        expect((rejected as Response).status).toBe(400);
+        const accepted = guardSaveAuthorize(
+          get(`client_id=${clientId}&scope=links:save%20offline_access&${S256}`),
+        ) as Request;
+        expect(new URL(accepted.url).searchParams.get("prompt")).toBe("consent");
+      },
+    );
     it("leaves another client's non-save scopes untouched", () => {
       const a = get("client_id=other&scope=openid");
       expect(guardSaveAuthorize(a)).toBe(a);

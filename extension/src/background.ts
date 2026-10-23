@@ -181,45 +181,188 @@ function isWebUrl(url: string): boolean {
   }
 }
 
-// The server answers 403 { code: "LIMIT_REACHED" } at the link cap; any other
-// 403 (or an unreadable body) stays a generic error.
-async function isLimitReached(res: Response): Promise<boolean> {
+
+// --- Connection -------------------------------------------------------------
+//
+// The extension saves with a save-only OAuth token (`links:save`), not the
+// site's session cookie: Safari sends no cookies with an extension's requests.
+// Connecting is a normal OAuth code flow with PKCE in a Purl tab: the user
+// signs in if needed and allows the extension, Purl redirects the tab to
+// REDIRECT_URI with a code, and the extension takes it from the tab's address
+// (no `identity` API, which Safari lacks), closes the tab and swaps it for
+// tokens. Signing out of Purl disconnects the extension (the next save gets a
+// 401 and connects again).
+
+// One registered client per browser, so Purl's Connected apps says where each
+// connection comes from. Safari's extension pages are safari-web-extension://;
+// every Chromium browser counts as Chrome.
+const CLIENT_ID = chrome.runtime.getURL("").startsWith("safari-web-extension:")
+  ? "purl-extension-safari"
+  : "purl-extension-chrome";
+const REDIRECT_URI = `${PURL_URL}/extension/connected`;
+const SCOPE = "links:save offline_access";
+const AUTHORIZE_URL = `${PURL_URL}/api/auth/mcp/authorize`;
+const TOKEN_URL = `${PURL_URL}/api/auth/mcp/token`;
+const SAVE_URL = `${PURL_URL}/api/v1/links/save`;
+
+type Tokens = {
+  accessToken: string;
+  refreshToken: string | null;
+  expiresAt: number; // ms since epoch
+};
+
+const TOKENS_KEY = "tokens";
+// Refresh a little before the access token runs out.
+const EXPIRY_MARGIN_MS = 60_000;
+
+async function readTokens(): Promise<Tokens | null> {
+  const stored = await chrome.storage.local.get(TOKENS_KEY);
+  return (stored[TOKENS_KEY] as Tokens | undefined) ?? null;
+}
+
+const writeTokens = (tokens: Tokens) =>
+  chrome.storage.local.set({ [TOKENS_KEY]: tokens });
+
+const clearTokens = () => chrome.storage.local.remove(TOKENS_KEY);
+
+/**
+ * Calls the token endpoint. Resolves to null when Purl refuses (an expired or
+ * revoked grant); a network failure throws, like any other request.
+ */
+async function requestTokens(
+  params: Record<string, string>,
+  signal: AbortSignal,
+  previousRefreshToken: string | null = null,
+): Promise<Tokens | null> {
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    credentials: "omit",
+    body: new URLSearchParams({ ...params, client_id: CLIENT_ID }),
+    signal,
+  });
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as {
+    access_token?: unknown;
+    refresh_token?: unknown;
+    expires_in?: unknown;
+  } | null;
+  if (typeof body?.access_token !== "string") return null;
+  const expiresIn = typeof body.expires_in === "number" ? body.expires_in : 3600;
+  return {
+    accessToken: body.access_token,
+    refreshToken:
+      typeof body.refresh_token === "string"
+        ? body.refresh_token
+        : previousRefreshToken,
+    expiresAt: Date.now() + expiresIn * 1000,
+  };
+}
+
+/** New tokens from the refresh token, or null (and disconnected) when that's refused. */
+async function refreshTokens(
+  tokens: Tokens,
+  signal: AbortSignal,
+): Promise<Tokens | null> {
+  const next = tokens.refreshToken
+    ? await requestTokens(
+        { grant_type: "refresh_token", refresh_token: tokens.refreshToken },
+        signal,
+        tokens.refreshToken,
+      )
+    : null;
+  if (next) await writeTokens(next);
+  else await clearTokens();
+  return next;
+}
+
+function base64Url(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+const randomToken = () =>
+  base64Url(crypto.getRandomValues(new Uint8Array(32)));
+
+async function codeChallenge(verifier: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(verifier),
+  );
+  return base64Url(new Uint8Array(digest));
+}
+
+// --- Saving -----------------------------------------------------------------
+
+// The server answers 403 { code: "LIMIT_REACHED" } at the link cap, and
+// 403 { code: "insufficient_scope" } for a token that can't save.
+async function errorCode(res: Response): Promise<string | null> {
   try {
     const body: unknown = await res.json();
-    return (
-      typeof body === "object" &&
-      body !== null &&
-      (body as { code?: unknown }).code === "LIMIT_REACHED"
-    );
+    const code =
+      typeof body === "object" && body !== null
+        ? (body as { code?: unknown }).code
+        : undefined;
+    return typeof code === "string" ? code : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
 type SaveOutcome = "done" | "unauthorized";
 
+const postSave = (accessToken: string, url: string, signal: AbortSignal) =>
+  fetch(SAVE_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+    credentials: "omit",
+    body: JSON.stringify({ url }),
+    signal,
+  });
+
 /**
- * Saves `url` and tells the user how it went in tab `tabId`. A 401 isn't
- * reported: the caller decides whether to start a sign-in or give up.
+ * Saves `url` and tells the user how it went in tab `tabId`. "unauthorized"
+ * (not connected, or the connection was revoked) isn't reported: the caller
+ * decides whether to connect or give up.
  */
 async function savePage(tabId: number, url: string): Promise<SaveOutcome> {
+  let tokens = await readTokens();
+  if (!tokens) return "unauthorized";
+
   await report(tabId, "saving");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15_000);
+  const { signal } = controller;
 
   try {
-    const res = await fetch(`${PURL_URL}/api/links`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ url }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
+    if (tokens.expiresAt - EXPIRY_MARGIN_MS <= Date.now()) {
+      tokens = await refreshTokens(tokens, signal);
+      if (!tokens) return "unauthorized";
+    }
 
-    if (res.status === 401) return "unauthorized";
-    if (res.status === 403 && (await isLimitReached(res))) {
+    let res = await postSave(tokens.accessToken, url, signal);
+    // Revoked or expired early: one refresh, then give up.
+    if (res.status === 401) {
+      tokens = await refreshTokens(tokens, signal);
+      if (!tokens) return "unauthorized";
+      res = await postSave(tokens.accessToken, url, signal);
+      if (res.status === 401) {
+        await clearTokens();
+        return "unauthorized";
+      }
+    }
+
+    const code = res.status === 403 ? await errorCode(res) : null;
+    if (code === "insufficient_scope") {
+      await clearTokens();
+      return "unauthorized";
+    }
+    if (code === "LIMIT_REACHED") {
       await report(tabId, "error", "Link limit reached");
     } else if (res.status === 429) {
       // Saves are limited to 30 a minute.
@@ -230,22 +373,25 @@ async function savePage(tabId: number, url: string): Promise<SaveOutcome> {
       await report(tabId, "saved");
     }
   } catch (e) {
-    clearTimeout(timeout);
     const msg =
       e instanceof Error && e.name === "AbortError"
         ? "Request timed out"
         : "Could not reach Purl";
     await report(tabId, "error", msg);
+  } finally {
+    clearTimeout(timeout);
   }
   return "done";
 }
 
-// A save that's waiting for the user to sign in. It lives in session storage
-// because Chrome can stop this worker while they're on the provider's pages.
+// A save that's waiting for the user to connect. It lives in session storage
+// because the browser can stop this worker while they're signing in.
 type PendingSave = {
   url: string;
   tabId: number; // the page being saved
   loginTabId: number; // the Purl tab we opened
+  state: string;
+  codeVerifier: string;
   at: number;
 };
 
@@ -257,41 +403,89 @@ async function readPending(): Promise<PendingSave | null> {
   return (stored[PENDING_KEY] as PendingSave | undefined) ?? null;
 }
 
-/** Opens Purl so the user can sign in; the save resumes in `resumeAfterSignIn`. */
-async function startSignIn(tabId: number, url: string): Promise<void> {
-  const loginTab = await chrome.tabs.create({ url: PURL_URL });
+/** Opens Purl so the user can connect; the save resumes in `finishConnect`. */
+async function startConnect(tabId: number, url: string): Promise<void> {
+  const state = randomToken();
+  const codeVerifier = randomToken();
+  const authorize = new URL(AUTHORIZE_URL);
+  authorize.search = new URLSearchParams({
+    response_type: "code",
+    client_id: CLIENT_ID,
+    redirect_uri: REDIRECT_URI,
+    scope: SCOPE,
+    state,
+    code_challenge: await codeChallenge(codeVerifier),
+    code_challenge_method: "S256",
+  }).toString();
+
+  const loginTab = await chrome.tabs.create({ url: authorize.href });
   if (loginTab.id !== undefined) {
     const pending: PendingSave = {
       url,
       tabId,
       loginTabId: loginTab.id,
+      state,
+      codeVerifier,
       at: Date.now(),
     };
     await chrome.storage.session.set({ [PENDING_KEY]: pending });
   }
-  await report(tabId, "error", "Log in to Purl to save this page");
+  await report(tabId, "error", "Connect Purl to save this page");
 }
 
-/** Sign-in sends the user to /home, so reaching it means they're in. */
-function isSignedInLanding(url: string): boolean {
+/** The callback's parameters when `url` is REDIRECT_URI, else null. */
+function readCallback(url: string): URLSearchParams | null {
   try {
-    const landing = new URL(url);
-    return (
-      landing.origin === new URL(PURL_URL).origin && landing.pathname === "/home"
-    );
+    const callback = new URL(url);
+    const expected = new URL(REDIRECT_URI);
+    return callback.origin === expected.origin &&
+      callback.pathname === expected.pathname
+      ? callback.searchParams
+      : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-async function resumeAfterSignIn(pending: PendingSave): Promise<void> {
-  // Back to the page, and the login tab out of the way; either tab may be gone.
+async function finishConnect(
+  pending: PendingSave,
+  params: URLSearchParams,
+): Promise<void> {
+  // Back to the page, and the Purl tab out of the way; either tab may be gone.
   await chrome.tabs.update(pending.tabId, { active: true }).catch(() => {});
   await chrome.tabs.remove(pending.loginTabId).catch(() => {});
 
-  // Still unauthorized: say so rather than sending them round again.
+  // A denial comes back with `error` and no `state` (Better Auth).
+  const code = params.get("code");
+  if (!code || params.get("state") !== pending.state) {
+    await report(pending.tabId, "error", "Purl wasn't connected");
+    return;
+  }
+
+  let tokens: Tokens | null;
+  try {
+    tokens = await requestTokens(
+      {
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: REDIRECT_URI,
+        code_verifier: pending.codeVerifier,
+      },
+      AbortSignal.timeout(15_000),
+    );
+  } catch {
+    await report(pending.tabId, "error", "Could not reach Purl");
+    return;
+  }
+  if (!tokens) {
+    await report(pending.tabId, "error", "Couldn't connect to Purl");
+    return;
+  }
+  await writeTokens(tokens);
+
+  // Just connected and still unauthorized: say so rather than going round again.
   if ((await savePage(pending.tabId, pending.url)) === "unauthorized") {
-    await report(pending.tabId, "error", "Log in to Purl first");
+    await report(pending.tabId, "error", "Couldn't connect to Purl");
   }
 }
 
@@ -299,11 +493,12 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
   if (!changeInfo.url) return;
   const pending = await readPending();
   if (!pending || pending.loginTabId !== tabId) return;
-  if (!isSignedInLanding(changeInfo.url)) return;
+  const params = readCallback(changeInfo.url);
+  if (!params) return;
 
   await chrome.storage.session.remove(PENDING_KEY);
   if (Date.now() - pending.at > PENDING_TTL_MS) return;
-  await resumeAfterSignIn(pending);
+  await finishConnect(pending, params);
 });
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
@@ -317,14 +512,14 @@ chrome.action.onClicked.addListener(async (tab) => {
   if (!tab.id) return;
   const tabId = tab.id;
 
-  // No address means Chrome gave us no access to the page (its own pages).
+  // No address means the browser gave us no access to the page (its own pages).
   if (!tab.url || !isWebUrl(tab.url)) {
     await report(tabId, "error", "Can't save this page");
     return;
   }
 
   if ((await savePage(tabId, tab.url)) === "unauthorized") {
-    await startSignIn(tabId, tab.url);
+    await startConnect(tabId, tab.url);
   }
 });
 

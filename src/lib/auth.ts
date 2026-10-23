@@ -11,7 +11,7 @@ import {
   getEnabledProviders,
   getSocialProviders,
 } from "@/lib/auth-providers";
-import { assignUsernameOnCreate, revokePortfolioOnSignOut } from "@/lib/auth-hooks";
+import { assignUsernameOnCreate, revokeSaveOnlyAppsOnSignOut } from "@/lib/auth-hooks";
 import { ADVERTISED_SCOPES, SAVE_SCOPE } from "@/lib/oauth-scopes";
 import { API_KEY_PREFIX, getPurlApiKey } from "@/lib/api-key-getter";
 
@@ -98,7 +98,7 @@ export const auth = betterAuth({
   },
   hooks: {
     before: createAuthMiddleware(async (ctx) => {
-      if (ctx.path === "/sign-out") await revokePortfolioOnSignOut(ctx);
+      if (ctx.path === "/sign-out") await revokeSaveOnlyAppsOnSignOut(ctx);
     }),
   },
   databaseHooks: {
