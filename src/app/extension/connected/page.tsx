@@ -25,12 +25,12 @@ export default async function ExtensionConnectedPage({
     <div className={CONSENT_COLUMN}>
       <BrandMark />
       <Typography variant="h3" component="h1" className="mt-8 md:text-3xl">
-        {error ? "The extension wasn’t connected" : "The extension is connected"}
+        {error ? "The extension wasn’t connected" : "Go back to your page"}
       </Typography>
       <Typography className="mt-3 text-pretty">
         {error
-          ? "Click the Purl button again to connect it."
-          : "You can close this tab."}
+          ? "Choose Purl from your browser’s extensions to try again."
+          : "If it wasn’t saved, choose Purl there again. You can close this tab."}
       </Typography>
     </div>
   );
