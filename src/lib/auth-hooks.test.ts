@@ -38,32 +38,50 @@ vi.mock("@/lib/connected-apps", () => ({
   revokeConnectedApp: (...args: unknown[]) => mockRevoke(...args),
 }));
 
-describe("revokePortfolioOnSignOut", () => {
+describe("revokeSaveOnlyAppsOnSignOut", () => {
   beforeEach(() => {
     mockGetSession.mockReset();
     mockRevoke.mockReset();
   });
 
-  it("revokes only the portfolio client's connection for the signing-out user", async () => {
-    const { revokePortfolioOnSignOut } = await import("./auth-hooks");
+  it("revokes only the save-only clients' connections for the signing-out user", async () => {
+    const { revokeSaveOnlyAppsOnSignOut } = await import("./auth-hooks");
     mockGetSession.mockResolvedValue({ user: { id: "user-1" } });
-    await revokePortfolioOnSignOut({} as never);
-    expect(mockRevoke).toHaveBeenCalledExactlyOnceWith("user-1", "nublson-com");
+    mockRevoke.mockResolvedValue(undefined);
+    await revokeSaveOnlyAppsOnSignOut({} as never);
+    expect(mockRevoke.mock.calls).toEqual([
+      ["user-1", "nublson-com"],
+      ["user-1", "purl-extension-chrome"],
+      ["user-1", "purl-extension-safari"],
+    ]);
+  });
+
+  it("still revokes the extension when the portfolio fails", async () => {
+    const { revokeSaveOnlyAppsOnSignOut } = await import("./auth-hooks");
+    mockGetSession.mockResolvedValue({ user: { id: "user-1" } });
+    mockRevoke.mockImplementation(async (_userId: string, clientId: string) => {
+      if (clientId === "nublson-com") throw new Error("db down");
+    });
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await revokeSaveOnlyAppsOnSignOut({} as never);
+    expect(mockRevoke).toHaveBeenCalledWith("user-1", "purl-extension-chrome");
+    expect(mockRevoke).toHaveBeenCalledWith("user-1", "purl-extension-safari");
+    spy.mockRestore();
   });
 
   it("does nothing without a session", async () => {
-    const { revokePortfolioOnSignOut } = await import("./auth-hooks");
+    const { revokeSaveOnlyAppsOnSignOut } = await import("./auth-hooks");
     mockGetSession.mockResolvedValue(null);
-    await revokePortfolioOnSignOut({} as never);
+    await revokeSaveOnlyAppsOnSignOut({} as never);
     expect(mockRevoke).not.toHaveBeenCalled();
   });
 
   it("never blocks sign-out when revoking fails", async () => {
-    const { revokePortfolioOnSignOut } = await import("./auth-hooks");
+    const { revokeSaveOnlyAppsOnSignOut } = await import("./auth-hooks");
     mockGetSession.mockResolvedValue({ user: { id: "user-1" } });
     mockRevoke.mockRejectedValue(new Error("db down"));
     const spy = vi.spyOn(console, "error").mockImplementation(() => {});
-    await expect(revokePortfolioOnSignOut({} as never)).resolves.toBeUndefined();
+    await expect(revokeSaveOnlyAppsOnSignOut({} as never)).resolves.toBeUndefined();
     spy.mockRestore();
   });
 });

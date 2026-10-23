@@ -1,0 +1,931 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 110;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		70F66071308B58F00019DB18 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F66070308B58F00019DB18 /* AppDelegate.swift */; };
+		70F66073308B58F00019DB18 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F66072308B58F00019DB18 /* SceneDelegate.swift */; };
+		70F66076308B58F00019DB18 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 70F66074308B58F00019DB18 /* LaunchScreen.storyboard */; };
+		70F66079308B58F00019DB18 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 70F66077308B58F00019DB18 /* Main.storyboard */; };
+		70F66082308B58F00019DB18 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F66081308B58F00019DB18 /* AppDelegate.swift */; };
+		70F66085308B58F00019DB18 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 70F66083308B58F00019DB18 /* Main.storyboard */; };
+		70F6608C308B58F00019DB18 /* Purl Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 70F6608B308B58F00019DB18 /* Purl Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		70F66096308B58F00019DB18 /* Purl Extension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 70F66095308B58F00019DB18 /* Purl Extension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		70F6609B308B58F00019DB18 /* Main.html in Resources */ = {isa = PBXBuildFile; fileRef = 70F66060308B58EF0019DB18 /* Main.html */; };
+		70F6609C308B58F00019DB18 /* Main.html in Resources */ = {isa = PBXBuildFile; fileRef = 70F66060308B58EF0019DB18 /* Main.html */; };
+		70F6609D308B58F00019DB18 /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 70F66062308B58EF0019DB18 /* Icon.png */; };
+		70F6609E308B58F00019DB18 /* Icon.png in Resources */ = {isa = PBXBuildFile; fileRef = 70F66062308B58EF0019DB18 /* Icon.png */; };
+		70F6609F308B58F00019DB18 /* Style.css in Resources */ = {isa = PBXBuildFile; fileRef = 70F66063308B58EF0019DB18 /* Style.css */; };
+		70F660A0308B58F00019DB18 /* Style.css in Resources */ = {isa = PBXBuildFile; fileRef = 70F66063308B58EF0019DB18 /* Style.css */; };
+		70F660A1308B58F00019DB18 /* Script.js in Resources */ = {isa = PBXBuildFile; fileRef = 70F66064308B58EF0019DB18 /* Script.js */; };
+		70F660A2308B58F00019DB18 /* Script.js in Resources */ = {isa = PBXBuildFile; fileRef = 70F66064308B58EF0019DB18 /* Script.js */; };
+		70F660A3308B58F00019DB18 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F66065308B58EF0019DB18 /* ViewController.swift */; };
+		70F660A4308B58F00019DB18 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F66065308B58EF0019DB18 /* ViewController.swift */; };
+		70F660A5308B58F00019DB18 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 70F66066308B58F00019DB18 /* Assets.xcassets */; };
+		70F660A6308B58F00019DB18 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 70F66066308B58F00019DB18 /* Assets.xcassets */; };
+		70F660A7308B58F00019DB18 /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F66068308B58F00019DB18 /* SafariWebExtensionHandler.swift */; };
+		70F660A8308B58F00019DB18 /* SafariWebExtensionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70F66068308B58F00019DB18 /* SafariWebExtensionHandler.swift */; };
+		70F660BD308B58F00019DB18 /* background.js in Resources */ = {isa = PBXBuildFile; fileRef = 70F660BA308B58F00019DB18 /* background.js */; };
+		70F660BE308B58F00019DB18 /* icons in Resources */ = {isa = PBXBuildFile; fileRef = 70F660BB308B58F00019DB18 /* icons */; };
+		70F660BF308B58F00019DB18 /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 70F660BC308B58F00019DB18 /* manifest.json */; };
+		70F660C0308B58F00019DB18 /* background.js in Resources */ = {isa = PBXBuildFile; fileRef = 70F660BA308B58F00019DB18 /* background.js */; };
+		70F660C1308B58F00019DB18 /* icons in Resources */ = {isa = PBXBuildFile; fileRef = 70F660BB308B58F00019DB18 /* icons */; };
+		70F660C2308B58F00019DB18 /* manifest.json in Resources */ = {isa = PBXBuildFile; fileRef = 70F660BC308B58F00019DB18 /* manifest.json */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		70F6608D308B58F00019DB18 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 70F6605A308B58EF0019DB18 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 70F6608A308B58F00019DB18;
+			remoteInfo = "Purl Extension (iOS)";
+		};
+		70F66097308B58F00019DB18 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 70F6605A308B58EF0019DB18 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 70F66094308B58F00019DB18;
+			remoteInfo = "Purl Extension (macOS)";
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		70F660AE308B58F00019DB18 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolder = PlugIns;
+			files = (
+				70F6608C308B58F00019DB18 /* Purl Extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+		};
+		70F660B5308B58F00019DB18 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			dstPath = "";
+			dstSubfolder = PlugIns;
+			files = (
+				70F66096308B58F00019DB18 /* Purl Extension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		70F66061308B58EF0019DB18 /* Base */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = Base; path = Base.lproj/Main.html; sourceTree = "<group>"; };
+		70F66062308B58EF0019DB18 /* Icon.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Icon.png; sourceTree = "<group>"; };
+		70F66063308B58EF0019DB18 /* Style.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; path = Style.css; sourceTree = "<group>"; };
+		70F66064308B58EF0019DB18 /* Script.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = Script.js; sourceTree = "<group>"; };
+		70F66065308B58EF0019DB18 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		70F66066308B58F00019DB18 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		70F66068308B58F00019DB18 /* SafariWebExtensionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SafariWebExtensionHandler.swift; sourceTree = "<group>"; };
+		70F6606D308B58F00019DB18 /* Purl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Purl.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		70F66070308B58F00019DB18 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		70F66072308B58F00019DB18 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		70F66075308B58F00019DB18 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		70F66078308B58F00019DB18 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		70F6607A308B58F00019DB18 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		70F6607F308B58F00019DB18 /* Purl.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Purl.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		70F66081308B58F00019DB18 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		70F66084308B58F00019DB18 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		70F66086308B58F00019DB18 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		70F6608B308B58F00019DB18 /* Purl Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Purl Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		70F66090308B58F00019DB18 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		70F66095308B58F00019DB18 /* Purl Extension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Purl Extension.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
+		70F6609A308B58F00019DB18 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		70F660BA308B58F00019DB18 /* background.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = background.js; path = ../../../dist/background.js; sourceTree = "<group>"; };
+		70F660BB308B58F00019DB18 /* icons */ = {isa = PBXFileReference; lastKnownFileType = folder; name = icons; path = ../../../dist/icons; sourceTree = "<group>"; };
+		70F660BC308B58F00019DB18 /* manifest.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = manifest.json; path = ../../../dist/manifest.json; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		70F6606A308B58F00019DB18 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		70F6607C308B58F00019DB18 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		70F66088308B58F00019DB18 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+		70F66092308B58F00019DB18 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		70F66059308B58EF0019DB18 = {
+			isa = PBXGroup;
+			children = (
+				70F6605E308B58EF0019DB18 /* Shared (App) */,
+				70F66067308B58F00019DB18 /* Shared (Extension) */,
+				70F6606F308B58F00019DB18 /* iOS (App) */,
+				70F66080308B58F00019DB18 /* macOS (App) */,
+				70F6608F308B58F00019DB18 /* iOS (Extension) */,
+				70F66099308B58F00019DB18 /* macOS (Extension) */,
+				70F6606E308B58F00019DB18 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		70F6605E308B58EF0019DB18 /* Shared (App) */ = {
+			isa = PBXGroup;
+			children = (
+				70F66065308B58EF0019DB18 /* ViewController.swift */,
+				70F66066308B58F00019DB18 /* Assets.xcassets */,
+				70F6605F308B58EF0019DB18 /* Resources */,
+			);
+			path = "Shared (App)";
+			sourceTree = "<group>";
+		};
+		70F6605F308B58EF0019DB18 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				70F66060308B58EF0019DB18 /* Main.html */,
+				70F66062308B58EF0019DB18 /* Icon.png */,
+				70F66063308B58EF0019DB18 /* Style.css */,
+				70F66064308B58EF0019DB18 /* Script.js */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		70F66067308B58F00019DB18 /* Shared (Extension) */ = {
+			isa = PBXGroup;
+			children = (
+				70F660B9308B58F00019DB18 /* Resources */,
+				70F66068308B58F00019DB18 /* SafariWebExtensionHandler.swift */,
+			);
+			path = "Shared (Extension)";
+			sourceTree = "<group>";
+		};
+		70F6606E308B58F00019DB18 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				70F6606D308B58F00019DB18 /* Purl.app */,
+				70F6607F308B58F00019DB18 /* Purl.app */,
+				70F6608B308B58F00019DB18 /* Purl Extension.appex */,
+				70F66095308B58F00019DB18 /* Purl Extension.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		70F6606F308B58F00019DB18 /* iOS (App) */ = {
+			isa = PBXGroup;
+			children = (
+				70F66070308B58F00019DB18 /* AppDelegate.swift */,
+				70F66072308B58F00019DB18 /* SceneDelegate.swift */,
+				70F66074308B58F00019DB18 /* LaunchScreen.storyboard */,
+				70F66077308B58F00019DB18 /* Main.storyboard */,
+				70F6607A308B58F00019DB18 /* Info.plist */,
+			);
+			path = "iOS (App)";
+			sourceTree = "<group>";
+		};
+		70F66080308B58F00019DB18 /* macOS (App) */ = {
+			isa = PBXGroup;
+			children = (
+				70F66081308B58F00019DB18 /* AppDelegate.swift */,
+				70F66083308B58F00019DB18 /* Main.storyboard */,
+				70F66086308B58F00019DB18 /* Info.plist */,
+			);
+			path = "macOS (App)";
+			sourceTree = "<group>";
+		};
+		70F6608F308B58F00019DB18 /* iOS (Extension) */ = {
+			isa = PBXGroup;
+			children = (
+				70F66090308B58F00019DB18 /* Info.plist */,
+			);
+			path = "iOS (Extension)";
+			sourceTree = "<group>";
+		};
+		70F66099308B58F00019DB18 /* macOS (Extension) */ = {
+			isa = PBXGroup;
+			children = (
+				70F6609A308B58F00019DB18 /* Info.plist */,
+			);
+			path = "macOS (Extension)";
+			sourceTree = "<group>";
+		};
+		70F660B9308B58F00019DB18 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				70F660BA308B58F00019DB18 /* background.js */,
+				70F660BB308B58F00019DB18 /* icons */,
+				70F660BC308B58F00019DB18 /* manifest.json */,
+			);
+			name = Resources;
+			path = "Shared (Extension)";
+			sourceTree = SOURCE_ROOT;
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		70F6606C308B58F00019DB18 /* Purl (iOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 70F660AF308B58F00019DB18 /* Build configuration list for PBXNativeTarget "Purl (iOS)" */;
+			buildPhases = (
+				70F66069308B58F00019DB18 /* Sources */,
+				70F6606A308B58F00019DB18 /* Frameworks */,
+				70F6606B308B58F00019DB18 /* Resources */,
+				70F660AE308B58F00019DB18 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				70F6608E308B58F00019DB18 /* PBXTargetDependency */,
+			);
+			name = "Purl (iOS)";
+			productName = "Purl (iOS)";
+			productReference = 70F6606D308B58F00019DB18 /* Purl.app */;
+			productType = "com.apple.product-type.application";
+		};
+		70F6607E308B58F00019DB18 /* Purl (macOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 70F660B6308B58F00019DB18 /* Build configuration list for PBXNativeTarget "Purl (macOS)" */;
+			buildPhases = (
+				70F6607B308B58F00019DB18 /* Sources */,
+				70F6607C308B58F00019DB18 /* Frameworks */,
+				70F6607D308B58F00019DB18 /* Resources */,
+				70F660B5308B58F00019DB18 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				70F66098308B58F00019DB18 /* PBXTargetDependency */,
+			);
+			name = "Purl (macOS)";
+			productName = "Purl (macOS)";
+			productReference = 70F6607F308B58F00019DB18 /* Purl.app */;
+			productType = "com.apple.product-type.application";
+		};
+		70F6608A308B58F00019DB18 /* Purl Extension (iOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 70F660AB308B58F00019DB18 /* Build configuration list for PBXNativeTarget "Purl Extension (iOS)" */;
+			buildPhases = (
+				70F66087308B58F00019DB18 /* Sources */,
+				70F66088308B58F00019DB18 /* Frameworks */,
+				70F66089308B58F00019DB18 /* Resources */,
+			);
+			buildRules = (
+			);
+			name = "Purl Extension (iOS)";
+			productName = "Purl Extension (iOS)";
+			productReference = 70F6608B308B58F00019DB18 /* Purl Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		70F66094308B58F00019DB18 /* Purl Extension (macOS) */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 70F660B2308B58F00019DB18 /* Build configuration list for PBXNativeTarget "Purl Extension (macOS)" */;
+			buildPhases = (
+				70F66091308B58F00019DB18 /* Sources */,
+				70F66092308B58F00019DB18 /* Frameworks */,
+				70F66093308B58F00019DB18 /* Resources */,
+			);
+			buildRules = (
+			);
+			name = "Purl Extension (macOS)";
+			productName = "Purl Extension (macOS)";
+			productReference = 70F66095308B58F00019DB18 /* Purl Extension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		70F6605A308B58EF0019DB18 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2710;
+				LastUpgradeCheck = 2710;
+				TargetAttributes = {
+					70F6606C308B58F00019DB18 = {
+						CreatedOnToolsVersion = 27.1;
+					};
+					70F6607E308B58F00019DB18 = {
+						CreatedOnToolsVersion = 27.1;
+					};
+					70F6608A308B58F00019DB18 = {
+						CreatedOnToolsVersion = 27.1;
+					};
+					70F66094308B58F00019DB18 = {
+						CreatedOnToolsVersion = 27.1;
+					};
+				};
+			};
+			buildConfigurationList = 70F6605D308B58EF0019DB18 /* Build configuration list for PBXProject "Purl" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 70F66059308B58EF0019DB18;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 70F6606E308B58F00019DB18 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				70F6606C308B58F00019DB18 /* Purl (iOS) */,
+				70F6607E308B58F00019DB18 /* Purl (macOS) */,
+				70F6608A308B58F00019DB18 /* Purl Extension (iOS) */,
+				70F66094308B58F00019DB18 /* Purl Extension (macOS) */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		70F6606B308B58F00019DB18 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+				70F6609D308B58F00019DB18 /* Icon.png in Resources */,
+				70F66076308B58F00019DB18 /* LaunchScreen.storyboard in Resources */,
+				70F6609B308B58F00019DB18 /* Main.html in Resources */,
+				70F660A1308B58F00019DB18 /* Script.js in Resources */,
+				70F660A5308B58F00019DB18 /* Assets.xcassets in Resources */,
+				70F66079308B58F00019DB18 /* Main.storyboard in Resources */,
+				70F6609F308B58F00019DB18 /* Style.css in Resources */,
+			);
+		};
+		70F6607D308B58F00019DB18 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+				70F6609E308B58F00019DB18 /* Icon.png in Resources */,
+				70F660A0308B58F00019DB18 /* Style.css in Resources */,
+				70F66085308B58F00019DB18 /* Main.storyboard in Resources */,
+				70F660A2308B58F00019DB18 /* Script.js in Resources */,
+				70F660A6308B58F00019DB18 /* Assets.xcassets in Resources */,
+				70F6609C308B58F00019DB18 /* Main.html in Resources */,
+			);
+		};
+		70F66089308B58F00019DB18 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+				70F660C0308B58F00019DB18 /* background.js in Resources */,
+				70F660C2308B58F00019DB18 /* manifest.json in Resources */,
+				70F660C1308B58F00019DB18 /* icons in Resources */,
+			);
+		};
+		70F66093308B58F00019DB18 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+				70F660BD308B58F00019DB18 /* background.js in Resources */,
+				70F660BF308B58F00019DB18 /* manifest.json in Resources */,
+				70F660BE308B58F00019DB18 /* icons in Resources */,
+			);
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		70F66069308B58F00019DB18 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				70F660A3308B58F00019DB18 /* ViewController.swift in Sources */,
+				70F66071308B58F00019DB18 /* AppDelegate.swift in Sources */,
+				70F66073308B58F00019DB18 /* SceneDelegate.swift in Sources */,
+			);
+		};
+		70F6607B308B58F00019DB18 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				70F660A4308B58F00019DB18 /* ViewController.swift in Sources */,
+				70F66082308B58F00019DB18 /* AppDelegate.swift in Sources */,
+			);
+		};
+		70F66087308B58F00019DB18 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				70F660A7308B58F00019DB18 /* SafariWebExtensionHandler.swift in Sources */,
+			);
+		};
+		70F66091308B58F00019DB18 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				70F660A8308B58F00019DB18 /* SafariWebExtensionHandler.swift in Sources */,
+			);
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		70F6608E308B58F00019DB18 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 70F6608A308B58F00019DB18 /* Purl Extension (iOS) */;
+			targetProxy = 70F6608D308B58F00019DB18 /* PBXContainerItemProxy */;
+		};
+		70F66098308B58F00019DB18 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 70F66094308B58F00019DB18 /* Purl Extension (macOS) */;
+			targetProxy = 70F66097308B58F00019DB18 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		70F66060308B58EF0019DB18 /* Main.html */ = {
+			isa = PBXVariantGroup;
+			children = (
+				70F66061308B58EF0019DB18 /* Base */,
+			);
+			name = Main.html;
+			sourceTree = "<group>";
+		};
+		70F66074308B58F00019DB18 /* LaunchScreen.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				70F66075308B58F00019DB18 /* Base */,
+			);
+			name = LaunchScreen.storyboard;
+			sourceTree = "<group>";
+		};
+		70F66077308B58F00019DB18 /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				70F66078308B58F00019DB18 /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+		70F66083308B58F00019DB18 /* Main.storyboard */ = {
+			isa = PBXVariantGroup;
+			children = (
+				70F66084308B58F00019DB18 /* Base */,
+			);
+			name = Main.storyboard;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
+/* Begin XCBuildConfiguration section */
+		70F660A9308B58F00019DB18 /* Debug configuration for PBXProject "Purl" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		70F660AA308B58F00019DB18 /* Release configuration for PBXProject "Purl" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		70F660AC308B58F00019DB18 /* Debug configuration for PBXNativeTarget "Purl Extension (iOS)" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "iOS (Extension)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Purl Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = live.purl.Purl.Extension;
+				PRODUCT_NAME = "Purl Extension";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		70F660AD308B58F00019DB18 /* Release configuration for PBXNativeTarget "Purl Extension (iOS)" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "iOS (Extension)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Purl Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = live.purl.Purl.Extension;
+				PRODUCT_NAME = "Purl Extension";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		70F660B0308B58F00019DB18 /* Debug configuration for PBXNativeTarget "Purl (iOS)" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "iOS (App)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Purl;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = live.purl.Purl;
+				PRODUCT_NAME = Purl;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		70F660B1308B58F00019DB18 /* Release configuration for PBXNativeTarget "Purl (iOS)" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "iOS (App)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Purl;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = live.purl.Purl;
+				PRODUCT_NAME = Purl;
+				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		70F660B3308B58F00019DB18 /* Debug configuration for PBXNativeTarget "Purl Extension (macOS)" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "macOS (Extension)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Purl Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = live.purl.Purl.Extension;
+				PRODUCT_NAME = "Purl Extension";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		70F660B4308B58F00019DB18 /* Release configuration for PBXNativeTarget "Purl Extension (macOS)" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "macOS (Extension)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Purl Extension";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = live.purl.Purl.Extension;
+				PRODUCT_NAME = "Purl Extension";
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		70F660B7308B58F00019DB18 /* Debug configuration for PBXNativeTarget "Purl (macOS)" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "macOS (App)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Purl;
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = live.purl.Purl;
+				PRODUCT_NAME = Purl;
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		70F660B8308B58F00019DB18 /* Release configuration for PBXNativeTarget "Purl (macOS)" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "macOS (App)/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Purl;
+				INFOPLIST_KEY_NSMainStoryboardFile = Main;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = (
+					"-framework",
+					SafariServices,
+					"-framework",
+					WebKit,
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = live.purl.Purl;
+				PRODUCT_NAME = Purl;
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		70F6605D308B58EF0019DB18 /* Build configuration list for PBXProject "Purl" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				70F660A9308B58F00019DB18 /* Debug configuration for PBXProject "Purl" */,
+				70F660AA308B58F00019DB18 /* Release configuration for PBXProject "Purl" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		70F660AB308B58F00019DB18 /* Build configuration list for PBXNativeTarget "Purl Extension (iOS)" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				70F660AC308B58F00019DB18 /* Debug configuration for PBXNativeTarget "Purl Extension (iOS)" */,
+				70F660AD308B58F00019DB18 /* Release configuration for PBXNativeTarget "Purl Extension (iOS)" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		70F660AF308B58F00019DB18 /* Build configuration list for PBXNativeTarget "Purl (iOS)" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				70F660B0308B58F00019DB18 /* Debug configuration for PBXNativeTarget "Purl (iOS)" */,
+				70F660B1308B58F00019DB18 /* Release configuration for PBXNativeTarget "Purl (iOS)" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		70F660B2308B58F00019DB18 /* Build configuration list for PBXNativeTarget "Purl Extension (macOS)" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				70F660B3308B58F00019DB18 /* Debug configuration for PBXNativeTarget "Purl Extension (macOS)" */,
+				70F660B4308B58F00019DB18 /* Release configuration for PBXNativeTarget "Purl Extension (macOS)" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		70F660B6308B58F00019DB18 /* Build configuration list for PBXNativeTarget "Purl (macOS)" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				70F660B7308B58F00019DB18 /* Debug configuration for PBXNativeTarget "Purl (macOS)" */,
+				70F660B8308B58F00019DB18 /* Release configuration for PBXNativeTarget "Purl (macOS)" */,
+			);
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 70F6605A308B58EF0019DB18 /* Project object */;
+	validationLevel = 1;
+}

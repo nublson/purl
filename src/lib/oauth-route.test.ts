@@ -24,6 +24,21 @@ describe("oauthCorsOrigin", () => {
     expect(oauthCorsOrigin("https://nublson.com", "")).toBeNull();
     expect(oauthCorsOrigin("https://nublson.com", undefined)).toBeNull();
   });
+  it("allows browser extensions, configured or not", () => {
+    for (const origin of [
+      "chrome-extension://abcdefghijklmnopabcdefghijklmnop",
+      "safari-web-extension://8BE7D49B-29C3-403E-AB76-93CDB49CBB2A",
+    ]) {
+      expect(oauthCorsOrigin(origin, undefined)).toBe(origin);
+      expect(oauthCorsOrigin(origin, ALLOWED)).toBe(origin);
+    }
+  });
+  it("rejects look-alike extension origins", () => {
+    expect(oauthCorsOrigin("chrome-extension://abc.evil.com", undefined)).toBeNull();
+    expect(oauthCorsOrigin("chrome-extension://abc/path", undefined)).toBeNull();
+    expect(oauthCorsOrigin("moz-extension://abc", undefined)).toBeNull();
+    expect(oauthCorsOrigin("https://chrome-extension.evil.com", undefined)).toBeNull();
+  });
   it("treats * literally", () => {
     expect(oauthCorsOrigin("https://evil.com", "*")).toBeNull();
     expect(oauthCorsOrigin("*", "*")).toBe("*");
@@ -142,6 +157,19 @@ describe("guardSaveAuthorize", () => {
       expect(res).toBeInstanceOf(Request);
       expect(new URL(res.url).searchParams.get("prompt")).toBe("consent");
     });
+    it.each(["purl-extension-chrome", "purl-extension-safari"])(
+      "holds the extension's client %s to the same rules",
+      (clientId) => {
+        const rejected = guardSaveAuthorize(
+          get(`client_id=${clientId}&scope=openid&${S256}`),
+        );
+        expect((rejected as Response).status).toBe(400);
+        const accepted = guardSaveAuthorize(
+          get(`client_id=${clientId}&scope=links:save%20offline_access&${S256}`),
+        ) as Request;
+        expect(new URL(accepted.url).searchParams.get("prompt")).toBe("consent");
+      },
+    );
     it("leaves another client's non-save scopes untouched", () => {
       const a = get("client_id=other&scope=openid");
       expect(guardSaveAuthorize(a)).toBe(a);

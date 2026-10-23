@@ -1,0 +1,131 @@
+name: Publish Safari Extension
+
+# Builds extension/ and the Xcode wrapper app (extension/safari) and uploads the
+# macOS and iOS apps to App Store Connect. Apple still reviews every version, and
+# a build goes to TestFlight / App Review only when submitted from App Store
+# Connect (this job uploads, it doesn't submit).
+#
+# NOT ENABLED YET: nothing dispatches it (release.yml only dispatches the Chrome
+# job) until the secrets below exist. See plans/safari-extension-distribution.md.
+# To enable: add the secrets, run it once by hand on main, then add a
+# `publish-safari-extension` job to release.yml next to `publish-extension`.
+#
+# extension/public/manifest.json's `version` is the app's version (MARKETING_VERSION);
+# a run whose version already has a build for a platform skips that platform.
+# The build number is the run number, so every upload is newer than the last.
+#
+# Signing is automatic and cloud-managed: xcodebuild signs and uploads with an
+# App Store Connect API key (Admin role, needed for cloud-managed certificates),
+# so no certificate or profile is stored in the repo or in secrets.
+# Secrets: APPLE_TEAM_ID, ASC_APP_ID, ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8
+# (the .p8 file's contents).
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: publish-safari-extension
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: macos-latest
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: MAC_OS
+            scheme: Purl (macOS)
+            destination: generic/platform=macOS
+          - platform: IOS
+            scheme: Purl (iOS)
+            destination: generic/platform=iOS
+    env:
+      ASC_APP_ID: ${{ secrets.ASC_APP_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_PATH: ${{ runner.temp }}/AuthKey.p8
+      TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      ARCHIVE: ${{ runner.temp }}/Purl.xcarchive
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Check secrets
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          for name in TEAM_ID ASC_APP_ID ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing secret for $name. See plans/safari-extension-distribution.md."
+              exit 1
+            fi
+          done
+          printf '%s' "$ASC_KEY_P8" > "$ASC_KEY_PATH"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Compare with App Store Connect
+        id: check
+        run: |
+          VERSION=$(jq -r .version extension/public/manifest.json)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          EXISTS=$(node extension/safari/scripts/build-exists.mjs "$VERSION" "${{ matrix.platform }}")
+          if [ "$EXISTS" = "true" ]; then
+            echo "::notice::${{ matrix.platform }} $VERSION is already uploaded. Bump version in extension/public/manifest.json to publish."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The Xcode project references extension/dist/ (it doesn't copy it), so the
+      # production build must exist before the archive.
+      - name: Build the extension
+        if: steps.check.outputs.skip == 'false'
+        working-directory: extension
+        run: npm ci && npm run build
+
+      - name: Archive
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          xcodebuild -version
+          xcodebuild archive \
+            -project extension/safari/Purl/Purl.xcodeproj \
+            -scheme "${{ matrix.scheme }}" \
+            -configuration Release \
+            -destination "${{ matrix.destination }}" \
+            -archivePath "$ARCHIVE" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            MARKETING_VERSION="${{ steps.check.outputs.version }}" \
+            CURRENT_PROJECT_VERSION="${{ github.run_number }}"
+
+      - name: Upload to App Store Connect
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          OPTIONS="$RUNNER_TEMP/ExportOptions.plist"
+          plutil -create xml1 "$OPTIONS"
+          plutil -insert method -string app-store-connect "$OPTIONS"
+          plutil -insert destination -string upload "$OPTIONS"
+          plutil -insert signingStyle -string automatic "$OPTIONS"
+          plutil -insert teamID -string "$TEAM_ID" "$OPTIONS"
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE" \
+            -exportOptionsPlist "$OPTIONS" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          echo "::notice::${{ matrix.platform }} ${{ steps.check.outputs.version }} (${{ github.run_number }}) uploaded. Submit it for review in App Store Connect."

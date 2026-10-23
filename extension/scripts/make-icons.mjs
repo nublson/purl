@@ -45,3 +45,48 @@ for (const [size, fill] of SIZES) {
     .toFile(path.join(outDir, `icon${size}.png`));
   console.log(`icon${size}.png`);
 }
+
+// The Safari wrapper app's icons (extension/safari): the black app tile with the
+// pearl, like the PWA icon (public/icons). iOS gets one full-bleed, opaque
+// 1024px square (the system rounds the corners, and App Store Connect rejects
+// alpha); macOS gets the rounded tile on Apple's 1024 grid (824px tile, 100px
+// margin), drawn at every size the asset catalog lists.
+const appIconDir = path.join(
+  root,
+  "extension/safari/Purl/Shared (App)/Assets.xcassets/AppIcon.appiconset",
+);
+const PEARL_SHARE = 0.62; // the pearl's diameter as a share of the tile
+
+function appIconSvg({ canvas, tile, radius }) {
+  const pearl = tile * PEARL_SHARE;
+  const pearlAt = (canvas - pearl) / 2;
+  const inner = logo
+    .replace(/<svg[^>]*>/, "")
+    .replace("</svg>", "")
+    .replaceAll("paint0_radial_133_229", "pearl");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas}" height="${canvas}" viewBox="0 0 ${canvas} ${canvas}">
+<rect x="${(canvas - tile) / 2}" y="${(canvas - tile) / 2}" width="${tile}" height="${tile}" rx="${radius}" fill="#000"/>
+<svg x="${pearlAt}" y="${pearlAt}" width="${pearl}" height="${pearl}" viewBox="0 0 32 32">${inner}</svg>
+</svg>`;
+}
+
+const ios = appIconSvg({ canvas: 1024, tile: 1024, radius: 0 });
+await sharp(Buffer.from(ios))
+  .flatten({ background: "#000" })
+  .removeAlpha()
+  .png()
+  .toFile(path.join(appIconDir, "universal-icon-1024@1x.png"));
+console.log("universal-icon-1024@1x.png");
+
+const mac = appIconSvg({ canvas: 1024, tile: 824, radius: 185 });
+for (const size of [16, 32, 128, 256, 512]) {
+  for (const scale of [1, 2]) {
+    const px = size * scale;
+    const name = `mac-icon-${size}@${scale}x.png`;
+    await sharp(Buffer.from(mac), { density: 72 * (px / 1024) * 4 })
+      .resize(px, px)
+      .png()
+      .toFile(path.join(appIconDir, name));
+    console.log(name);
+  }
+}

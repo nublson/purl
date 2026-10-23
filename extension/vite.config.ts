@@ -8,6 +8,8 @@ const PRODUCTION_URL = "https://purl.live";
  * Writes manifest.json into dist/ after the build. The source manifest only
  * allows the production site; `npm run dev` adds the local server it talks to
  * (VITE_PURL_URL), so a store build can never carry a localhost permission.
+ * The pattern leaves out the port: Safari ignores host patterns with one, and
+ * Chrome matches every port without it.
  */
 function manifestPlugin(isDev: boolean, purlUrl: string): Plugin {
   return {
@@ -20,7 +22,8 @@ function manifestPlugin(isDev: boolean, purlUrl: string): Plugin {
       const hosts: string[] = manifest.host_permissions;
 
       if (isDev) {
-        const local = `${new URL(purlUrl).origin}/*`;
+        const { protocol, hostname } = new URL(purlUrl);
+        const local = `${protocol}//${hostname}/*`;
         if (!hosts.includes(local)) hosts.push(local);
         manifest.name = `${manifest.name} (dev)`;
       } else if (hosts.some((h) => h !== `${PRODUCTION_URL}/*`)) {
