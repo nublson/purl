@@ -1,5 +1,6 @@
 "use client";
 
+import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useCurrentFolder } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
@@ -41,10 +42,13 @@ function safeHttpsUrl(value: string | undefined) {
  * "Paste link" for people who can't easily press the shortcut (voice
  * control, switch access, trackpad-only). On a folder page it also offers
  * "Add links" (also `A`), which opens `AddLinksPopover` under the + button.
+ * In the landing demo, Paste link and Add links are disabled; the apps and
+ * extensions links still open.
  */
 export function HeaderAddMenu() {
   const { notifyLinksChanged } = useLinksSyncActions();
   const currentFolder = useCurrentFolder();
+  const isDemo = useIsDemo();
   const pathname = usePathname();
   const hintId = useId();
   // Set by "Add links": the popover opens once the menu has closed and
@@ -54,7 +58,7 @@ export function HeaderAddMenu() {
   // `A` on a folder page opens "Add links" (not while typing, or with a
   // dialog or menu open).
   useEffect(() => {
-    if (!currentFolder) return;
+    if (!currentFolder || isDemo) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.repeat) return;
       if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
@@ -67,7 +71,7 @@ export function HeaderAddMenu() {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [currentFolder]);
+  }, [currentFolder, isDemo]);
 
   async function handlePasteLink() {
     let text: string;
@@ -157,6 +161,7 @@ export function HeaderAddMenu() {
       <DropdownMenuGroup>
         <DropdownMenuItem
           aria-describedby={hintId}
+          disabled={isDemo}
           onSelect={() => {
             void handlePasteLink();
           }}
@@ -167,7 +172,8 @@ export function HeaderAddMenu() {
         {/* Folder pages only: pick links you've already saved. */}
         {currentFolder ? (
           <DropdownMenuItem
-            aria-keyshortcuts={ADD_LINKS_SHORTCUT}
+            aria-keyshortcuts={isDemo ? undefined : ADD_LINKS_SHORTCUT}
+            disabled={isDemo}
             onSelect={() => {
               pendingAddLinks.current = true;
             }}
@@ -192,7 +198,7 @@ export function HeaderAddMenu() {
                 rel="noopener noreferrer"
               >
                 <Chrome />
-                Chrome
+                Chrome Extension
                 <span className="sr-only">(opens in new tab)</span>
                 <Export5 className="ml-auto text-muted-foreground" />
               </a>
@@ -204,7 +210,7 @@ export function HeaderAddMenu() {
   );
 
   // On a folder page, "Add links" opens under the + button.
-  return currentFolder ? (
+  return currentFolder && !isDemo ? (
     <AddLinksPopover folder={currentFolder} placement="header" align="end">
       <div className="inline-flex">{menu}</div>
     </AddLinksPopover>
