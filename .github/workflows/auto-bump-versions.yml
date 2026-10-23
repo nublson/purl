@@ -6,7 +6,9 @@ name: Auto Bump Versions
 #   - MCP server: server.json's `version` (release.yml tags it, publish-mcp.yml
 #     publishes it)
 #   - Chrome extension: extension/public/manifest.json's `version`
-#     (publish-extension.yml submits it to the Chrome Web Store)
+#     (publish-extension.yml submits it to the Chrome Web Store; it is also the
+#     Safari app's version, publish-safari-extension.yml). Changes to the Xcode
+#     wrapper alone (extension/safari/) don't bump it: bump by hand to ship one.
 #
 # The bump size comes from the conventional-commit subjects of the pushed commits
 # that touch the component (merge commits skipped, since PRs land as merges):
@@ -108,6 +110,7 @@ jobs:
             'extension/' \
             ':(exclude)extension/**/*.test.ts' \
             ':(exclude)extension/scripts/' \
+            ':(exclude)extension/safari/' \
             ':(exclude)extension/.env.example'
 
           if [ ${#BUMPED[@]} -gt 0 ]; then

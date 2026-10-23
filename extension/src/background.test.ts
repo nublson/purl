@@ -13,6 +13,9 @@ const setTitle = vi.fn();
 const tabsCreate = vi.fn();
 const tabsUpdate = vi.fn();
 const tabsRemove = vi.fn();
+// Site access to Purl: granted at install unless a test says otherwise (Chrome).
+const permissionsContains = vi.fn(async () => true);
+const permissionsRequest = vi.fn();
 // The extension's own base address: Chrome's, unless a test says Safari.
 let extensionBase = "chrome-extension://abcdef/";
 
@@ -45,6 +48,7 @@ beforeAll(async () => {
         setBadgeBackgroundColor,
         setTitle,
       },
+      permissions: { contains: permissionsContains, request: permissionsRequest },
       runtime: { getURL: (path: string) => `${extensionBase}${path}` },
       scripting: { executeScript },
       tabs: {
@@ -146,6 +150,8 @@ beforeEach(() => {
   tabsCreate.mockReset().mockResolvedValue({ id: 99 });
   tabsUpdate.mockReset().mockResolvedValue(undefined);
   tabsRemove.mockReset().mockResolvedValue(undefined);
+  permissionsContains.mockReset().mockResolvedValue(true);
+  permissionsRequest.mockReset().mockResolvedValue(true);
   session = {};
   local = {};
 });
@@ -289,6 +295,8 @@ describe("when the extension isn't connected", () => {
       createHash("sha256").update(codeVerifier).digest("base64url"),
     );
     expect(lastToast()).toEqual(["error", "Connect Purl to save this page"]);
+    // Chrome granted the manifest's site access at install: nothing to ask.
+    expect(permissionsRequest).not.toHaveBeenCalled();
   });
 
   it("swaps the callback's code for tokens, closes the tab and saves the page", async () => {
@@ -521,6 +529,52 @@ describe("when the toast can't be shown", () => {
     // One badge for the result, none for "Saving…".
     expect(setBadgeText.mock.calls.filter(([o]) => o.text === "✓")).toHaveLength(1);
     expect(setBadgeText.mock.calls.filter(([o]) => o.text === "!")).toHaveLength(0);
+  });
+});
+
+describe("without access to Purl's site (Safari, until the user allows it)", () => {
+  // A fresh worker that finds no access when it starts.
+  beforeEach(async () => {
+    permissionsContains.mockResolvedValue(false);
+    vi.resetModules();
+    await import("./background");
+    await new Promise((resolve) => setTimeout(resolve));
+  });
+
+  it("asks during the click itself, then connects", async () => {
+    server();
+    const done = click(PAGE);
+    // Before any await: Safari refuses the request outside the user gesture.
+    expect(permissionsRequest).toHaveBeenCalledWith({ origins: ["https://purl.live/*"] });
+    await done;
+    expect(tabsCreate).toHaveBeenCalledTimes(1);
+    expect(lastToast()).toEqual(["error", "Connect Purl to save this page"]);
+  });
+
+  it("doesn't open Purl when the user refuses, and says why", async () => {
+    permissionsRequest.mockResolvedValue(false);
+    server();
+    await click(PAGE);
+    expect(tabsCreate).not.toHaveBeenCalled();
+    expect(session.pendingSave).toBeUndefined();
+    expect(lastToast()).toEqual(["error", "Allow Purl to access its site to connect"]);
+  });
+
+  it("still saves with a token it already has", async () => {
+    permissionsRequest.mockResolvedValue(false);
+    connect();
+    const fetchMock = server();
+    await click(PAGE);
+    expect(requestsTo(fetchMock, SAVE_URL)).toHaveLength(1);
+    expect(lastToast()).toEqual(["saved", null]);
+  });
+
+  it("asks only until it's granted", async () => {
+    connect();
+    server();
+    await click(PAGE);
+    await click(PAGE);
+    expect(permissionsRequest).toHaveBeenCalledTimes(1);
   });
 });
 

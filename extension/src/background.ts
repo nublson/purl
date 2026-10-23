@@ -403,6 +403,39 @@ async function readPending(): Promise<PendingSave | null> {
   return (stored[PENDING_KEY] as PendingSave | undefined) ?? null;
 }
 
+// Connecting needs access to Purl's site: the extension reads the code from
+// the connect tab's address, and the token endpoint answers CORS only for the
+// site itself. Chrome grants the manifest's host permissions at install;
+// Safari asks per site, and on iOS nothing asks while the user is on Purl, so
+// the tab's address arrives empty and the connect never finishes. The pattern
+// is the manifest's (no port).
+const PURL_ORIGINS = [
+  `${new URL(PURL_URL).protocol}//${new URL(PURL_URL).hostname}/*`,
+];
+
+// Checked when the worker starts, so a click that finds access already
+// granted asks nothing.
+let hasPurlAccess = false;
+void chrome.permissions
+  .contains({ origins: PURL_ORIGINS })
+  .then((has) => {
+    hasPurlAccess ||= has;
+  })
+  .catch(() => {});
+
+/**
+ * Asks for access to Purl's site unless the extension has it. Call it
+ * synchronously from the click: Safari refuses the request after an await
+ * ("Must be called during a user gesture"). Resolves to whether it's granted.
+ */
+function requestPurlAccess(): Promise<boolean> {
+  if (hasPurlAccess) return Promise.resolve(true);
+  return chrome.permissions
+    .request({ origins: PURL_ORIGINS })
+    .then((granted) => (hasPurlAccess = granted))
+    .catch(() => false);
+}
+
 /** Opens Purl so the user can connect; the save resumes in `finishConnect`. */
 async function startConnect(tabId: number, url: string): Promise<void> {
   const state = randomToken();
@@ -509,6 +542,9 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 });
 
 chrome.action.onClicked.addListener(async (tab) => {
+  // First, before any await (see requestPurlAccess). Saving doesn't need it;
+  // connecting does.
+  const access = requestPurlAccess();
   if (!tab.id) return;
   const tabId = tab.id;
 
@@ -519,7 +555,8 @@ chrome.action.onClicked.addListener(async (tab) => {
   }
 
   if ((await savePage(tabId, tab.url)) === "unauthorized") {
-    await startConnect(tabId, tab.url);
+    if (await access) await startConnect(tabId, tab.url);
+    else await report(tabId, "error", "Allow Purl to access its site to connect");
   }
 });
 
