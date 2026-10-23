@@ -39,7 +39,7 @@ Tested only on `http://localhost`. Since even `SameSite=None; Secure` cookies we
 
 ## Decision: how the Safari extension authenticates
 
-**Decided 2026-10-23: option 1, for Chrome and Safari alike,** with one OAuth client per browser (`purl-extension-chrome` "Purl for Chrome", `purl-extension-safari` "Purl for Safari") so Connected apps says where each connection comes from, and signing out of Purl disconnects them. Built on the same branch and verified in Safari (connect, save, sign-out → reconnect).
+**Decided 2026-10-23: option 1, for Chrome and Safari alike,** with one OAuth client per browser (`purl-extension-chrome` "Purl Chrome Extension", `purl-extension-safari` "Purl Safari Extension") so Connected apps says where each connection comes from, and signing out of Purl disconnects them. Built on the same branch and verified in Safari (connect, save, sign-out → reconnect).
 
 The cookie route is closed. Options considered:
 

@@ -5,6 +5,6 @@
 -- Data only and additive; safe to run twice.
 INSERT INTO "oauthApplication" ("id","name","clientId","clientSecret","redirectUrls","type","disabled","createdAt","updatedAt")
 VALUES
-  ('purl-extension-chrome','Purl for Chrome','purl-extension-chrome',NULL,'https://purl.live/extension/connected,http://localhost:3000/extension/connected','public',false,NOW(),NOW()),
-  ('purl-extension-safari','Purl for Safari','purl-extension-safari',NULL,'https://purl.live/extension/connected,http://localhost:3000/extension/connected','public',false,NOW(),NOW())
+  ('purl-extension-chrome','Purl Chrome Extension','purl-extension-chrome',NULL,'https://purl.live/extension/connected,http://localhost:3000/extension/connected','public',false,NOW(),NOW()),
+  ('purl-extension-safari','Purl Safari Extension','purl-extension-safari',NULL,'https://purl.live/extension/connected,http://localhost:3000/extension/connected','public',false,NOW(),NOW())
 ON CONFLICT ("clientId") DO NOTHING;

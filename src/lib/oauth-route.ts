@@ -63,8 +63,8 @@ export const PORTFOLIO_CLIENT_ID = "nublson-com";
 
 /**
  * The Purl browser extension's registered OAuth clients, one per browser so
- * Connected apps names where each connection comes from ("Purl for Chrome",
- * "Purl for Safari"). Chromium browsers (Edge, Brave, …) use Chrome's.
+ * Connected apps names where each connection comes from ("Purl Chrome Extension",
+ * "Purl Safari Extension"). Chromium browsers (Edge, Brave, …) use Chrome's.
  */
 export const EXTENSION_CLIENT_IDS = [
   "purl-extension-chrome",
