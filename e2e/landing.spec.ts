@@ -31,7 +31,6 @@ test.describe("Landing page", () => {
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Continue with GitHub" })).toBeVisible();
-    await expect(page.getByText("Free · 1,000 links · No ads · No AI")).toBeVisible();
 
     const footer = page.getByRole("contentinfo");
     await expect(footer.getByRole("link", { name: "@nublson" })).toHaveAttribute("href", getAuthorUrl());

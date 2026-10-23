@@ -139,6 +139,16 @@ describe("proxy", () => {
     },
   );
 
+  it.each(["/opengraph-image", "/docs/api/opengraph-image-vc1w9x", "/privacy/opengraph-image-1a2b3c"])(
+    "lets anyone fetch the preview images: %s passes without a session lookup",
+    async (path) => {
+      const res = await proxy(createRequest(path));
+      expect(res.status).toBe(200);
+      expect(res.headers.get("location")).toBeNull();
+      expect(auth.auth.api.getSession).not.toHaveBeenCalled();
+    },
+  );
+
   it("still gates paths under the static pages", async () => {
     const res = await proxy(createRequest("/docs"));
     expect(res.status).toBe(307);
