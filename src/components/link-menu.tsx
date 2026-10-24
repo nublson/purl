@@ -1,6 +1,5 @@
 "use client";
 
-import { useCurrentFolder, useFolders } from "@/hooks/use-folders";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { copyToClipboard } from "@/lib/clipboard";
 import { haptic } from "@/lib/haptics";
@@ -17,6 +16,7 @@ import { toast } from "sonner";
 import { EditDialog } from "./dialog-edit-link";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { FolderEmoji } from "./folder-emoji";
+import { useLinkFolder } from "./folder-tag";
 import { HapticTarget } from "./haptic-target";
 import { LinkFolderSubmenu } from "./link-folder-submenu";
 import { Typography } from "./typography";
@@ -40,13 +40,10 @@ interface LinkMenuProps {
 
 export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
   const isPhone = useIsPhone();
-  const { folders } = useFolders();
   // Off a folder page (every link there is in it): the link's folder, for
   // "Go to …". The quick way there on every screen, touch included (the
   // row's own Go to folder button shows only with a pointer that hovers).
-  const linkFolder = useCurrentFolder()
-    ? null
-    : (folders.find((folder) => folder.id === link.folderId) ?? null);
+  const linkFolder = useLinkFolder(link);
 
   async function handleOpenInNewTab() {
     window.open(link.url, "_blank");

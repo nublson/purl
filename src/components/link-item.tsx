@@ -24,6 +24,7 @@ import {
   FolderTagLabel,
   useFolderBadgeArrival,
   useFolderTag,
+  useLinkFolder,
 } from "./folder-tag";
 import { HapticTarget } from "./haptic-target";
 import { LinkIcon } from "./link-icon";
@@ -83,6 +84,7 @@ export const LinkItem = React.forwardRef<
   const selecting = useIsSelectionActive() && !demo;
   const selected = useIsLinkSelected(link.id);
   const folderTag = useFolderTag(link);
+  const linkFolder = useLinkFolder(link);
   const badgeArrives = useFolderBadgeArrival(folderTag);
   const longPressRef = React.useRef<{
     timer: ReturnType<typeof setTimeout>;
@@ -316,15 +318,18 @@ export const LinkItem = React.forwardRef<
               or keyboard focus, and on every row while selecting. */}
           <div
             className={cn(
-              // Cross-fades with the checkbox: a fast opacity swap, no movement.
-              "contents *:transition-opacity *:duration-150 *:ease-out-strong",
+              // Morphs into the checkbox: it shrinks to the checkbox's size
+              // (16/20) as it fades while the checkbox settles from the
+              // favicon's (20/16), so they read as one shape changing size.
+              // The badge rides along. Reduced motion keeps the fade only.
+              "absolute inset-0 transition-[opacity,scale] duration-150 ease-out-strong",
               demo
                 ? null
                 : selecting
-                  ? "*:opacity-0"
+                  ? "opacity-0 motion-safe:scale-80"
                   : // Keyboard focus only: a mouse click leaves focus on the
                     // checkbox, and the favicon must come back once you move away.
-                    "[@media(hover:hover)]:group-hover/item:*:opacity-0 group-has-[:focus-visible]/media:*:opacity-0",
+                    "[@media(hover:hover)]:group-hover/item:opacity-0 motion-safe:[@media(hover:hover)]:group-hover/item:scale-80 group-has-[:focus-visible]/media:opacity-0 motion-safe:group-has-[:focus-visible]/media:scale-80",
             )}
           >
             {arriving ? (
@@ -350,10 +355,10 @@ export const LinkItem = React.forwardRef<
                 checked={selected}
                 aria-label={`Select ${link.title}`}
                 className={cn(
-                  "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background max-md:size-5 transition-[opacity,box-shadow] duration-150 ease-out-strong",
+                  "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background max-md:size-5 transition-[opacity,scale,box-shadow] duration-150 ease-out-strong",
                   selecting
                     ? "opacity-100"
-                    : "opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:group-hover/item:opacity-100",
+                    : "opacity-0 motion-safe:scale-125 focus-visible:opacity-100 motion-safe:focus-visible:scale-100 [@media(hover:hover)]:group-hover/item:opacity-100 motion-safe:[@media(hover:hover)]:group-hover/item:scale-100",
                 )}
                 onClick={(event) => {
                   event.preventDefault();
@@ -447,7 +452,7 @@ export const LinkItem = React.forwardRef<
           <div className="size-8" aria-hidden />
         ) : (
           <>
-            {folderTag ? <FolderLinkButton folder={folderTag} /> : null}
+            {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}
             <LinkMenu link={link} onDelete={deleteRow} />
           </>
         )}

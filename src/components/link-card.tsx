@@ -23,6 +23,7 @@ import {
   FolderTagLabel,
   useFolderBadgeArrival,
   useFolderTag,
+  useLinkFolder,
 } from "./folder-tag";
 import { HapticTarget } from "./haptic-target";
 import { LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
@@ -66,6 +67,7 @@ export function LinkCard({
   const selecting = useIsSelectionActive() && !demo;
   const selected = useIsLinkSelected(link.id);
   const folderTag = useFolderTag(link);
+  const linkFolder = useLinkFolder(link);
   const badgeArrives = useFolderBadgeArrival(folderTag);
   const folderLabelId = React.useId();
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -198,7 +200,7 @@ export function LinkCard({
             )}
             data-card-menu
           >
-            {folderTag ? <FolderLinkButton folder={folderTag} /> : null}
+            {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}
             <LinkMenu
               link={link}
               onOpenChange={setMenuOpen}

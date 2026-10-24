@@ -146,6 +146,13 @@ test.describe("Owner grid view", () => {
     // A row: the folder's emoji as a badge on the favicon's corner.
     const badges = page.locator('[data-cy="folder-badge"]:visible');
     await expect(badges).toHaveCount(0);
+    // Tags off: the filed row still has its Go to folder button on hover.
+    const alphaRow = page.locator('[data-cy="link-item"]').filter({ hasText: "Alpha" });
+    await alphaRow.hover();
+    await expect(alphaRow.getByRole("link", { name: "Go to Reading" })).toBeVisible();
+    const bravoRow = page.locator('[data-cy="link-item"]').filter({ hasText: "Bravo" });
+    await bravoRow.hover();
+    await expect(bravoRow.getByRole("link", { name: /^Go to/ })).toHaveCount(0);
 
     // On: the menu stays open, and the filed link gets its folder's tag.
     await page.getByRole("button", { name: "Account menu" }).click();
