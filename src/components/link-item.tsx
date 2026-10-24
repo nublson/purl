@@ -328,6 +328,7 @@ export const LinkItem = React.forwardRef<
           {/* The favicon gives way to the checkbox on hover (pointer devices)
               or keyboard focus, and on every row while selecting. */}
           <div
+            data-cy="row-favicon"
             className={cn(
               // Morphs into the checkbox: it shrinks to the checkbox's size
               // (16/20) as it fades while the checkbox settles from the

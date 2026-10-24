@@ -262,7 +262,7 @@ test.describe("Link selection, after deselecting", () => {
     // keyboard focus, so the row looks as it did before.
     await page.mouse.move(0, 0);
 
-    const favicon = row.locator("div.contents > *").first();
+    const favicon = row.locator('[data-cy="row-favicon"]');
     await expect(favicon).toHaveCSS("opacity", "1");
     await expect(checkbox(page, "Bravo")).toHaveCSS("opacity", "0");
     // The menu button fades with its container.
@@ -283,7 +283,7 @@ test.describe("Link selection, after deselecting", () => {
     }
     await expect(checkbox(page, "Alpha")).toBeFocused();
     await expect(checkbox(page, "Alpha")).toHaveCSS("opacity", "1");
-    await expect(rows(page).first().locator("div.contents > *").first()).toHaveCSS("opacity", "0");
+    await expect(rows(page).first().locator('[data-cy="row-favicon"]')).toHaveCSS("opacity", "0");
   });
 });
 
