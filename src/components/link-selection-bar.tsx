@@ -11,7 +11,7 @@ import { formatFolderLabel, formatLinkCount } from "@/lib/folder-display";
 import { afterTap, haptic } from "@/lib/haptics";
 import {
   linkSelection,
-  useSelectableLinkCount,
+  useAreAllShownSelected,
   useSelectedLinkIds,
 } from "@/lib/link-selection";
 import {
@@ -82,9 +82,10 @@ export function LinkSelectionBar({
   folderOf: (linkId: string) => string | null | undefined;
 }) {
   const selectedIds = useSelectedLinkIds();
-  const selectableCount = useSelectableLinkCount();
   const count = selectedIds.size;
-  const allSelected = count > 0 && count >= selectableCount;
+  // Every link on screen: with a search on, selected links it hides don't
+  // count, and unselecting leaves them selected.
+  const allSelected = useAreAllShownSelected();
   const [apple, setApple] = React.useState(false);
   const [moveOpen, setMoveOpen] = React.useState(false);
   const [newFolderOpen, setNewFolderOpen] = React.useState(false);
@@ -135,12 +136,9 @@ export function LinkSelectionBar({
   }, [notifyLinksChanged]);
 
   const toggleAll = React.useCallback(() => {
-    if (linkSelection.selectedIds().length >= selectableCount) {
-      linkSelection.clear();
-    } else {
-      linkSelection.selectAll();
-    }
-  }, [selectableCount]);
+    if (allSelected) linkSelection.unselectShown();
+    else linkSelection.selectAll();
+  }, [allSelected]);
 
   // Shortcuts, only while something is selected and no dialog or menu is
   // open (they handle their own keys, e.g. Esc closes the Move menu first).

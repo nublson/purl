@@ -69,4 +69,18 @@ test.describe("Link rows on phones", () => {
     );
     expect(userSelect).toBe("none");
   });
+
+  test("tapping the row menu doesn't select the row", async ({ page, seed }) => {
+    await seed.link({ url: "https://alpha.example", title: "Alpha" });
+    await openHome(page);
+    // The menu opens on the press, so the lift never reaches the row: a
+    // long-press started there used to select it 500ms later.
+    await row(page, "Alpha").getByRole("button", { name: "Open link menu" }).tap();
+    await expect(page.getByRole("menu")).toBeVisible();
+    await page.waitForTimeout(700);
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(row(page, "Alpha")).not.toHaveAttribute("data-selected");
+    await expect(page.getByRole("checkbox", { name: "Select all" })).toHaveCount(0);
+  });
 });

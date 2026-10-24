@@ -7,10 +7,12 @@ import { useSyncExternalStore } from "react";
  * list on screen (Home or one folder). Selection mode is simply "something
  * is selected".
  *
- * `HomeShell` registers the list's links, in display order, with
- * `setSelectableLinks` whenever it changes; that order drives shift-click
- * ranges and Select all, and links that leave the list (moved out of this
- * folder, deleted) drop out of the selection.
+ * `HomeShell` registers the links on screen, in display order, with
+ * `setSelectableLinks` whenever they change; that order drives shift-click
+ * ranges and Select all. A search narrows what's on screen without touching
+ * the selection: selected links it hides stay selected (and in the bulk
+ * actions), so you can search, select, and search again. Links that leave
+ * for good (deleted, moved out of this folder) are removed by `HomeShell`.
  */
 export type LinkSelectionState = {
   selected: ReadonlySet<string>;
@@ -103,21 +105,21 @@ export function useSelectedLinkIds(): ReadonlySet<string> {
   );
 }
 
+/** Whether every link on screen is selected (Select all's checked state). */
+export function useAreAllShownSelected(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => order.length > 0 && order.every((id) => state.selected.has(id)),
+    () => false,
+  );
+}
+
 /** Whether any link is selected (selection mode); re-renders only when that flips. */
 export function useIsSelectionActive(): boolean {
   return useSyncExternalStore(
     subscribe,
     () => state.selected.size > 0,
     () => false,
-  );
-}
-
-/** How many links the list offers for selection (what Select all selects). */
-export function useSelectableLinkCount(): number {
-  return useSyncExternalStore(
-    subscribe,
-    () => order.length,
-    () => 0,
   );
 }
 
@@ -140,9 +142,16 @@ export const linkSelection = {
         : toggleInSelection(state, id),
     );
   },
-  /** Selects every link in the list (every loaded link). */
+  /** Adds every link on screen (every loaded result) to the selection. */
   selectAll() {
-    setState({ selected: new Set(order), anchor: state.anchor });
+    setState({
+      selected: new Set([...state.selected, ...order]),
+      anchor: state.anchor,
+    });
+  },
+  /** Unselects the links on screen, keeping ones a search hides. */
+  unselectShown() {
+    linkSelection.remove(order);
   },
   /** Unselects `ids` (e.g. the links an action just moved), keeping the rest. */
   remove(ids: readonly string[]) {
@@ -154,24 +163,44 @@ export const linkSelection = {
       anchor: state.anchor !== null && gone.has(state.anchor) ? null : state.anchor,
     });
   },
+  /**
+   * Keeps only the selected links in `ids`: after the data changed (here or
+   * elsewhere), selected links a search hides may have been deleted or
+   * moved out, and only a fresh list can vouch for them.
+   */
+  retain(ids: readonly string[]) {
+    setState(retainInSelection(state, ids));
+  },
   /** Leaves selection mode. */
   clear() {
     setState(EMPTY_SELECTION);
   },
-  /** Current selected ids, in display order (for the bulk actions). */
+  /**
+   * Current selected ids (for the bulk actions): the ones on screen in
+   * display order, then the ones a search hides, in the order picked.
+   */
   selectedIds(): string[] {
-    return order.filter((id) => state.selected.has(id));
+    const shown = order.filter((id) => state.selected.has(id));
+    const onScreen = new Set(order);
+    const hidden = Array.from(state.selected).filter((id) => !onScreen.has(id));
+    return [...shown, ...hidden];
   },
 };
 
 /**
- * Registers the list's link ids in display order (called by `HomeShell`).
- * Links no longer in it leave the selection.
+ * Registers the link ids on screen in display order (called by `HomeShell`).
+ * With `complete` (no search, every page loaded: the list is all there is),
+ * links no longer in it leave the selection; otherwise a link missing from
+ * it may just be filtered out or not loaded, so the selection is kept.
  */
-export function setSelectableLinks(ids: readonly string[]) {
-  const lengthChanged = ids.length !== order.length;
+export function setSelectableLinks(
+  ids: readonly string[],
+  { complete }: { complete: boolean },
+) {
+  const changed =
+    ids.length !== order.length || ids.some((id, index) => id !== order[index]);
   order = ids;
-  const next = retainInSelection(state, ids);
+  const next = complete ? retainInSelection(state, ids) : state;
   if (next !== state) setState(next);
-  else if (lengthChanged) notify();
+  else if (changed) notify();
 }

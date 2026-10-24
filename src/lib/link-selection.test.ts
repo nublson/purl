@@ -66,7 +66,7 @@ describe("retainInSelection", () => {
 describe("linkSelection store", () => {
   beforeEach(() => {
     linkSelection.clear();
-    setSelectableLinks(ORDER);
+    setSelectableLinks(ORDER, { complete: true });
   });
 
   it("selects all, reports ids in display order, and clears", () => {
@@ -93,9 +93,42 @@ describe("linkSelection store", () => {
     expect(linkSelection.selectedIds()).toEqual(["d"]);
   });
 
-  it("drops links that leave the list", () => {
+  it("drops links that leave the whole list", () => {
     linkSelection.selectAll();
-    setSelectableLinks(["a", "e"]);
+    setSelectableLinks(["a", "e"], { complete: true });
     expect(linkSelection.selectedIds()).toEqual(["a", "e"]);
+  });
+
+  it("keeps links a search hides, after the shown ones", () => {
+    linkSelection.toggle("d");
+    linkSelection.toggle("a");
+    // A search showing only "b" and "c": nothing selected matches.
+    setSelectableLinks(["b", "c"], { complete: false });
+    expect(linkSelection.selectedIds()).toEqual(["d", "a"]);
+    linkSelection.toggle("c");
+    expect(linkSelection.selectedIds()).toEqual(["c", "d", "a"]);
+    // Search cleared: all still selected, in display order.
+    setSelectableLinks(ORDER, { complete: true });
+    expect(linkSelection.selectedIds()).toEqual(["a", "c", "d"]);
+  });
+
+  it("retain drops selected links a fresh list no longer has", () => {
+    linkSelection.toggle("a");
+    linkSelection.toggle("d");
+    // A search hides both; then a change elsewhere: the fresh results
+    // (still filtered) vouch for neither, so neither stays.
+    setSelectableLinks(["b", "c"], { complete: false });
+    linkSelection.toggle("b");
+    linkSelection.retain(["b", "c"]);
+    expect(linkSelection.selectedIds()).toEqual(["b"]);
+  });
+
+  it("Select all adds the shown links; unselecting removes only those", () => {
+    linkSelection.toggle("a");
+    setSelectableLinks(["c", "d"], { complete: false });
+    linkSelection.selectAll();
+    expect(linkSelection.selectedIds()).toEqual(["c", "d", "a"]);
+    linkSelection.unselectShown();
+    expect(linkSelection.selectedIds()).toEqual(["a"]);
   });
 });
