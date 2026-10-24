@@ -112,6 +112,17 @@ describe("linkSelection store", () => {
     expect(linkSelection.selectedIds()).toEqual(["a", "c", "d"]);
   });
 
+  it("retain drops selected links a fresh list no longer has", () => {
+    linkSelection.toggle("a");
+    linkSelection.toggle("d");
+    // A search hides both; then a change elsewhere: the fresh results
+    // (still filtered) vouch for neither, so neither stays.
+    setSelectableLinks(["b", "c"], { complete: false });
+    linkSelection.toggle("b");
+    linkSelection.retain(["b", "c"]);
+    expect(linkSelection.selectedIds()).toEqual(["b"]);
+  });
+
   it("Select all adds the shown links; unselecting removes only those", () => {
     linkSelection.toggle("a");
     setSelectableLinks(["c", "d"], { complete: false });

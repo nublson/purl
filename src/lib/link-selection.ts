@@ -163,6 +163,14 @@ export const linkSelection = {
       anchor: state.anchor !== null && gone.has(state.anchor) ? null : state.anchor,
     });
   },
+  /**
+   * Keeps only the selected links in `ids`: after the data changed (here or
+   * elsewhere), selected links a search hides may have been deleted or
+   * moved out, and only a fresh list can vouch for them.
+   */
+  retain(ids: readonly string[]) {
+    setState(retainInSelection(state, ids));
+  },
   /** Leaves selection mode. */
   clear() {
     setState(EMPTY_SELECTION);

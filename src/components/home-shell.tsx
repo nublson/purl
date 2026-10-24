@@ -181,9 +181,12 @@ export function HomeShell({
   /**
    * Re-fetches exactly as many links as are loaded, so pages stay consistent
    * after inserts/deletes; `fresh` starts over from the first page (a new
-   * search). Follows the current search.
+   * search). Follows the current search. `reconcile` (the data changed,
+   * maybe elsewhere): the selection keeps only links in the fresh list, so
+   * a selected link a search hid can't linger after being deleted or moved
+   * out in another tab.
    */
-  const reload = useCallback(async ({ fresh = false, glide: glideRows = false, endsBatch = false } = {}) => {
+  const reload = useCallback(async ({ fresh = false, glide: glideRows = false, endsBatch = false, reconcile = false } = {}) => {
     const seq = ++reloadSeq.current;
     const startedAt = Date.now();
     const limit = fresh
@@ -210,6 +213,11 @@ export function HomeShell({
       if (endsBatch) setPendingSave(null);
       setGroups(page.groups);
       setNextCursor(page.nextCursor);
+      if (reconcile) {
+        linkSelection.retain(
+          page.groups.flatMap((group) => group.links.map((link) => link.id)),
+        );
+      }
       cursorQueryRef.current = query;
       setLoadedQuery(query);
       // The list now says where every row is: rows faded out by a move
@@ -310,6 +318,7 @@ export function HomeShell({
   const [settled, setSettled] = useState(() => ({
     query: loadedQuery,
     groups: initialGroups,
+    nextCursor: initialNextCursor,
     addLinks,
     addHasMore: otherResults.hasMore,
   }));
@@ -317,12 +326,14 @@ export function HomeShell({
     !pending &&
     (settled.query !== loadedQuery ||
       settled.groups !== groups ||
+      settled.nextCursor !== nextCursor ||
       settled.addLinks !== addLinks ||
       settled.addHasMore !== otherResults.hasMore)
   ) {
     setSettled({
       query: loadedQuery,
       groups,
+      nextCursor,
       addLinks,
       addHasMore: otherResults.hasMore,
     });
@@ -471,7 +482,7 @@ export function HomeShell({
       }
       if (hiddenAt !== null && Date.now() - hiddenAt >= RETURN_REFRESH_AFTER_MS) {
         refreshFolders();
-        void reload();
+        void reload({ reconcile: true });
       }
       hiddenAt = null;
     };
@@ -543,7 +554,7 @@ export function HomeShell({
   useEffect(() => {
     if (version === handledVersion.current) return;
     handledVersion.current = version;
-    void reload();
+    void reload({ reconcile: true });
   }, [version, reload]);
 
   // Leaving /home without a mouse-leave (e.g. keyboard navigation) must not
@@ -656,7 +667,8 @@ export function HomeShell({
   // search, every page loaded) drops selected links missing from it. Links
   // that leave for good (deleted, moved out of this folder) leave the
   // selection as they go.
-  const listComplete = !settled.query && !nextCursor;
+  // The list on screen and its cursor come from the same answer (`settled`).
+  const listComplete = !settled.query && !settled.nextCursor;
   useEffect(() => {
     const shown: string[] = [];
     const gone: string[] = [];
