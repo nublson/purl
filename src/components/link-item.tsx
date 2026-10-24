@@ -24,6 +24,7 @@ import {
   FolderTagLabel,
   useFolderBadgeArrival,
   useFolderTag,
+  useLinkFolder,
 } from "./folder-tag";
 import { HapticTarget } from "./haptic-target";
 import { LinkIcon } from "./link-icon";
@@ -83,6 +84,7 @@ export const LinkItem = React.forwardRef<
   const selecting = useIsSelectionActive() && !demo;
   const selected = useIsLinkSelected(link.id);
   const folderTag = useFolderTag(link);
+  const linkFolder = useLinkFolder(link);
   const badgeArrives = useFolderBadgeArrival(folderTag);
   const longPressRef = React.useRef<{
     timer: ReturnType<typeof setTimeout>;
@@ -450,7 +452,7 @@ export const LinkItem = React.forwardRef<
           <div className="size-8" aria-hidden />
         ) : (
           <>
-            {folderTag ? <FolderLinkButton folder={folderTag} /> : null}
+            {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}
             <LinkMenu link={link} onDelete={deleteRow} />
           </>
         )}

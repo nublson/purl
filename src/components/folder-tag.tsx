@@ -14,16 +14,25 @@ import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 /**
- * The folder to tag `link` with, or null: only with folder tags on (the
- * user menu's Layout group), only on Home (on a folder page every link is
- * in that folder), and only for a link that's in one.
+ * The folder `link` is in, or null: only off a folder page (there every
+ * link is in that folder), and only for a link that's in one. Folder tags
+ * on or off: the Go to folder button and menu item follow this.
+ */
+export function useLinkFolder(link: Pick<Link, "folderId">): FolderSummary | null {
+  const { folders } = useFolders();
+  const currentFolder = useCurrentFolder();
+  if (currentFolder || !link.folderId) return null;
+  return folders.find((folder) => folder.id === link.folderId) ?? null;
+}
+
+/**
+ * The folder to tag `link` with, or null: `useLinkFolder`, only with folder
+ * tags on (the user menu's Layout group).
  */
 export function useFolderTag(link: Pick<Link, "folderId">): FolderSummary | null {
   const { folderTags } = useLinkView();
-  const { folders } = useFolders();
-  const currentFolder = useCurrentFolder();
-  if (!folderTags || currentFolder || !link.folderId) return null;
-  return folders.find((folder) => folder.id === link.folderId) ?? null;
+  const folder = useLinkFolder(link);
+  return folderTags ? folder : null;
 }
 
 /**
