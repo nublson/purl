@@ -154,6 +154,40 @@ test.describe("Link selection", () => {
     await expect(rows(page)).toHaveCount(2);
   });
 
+  test("a search keeps the selection: pick across searches, then move them all", async ({ page, seed }) => {
+    await seed.folder({ name: "Reading", slug: "reading", emoji: "📚" });
+    await seedLinks(seed, ["Alpha", "Bravo", "Charlie"]);
+    await openHome(page);
+
+    await rows(page).first().hover();
+    await checkbox(page, "Alpha").click();
+    await expect(bar(page)).toContainText("1 selected");
+
+    // A search that hides Alpha: still in selection mode, Alpha still counts.
+    const search = page.getByRole("searchbox", { name: "Search your links or paste a link to save" });
+    await search.fill("charlie");
+    await expect(rows(page)).toHaveCount(1);
+    await expect(bar(page)).toContainText("1 selected");
+    await rows(page).first().click();
+    await expect(bar(page)).toContainText("2 selected");
+    // Select all is about the results on screen: Charlie is all of them.
+    const selectAll = bar(page).getByRole("checkbox", { name: "Select all" });
+    await expect(selectAll).toHaveAttribute("aria-checked", "true");
+
+    // Cleared: both still selected, Bravo not.
+    await search.fill("");
+    await expect(rows(page)).toHaveCount(3);
+    await expect(checkbox(page, "Alpha")).toBeChecked();
+    await expect(checkbox(page, "Charlie")).toBeChecked();
+    await expect(checkbox(page, "Bravo")).not.toBeChecked();
+
+    await bar(page).getByRole("button", { name: "Move" }).click();
+    await page.getByRole("menuitem", { name: "Reading" }).click();
+    await expect(page.getByText("Moved 2 links to 📚 Reading")).toBeVisible();
+    await page.goto("/folders/reading");
+    await expect(rows(page)).toHaveCount(2);
+  });
+
   test("New folder… creates a folder and moves the selection into it", async ({ page, seed }) => {
     await seedLinks(seed, ["Alpha"]);
     await openHome(page);

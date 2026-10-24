@@ -93,6 +93,12 @@ async function fetchLinksPage(params: URLSearchParams) {
 /** Rows whose favicons load eagerly: about two phone screens. */
 const EAGER_FAVICONS = 15;
 
+function linksById(groups: LinkGroupType[]) {
+  return new Map(
+    groups.flatMap((group) => group.links.map((link) => [link.id, link] as const)),
+  );
+}
+
 export function HomeShell({
   userId,
   initialGroups,
@@ -645,34 +651,41 @@ export function HomeShell({
     !nextCursor &&
     shownGroups.every((group) => group.links.every((link) => isHidden(link.id)));
 
-  // The selectable links are the ones on screen, in display order; a link
-  // that leaves the list (moved out of this folder, deleted) leaves the
-  // selection too.
+  // The selectable links are the ones on screen, in display order. A search
+  // only hides links, so the selection outlives it; only the whole list (no
+  // search, every page loaded) drops selected links missing from it. Links
+  // that leave for good (deleted, moved out of this folder) leave the
+  // selection as they go.
+  const listComplete = !settled.query && !nextCursor;
   useEffect(() => {
-    setSelectableLinks(
-      shownGroups.flatMap((group) =>
-        group.links
-          .filter(
-            (link) =>
-              pendingDeletes.get(link.id) !== "hidden" &&
-              leavingLinks.get(link.id)?.phase !== "hidden",
-          )
-          .map((link) => link.id),
-      ),
-    );
-  }, [shownGroups, pendingDeletes, leavingLinks]);
+    const shown: string[] = [];
+    const gone: string[] = [];
+    for (const group of shownGroups) {
+      for (const link of group.links) {
+        const hidden =
+          pendingDeletes.get(link.id) === "hidden" ||
+          leavingLinks.get(link.id)?.phase === "hidden";
+        (hidden ? gone : shown).push(link.id);
+      }
+    }
+    if (gone.length) linkSelection.remove(gone);
+    setSelectableLinks(shown, { complete: listComplete });
+  }, [shownGroups, pendingDeletes, leavingLinks, listComplete]);
 
-  // Each loaded link, for the selection bar: its folder ("Remove from
-  // folders").
-  const linkById = useMemo(
-    () =>
-      new Map(
-        groups.flatMap((group) =>
-          group.links.map((link) => [link.id, link] as const),
-        ),
-      ),
-    [groups],
-  );
+  // Each link loaded in this list, searches included, for the selection
+  // bar: its folder ("Remove from folders"), also for selected links the
+  // current search hides. A newer load of a link wins.
+  const [knownLinks, setKnownLinks] = useState(() => ({
+    groups,
+    byId: linksById(groups),
+  }));
+  if (knownLinks.groups !== groups) {
+    setKnownLinks({
+      groups,
+      byId: new Map([...knownLinks.byId, ...linksById(groups)]),
+    });
+  }
+  const linkById = knownLinks.byId;
   const folderOf = useCallback(
     (linkId: string) => {
       const link = linkById.get(linkId);
