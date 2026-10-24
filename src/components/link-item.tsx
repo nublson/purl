@@ -211,6 +211,17 @@ export const LinkItem = React.forwardRef<
       )}
       onPointerDown={(event) => {
         if (demo || event.pointerType !== "touch") return;
+        // A press on the row's actions, or inside a portal (the open menu,
+        // whose React events bubble through here), isn't a long-press on
+        // the row: opening the menu takes the lift away from the row, so
+        // the press would select it behind the menu.
+        const target = event.target as Element;
+        if (
+          !event.currentTarget.contains(target) ||
+          target.closest("[data-row-actions]")
+        ) {
+          return;
+        }
         cancelLongPress();
         longPressedRef.current = false;
         longPressRef.current = {
@@ -430,6 +441,7 @@ export const LinkItem = React.forwardRef<
           fading in over 24px, so it covers the text's end cleanly. Hidden
           (and inert) while selecting. */}
       <ItemActions
+        data-row-actions
         inert={selecting}
         className={cn(
           (selecting || demo) && "invisible",
