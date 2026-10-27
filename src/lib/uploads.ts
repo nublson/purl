@@ -1,9 +1,10 @@
 import "server-only";
 
-import { del, head } from "@vercel/blob";
+import { BlobNotFoundError, del, head } from "@vercel/blob";
 import { insertWithinSaveLimit } from "@/lib/entitlements";
 import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
 import { mapRowToLink } from "@/lib/links";
+import { MAX_UPLOAD_PREVIEW_BYTES } from "@/lib/limits";
 import prisma from "@/lib/prisma";
 import { blobPathnameOf, isBlobUrl, isOwnBlobPathname } from "@/lib/uploads/blob-url";
 import { contentTypeForMime, UPLOAD_MIME_TYPES } from "@/lib/uploads/mime";
@@ -76,13 +77,31 @@ function normalizeMime(mime: string): string {
   return mime.split(";")[0].trim().toLowerCase();
 }
 
+let warnedAboutBaseUrl = false;
+
 /** The host of `BASE_URL` (an upload's domain): `purl.live`. */
 function uploadDomain(): string {
   try {
     return new URL(process.env.BASE_URL as string).host;
   } catch {
+    if (!warnedAboutBaseUrl) {
+      warnedAboutBaseUrl = true;
+      console.warn(
+        "[createUploadForUser] BASE_URL is missing or invalid; uploads use purl.live as their domain",
+      );
+    }
     return "purl.live";
   }
+}
+
+/** `users/u1/c1/` for `users/u1/c1/a.png`. */
+function directoryOf(pathname: string): string {
+  return pathname.slice(0, pathname.lastIndexOf("/") + 1);
+}
+
+/** `a.png` for `users/u1/c1/a.png`. */
+function fileNameOf(pathname: string): string {
+  return pathname.slice(pathname.lastIndexOf("/") + 1);
 }
 
 /** The blob URL's pathname when it's in this user's own prefix, else null. */
@@ -128,11 +147,15 @@ async function discardBlobs(
 
 /**
  * Turns a file the browser put in Blob into a pearl. The client's claims are
- * checked against Blob itself: `head()` runs with Purl's token, so a URL from
- * another store (or a missing blob) fails, and the size counted against the
- * storage cap is Blob's. Once both heads succeed, any failure (wrong type,
- * the save or storage limit, the folder gone, the database) deletes the
- * blobs before rethrowing. Two uploads of one file are two pearls.
+ * checked against Blob itself: `head()` runs with Purl's token and must
+ * answer with exactly the URL sent, so a URL from another store (or a
+ * missing blob) fails, and the size counted against the storage cap is
+ * Blob's. The preview must sit beside its file (same directory, named
+ * `preview…`) and stay under `MAX_UPLOAD_PREVIEW_BYTES`, so a full-size file
+ * can't ride along uncounted. Once both heads succeed, any failure (wrong
+ * type, the save or storage limit, the folder gone, the database) deletes
+ * the blobs before rethrowing. Saving one blob again (a retried request)
+ * returns its pearl unchanged; two uploads of one file are two pearls.
  */
 export async function createUploadForUser(
   userId: string,
@@ -152,11 +175,19 @@ export async function createUploadForUser(
   }
 
   const { url, previewUrl } = input;
-  if (
-    !ownPathname(url, userId) ||
-    (previewUrl !== null && !ownPathname(previewUrl, userId))
-  ) {
-    throw new InvalidUploadError("Invalid upload URL");
+  const filePath = ownPathname(url, userId);
+  if (!filePath) throw new InvalidUploadError("Invalid upload URL");
+  if (previewUrl !== null) {
+    const previewPath = ownPathname(previewUrl, userId);
+    if (
+      !previewPath ||
+      previewUrl === url ||
+      previewPath === filePath ||
+      directoryOf(previewPath) !== directoryOf(filePath) ||
+      !fileNameOf(previewPath).startsWith("preview")
+    ) {
+      throw new InvalidUploadError("Invalid upload preview");
+    }
   }
 
   let file: Awaited<ReturnType<typeof head>>;
@@ -166,19 +197,26 @@ export async function createUploadForUser(
       head(url),
       previewUrl !== null ? head(previewUrl) : Promise.resolve(null),
     ]);
-  } catch {
-    throw new InvalidUploadError("Upload not found");
+  } catch (error) {
+    // Anything else (an outage, a rate limit) is a 500 the client can retry.
+    if (error instanceof BlobNotFoundError) {
+      throw new InvalidUploadError("Upload not found");
+    }
+    throw error;
   }
 
-  // Defence in depth: never delete (or save) a blob outside the user's prefix.
+  // Pins Purl's store: Blob must answer for exactly these URLs. Defence in
+  // depth too: never delete (or save) a blob outside the user's prefix.
   if (
+    file.url !== url ||
+    (preview !== null && preview.url !== previewUrl) ||
     !isOwnBlobPathname(file.pathname, userId) ||
     (preview !== null && !isOwnBlobPathname(preview.pathname, userId))
   ) {
     throw new InvalidUploadError("Invalid upload URL");
   }
 
-  const urls = previewUrl !== null ? [url, previewUrl] : [url];
+  const urls = preview !== null ? [file.url, preview.url] : [file.url];
   try {
     const mimeType = normalizeMime(file.contentType);
     const contentType = contentTypeForMime(mimeType);
@@ -189,10 +227,15 @@ export async function createUploadForUser(
     ) {
       throw new InvalidUploadError("Unsupported file type");
     }
-    if (preview !== null && normalizeMime(preview.contentType) !== PREVIEW_MIME_TYPE) {
+    if (
+      preview !== null &&
+      (normalizeMime(preview.contentType) !== PREVIEW_MIME_TYPE ||
+        !Number.isSafeInteger(preview.size) ||
+        preview.size > MAX_UPLOAD_PREVIEW_BYTES)
+    ) {
       throw new InvalidUploadError("Invalid upload preview");
     }
-    if (!Number.isSafeInteger(file.size) || file.size < 0) {
+    if (!Number.isSafeInteger(file.size) || file.size <= 0) {
       throw new InvalidUploadError("Invalid upload size");
     }
 
@@ -201,14 +244,14 @@ export async function createUploadForUser(
       (tx) =>
         tx.link.create({
           data: {
-            url,
+            url: file.url,
             // Strip control characters (a NUL would fail the insert).
             title: titleFromFileName(input.name.replace(/[\u0000-\u001f\u007f]/g, "")),
             favicon: UPLOAD_FAVICON,
             domain: uploadDomain(),
             contentType,
             mimeType,
-            thumbnail: previewUrl,
+            thumbnail: preview?.url ?? null,
             fileKey: file.pathname,
             fileSize: file.size,
             width: input.width,
@@ -219,7 +262,12 @@ export async function createUploadForUser(
             ...(opts?.folderId !== undefined ? { folderId: opts.folderId } : {}),
           },
         }),
-      { bytes: file.size },
+      {
+        bytes: file.size,
+        // A retry of a save that went through: the same blob's pearl, as is.
+        reuse: (tx) =>
+          tx.link.findFirst({ where: { userId, fileKey: file.pathname } }),
+      },
     );
     return mapRowToLink(row);
   } catch (error) {

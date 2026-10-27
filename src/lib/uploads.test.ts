@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@vercel/blob", () => ({
   head: vi.fn(),
   del: vi.fn(),
+  BlobNotFoundError: class BlobNotFoundError extends Error {},
 }));
 
 vi.mock("@/lib/prisma", () => {
@@ -30,11 +31,13 @@ vi.mock("@/lib/folders", () => ({
   },
 }));
 
-const { head, del } = await import("@vercel/blob");
+const { head, del, BlobNotFoundError } = await import("@vercel/blob");
 const prisma = (await import("@/lib/prisma")).default;
 const { assertFolderOwned, FolderNotFoundError } = await import("@/lib/folders");
 const { StorageLimitError, SaveLimitError } = await import("@/lib/entitlements");
-const { MAX_UPLOAD_BYTES_PER_ACCOUNT } = await import("@/lib/limits");
+const { MAX_UPLOAD_BYTES_PER_ACCOUNT, MAX_UPLOAD_PREVIEW_BYTES } = await import(
+  "@/lib/limits"
+);
 const { createUploadForUser, InvalidUploadError, parseUploadInput } =
   await import("./uploads");
 
@@ -71,10 +74,14 @@ function headResult(pathname: string, contentType: string, size: number): HeadRe
   } as HeadResult;
 }
 
-function mockHeads(fileType = "image/png", previewType = "image/webp") {
+function mockHeads(
+  fileType = "image/png",
+  previewType = "image/webp",
+  { fileSize = 123_456, previewSize = 4_000 } = {},
+) {
   vi.mocked(head).mockImplementation(async (url) => {
-    if (url === PREVIEW_URL) return headResult(PREVIEW_PATH, previewType, 4_000);
-    if (url === FILE_URL) return headResult(FILE_PATH, fileType, 123_456);
+    if (url === PREVIEW_URL) return headResult(PREVIEW_PATH, previewType, previewSize);
+    if (url === FILE_URL) return headResult(FILE_PATH, fileType, fileSize);
     throw new Error(`unexpected head(${String(url)})`);
   });
 }
@@ -162,10 +169,61 @@ describe("createUploadForUser", () => {
     );
   });
 
-  it("creates a second row for the same input (no reuse)", async () => {
+  it("returns the same pearl when one blob is saved again (a retry)", async () => {
     mockHeads();
-    await createUploadForUser("u1", INPUT);
-    await createUploadForUser("u1", INPUT);
+    const first = await createUploadForUser("u1", INPUT);
+    const row = await vi.mocked(prisma.link.create).mock.results[0].value;
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+
+    const again = await createUploadForUser("u1", { ...INPUT, previewUrl: null });
+
+    expect(prisma.link.create).toHaveBeenCalledTimes(1);
+    expect(prisma.link.findFirst).toHaveBeenCalledWith({
+      where: { userId: "u1", fileKey: FILE_PATH },
+    });
+    expect(again).toEqual(first);
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("returns the saved pearl on a retry at the save cap, deleting nothing", async () => {
+    mockHeads();
+    vi.mocked(prisma.link.count).mockResolvedValue(1_000);
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(
+      rowFrom({
+        url: FILE_URL,
+        title: "My Shot",
+        favicon: "/icon.png",
+        domain: "purl.live",
+        contentType: "IMAGE",
+        mimeType: "image/png",
+        thumbnail: PREVIEW_URL,
+        fileKey: FILE_PATH,
+        fileSize: 123_456,
+        width: 1600,
+        height: 900,
+        duration: null,
+        description: null,
+        userId: "u1",
+      }) as never,
+    );
+
+    const link = await createUploadForUser("u1", INPUT);
+
+    expect(link).toMatchObject({ id: "link-1", url: FILE_URL, upload: true });
+    expect(prisma.link.count).not.toHaveBeenCalled();
+    expect(prisma.link.create).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("creates two pearls for two uploads of one file", async () => {
+    const second = `${HOST}/users/u1/c2/My-Shot-x3.png`;
+    vi.mocked(head).mockImplementation(async (url) =>
+      url === second
+        ? headResult("users/u1/c2/My-Shot-x3.png", "image/png", 123_456)
+        : headResult(FILE_PATH, "image/png", 123_456),
+    );
+    await createUploadForUser("u1", { ...INPUT, previewUrl: null });
+    await createUploadForUser("u1", { ...INPUT, url: second, previewUrl: null });
     expect(prisma.link.create).toHaveBeenCalledTimes(2);
   });
 
@@ -263,13 +321,107 @@ describe("createUploadForUser", () => {
     expect(del).not.toHaveBeenCalled();
   });
 
-  it("maps a head failure (another store, missing blob) to InvalidUploadError, with no insert or del", async () => {
-    vi.mocked(head).mockRejectedValue(new Error("BlobNotFoundError"));
+  it("maps a missing blob to InvalidUploadError, with no insert or del", async () => {
+    vi.mocked(head).mockRejectedValue(new BlobNotFoundError());
     await expect(createUploadForUser("u1", INPUT)).rejects.toBeInstanceOf(
       InvalidUploadError,
     );
     expect(prisma.link.create).not.toHaveBeenCalled();
     expect(del).not.toHaveBeenCalled();
+  });
+
+  it("rethrows any other head error (a Blob outage), with no insert or del", async () => {
+    const outage = new Error("BlobServiceNotAvailable");
+    vi.mocked(head).mockRejectedValue(outage);
+    await expect(createUploadForUser("u1", INPUT)).rejects.toBe(outage);
+    expect(prisma.link.create).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("rejects a head that answers for another URL (another store), with no insert or del", async () => {
+    vi.mocked(head).mockResolvedValue({
+      ...headResult(FILE_PATH, "image/png", 10),
+      url: `https://other.public.blob.vercel-storage.com/${FILE_PATH}`,
+    });
+    await expect(
+      createUploadForUser("u1", { ...INPUT, previewUrl: null }),
+    ).rejects.toBeInstanceOf(InvalidUploadError);
+    expect(prisma.link.create).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("rejects a preview head that answers for another URL, with no del", async () => {
+    vi.mocked(head).mockImplementation(async (url) =>
+      url === PREVIEW_URL
+        ? {
+            ...headResult(PREVIEW_PATH, "image/webp", 10),
+            url: `https://other.public.blob.vercel-storage.com/${PREVIEW_PATH}`,
+          }
+        : headResult(FILE_PATH, "image/png", 10),
+    );
+    await expect(createUploadForUser("u1", INPUT)).rejects.toBeInstanceOf(
+      InvalidUploadError,
+    );
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("rejects a URL with a query, which isn't the blob's own URL", async () => {
+    vi.mocked(head).mockImplementation(async () =>
+      headResult(FILE_PATH, "image/png", 10),
+    );
+    await expect(
+      createUploadForUser("u1", { ...INPUT, url: `${FILE_URL}?x=1`, previewUrl: null }),
+    ).rejects.toBeInstanceOf(InvalidUploadError);
+    expect(prisma.link.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["the file itself", FILE_URL],
+    ["another directory", `${HOST}/users/u1/c9/preview-x2.webp`],
+    ["a name not starting with preview", `${HOST}/users/u1/c1/other-x2.webp`],
+  ])("rejects a preview that is %s, without calling head", async (_, previewUrl) => {
+    await expect(
+      createUploadForUser("u1", { ...INPUT, previewUrl }),
+    ).rejects.toBeInstanceOf(InvalidUploadError);
+    expect(head).not.toHaveBeenCalled();
+  });
+
+  it("rejects a preview over the preview cap and deletes the blobs", async () => {
+    mockHeads("image/png", "image/webp", { previewSize: MAX_UPLOAD_PREVIEW_BYTES + 1 });
+    await expect(createUploadForUser("u1", INPUT)).rejects.toBeInstanceOf(
+      InvalidUploadError,
+    );
+    expect(prisma.link.create).not.toHaveBeenCalled();
+    expect(del).toHaveBeenCalledWith([FILE_URL, PREVIEW_URL]);
+  });
+
+  it("accepts a preview at the preview cap", async () => {
+    mockHeads("image/png", "image/webp", { previewSize: MAX_UPLOAD_PREVIEW_BYTES });
+    await createUploadForUser("u1", INPUT);
+    expect(prisma.link.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an empty file and deletes the blobs", async () => {
+    mockHeads("image/png", "image/webp", { fileSize: 0 });
+    await expect(createUploadForUser("u1", INPUT)).rejects.toBeInstanceOf(
+      InvalidUploadError,
+    );
+    expect(prisma.link.create).not.toHaveBeenCalled();
+    expect(del).toHaveBeenCalledWith([FILE_URL, PREVIEW_URL]);
+  });
+
+  it("falls back to purl.live and warns once without BASE_URL", async () => {
+    vi.stubEnv("BASE_URL", "");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockHeads();
+    await createUploadForUser("u1", INPUT);
+    await createUploadForUser("u1", INPUT);
+    const { data } = vi.mocked(prisma.link.create).mock.calls[0][0] as {
+      data: Record<string, unknown>;
+    };
+    expect(data.domain).toBe("purl.live");
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 
   it("rejects an unsupported type from head and deletes both blobs", async () => {
@@ -379,13 +531,23 @@ describe("createUploadForUser", () => {
     errorLog.mockRestore();
   });
 
-  it("leaves the blobs alone when a saved link already uses them (a retried save)", async () => {
-    mockHeads();
-    vi.mocked(prisma.link.count).mockResolvedValue(1_000);
+  it("leaves the blobs alone when a saved link already uses them (a retry with a bad preview)", async () => {
+    mockHeads("image/png", "image/png");
     vi.mocked(prisma.link.findFirst).mockResolvedValue({ id: "link-0" } as never);
     await expect(createUploadForUser("u1", INPUT)).rejects.toBeInstanceOf(
-      SaveLimitError,
+      InvalidUploadError,
     );
+    expect(prisma.link.findFirst).toHaveBeenCalledWith({
+      where: {
+        userId: "u1",
+        OR: [
+          { fileKey: FILE_PATH },
+          { url: { in: [FILE_URL, PREVIEW_URL] } },
+          { thumbnail: { in: [FILE_URL, PREVIEW_URL] } },
+        ],
+      },
+      select: { id: true },
+    });
     expect(del).not.toHaveBeenCalled();
   });
 });
