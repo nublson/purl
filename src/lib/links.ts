@@ -384,7 +384,7 @@ export async function resolveLinkFromUrl(
       detectContentType(url, options),
       scrapeLinkMetadata(url, options),
     ]);
-  const contentType = detected as ContentType;
+  const contentType: ContentType = detected.contentType;
   return {
     url,
     domain,
