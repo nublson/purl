@@ -7,8 +7,10 @@ import type { FolderSummary } from "@/lib/folders";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import type { Link } from "@/utils/links";
 import type { ReactNode } from "react";
+import { linkKind } from "@/lib/link-kind";
 import { FolderEmoji } from "./folder-emoji";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
+import { AudioFace, ImageFace, VideoFace } from "./media-card-face";
 import { PdfThumbnail } from "./pdf-thumbnail";
 
 type LinkPreviewProps = {
@@ -71,9 +73,13 @@ export function LinkPreview({
   );
 }
 
+/** The preview's media: its top corners, at most 320px tall (cropped). */
+const MEDIA_FACE = "max-h-80 rounded-t-lg";
+
 /**
- * What a preview card shows: the thumbnail (or favicon), title and
- * description, then the folder when given. `pdfThumbnail: false` skips the PDF render (it needs the
+ * What a preview card shows: the thumbnail (or favicon), or for an image,
+ * video or audio pearl the media itself, then the title and description,
+ * then the folder when given. `pdfThumbnail: false` skips the PDF render (it needs the
  * signed-in PDF proxy) for the regular thumbnail.
  */
 export function LinkPreviewBody({
@@ -88,9 +94,16 @@ export function LinkPreviewBody({
   folder?: FolderSummary | null;
 }) {
   const thumbnailSrc = link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
+  const kind = linkKind(link);
   return (
     <>
-      {link.contentType === "PDF" && pdfThumbnail ? (
+      {kind === "image" ? (
+        <ImageFace link={link} eager={eagerThumbnail} className={MEDIA_FACE} />
+      ) : kind === "video" ? (
+        <VideoFace link={link} className={MEDIA_FACE} />
+      ) : kind === "audio" ? (
+        <AudioFace link={link} className="rounded-t-lg pt-4" />
+      ) : link.contentType === "PDF" && pdfThumbnail ? (
         <PdfThumbnail url={link.url} />
       ) : (
         <LinkPreviewThumbnail

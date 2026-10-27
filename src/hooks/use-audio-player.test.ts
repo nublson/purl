@@ -27,4 +27,19 @@ describe("audioPlayerStore", () => {
     audioPlayerStore.toggle("b");
     expect(listener).toHaveBeenCalledTimes(2);
   });
+
+  it("stop clears only its own id, notifying subscribers", () => {
+    const listener = vi.fn();
+    const unsubscribe = audioPlayerStore.subscribe(listener);
+    audioPlayerStore.toggle("a");
+    audioPlayerStore.stop("b");
+    expect(audioPlayerStore.getSnapshot()).toBe("a");
+    expect(listener).toHaveBeenCalledTimes(1);
+    audioPlayerStore.stop("a");
+    expect(audioPlayerStore.getSnapshot()).toBeNull();
+    expect(listener).toHaveBeenCalledTimes(2);
+    audioPlayerStore.stop("a");
+    expect(listener).toHaveBeenCalledTimes(2);
+    unsubscribe();
+  });
 });

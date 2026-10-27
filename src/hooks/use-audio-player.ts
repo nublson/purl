@@ -24,6 +24,15 @@ export const audioPlayerStore = {
     currentId = currentId === id ? null : id;
     for (const listener of [...listeners]) listener();
   },
+  /**
+   * Stops `id` if it is the one playing (its element ended, or its card
+   * unmounted), so a remounted card never starts on its own.
+   */
+  stop(id: string): void {
+    if (currentId !== id) return;
+    currentId = null;
+    for (const listener of [...listeners]) listener();
+  },
 };
 
 /**

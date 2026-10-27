@@ -3,7 +3,7 @@
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
-import { FileText, Globe, MusicNote } from "reicon-react";
+import { FileText, Globe, MusicNote, Video } from "reicon-react";
 import * as React from "react";
 
 interface LinkIconProps {
@@ -35,6 +35,25 @@ export function LinkIcon({
       return <FileText className={icon} />;
     case "AUDIO":
       return <MusicNote className={icon} />;
+    case "VIDEO":
+      return <Video className={icon} />;
+    case "IMAGE": {
+      // The image itself (its preview, else the file), as a rounded square.
+      const previewSrc = safeRemoteImgSrc(link.thumbnail ?? link.url);
+      return previewSrc ? (
+        <RemoteFavicon
+          key={previewSrc}
+          src={previewSrc}
+          px={px}
+          box={box}
+          icon={icon}
+          eager={eagerFavicon}
+          cover
+        />
+      ) : (
+        <Globe className={cn(icon, "text-muted-foreground")} aria-hidden />
+      );
+    }
     default: {
       const faviconSrc = safeRemoteImgSrc(link.favicon);
       return faviconSrc ? (
@@ -54,9 +73,10 @@ export function LinkIcon({
 }
 
 /**
- * A favicon from another site, which can take a moment: a muted square
- * holds its place, then it fades in (150ms, opacity only) instead of
- * popping into an empty gap. A favicon that fails shows the globe.
+ * A favicon (or an image pearl's preview, `cover`) from another site, which
+ * can take a moment: a muted square holds its place, then it fades in
+ * (150ms, opacity only) instead of popping into an empty gap. One that
+ * fails shows the globe.
  */
 function RemoteFavicon({
   src,
@@ -64,12 +84,15 @@ function RemoteFavicon({
   box,
   icon,
   eager,
+  cover = false,
 }: {
   src: string;
   px: number;
   box: string;
   icon: string;
   eager: boolean;
+  /** Fill the square, cropping (an image's preview), not fit a favicon. */
+  cover?: boolean;
 }) {
   const [state, setState] = React.useState<"loading" | "loaded" | "failed">(
     "loading",
@@ -105,7 +128,8 @@ function RemoteFavicon({
         height={px}
         referrerPolicy="no-referrer"
         className={cn(
-          "aspect-square object-contain transition-opacity duration-150 ease-out",
+          "aspect-square transition-opacity duration-150 ease-out",
+          cover ? "object-cover" : "object-contain",
           box,
           state === "loaded" ? "opacity-100" : "opacity-0",
         )}
