@@ -1,5 +1,6 @@
 "use client";
 
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCurrentFolder } from "@/hooks/use-folders";
 import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -8,6 +9,8 @@ import { parsePastedUrls, type PastedUrls } from "@/lib/pasted-urls";
 import type { PendingSave } from "@/lib/pending-save";
 import { SAVE_URL_EVENT, saveLink } from "@/lib/save-link";
 import { batchSummary, saveLinks } from "@/lib/save-links";
+import { requestUploadFiles } from "@/lib/save-uploads";
+import { NO_UPLOAD_PAGE_MESSAGE } from "@/lib/upload-picker";
 
 export function PasteHandler({
   onPasteStart,
@@ -30,6 +33,7 @@ export function PasteHandler({
   onBatchDone?: () => void;
 }) {
   const currentFolder = useCurrentFolder();
+  const { uploadsEnabled } = useCurrentUser();
   const savingMany = useRef(false);
 
   const saveMany = useCallback(
@@ -117,13 +121,24 @@ export function PasteHandler({
 
       if (isInputTarget) return;
 
+      // Files (a copied image or file) upload; the text browsers put beside
+      // them is only a placeholder name, so it's never saved too.
+      const files = e.clipboardData?.files;
+      if (uploadsEnabled && files && files.length > 0) {
+        e.preventDefault();
+        if (!requestUploadFiles(Array.from(files))) {
+          toast.error(NO_UPLOAD_PAGE_MESSAGE);
+        }
+        return;
+      }
+
       const text = e.clipboardData?.getData("text")?.trim();
       if (!text) return;
 
       e.preventDefault();
       await save(text);
     },
-    [save],
+    [save, uploadsEnabled],
   );
 
   // The header "Paste link" menu item reads the clipboard and sends it here.

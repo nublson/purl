@@ -13,7 +13,9 @@ import {
   OmniboxAddSection,
   useOmniboxAddResults,
 } from "@/components/omnibox-add-section";
+import { DropHandler } from "@/components/drop-handler";
 import { PasteHandler } from "@/components/paste-handler";
+import { UploadInput } from "@/components/upload-input";
 import {
   LinkResultsSkeleton,
   OmniboxAddSkeleton,
@@ -895,6 +897,10 @@ export function HomeShell({
         onSaveError={onSaveError}
         onBatchDone={onBatchDone}
       />
+      {/* The other ways in: files dropped on the page (or a dragged link),
+          and the + menu's "Upload files" / `U` picker. */}
+      <DropHandler folder={folderId ? currentFolder : null} />
+      <UploadInput />
       {savableUrls.length > 0 ? (
         <div className="wrapper-private flex flex-col">
           {savableUrls.map((url, index) => (

@@ -1,6 +1,4 @@
-import { CurrentUserProvider } from "@/contexts/current-user-context";
 import { UsageProvider } from "@/contexts/usage-context";
-import { getEnabledProviders } from "@/lib/auth-providers";
 import { getSessionUser } from "@/lib/session";
 import { getUsageSummaryForUser } from "@/lib/usage-summary";
 import { Suspense } from "react";
@@ -15,18 +13,17 @@ import { User } from "./user";
 async function HeaderActions() {
   const user = await getSessionUser();
   const usageSummary = user ? await getUsageSummaryForUser(user.id) : null;
-  const enabledProviders = getEnabledProviders();
 
+  // The signed-in user comes from the `(app)` layout's CurrentUserProvider,
+  // which wraps the page too (its upload entry points read it).
   return (
-    <CurrentUserProvider user={user} enabledProviders={enabledProviders}>
-      <UsageProvider usageSummary={usageSummary}>
-        <div className="flex items-center justify-end gap-2">
-          <FolderSharePopover />
-          <HeaderAddMenu />
-          <User />
-        </div>
-      </UsageProvider>
-    </CurrentUserProvider>
+    <UsageProvider usageSummary={usageSummary}>
+      <div className="flex items-center justify-end gap-2">
+        <FolderSharePopover />
+        <HeaderAddMenu />
+        <User />
+      </div>
+    </UsageProvider>
   );
 }
 

@@ -67,7 +67,7 @@ export function DemoProvider({
         offline
       >
         <CurrentFolderProvider folder={current}>
-          <CurrentUserProvider user={user}>
+          <CurrentUserProvider user={user} uploadsEnabled={false}>
             <LinkViewProvider initialLayout={DEMO_LAYOUT} persist={false}>
               {children}
             </LinkViewProvider>

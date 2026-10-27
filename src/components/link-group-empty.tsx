@@ -1,5 +1,6 @@
 "use client";
 
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCurrentFolder } from "@/hooks/use-folders";
 import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
 import { Additem, Box, SearchMinus } from "reicon-react";
@@ -18,8 +19,8 @@ import { Kbd } from "./ui/kbd";
 
 /**
  * Empty list. On a folder page (`inFolder`) it also offers "Add links" to
- * pull in links you've already saved. With a search (`query`) it says
- * nothing matched instead.
+ * pull in links you've already saved, and (with uploads on) says files can
+ * be dropped there. With a search (`query`) it says nothing matched instead.
  */
 export function LinkGroupEmpty({
   inFolder = false,
@@ -29,6 +30,7 @@ export function LinkGroupEmpty({
   query?: string;
 }) {
   const folder = useCurrentFolder();
+  const { uploadsEnabled } = useCurrentUser();
   if (query) {
     return (
       <Empty data-cy="link-group-empty">
@@ -72,6 +74,9 @@ export function LinkGroupEmpty({
               <Kbd aria-hidden="true">{ADD_LINKS_SHORTCUT}</Kbd>
             </Button>
           </AddLinksPopover>
+          {uploadsEnabled ? (
+            <EmptyDescription>or drop files here</EmptyDescription>
+          ) : null}
         </EmptyContent>
       ) : null}
     </Empty>

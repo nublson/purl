@@ -213,13 +213,13 @@ test.describe("Landing demo", () => {
       }
     });
 
-    test("+ menu: Paste link and Add links are disabled; A opens no picker; no API request", async ({ page, isMobile }) => {
+    test("+ menu: Paste link, Upload files and Add links are disabled; A and U open no picker; no API request", async ({ page, isMobile }) => {
       test.skip(isMobile, "the + menu shows only with a pointer that hovers");
       const { apiRequests } = watch(page);
       await openDemo(page);
       await page.getByRole("button", { name: "Add", exact: true }).click();
       const menu = page.getByRole("menu");
-      for (const name of ["Paste link", "Add links"]) {
+      for (const name of ["Paste link", "Upload files", "Add links"]) {
         await expect(menu.getByRole("menuitem", { name })).toHaveAttribute("aria-disabled", "true");
       }
       await page.keyboard.press("Escape");
@@ -227,8 +227,15 @@ test.describe("Landing demo", () => {
 
       await page.keyboard.press("a");
       await expect(page.getByLabel("Search your links")).toHaveCount(0);
+      let picked = false;
+      page.on("filechooser", () => {
+        picked = true;
+      });
+      await page.keyboard.press("u");
+      await expect(page.locator('[data-cy="upload-input"]')).toHaveCount(0);
       await page.waitForLoadState("networkidle");
       expect(apiRequests).toEqual([]);
+      expect(picked).toBe(false);
     });
 
     test("account menu: Grid shows cards without saving; account items are disabled", async ({ page }) => {

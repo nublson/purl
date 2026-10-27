@@ -1,6 +1,7 @@
 "use client";
 
 import { useIsDemo } from "@/contexts/demo-mode-context";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCurrentFolder } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
@@ -8,7 +9,19 @@ import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { isApplePlatform } from "@/lib/platform";
 import { parsePastedUrls } from "@/lib/pasted-urls";
 import { requestSaveUrl, saveLink } from "@/lib/save-link";
-import { Additem, Chrome, ClipboardImport, Export5, Plus } from "reicon-react";
+import {
+  NO_UPLOAD_PAGE_MESSAGE,
+  openUploadPicker,
+  UPLOAD_SHORTCUT,
+} from "@/lib/upload-picker";
+import {
+  Additem,
+  Chrome,
+  ClipboardImport,
+  Export5,
+  Plus,
+  Upload,
+} from "reicon-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef } from "react";
 import { AddLinksPopover } from "./add-links-popover";
@@ -42,13 +55,17 @@ function safeHttpsUrl(value: string | undefined) {
  * "Paste link" for people who can't easily press the shortcut (voice
  * control, switch access, trackpad-only). On a folder page it also offers
  * "Add links" (also `A`), which opens `AddLinksPopover` under the + button.
- * In the landing demo, Paste link and Add links are disabled; the apps and
- * extensions links still open.
+ * "Upload files" (also `U`) opens the page's file picker; it's disabled
+ * without a Blob store. In the landing demo, Paste link, Upload files and
+ * Add links are disabled; the apps and extensions links still open.
  */
 export function HeaderAddMenu() {
   const { notifyLinksChanged } = useLinksSyncActions();
   const currentFolder = useCurrentFolder();
   const isDemo = useIsDemo();
+  const { uploadsEnabled } = useCurrentUser();
+  // "Upload files" opens the page's picker (`UploadInput`, also `U`).
+  const canUpload = uploadsEnabled && !isDemo;
   const pathname = usePathname();
   const hintId = useId();
   // Set by "Add links": the popover opens once the menu has closed and
@@ -168,6 +185,19 @@ export function HeaderAddMenu() {
         >
           <ClipboardImport />
           Paste link
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          aria-keyshortcuts={canUpload ? UPLOAD_SHORTCUT : undefined}
+          disabled={!canUpload}
+          onSelect={() => {
+            if (!openUploadPicker()) toast.error(NO_UPLOAD_PAGE_MESSAGE);
+          }}
+        >
+          <Upload />
+          Upload files
+          <Kbd aria-hidden="true" className="ms-auto">
+            {UPLOAD_SHORTCUT}
+          </Kbd>
         </DropdownMenuItem>
         {/* Folder pages only: pick links you've already saved. */}
         {currentFolder ? (
