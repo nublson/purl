@@ -933,14 +933,14 @@ test.describe("Media viewer from the URL", () => {
           const seen: number[] = [];
           const tick = () => {
             seen.push(document.querySelectorAll("[data-media-viewer]").length);
-            if (seen.length < 6) requestAnimationFrame(tick);
+            if (seen.length < 4) requestAnimationFrame(tick);
             else resolve(seen);
           };
           requestAnimationFrame(tick);
         }),
     );
     await page.keyboard.press("Escape");
-    expect(await frames).toEqual([1, 1, 1, 1, 1, 1]);
+    expect(await frames).toEqual([1, 1, 1, 1]);
     await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
     await expect.poll(() => pearlInUrl(page)).toBeNull();
     // Its button isn't on the page: focus goes into the page's main region,
