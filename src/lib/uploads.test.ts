@@ -37,9 +37,12 @@ const { head, del, list, BlobNotFoundError } = await import("@vercel/blob");
 const prisma = (await import("@/lib/prisma")).default;
 const { assertFolderOwned, FolderNotFoundError } = await import("@/lib/folders");
 const { StorageLimitError, SaveLimitError } = await import("@/lib/entitlements");
-const { MAX_UPLOAD_BYTES_PER_ACCOUNT, MAX_UPLOAD_PREVIEW_BYTES } = await import(
-  "@/lib/limits"
-);
+const {
+  MAX_UPLOAD_BYTES_PER_ACCOUNT,
+  MAX_UPLOAD_PREVIEW_BYTES,
+  SWEEP_MIN_AGE_MS,
+  UPLOAD_ROW_WINDOW_MS,
+} = await import("@/lib/limits");
 const {
   createUploadForUser,
   deleteBlobsFor,
@@ -122,10 +125,14 @@ describe("createUploadForUser", () => {
       .mockImplementation((async ({ data }: { data: Record<string, unknown> }) =>
         rowFrom(data)) as never);
     vi.mocked(prisma.$executeRaw).mockReset().mockResolvedValue(0 as never);
+    // The blobs were uploaded a minute ago, well inside the row window.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(CREATED_AT.getTime() + 60_000));
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.useRealTimers();
   });
 
   it("creates the row from the blob's head and the file's name", async () => {
@@ -413,6 +420,43 @@ describe("createUploadForUser", () => {
     await expect(createUploadForUser("u1", INPUT)).rejects.toBeInstanceOf(
       InvalidUploadError,
     );
+    expect(prisma.link.create).not.toHaveBeenCalled();
+    expect(del).toHaveBeenCalledWith([FILE_URL, PREVIEW_URL]);
+  });
+
+  it("gives a blob 30 minutes to get its row, and the sweep twice that", () => {
+    expect(UPLOAD_ROW_WINDOW_MS).toBe(30 * 60 * 1000);
+    expect(SWEEP_MIN_AGE_MS).toBe(2 * UPLOAD_ROW_WINDOW_MS);
+  });
+
+  it("accepts a file uploaded 29 minutes ago", async () => {
+    mockHeads();
+    vi.setSystemTime(new Date(CREATED_AT.getTime() + 29 * 60 * 1000));
+    await expect(createUploadForUser("u1", INPUT)).resolves.toMatchObject({
+      url: FILE_URL,
+    });
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file uploaded 31 minutes ago and deletes the blobs", async () => {
+    mockHeads();
+    vi.setSystemTime(new Date(CREATED_AT.getTime() + 31 * 60 * 1000));
+    const attempt = createUploadForUser("u1", INPUT);
+    await expect(attempt).rejects.toThrow(InvalidUploadError);
+    await expect(attempt).rejects.toThrow("Upload expired");
+    expect(prisma.link.create).not.toHaveBeenCalled();
+    expect(del).toHaveBeenCalledWith([FILE_URL, PREVIEW_URL]);
+  });
+
+  it("rejects a fresh file whose preview is 31 minutes old and deletes the blobs", async () => {
+    const stale = new Date(CREATED_AT.getTime() - 30 * 60 * 1000);
+    vi.mocked(head).mockImplementation(async (url) => {
+      if (url === PREVIEW_URL) {
+        return { ...headResult(PREVIEW_PATH, "image/webp", 4_000), uploadedAt: stale };
+      }
+      return headResult(FILE_PATH, "image/png", 123_456);
+    });
+    await expect(createUploadForUser("u1", INPUT)).rejects.toThrow("Upload expired");
     expect(prisma.link.create).not.toHaveBeenCalled();
     expect(del).toHaveBeenCalledWith([FILE_URL, PREVIEW_URL]);
   });

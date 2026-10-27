@@ -37,3 +37,16 @@ export const MAX_UPLOAD_BYTES_PER_ACCOUNT = 250 * 1024 * 1024;
 
 /** Most files the client uploads at once; the rest wait their turn. */
 export const MAX_CONCURRENT_UPLOADS = 3;
+
+/**
+ * Longest a blob may wait for its row: `createUploadForUser` refuses a file
+ * (or preview) uploaded longer ago, so a late request can't adopt a blob the
+ * sweep may be deleting.
+ */
+export const UPLOAD_ROW_WINDOW_MS = 30 * 60 * 1000;
+
+/**
+ * The sweep leaves blobs younger than this alone: twice the row window, so a
+ * row can never be created for a blob the sweep has already judged orphaned.
+ */
+export const SWEEP_MIN_AGE_MS = 2 * UPLOAD_ROW_WINDOW_MS;

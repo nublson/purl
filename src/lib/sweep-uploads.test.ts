@@ -13,9 +13,8 @@ vi.mock("@/lib/prisma", () => ({
 
 const { del, list } = await import("@vercel/blob");
 const prisma = (await import("@/lib/prisma")).default;
-const { SWEEP_BUDGET, SWEEP_MIN_AGE_MS, sweepOrphanUploads } = await import(
-  "./sweep-uploads"
-);
+const { SWEEP_MIN_AGE_MS, UPLOAD_ROW_WINDOW_MS } = await import("@/lib/limits");
+const { SWEEP_BUDGET, sweepOrphanUploads } = await import("./sweep-uploads");
 
 type ListResult = Awaited<ReturnType<typeof list>>;
 
@@ -59,9 +58,10 @@ describe("sweepOrphanUploads", () => {
     vi.restoreAllMocks();
   });
 
-  it("uses a 500-blob budget and a one-hour minimum age", () => {
+  it("uses a 500-blob budget and a one-hour minimum age, twice the row window", () => {
     expect(SWEEP_BUDGET).toBe(500);
     expect(SWEEP_MIN_AGE_MS).toBe(60 * 60 * 1000);
+    expect(SWEEP_MIN_AGE_MS).toBe(2 * UPLOAD_ROW_WINDOW_MS);
   });
 
   it("deletes an old blob no row references and keeps the referenced ones", async () => {
@@ -75,6 +75,7 @@ describe("sweepOrphanUploads", () => {
 
     expect(findMany).toHaveBeenCalledWith({
       where: {
+        fileKey: { not: null },
         OR: [
           { url: { in: [file.url, preview.url, orphan.url] } },
           { thumbnail: { in: [file.url, preview.url, orphan.url] } },
@@ -84,6 +85,24 @@ describe("sweepOrphanUploads", () => {
     });
     expect(vi.mocked(del).mock.calls).toEqual([[[orphan.url]]]);
     expect(result).toEqual({ listed: 3, deleted: 1, stopped: false });
+  });
+
+  it("deletes an old blob referenced only by a page link (no fileKey)", async () => {
+    const orphan = blob("users/u1/c1/shot.png");
+    vi.mocked(list).mockResolvedValueOnce(page([orphan]));
+    // The query only returns upload rows; a page link saved with the blob's
+    // URL is filtered out by `fileKey: { not: null }`, so nothing comes back.
+    findMany.mockImplementation((async (args: {
+      where: { fileKey?: unknown };
+    }) =>
+      args.where.fileKey
+        ? []
+        : [{ url: orphan.url, thumbnail: null }]) as never);
+
+    const result = await sweepOrphanUploads({ now: NOW });
+
+    expect(vi.mocked(del).mock.calls).toEqual([[[orphan.url]]]);
+    expect(result).toEqual({ listed: 1, deleted: 1, stopped: false });
   });
 
   it("keeps a blob referenced only as a row's thumbnail", async () => {
@@ -159,6 +178,16 @@ describe("sweepOrphanUploads", () => {
     expect(result).toEqual({ listed: 800, deleted: 500, stopped: true });
   });
 
+  it("isn't stopped when the budget runs out on the store's last page", async () => {
+    vi.mocked(list).mockResolvedValueOnce(
+      page([blob("users/u1/a/a.png"), blob("users/u1/b/b.png")]),
+    );
+
+    const result = await sweepOrphanUploads({ now: NOW, budget: 2 });
+
+    expect(result).toEqual({ listed: 2, deleted: 2, stopped: false });
+  });
+
   it("takes a smaller budget", async () => {
     vi.mocked(list).mockResolvedValueOnce(
       page([blob("users/u1/a/a.png"), blob("users/u1/b/b.png")], "c2"),
@@ -194,8 +223,21 @@ describe("sweepOrphanUploads", () => {
 
     const result = await sweepOrphanUploads({ now: NOW });
 
-    expect(error).toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith("[uploads] sweep failed", expect.any(Error));
     expect(result).toEqual({ listed: 1, deleted: 1, stopped: false });
+  });
+
+  it("ends the run with no del when the lookup fails", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(list).mockResolvedValueOnce(page([blob("users/u1/a/a.png")], "c2"));
+    findMany.mockRejectedValueOnce(new Error("db down"));
+
+    const result = await sweepOrphanUploads({ now: NOW });
+
+    expect(del).not.toHaveBeenCalled();
+    expect(list).toHaveBeenCalledTimes(1);
+    expect(error).toHaveBeenCalledWith("[uploads] sweep failed", expect.any(Error));
+    expect(result).toEqual({ listed: 1, deleted: 0, stopped: false });
   });
 
   it("does nothing when uploads are disabled", async () => {

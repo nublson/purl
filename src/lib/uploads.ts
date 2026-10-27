@@ -4,7 +4,7 @@ import { BlobNotFoundError, del, head, list } from "@vercel/blob";
 import { insertWithinSaveLimit } from "@/lib/entitlements";
 import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
 import { mapRowToLink } from "@/lib/links";
-import { MAX_UPLOAD_PREVIEW_BYTES } from "@/lib/limits";
+import { MAX_UPLOAD_PREVIEW_BYTES, UPLOAD_ROW_WINDOW_MS } from "@/lib/limits";
 import prisma from "@/lib/prisma";
 import { blobPathnameOf, isBlobUrl, isOwnBlobPathname } from "@/lib/uploads/blob-url";
 import { contentTypeForMime, UPLOAD_MIME_TYPES } from "@/lib/uploads/mime";
@@ -152,7 +152,9 @@ async function discardBlobs(
  * missing blob) fails, and the size counted against the storage cap is
  * Blob's. The preview must sit beside its file (same directory, named
  * `preview…`) and stay under `MAX_UPLOAD_PREVIEW_BYTES`, so a full-size file
- * can't ride along uncounted. Once both heads succeed, any failure (wrong
+ * can't ride along uncounted. A blob uploaded more than
+ * `UPLOAD_ROW_WINDOW_MS` ago is refused (the sweep may be deleting it). Once
+ * both heads succeed, any failure (expired, wrong
  * type, the save or storage limit, the folder gone, the database) deletes
  * the blobs before rethrowing. Saving one blob again (a retried request)
  * returns its pearl unchanged; two uploads of one file are two pearls.
@@ -218,6 +220,14 @@ export async function createUploadForUser(
 
   const urls = preview !== null ? [file.url, preview.url] : [file.url];
   try {
+    // A blob past the row window may already be judged orphaned by the sweep
+    // (which waits twice as long), so it can't become a pearl.
+    const now = Date.now();
+    const expired = (uploadedAt: Date) =>
+      !(now - new Date(uploadedAt).getTime() <= UPLOAD_ROW_WINDOW_MS);
+    if (expired(file.uploadedAt) || (preview !== null && expired(preview.uploadedAt))) {
+      throw new InvalidUploadError("Upload expired");
+    }
     const mimeType = normalizeMime(file.contentType);
     const contentType = contentTypeForMime(mimeType);
     if (
