@@ -55,6 +55,12 @@ describe("updatePending", () => {
     const list = [item("a")];
     expect(updatePending(list, "x", { progress: 1 })).toBe(list);
   });
+
+  it("returns the same list when the patch changes nothing", () => {
+    const list = [item("a", { progress: 42 })];
+    expect(updatePending(list, "a", { progress: 42 })).toBe(list);
+    expect(updatePending(list, "a", { progress: 43 })).not.toBe(list);
+  });
 });
 
 describe("removePending", () => {

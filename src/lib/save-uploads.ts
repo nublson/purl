@@ -14,6 +14,8 @@ const TOKEN_ROUTE = "/api/uploads/token";
 const PREVIEW_MIME_TYPE = "image/webp";
 const RATE_LIMITED_MESSAGE = "Too many uploads at once. Try again in a minute.";
 const UNAVAILABLE_MESSAGE = "Uploads aren't available here";
+/** Object URLs outlive their item a moment, until what replaced it is drawn. */
+const REVOKE_DELAY_MS = 1000;
 
 export type UploadHandlers = {
   /** The signed-in user: the files go under `users/<userId>/`. */
@@ -35,6 +37,8 @@ export type UploadHandlers = {
   onError(id: string, message: string): void;
   /** Always once, when the batch has nothing left to run. */
   onBatchDone(outcome: { uploaded: number }): void;
+  /** Aborted (the page left): files not yet started never start. */
+  signal?: AbortSignal;
 };
 
 type QueuedFile = { id: string; file: File; mimeType: string };
@@ -146,22 +150,25 @@ async function uploadOne(
 ) {
   const kind = kindOf(mimeType);
   const objectUrls: string[] = [];
-  const previewUrl = kind === "audio" ? null : URL.createObjectURL(file);
-  if (previewUrl) objectUrls.push(previewUrl);
+  // A retry's previous URLs are on screen until `onStart` replaces them.
+  const stale = kept.get(id)?.objectUrls ?? [];
   kept.set(id, { id, file, mimeType, objectUrls });
 
-  handlers.onStart({
-    id,
-    name: file.name,
-    kind,
-    previewUrl,
-    progress: 0,
-    status: "uploading",
-    width: null,
-    height: null,
-  });
-
   try {
+    const previewUrl = kind === "audio" ? null : URL.createObjectURL(file);
+    if (previewUrl) objectUrls.push(previewUrl);
+    handlers.onStart({
+      id,
+      name: file.name,
+      kind,
+      previewUrl,
+      progress: 0,
+      status: "uploading",
+      width: null,
+      height: null,
+    });
+    if (stale.length > 0) setTimeout(() => revokeUrls(stale), REVOKE_DELAY_MS);
+
     const preview = await makePreview(file, mimeType);
     if (preview.width !== null || preview.blob) {
       const patch: Parameters<NonNullable<UploadHandlers["onPreview"]>>[1] = {
@@ -238,7 +245,7 @@ async function uploadOne(
     await handlers.onDone(id, link);
     // A moment later, once the pearl's card has taken the item's place.
     kept.delete(id);
-    setTimeout(() => revokeUrls(objectUrls), 1000);
+    setTimeout(() => revokeUrls(objectUrls), REVOKE_DELAY_MS);
   } catch (error) {
     handlers.onError(id, failureMessage(error, file, batch));
   }
@@ -263,7 +270,8 @@ function failureMessage(error: unknown, file: File, batch: Batch): string {
     return message;
   }
   if (error.status === 429) {
-    toast.error(RATE_LIMITED_MESSAGE);
+    // One toast however many files a batch has rate-limited.
+    toast.error(RATE_LIMITED_MESSAGE, { id: "upload-rate-limited" });
     return RATE_LIMITED_MESSAGE;
   }
   return error.message || fallback;
@@ -272,12 +280,15 @@ function failureMessage(error: unknown, file: File, batch: Batch): string {
 async function runBatch(files: QueuedFile[], handlers: UploadHandlers) {
   const batch: Batch = { cancelled: false, toasted: false, uploaded: 0 };
   try {
-    // Every file takes its place in line now, so they start in order.
-    await Promise.all(
+    // Every file takes its place in line now, so they start in order. One
+    // file throwing never ends the others.
+    await Promise.allSettled(
       files.map(async (queued) => {
         await acquireSlot();
         try {
-          if (!batch.cancelled) await uploadOne(queued, handlers, batch);
+          if (!batch.cancelled && !handlers.signal?.aborted) {
+            await uploadOne(queued, handlers, batch);
+          }
         } finally {
           releaseSlot();
         }
@@ -322,7 +333,6 @@ export async function retryUpload(
 ): Promise<boolean> {
   const entry = kept.get(id);
   if (!entry) return false;
-  revokeUrls(entry.objectUrls);
   await runBatch(
     [{ id, file: entry.file, mimeType: entry.mimeType }],
     handlers,

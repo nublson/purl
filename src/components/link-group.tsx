@@ -28,8 +28,8 @@ interface LinkGroupProps {
   newLinkId?: string | null;
   /** A save in flight here: its placeholder comes first. */
   pending?: PendingSave | null;
-  /** Files uploading here: before the save's placeholder, in order. */
-  pendingUploads?: PendingUpload[];
+  /** Files uploading here, with their Retry/Dismiss: first, in order. */
+  uploads?: { items: PendingUpload[]; actions: PendingUploadActions };
   /** How many of the first links load their favicons (or thumbnails) eagerly. */
   eagerFavicons?: number;
 }
@@ -57,14 +57,13 @@ export const LinkGroup = ({
   links,
   newLinkId,
   pending,
-  pendingUploads,
-  uploadActions,
+  uploads,
   eagerFavicons = 0,
-}: LinkGroupProps & { uploadActions?: PendingUploadActions }) => {
+}: LinkGroupProps) => {
   const headingId = `link-group-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   // A day whose links are all hidden drops its heading too.
   const visibleLinks = useVisibleLinks(links);
-  if (visibleLinks.length === 0 && !pending && !pendingUploads?.length) {
+  if (visibleLinks.length === 0 && !pending && !uploads?.items.length) {
     return null;
   }
 
@@ -81,17 +80,15 @@ export const LinkGroup = ({
         {label}
       </h2>
       <ItemGroup aria-labelledby={headingId} className="w-full gap-0">
-        {uploadActions
-          ? pendingUploads?.map((item) => (
-              <div
-                key={`upload-${item.id}`}
-                role="listitem"
-                data-flip={`upload:${item.id}`}
-              >
-                <PendingUploadRow item={item} {...uploadActions} />
-              </div>
-            ))
-          : null}
+        {uploads?.items.map((item) => (
+          <div
+            key={`upload-${item.id}`}
+            role="listitem"
+            data-flip={`upload:${item.id}`}
+          >
+            <PendingUploadRow item={item} {...uploads.actions} />
+          </div>
+        ))}
         {pending ? (
           <LinkItemSkeleton
             url={pending.url}
@@ -132,13 +129,10 @@ export type LinkGridGroup = Omit<LinkGroupProps, "newLinkId">;
 export function LinkGrid({
   groups,
   newLinkId,
-  uploadActions,
   columns = LINK_GRID_COLUMNS,
 }: {
   groups: LinkGridGroup[];
   newLinkId?: string | null;
-  /** Retry and Dismiss on a failed upload's card. */
-  uploadActions?: PendingUploadActions;
   /** The grid's column classes (the landing demo stops at three). */
   columns?: string;
 }) {
@@ -165,12 +159,13 @@ export function LinkGrid({
       </h2>
     );
     const groupCells: { key: string; node: ReactNode; flip?: string }[] = [];
-    if (uploadActions) {
-      for (const item of group.pendingUploads ?? []) {
+    const uploads = group.uploads;
+    if (uploads) {
+      for (const item of uploads.items) {
         groupCells.push({
           key: `upload-${item.id}`,
           flip: `upload:${item.id}`,
-          node: <PendingUploadCard item={item} {...uploadActions} />,
+          node: <PendingUploadCard item={item} {...uploads.actions} />,
         });
       }
     }

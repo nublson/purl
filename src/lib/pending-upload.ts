@@ -36,6 +36,12 @@ export function updatePending(
 ): PendingUpload[] {
   const index = list.findIndex((item) => item.id === id);
   if (index === -1) return list;
+  const current = list[index];
+  // A progress tick that changes nothing re-renders nothing.
+  const changes = (Object.keys(patch) as (keyof typeof patch)[]).some(
+    (key) => current[key] !== patch[key],
+  );
+  if (!changes) return list;
   const next = [...list];
   next[index] = { ...next[index], ...patch };
   return next;

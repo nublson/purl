@@ -343,6 +343,7 @@ describe("uploadFiles", () => {
 
     expect(toastError).toHaveBeenCalledWith(
       "Too many uploads at once. Try again in a minute.",
+      { id: "upload-rate-limited" },
     );
     expect(h.onDone).toHaveBeenCalledTimes(3);
     expect(h.onError).toHaveBeenCalledTimes(1);
@@ -432,7 +433,70 @@ describe("uploadFiles", () => {
   });
 });
 
+describe("uploadFiles, leaving and throwing", () => {
+  it("never starts queued files once its signal is aborted", async () => {
+    stubFetch();
+    const controller = new AbortController();
+    const h = { ...handlers(), signal: controller.signal };
+    // The page leaves once the first pearl lands.
+    h.onDone.mockImplementation(async () => controller.abort());
+
+    await uploadFiles(["a", "b", "c", "d", "e"].map((n) => png(`${n}.png`)), h);
+
+    // The three in flight finish; d and e never start.
+    expect(h.onStart).toHaveBeenCalledTimes(3);
+    expect(h.onDone).toHaveBeenCalledTimes(3);
+    expect(h.onBatchDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails a file whose onStart throws and keeps going with the rest", async () => {
+    stubFetch();
+    const h = handlers();
+    h.onStart.mockImplementationOnce(() => {
+      throw new Error("boom");
+    });
+
+    await expect(
+      uploadFiles([png("a.png"), png("b.png")], h),
+    ).resolves.toBeUndefined();
+
+    expect(h.onError).toHaveBeenCalledTimes(1);
+    expect(h.onDone).toHaveBeenCalledTimes(1);
+    expect(h.onBatchDone).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("retryUpload", () => {
+  it("revokes the old preview only after the retry's item replaced it", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    try {
+      let fail = true;
+      stubFetch((call) =>
+        call.url === "/api/links" && fail ? jsonResponse(500, {}) : undefined,
+      );
+      const h = handlers();
+      await uploadFiles([png("a.png")], h);
+      const first = h.onStart.mock.calls[0][0];
+      const revoke = vi.mocked(URL.revokeObjectURL);
+      expect(revoke).not.toHaveBeenCalled();
+
+      fail = false;
+      const revokedAtRestart: string[][] = [];
+      h.onStart.mockImplementation(() => {
+        revokedAtRestart.push(revoke.mock.calls.map(([url]) => url));
+      });
+      await retryUpload(first.id, h);
+
+      // Not yet when the new item went up…
+      expect(revokedAtRestart).toEqual([[]]);
+      // …a moment later.
+      vi.runAllTimers();
+      expect(revoke).toHaveBeenCalledWith(first.previewUrl);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("re-runs a failed file under the same id", async () => {
     let fail = true;
     stubFetch((call) =>

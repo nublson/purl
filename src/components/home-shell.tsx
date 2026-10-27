@@ -152,6 +152,9 @@ export function HomeShell({
   const [pendingSave, setPendingSave] = useState<PendingSave | null>(null);
   // Files on their way to becoming pearls (`uploadFiles`), first in "Today".
   const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+  // Uploads whose pearl exists: the next reload that commits takes their
+  // items away in the same update that brings the pearls (in its glide).
+  const landedUploadsRef = useRef(new Set<string>());
   // The link just saved, while its row plays the arrival.
   const [arrivingId, setArrivingId] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -163,13 +166,9 @@ export function HomeShell({
   const [seed, setSeed] = useState(initialGroups);
   if (seed !== initialGroups) {
     setSeed(initialGroups);
-    // The server renders the whole list: during a search (an upload batch's
-    // `router.refresh()` can land mid-search) the search's answer stays.
-    if (!searchQuery) {
-      setGroups(initialGroups);
-      setNextCursor(initialNextCursor);
-      setGroupsTimeZone(timeZone);
-    }
+    setGroups(initialGroups);
+    setNextCursor(initialNextCursor);
+    setGroupsTimeZone(timeZone);
   }
 
   const groupsRef = useRef(groups);
@@ -207,18 +206,21 @@ export function HomeShell({
    * a selected link a search hid can't linger after being deleted or moved
    * out in another tab.
    */
+  const takeLandedUploads = useCallback(() => {
+    const landed = new Set(landedUploadsRef.current);
+    landedUploadsRef.current.clear();
+    return landed;
+  }, []);
+
   const reload = useCallback(async ({
     fresh = false,
     glide: glideRows = false,
     endsBatch = false,
-    endsUpload,
     reconcile = false,
   }: {
     fresh?: boolean;
     glide?: boolean;
     endsBatch?: boolean;
-    /** A pending upload whose pearl this reload brings: it leaves as it lands. */
-    endsUpload?: string;
     reconcile?: boolean;
   } = {}) => {
     const seq = ++reloadSeq.current;
@@ -245,8 +247,11 @@ export function HomeShell({
       // A batch's last link lands where its indicator was: they go in one
       // update, so the rows below stay put (no drop and spring back).
       if (endsBatch) setPendingSave(null);
-      if (endsUpload) {
-        setPendingUploads((list) => removePending(list, endsUpload));
+      // Uploads that landed before this reload began: their pearls are in
+      // `page`, so their items leave in this same update.
+      const landed = takeLandedUploads();
+      if (landed.size > 0) {
+        setPendingUploads((list) => list.filter((item) => !landed.has(item.id)));
       }
       setGroups(page.groups);
       setNextCursor(page.nextCursor);
@@ -266,9 +271,19 @@ export function HomeShell({
       // Keep the current list; the next change or reload will retry. It
       // stands as this search's answer, rather than a skeleton that never
       // ends.
-      if (seq === reloadSeq.current) setLoadedQuery(searchQueryRef.current);
+      if (seq === reloadSeq.current) {
+        setLoadedQuery(searchQueryRef.current);
+        // No reload is coming to bring landed pearls: their items go now
+        // (the next change or reload shows the pearls).
+        const landed = takeLandedUploads();
+        if (landed.size > 0) {
+          setPendingUploads((list) =>
+            list.filter((item) => !landed.has(item.id)),
+          );
+        }
+      }
     }
-  }, [setLinksTotal, folderId, glide]);
+  }, [setLinksTotal, folderId, glide, takeLandedUploads]);
 
   // A folder page: links moved out of it fade out (like a delete) before
   // the reload drops them.
@@ -622,18 +637,14 @@ export function HomeShell({
   const onSaveSuccess = useCallback(
     async (
       newLinkId?: string,
-      opts?: { quiet?: boolean; last?: boolean; upload?: string },
+      opts?: { quiet?: boolean; last?: boolean },
     ) => {
       // Set before the reload, so the real row mounts already arriving.
       if (newLinkId) setArrivingId(newLinkId);
       // In a batch the indicator stays put and the link lands under it: the
       // rows below glide down a row instead of jumping. An upload's pearl
-      // takes its pending item's slot (they change in one update).
-      await reload({
-        glide: opts?.quiet,
-        endsBatch: opts?.last,
-        endsUpload: opts?.upload,
-      });
+      // takes its pending item's slot (see `landedUploadsRef`).
+      await reload({ glide: opts?.quiet, endsBatch: opts?.last });
       // One link of a multi-link paste: the batch's indicator stays until the
       // last one is in (`onBatchDone`), so it doesn't blink between links.
       if (!opts?.quiet) setPendingSave(null);
@@ -675,6 +686,9 @@ export function HomeShell({
     setPendingSave(null);
   }, []);
 
+  // Leaving the page stops its batches: queued files don't start. Made in
+  // the effect below (Strict Mode's rehearsal unmount aborts its own).
+  const uploadsAbort = useRef<AbortController | null>(null);
   // Uploads (`uploadFiles`): each file's pending item from its start until
   // its pearl lands in its slot; a failed one stays with Retry and Dismiss.
   const uploadHandlers = useMemo<UploadHandlers | null>(() => {
@@ -692,29 +706,30 @@ export function HomeShell({
       onPreview: (id, patch) =>
         setPendingUploads((list) => updatePending(list, id, patch)),
       onDone: async (id, link) => {
-        await onSaveSuccess(link.id, { quiet: true, upload: id });
-        // Already gone when the reload landed; this covers one that didn't
-        // (failed, or overtaken by a newer reload).
-        setPendingUploads((list) => removePending(list, id));
+        // Marked before the reload starts, so whichever reload commits
+        // next (this one, or a newer one overtaking it) has the pearl.
+        landedUploadsRef.current.add(id);
+        await onSaveSuccess(link.id, { quiet: true });
       },
       onError: (id) =>
         setPendingUploads((list) =>
           updatePending(list, id, { status: "failed" }),
         ),
       onBatchDone: ({ uploaded }) => {
-        if (uploaded === 0) return;
         // A save here files the pearls into this folder: its count changed.
-        if (folderId) refreshFolders();
-        // Settings → Usage's storage line is rendered on the server.
-        router.refresh();
+        if (uploaded > 0 && folderId) refreshFolders();
       },
     };
-  }, [userId, folderId, glide, onSaveSuccess, refreshFolders, router]);
+  }, [userId, folderId, glide, onSaveSuccess, refreshFolders]);
 
   /** What the entry points (+ menu, drop, paste) call, via `requestUploadFiles`. */
   const startUploads = useCallback(
     (files: File[]) => {
-      if (uploadHandlers) void uploadFiles(files, uploadHandlers);
+      if (!uploadHandlers) return;
+      void uploadFiles(files, {
+        ...uploadHandlers,
+        signal: uploadsAbort.current?.signal,
+      });
     },
     [uploadHandlers],
   );
@@ -736,7 +751,10 @@ export function HomeShell({
         setPendingUploads((list) =>
           updatePending(list, id, { status: "uploading", progress: 0 }),
         );
-        void retryUpload(id, uploadHandlers).then((ran) => {
+        void retryUpload(id, {
+          ...uploadHandlers,
+          signal: uploadsAbort.current?.signal,
+        }).then((ran) => {
           // Its file is gone: nothing to retry, so the item goes too.
           if (!ran) setPendingUploads((list) => removePending(list, id));
         });
@@ -756,11 +774,17 @@ export function HomeShell({
   useEffect(() => {
     pendingUploadsRef.current = pendingUploads;
   }, [pendingUploads]);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const abort = new AbortController();
+    uploadsAbort.current = abort;
+    return () => {
+      abort.abort();
       for (const item of pendingUploadsRef.current) forgetUpload(item.id);
-    },
-    [],
+    };
+  }, []);
+  const uploads = useMemo(
+    () => ({ items: pendingUploads, actions: uploadActions }),
+    [pendingUploads, uploadActions],
   );
   const uploadingCount = countUploading(pendingUploads);
 
@@ -861,11 +885,10 @@ export function HomeShell({
 
   return (
     <>
-      {uploadingCount > 0 ? (
-        <span className="sr-only" role="status">
-          {uploadingStatusText(uploadingCount)}
-        </span>
-      ) : null}
+      {/* Always mounted (only its text changes), so each count is read. */}
+      <span className="sr-only" role="status">
+        {uploadingCount > 0 ? uploadingStatusText(uploadingCount) : ""}
+      </span>
       <PasteHandler
         onPasteStart={onPasteStart}
         onSaveSuccess={onSaveSuccess}
@@ -929,7 +952,6 @@ export function HomeShell({
           {view === "grid" ? (
             <LinkGrid
               newLinkId={arrivingId}
-              uploadActions={uploadActions}
               groups={[
                 ...(showSyntheticToday
                   ? [
@@ -937,7 +959,7 @@ export function HomeShell({
                         label: "Today",
                         links: [],
                         pending: pendingSave,
-                        pendingUploads,
+                        uploads,
                       },
                     ]
                   : []),
@@ -945,8 +967,7 @@ export function HomeShell({
                   label: group.label,
                   links: group.links,
                   pending: group.label === "Today" ? pendingSave : null,
-                  pendingUploads:
-                    group.label === "Today" ? pendingUploads : undefined,
+                  uploads: group.label === "Today" ? uploads : undefined,
                   eagerFavicons: eagerFaviconsByGroup[groupIndex],
                 })),
               ]}
@@ -966,10 +987,7 @@ export function HomeShell({
                 links={group.links}
                 newLinkId={arrivingId}
                 pending={group.label === "Today" ? pendingSave : null}
-                pendingUploads={
-                  group.label === "Today" ? pendingUploads : undefined
-                }
-                uploadActions={uploadActions}
+                uploads={group.label === "Today" ? uploads : undefined}
                 eagerFavicons={
                   eagerFaviconsByGroup[groupIndex - (showSyntheticToday ? 1 : 0)]
                 }

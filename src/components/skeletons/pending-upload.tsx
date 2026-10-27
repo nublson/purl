@@ -128,6 +128,12 @@ function FailedActions({
         type="button"
         variant="ghost"
         size={compact ? "icon-sm" : "sm"}
+        // Compact (a row): a 44px target to the touch, like the row's ⋯.
+        className={
+          compact
+            ? "relative pointer-coarse:after:absolute pointer-coarse:after:-inset-1.5"
+            : undefined
+        }
         aria-label={`Dismiss ${item.name}`}
         onClick={() => onDismiss(item.id)}
       >
@@ -233,7 +239,8 @@ export function PendingUploadRow({ item, onRetry, onDismiss }: Props) {
         </ItemTitle>
       </ItemContent>
       {failed ? (
-        <div className="flex items-center gap-1">
+        // Room on touch for Dismiss's 6px hit extension beside Retry.
+        <div className="flex items-center gap-1 pointer-coarse:gap-3">
           <FailedActions
             item={item}
             onRetry={onRetry}
