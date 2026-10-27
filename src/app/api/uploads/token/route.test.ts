@@ -4,6 +4,12 @@ vi.mock("@/lib/require-browser-session", () => ({
   getBrowserSessionUserId: vi.fn(),
 }));
 
+const userLimit = vi.fn();
+
+vi.mock("@/lib/upstash-rate-limit", () => ({
+  getUploadsTokenUserRateLimiter: vi.fn(),
+}));
+
 vi.mock("@/lib/upload-token", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/upload-token")>()),
   issueUploadToken: vi.fn(),
@@ -20,6 +26,7 @@ vi.mock("@/lib/entitlements", async () => {
 const { getBrowserSessionUserId } = await import("@/lib/require-browser-session");
 const { issueUploadToken, UploadRejectedError } = await import("@/lib/upload-token");
 const { StorageLimitError } = await import("@/lib/entitlements");
+const { getUploadsTokenUserRateLimiter } = await import("@/lib/upstash-rate-limit");
 const { POST } = await import("./route");
 
 const TOKEN_BODY = {
@@ -44,6 +51,8 @@ describe("POST /api/uploads/token", () => {
     vi.stubEnv("BLOB_READ_WRITE_TOKEN", "vercel_blob_rw_test");
     vi.mocked(getBrowserSessionUserId).mockReset().mockResolvedValue("user1");
     vi.mocked(issueUploadToken).mockReset();
+    userLimit.mockReset();
+    vi.mocked(getUploadsTokenUserRateLimiter).mockReset().mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -65,6 +74,78 @@ describe("POST /api/uploads/token", () => {
     expect(await res.json()).toEqual({
       error: "Uploads aren't available here",
       code: "UPLOADS_UNAVAILABLE",
+    });
+    expect(issueUploadToken).not.toHaveBeenCalled();
+  });
+
+  describe("per-user token limit", () => {
+    it("answers 429 with Retry-After once the user is over it", async () => {
+      vi.mocked(getUploadsTokenUserRateLimiter).mockReturnValue({
+        limit: userLimit,
+      } as never);
+      userLimit.mockResolvedValue({ success: false, reset: Date.now() + 30_000 });
+
+      const res = await POST(post(TOKEN_BODY));
+
+      expect(userLimit).toHaveBeenCalledWith("user1");
+      expect(res.status).toBe(429);
+      expect(await res.json()).toEqual({ error: "Too many requests" });
+      expect(Number(res.headers.get("Retry-After"))).toBeGreaterThan(0);
+      expect(issueUploadToken).not.toHaveBeenCalled();
+    });
+
+    it("issues the token while the user is under it", async () => {
+      vi.mocked(getUploadsTokenUserRateLimiter).mockReturnValue({
+        limit: userLimit,
+      } as never);
+      userLimit.mockResolvedValue({ success: true, reset: Date.now() + 30_000 });
+      vi.mocked(issueUploadToken).mockResolvedValue({ clientToken: "tok" });
+
+      const res = await POST(post(TOKEN_BODY));
+
+      expect(userLimit).toHaveBeenCalledWith("user1");
+      expect(res.status).toBe(200);
+    });
+
+    it("is skipped without Upstash", async () => {
+      vi.mocked(issueUploadToken).mockResolvedValue({ clientToken: "tok" });
+      const res = await POST(post(TOKEN_BODY));
+      expect(res.status).toBe(200);
+      expect(userLimit).not.toHaveBeenCalled();
+    });
+
+    it("isn't counted without a session", async () => {
+      vi.mocked(getUploadsTokenUserRateLimiter).mockReturnValue({
+        limit: userLimit,
+      } as never);
+      vi.mocked(getBrowserSessionUserId).mockResolvedValue(null);
+      const res = await POST(post(TOKEN_BODY));
+      expect(res.status).toBe(401);
+      expect(userLimit).not.toHaveBeenCalled();
+    });
+  });
+
+  it.each([
+    [
+      "an unsigned upload-completed callback",
+      {
+        type: "blob.upload-completed",
+        payload: { blob: { url: "https://x.public.blob.vercel-storage.com/a" } },
+      },
+    ],
+    ["an empty object", {}],
+    ["a token event without a payload", { type: "blob.generate-client-token" }],
+    [
+      "a token event without a pathname",
+      { type: "blob.generate-client-token", payload: { clientPayload: null } },
+    ],
+    ["a JSON array", []],
+  ])("answers 400 for %s", async (_label, body) => {
+    const res = await POST(post(body));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Invalid upload event",
+      code: "INVALID_BODY",
     });
     expect(issueUploadToken).not.toHaveBeenCalled();
   });

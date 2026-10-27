@@ -75,3 +75,56 @@ describe("links_import bucket", () => {
     expect(getLinksImportRateLimiter()).toBeNull();
   });
 });
+
+describe("upload token buckets", () => {
+  afterEach(() => {
+    vi.resetModules();
+    vi.unstubAllEnvs();
+    vi.doUnmock("@upstash/ratelimit");
+    vi.doUnmock("@upstash/redis");
+  });
+
+  async function loadWithFakeUpstash() {
+    vi.resetModules();
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.test");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "token");
+    const slidingWindow = vi.fn().mockReturnValue("limiter-config");
+    const ctor = vi.fn();
+    class FakeRatelimit {
+      static slidingWindow = slidingWindow;
+      constructor(options: unknown) {
+        ctor(options);
+      }
+    }
+    vi.doMock("@upstash/ratelimit", () => ({ Ratelimit: FakeRatelimit }));
+    vi.doMock("@upstash/redis", () => ({ Redis: class {} }));
+    const mod = await import("./upstash-rate-limit");
+    return { mod, slidingWindow, ctor };
+  }
+
+  it("allows 120 tokens per minute per IP (two per file), cached", async () => {
+    const { mod, slidingWindow, ctor } = await loadWithFakeUpstash();
+    const first = mod.getUploadsTokenRateLimiter();
+
+    expect(first).not.toBeNull();
+    expect(slidingWindow).toHaveBeenCalledWith(120, "1 m");
+    expect(ctor).toHaveBeenCalledWith(
+      expect.objectContaining({ prefix: "purl:rl:uploads_token" }),
+    );
+    expect(mod.getUploadsTokenRateLimiter()).toBe(first);
+    expect(ctor).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows 240 tokens per hour per user, cached", async () => {
+    const { mod, slidingWindow, ctor } = await loadWithFakeUpstash();
+    const first = mod.getUploadsTokenUserRateLimiter();
+
+    expect(first).not.toBeNull();
+    expect(slidingWindow).toHaveBeenCalledWith(240, "1 h");
+    expect(ctor).toHaveBeenCalledWith(
+      expect.objectContaining({ prefix: "purl:rl:uploads_token_user" }),
+    );
+    expect(mod.getUploadsTokenUserRateLimiter()).toBe(first);
+    expect(ctor).toHaveBeenCalledTimes(1);
+  });
+});

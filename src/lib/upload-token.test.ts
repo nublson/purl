@@ -46,7 +46,7 @@ vi.mock("@/lib/entitlements", async () => {
 const { assertCanSaveLink, assertCanStore, StorageLimitError, SaveLimitError } =
   await import("@/lib/entitlements");
 const { issueUploadToken, UploadRejectedError } = await import("./upload-token");
-const { MAX_UPLOAD_FILE_BYTES } = await import("@/lib/limits");
+const { MAX_UPLOAD_FILE_BYTES, MAX_UPLOAD_PREVIEW_BYTES } = await import("@/lib/limits");
 
 const USER = "user1";
 const request = new Request("http://localhost/api/uploads/token", { method: "POST" });
@@ -137,6 +137,15 @@ describe("issueUploadToken", () => {
         mimeType: "image/png",
         size: 10,
       }),
+    ).toBe("INVALID_PATH");
+  });
+
+  it.each([
+    ["directly under the user's folder", `users/${USER}/a.png`],
+    ["nested a level too deep", `users/${USER}/a/b/c.png`],
+  ])("rejects a path %s", async (_label, pathname) => {
+    expect(
+      await rejection(pathname, { kind: "file", mimeType: "image/png", size: 10 }),
     ).toBe("INVALID_PATH");
   });
 
@@ -236,14 +245,34 @@ describe("issueUploadToken", () => {
       ).toBe("INVALID_PATH");
     });
 
-    it("is held to the size cap too", async () => {
+    it("may be up to the preview cap", async () => {
+      expect(MAX_UPLOAD_PREVIEW_BYTES).toBe(2 * 1024 * 1024);
+      const options = await issue(`users/${USER}/c1/preview.webp`, {
+        kind: "preview",
+        mimeType: "image/webp",
+        size: MAX_UPLOAD_PREVIEW_BYTES,
+      });
+      expect(options.maximumSizeInBytes).toBe(MAX_UPLOAD_PREVIEW_BYTES);
+    });
+
+    it("is rejected over the preview cap", async () => {
       expect(
         await rejection(`users/${USER}/c1/preview.webp`, {
           kind: "preview",
           mimeType: "image/webp",
-          size: MAX_UPLOAD_FILE_BYTES + 1,
+          size: MAX_UPLOAD_PREVIEW_BYTES + 1,
         }),
       ).toBe("FILE_TOO_LARGE");
+    });
+
+    it("must sit in an upload's folder", async () => {
+      expect(
+        await rejection(`users/${USER}/preview.webp`, {
+          kind: "preview",
+          mimeType: "image/webp",
+          size: 10,
+        }),
+      ).toBe("INVALID_PATH");
     });
   });
 });

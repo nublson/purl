@@ -25,6 +25,13 @@ export const MAX_FOLDER_NAME_LENGTH = 60;
 /** Largest single file an upload accepts. */
 export const MAX_UPLOAD_FILE_BYTES = 25 * 1024 * 1024;
 
+/**
+ * Largest preview image an upload's token allows. A 1,280 px WebP preview is
+ * well under this; previews don't count against storage, so the cap keeps a
+ * preview from carrying a file.
+ */
+export const MAX_UPLOAD_PREVIEW_BYTES = 2 * 1024 * 1024;
+
 /** Per-account storage for uploaded files (the sum of `Link.fileSize`). */
 export const MAX_UPLOAD_BYTES_PER_ACCOUNT = 250 * 1024 * 1024;
 

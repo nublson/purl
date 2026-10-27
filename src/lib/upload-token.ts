@@ -2,7 +2,7 @@ import "server-only";
 
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { assertCanSaveLink, assertCanStore } from "@/lib/entitlements";
-import { MAX_UPLOAD_FILE_BYTES } from "@/lib/limits";
+import { MAX_UPLOAD_FILE_BYTES, MAX_UPLOAD_PREVIEW_BYTES } from "@/lib/limits";
 import { isOwnBlobPathname } from "@/lib/uploads/blob-url";
 import { UPLOAD_MIME_TYPES } from "@/lib/uploads/mime";
 
@@ -62,15 +62,22 @@ function parseClientPayload(raw: string | null): UploadClientPayload {
   return { kind, mimeType, size };
 }
 
-function lastSegment(pathname: string): string {
-  return pathname.slice(pathname.lastIndexOf("/") + 1);
+/**
+ * The pathname is the user's own (`isOwnBlobPathname`) and exactly
+ * `users/<userId>/<upload id>/<name>`; returns `<name>`, else null.
+ */
+function uploadFileName(pathname: string, userId: string): string | null {
+  if (!isOwnBlobPathname(pathname, userId)) return null;
+  const rest = pathname.slice(`users/${userId}/`.length).split("/");
+  return rest.length === 2 ? rest[1] : null;
 }
 
 /**
  * Answers the browser's `upload()` with a client token for exactly this
  * file: its path under the user's folder, its type and its size, for 10
- * minutes. A file (not its preview) must also fit the link cap and the
- * account's storage; those `LimitError`s propagate.
+ * minutes. A preview is capped at `MAX_UPLOAD_PREVIEW_BYTES`. A file (not its
+ * preview) must also fit the link cap and the account's storage; those
+ * `LimitError`s propagate.
  *
  * No `onUploadCompleted`: Purl creates the row itself after the upload
  * (`POST /api/links`), and passing one makes the SDK ask Vercel Blob to call
@@ -86,11 +93,12 @@ export async function issueUploadToken(
     request,
     onBeforeGenerateToken: async (pathname, clientPayload) => {
       const { kind, mimeType, size } = parseClientPayload(clientPayload);
-      if (!isOwnBlobPathname(pathname, userId)) {
+      const name = uploadFileName(pathname, userId);
+      if (name === null) {
         throw new UploadRejectedError("INVALID_PATH");
       }
       if (kind === "preview") {
-        if (!lastSegment(pathname).startsWith("preview")) {
+        if (!name.startsWith("preview")) {
           throw new UploadRejectedError("INVALID_PATH");
         }
         if (mimeType !== PREVIEW_MIME_TYPE) {
@@ -99,7 +107,9 @@ export async function issueUploadToken(
       } else if (!UPLOAD_MIME_TYPES.includes(mimeType)) {
         throw new UploadRejectedError("UNSUPPORTED_TYPE");
       }
-      if (size <= 0 || size > MAX_UPLOAD_FILE_BYTES) {
+      const maxBytes =
+        kind === "preview" ? MAX_UPLOAD_PREVIEW_BYTES : MAX_UPLOAD_FILE_BYTES;
+      if (size <= 0 || size > maxBytes) {
         throw new UploadRejectedError("FILE_TOO_LARGE");
       }
       if (kind === "file") {

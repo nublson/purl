@@ -54,7 +54,8 @@ async function resolveBearerRateLimitKey(
   }
 }
 
-function tooManyRequests(reset: number) {
+/** The 429 every rate limit answers; `reset` is the limiter's (ms epoch). */
+export function tooManyRequests(reset: number) {
   const retryAfterSec = Math.max(
     1,
     Math.ceil((reset - Date.now()) / 1000),
