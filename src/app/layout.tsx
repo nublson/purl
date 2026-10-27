@@ -81,7 +81,7 @@ export default function RootLayout({
             visitor so the landing page renders settled. */}
         <script dangerouslySetInnerHTML={{ __html: LANDING_SEEN_SCRIPT }} />
       </head>
-      <body className={`antialiased h-full flex flex-col relative`}>
+      <body className={`antialiased h-full flex flex-col relative isolate`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
