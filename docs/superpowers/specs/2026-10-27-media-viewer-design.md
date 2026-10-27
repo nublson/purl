@@ -115,3 +115,9 @@ One branch, in order:
 - **Base UI beside Radix:** one more primitives library, tree-shaken to the Dialog. Cambio is small enough to vendor if it stalls (one maintainer, v1.1.5, August 2025).
 - **Video morph quality:** a playing `<video>` isn't morphed; the poster is, then the player appears. On a video link with no poster the current frame of the paused card is the start rect's content.
 - **Virtualised or unmounted targets:** rows use `content-visibility: auto`; a target off-screen may have no box, so the close falls back to a fade. Accepted.
+
+## Deviations (as built, 2026-10-27)
+
+- **Pinch-zoom is blocked on touch** while the slide is draggable: the slide is `touch-none` so the browser's pan and pinch can't cancel the swipe (Motion would write the same `touch-action: none` for `drag` if it listened itself; the slide starts the drag from its own `onPointerDown`, `dragListener={false}`, so the class is ours). `drag="x"` with `touch-action: pan-y` would forbid pinch too. A zoom of the viewer's own is a follow-up.
+- **The box snaps** rather than animates between pearls of different sizes (the Popup's `layoutDependency` stays fixed while open).
+- **A vertical drag scales the media** (toward 0.95) but doesn't fade the backdrop.
