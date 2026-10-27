@@ -252,6 +252,77 @@ test.describe("Media viewer", () => {
     await expect(openButton(page, "Shot A")).toBeFocused();
   });
 
+  test("a tiny image opens in a box big enough to keep the X and the arrows clear", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    // Shot A is 32×32: the box is scaled up to 240px on its shorter side.
+    await seedPearls(seed, baseURL!);
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(3);
+
+    await openButton(page, "Shot A").click();
+    const dialog = page.getByRole("dialog", { name: "Shot A" });
+    await expect(dialog.locator('img[src$="?a=1"]')).toHaveAttribute("alt", "Shot A");
+    await dialog.hover();
+    await expect(dialog.getByRole("button", { name: "Next pearl" })).toBeVisible();
+    const media = dialog.locator('[data-viewer-media="image"]');
+    await expect
+      .poll(async () => {
+        const box = (await media.boundingBox())!;
+        return Math.round(Math.min(box.width, box.height));
+      })
+      .toBeGreaterThanOrEqual(240);
+    const layout = await dialog.evaluate((popup) => {
+      const rect = (el: Element | null) => {
+        const r = el!.getBoundingClientRect();
+        return { l: r.left, t: r.top, r: r.right, b: r.bottom };
+      };
+      const image = rect(popup.querySelector('[data-viewer-media="image"]'));
+      const centre = document.elementFromPoint((image.l + image.r) / 2, (image.t + image.b) / 2);
+      return {
+        close: rect(popup.querySelector('[aria-label="Close"]')),
+        next: rect(popup.querySelector('[aria-label="Next pearl"]')),
+        centreIsImage: Boolean(centre?.closest('[data-viewer-media="image"]')),
+      };
+    });
+    // The X sits in the image's corner, apart from the arrow, and the
+    // image's middle is the image, not a control.
+    const { close, next } = layout;
+    const overlap = close.l < next.r && next.l < close.r && close.t < next.b && next.t < close.b;
+    expect(overlap, JSON.stringify(layout)).toBe(false);
+    expect(layout.centreIsImage).toBe(true);
+  });
+
+  test("a press on the backdrop closes the viewer and gives focus back", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await seedPearls(seed, baseURL!);
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(3);
+
+    await openButton(page, "Shot A").click();
+    const dialog = page.getByRole("dialog", { name: "Shot A" });
+    await expect(dialog.locator('img[src$="?a=1"]')).toHaveAttribute("alt", "Shot A");
+    await expect.poll(() => pearlInUrl(page)).not.toBeNull();
+
+    // The viewport's top-left corner: backdrop, far from the box and its arrows.
+    const popup = (await dialog.boundingBox())!;
+    expect(popup.x).toBeGreaterThan(40);
+    expect(popup.y).toBeGreaterThan(40);
+    await page.mouse.click(12, 12);
+
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect.poll(() => pearlInUrl(page)).toBeNull();
+    await expect(openButton(page, "Shot A")).toBeFocused();
+  });
+
   test("an image that won't load shows the icon tile, never a broken image", async ({
     page,
     seed,
@@ -831,6 +902,52 @@ test.describe("Media viewer from the URL", () => {
     await expect(page.getByRole("dialog", { name: "Shot 20" })).toBeVisible();
     await page.getByRole("dialog").hover();
     await expect(page.getByRole("button", { name: "Next pearl" })).toBeVisible();
+  });
+
+  test("a pearl filed elsewhere, alone on the page, still fades out; focus stays in the page", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    const icon = `${baseURL}/icon.png`;
+    const folderId = await seed.folder({ name: "Reading", slug: "reading" });
+    await seed.link({ url: "https://alpha.example", title: "Alpha", folderId });
+    const shot = await seed.link({
+      url: `${icon}?s=1`,
+      title: "Lone shot",
+      contentType: "IMAGE",
+      thumbnail: icon,
+      width: 800,
+      height: 600,
+    });
+    await page.goto(`/folders/reading?pearl=${shot}`);
+    await waitForHydration(page, '[data-cy="link-item"], [data-cy="link-card"]');
+    const dialog = page.getByRole("dialog", { name: "Lone shot" });
+    await expect(dialog.locator('img[src$="?s=1"]')).toHaveAttribute("alt", "Lone shot");
+
+    // The page's only pearl leaves once the close settles, which is at
+    // once; the dialog stays mounted and plays its exit all the same.
+    const frames = page.evaluate(
+      () =>
+        new Promise<number[]>((resolve) => {
+          const seen: number[] = [];
+          const tick = () => {
+            seen.push(document.querySelectorAll("[data-media-viewer]").length);
+            if (seen.length < 6) requestAnimationFrame(tick);
+            else resolve(seen);
+          };
+          requestAnimationFrame(tick);
+        }),
+    );
+    await page.keyboard.press("Escape");
+    expect(await frames).toEqual([1, 1, 1, 1, 1, 1]);
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect.poll(() => pearlInUrl(page)).toBeNull();
+    // Its button isn't on the page: focus goes into the page's main region,
+    // not to <body>.
+    expect(
+      await page.evaluate(() => Boolean(document.activeElement?.closest("main"))),
+    ).toBe(true);
   });
 
   test("a shared folder opens the URL's pearl, and drops one it doesn't show", async ({

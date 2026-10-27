@@ -243,6 +243,10 @@ function ViewerSlide({
         onDragOutcome(outcome);
       }}
       style={{ scale }}
+      // `touch-none` is ours, not Motion's: Motion writes `touch-action` only
+      // when it listens for the drag itself (not with `dragListener={false}`).
+      // It keeps the browser's pan and pinch from cancelling the swipe, and
+      // is why a pinch doesn't zoom here; dropping it breaks the swipe.
       className="touch-none select-none"
     >
       {children}

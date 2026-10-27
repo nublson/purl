@@ -44,8 +44,8 @@ function FaceBadge({ badge }: { badge: ReactNode }) {
 /**
  * An image pearl: the preview (`thumbnail`), else the file itself, full-bleed
  * at its own ratio. A media link of unknown size starts at 16:10 and takes
- * the image's ratio once it loads. A failed image shows the page card's
- * fallback (the favicon on a tint), never a broken image.
+ * the image's ratio once it loads. A failed image shows the Reicon `Image`
+ * icon on `bg-muted` at the face's ratio, never a broken image.
  */
 export function ImageFace({
   link,

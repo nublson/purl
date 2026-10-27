@@ -128,10 +128,10 @@ describe("mediaViewer", () => {
     mediaViewer.register([link("a"), link("b"), link("c")]);
     mediaViewer.open("b");
     mediaViewer.register([link("a"), link("c")]);
-    expect(mediaViewer.getSnapshot()).toMatchObject({ openedId: "c", currentId: "c" });
+    expect(mediaViewer.getSnapshot()).toMatchObject({ openedId: "b", currentId: "c" });
 
     mediaViewer.register([link("a")]);
-    expect(mediaViewer.getSnapshot()).toMatchObject({ openedId: "a", currentId: "a" });
+    expect(mediaViewer.getSnapshot()).toMatchObject({ openedId: "b", currentId: "a" });
 
     mediaViewer.register([]);
     expect(mediaViewer.getSnapshot()).toMatchObject({ openedId: null, currentId: null });
@@ -144,12 +144,17 @@ describe("mediaViewer", () => {
     expect(mediaViewer.getSnapshot().currentId).toBe("b");
   });
 
-  it("removing the opened pearl after navigating leaves currentId, opened follows", () => {
+  it("removing the opened pearl after navigating leaves both ids (the dialog isn't remounted)", () => {
     mediaViewer.register([link("a"), link("b"), link("c")]);
     mediaViewer.open("a");
     mediaViewer.next();
     mediaViewer.register([link("b"), link("c")]);
-    expect(mediaViewer.getSnapshot()).toMatchObject({ openedId: "b", currentId: "b" });
+    expect(mediaViewer.getSnapshot()).toMatchObject({ openedId: "a", currentId: "b" });
+    // Still movable, and closing clears both.
+    mediaViewer.next();
+    expect(mediaViewer.getSnapshot().currentId).toBe("c");
+    mediaViewer.close();
+    expect(mediaViewer.getSnapshot()).toMatchObject({ openedId: null, currentId: null });
   });
 
   it("removing a pearl that is not current leaves the ids alone", () => {

@@ -881,8 +881,9 @@ export function HomeShell({
       stale = true;
     };
   }, [pendingId, dismissPending]);
-  // It stays registered until the viewer has closed (the dialog unmounts
-  // with the last pearl), then leaves with the list's next registration.
+  // It stays registered until the viewer's close settles, then leaves with
+  // the list's next registration (the dialog stays mounted for its exit,
+  // even when that was the page's only pearl: `MediaViewerLazy`).
   useEffect(() => {
     if (deepLinked === null) return;
     return onCloseSettled(() => setDeepLinked(null));

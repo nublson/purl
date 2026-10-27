@@ -21,15 +21,19 @@ export const MAX_WIDTH =
   "min(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right), 1200px)";
 export const MAX_HEIGHT = "calc(100dvh - 32px - env(safe-area-inset-top) - var(--bottom-inset))";
 
-/** Starts loading a pearl's file (an image's original, a video's poster). */
-export function preloadOriginal(link: Link) {
+/** The file to load ahead for a pearl (an image's original, a video's poster). */
+export function preloadSrc(link: Link | null | undefined): string | null {
+  if (!link) return null;
   const kind = linkKind(link);
-  const src =
-    kind === "image"
-      ? safeRemoteImgSrc(link.url)
-      : kind === "video" && link.thumbnail
-        ? safeRemoteImgSrc(link.thumbnail)
-        : null;
+  return kind === "image"
+    ? safeRemoteImgSrc(link.url)
+    : kind === "video" && link.thumbnail
+      ? safeRemoteImgSrc(link.thumbnail)
+      : null;
+}
+
+/** Starts loading a pearl's file (`preloadSrc`). */
+export function preloadOriginal(src: string | null) {
   if (!src) return;
   const image = new Image();
   image.decoding = "async";
@@ -77,11 +81,18 @@ function ImageTile({ style }: { style?: CSSProperties }) {
 }
 
 /**
+ * A small image's box is scaled up to this on its shorter side (the image
+ * fitted inside, at its ratio), so the X and the arrows never cover it.
+ */
+export const MIN_IMAGE_SIDE = 240;
+
+/**
  * An image: the preview the card showed (already loaded, so it's what
  * travels in the morph), then the original over it, requested once the
  * morph has played (`ready`) and faded in on load. With a known size the
  * box is the image's ratio, as large as the viewer allows but never past
- * the image's own pixels; without one, the preview sizes it. A preview
+ * the image's own pixels, except that a small one is scaled up to
+ * `MIN_IMAGE_SIDE` on its shorter side; without one, the preview sizes it. A preview
  * that fails shows the icon tile (the original still gets its chance); an
  * original that fails leaves the preview, named for it.
  */
@@ -93,10 +104,13 @@ function ViewerImage({ link, ready }: { link: Link; ready: boolean }) {
   const [originalFailed, setOriginalFailed] = useState(false);
   const known = Boolean(link.width && link.height);
 
+  const ratio = known ? link.width! / link.height! : 1;
+  // Its own pixels, but at least `MIN_IMAGE_SIDE` on the shorter side.
+  const natural = `max(${link.width}px, ${MIN_IMAGE_SIDE * Math.max(ratio, 1)}px)`;
   const box: CSSProperties | undefined = known
     ? {
         aspectRatio: `${link.width} / ${link.height}`,
-        width: `min(${link.width}px, ${MAX_WIDTH}, (${MAX_HEIGHT}) * ${link.width! / link.height!})`,
+        width: `min(${natural}, ${MAX_WIDTH}, (${MAX_HEIGHT}) * ${ratio})`,
       }
     : undefined;
   const showOriginal = Boolean(original) && ready && !originalFailed;

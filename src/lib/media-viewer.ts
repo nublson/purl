@@ -11,7 +11,9 @@ import type { Link } from "@/utils/links";
  * `items` are the image, video and audio pearls on screen, in display order,
  * registered by the page whenever its list changes. `openedId` is the pearl
  * the viewer opened from (the card the dialog morphs out of and back into),
- * `currentId` the one showing now; they differ after next/prev.
+ * `currentId` the one showing now; they differ after next/prev, or once the
+ * opened pearl has left the list (its id stays: the dialog is keyed by it,
+ * and closing morphs into the pearl shown whenever the two differ).
  */
 export type MediaViewerPreset = "smooth" | "snappy";
 
@@ -103,21 +105,19 @@ export const mediaViewer = {
       return;
     }
     const ids = new Set(items.map((item) => item.id));
-    let { openedId, currentId } = state;
-    let closed = false;
+    let { currentId } = state;
 
     if (currentId !== null && !ids.has(currentId)) {
       const replacement = replacementFor(state.items, currentId, ids);
-      if (replacement === null) closed = true;
-      else currentId = replacement;
+      if (replacement === null) {
+        setState({ ...INITIAL, items });
+        return;
+      }
+      currentId = replacement;
     }
-    if (!closed && openedId !== null && !ids.has(openedId)) openedId = currentId;
-
-    if (closed) {
-      setState({ ...INITIAL, items });
-      return;
-    }
-    setState({ ...state, items, openedId, currentId, pageLeft: false });
+    // `openedId` is left alone even when its pearl is gone: the dialog is
+    // keyed by it, so moving it would remount the dialog mid-view.
+    setState({ ...state, items, currentId, pageLeft: false });
   },
 
   /**

@@ -1,6 +1,10 @@
 "use client";
 
-import { mediaViewer, type MediaViewerPreset } from "@/lib/media-viewer";
+import {
+  consumeReturningFocus,
+  mediaViewer,
+  type MediaViewerPreset,
+} from "@/lib/media-viewer";
 import type { Link } from "@/utils/links";
 import type { ComponentPropsWithoutRef, MouseEvent, Ref } from "react";
 
@@ -10,7 +14,9 @@ import type { ComponentPropsWithoutRef, MouseEvent, Ref } from "react";
  * (`onClick` toggles the selection) and the viewer stays shut; a click that
  * ends a long-press opens nothing either (`consumeLongPress`).
  *
- * `data-pearl-button` lets the viewer find it again, to give it focus back.
+ * `data-pearl-button` lets the viewer find it again, to give it focus back;
+ * that focus clears the viewer's returning-focus flag here (after the
+ * caller's own `onFocus`, which a row reads it in), on cards too.
  */
 export function MediaOpenButton({
   ref,
@@ -19,6 +25,7 @@ export function MediaOpenButton({
   consumeLongPress,
   preset,
   onClick,
+  onFocus,
   ...props
 }: Omit<ComponentPropsWithoutRef<"button">, "onClick" | "type"> & {
   ref?: Ref<HTMLButtonElement>;
@@ -39,6 +46,10 @@ export function MediaOpenButton({
       aria-label={link.title}
       data-pearl-button={link.id}
       {...props}
+      onFocus={(event) => {
+        onFocus?.(event);
+        consumeReturningFocus();
+      }}
       onClick={(event) => {
         if (consumeLongPress?.()) return;
         if (selecting) {

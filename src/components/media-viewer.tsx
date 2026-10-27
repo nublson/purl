@@ -35,7 +35,13 @@ import {
   viewerKeyMove,
   type ViewerMove,
 } from "./media-viewer-nav";
-import { MAX_HEIGHT, MAX_WIDTH, ViewerMedia, preloadOriginal } from "./media-viewer-media";
+import {
+  MAX_HEIGHT,
+  MAX_WIDTH,
+  ViewerMedia,
+  preloadOriginal,
+  preloadSrc,
+} from "./media-viewer-media";
 
 /** The box is centred in the room between the safe areas. */
 const CENTER_TOP = "calc(50% + (env(safe-area-inset-top) - var(--bottom-inset)) / 2)";
@@ -104,6 +110,9 @@ export function MediaViewer() {
   // Focus goes back to the button of the pearl last shown (the one moved
   // to), else of the card the viewer closes into; read when the dialog lets
   // go of focus, after the store has closed. `morphInto` is that card.
+  // Neither on the page (a deep-linked pearl the list doesn't show, or every
+  // pearl gone in a live reload): the page's `<main>`, whose first tabbable
+  // element Base UI focuses, rather than `<body>`.
   const shownLast = useRef<string | null>(null);
   const morphInto = useRef<string | null>(null);
   useEffect(() => {
@@ -118,7 +127,10 @@ export function MediaViewer() {
         id
           ? document.querySelector<HTMLElement>(`[data-pearl-button="${CSS.escape(id)}"]`)
           : null;
-      const target = button(shownLast.current) ?? button(morphInto.current);
+      const target =
+        button(shownLast.current) ??
+        button(morphInto.current) ??
+        document.querySelector<HTMLElement>("main");
       // Read as focus goes back: the row it lands on mustn't take it for
       // keyboard navigation (no hover preview over the morph back).
       if (target) markReturningFocus();
@@ -189,12 +201,15 @@ export function MediaViewer() {
   }, [currentId, hasPrev, hasNext]);
 
   // The neighbours' originals load ahead, once this pearl's own has had
-  // its turn, so moving to them shows the file at once.
+  // its turn, so moving to them shows the file at once. Keyed on the files
+  // themselves (each list reload is a new `items`), so each loads once.
+  const prevSrc = hasPrev ? preloadSrc(items[index - 1]) : null;
+  const nextSrc = hasNext ? preloadSrc(items[index + 1]) : null;
   useEffect(() => {
-    if (!ready || index === -1) return;
-    if (hasPrev) preloadOriginal(items[index - 1]);
-    if (hasNext) preloadOriginal(items[index + 1]);
-  }, [ready, index, items, hasPrev, hasNext]);
+    if (!ready) return;
+    preloadOriginal(prevSrc);
+    preloadOriginal(nextSrc);
+  }, [ready, prevSrc, nextSrc]);
 
   // Playback hand-off: the viewer starts fresh, so the card's audio strip
   // stops when the viewer shows its pearl (the card's video loop pauses on
