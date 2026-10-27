@@ -40,7 +40,7 @@ test.describe("Media pearls", () => {
     page,
     seed,
     baseURL,
-  }, testInfo) => {
+  }) => {
     // The app's own icon: an image that loads locally in both browsers.
     const icon = `${baseURL}/icon.png`;
     await page.context().route("https://clips.example/**", (route) => route.abort());
@@ -110,8 +110,6 @@ test.describe("Media pearls", () => {
     await expect(song.getByText("0:00 / 1:05")).toBeVisible();
     await expect(song.getByRole("slider")).toBeVisible();
     await expect(song.getByText("Song", { exact: true })).toBeVisible();
-    await page.mouse.move(0, 0);
-    await page.screenshot({ path: testInfo.outputPath("media-grid.png") });
 
     // A file that won't load: Play opens nothing and turns back to Play.
     let popups = 0;
@@ -119,6 +117,66 @@ test.describe("Media pearls", () => {
     await song.getByRole("button", { name: "Play Song" }).click();
     await expect(song.getByRole("button", { name: "Play Song" })).toBeVisible();
     expect(popups).toBe(0);
+  });
+
+  test("a broken image shows the image icon at its ratio, never a broken image", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await seed.link({
+      url: "https://shots.example/gone.png",
+      title: "Gone",
+      contentType: "IMAGE",
+      thumbnail: `${baseURL}/does-not-exist.png`,
+      width: 800,
+      height: 600,
+    });
+    await openHome(page);
+    await chooseView(page, "Grid");
+
+    const gone = card(page, "Gone");
+    const face = gone.locator('[data-face="image"]');
+    await expect(face.locator("img")).toHaveCount(0);
+    await expect(face.locator("svg")).toBeVisible();
+    expect(await face.evaluate((el) => getComputedStyle(el).aspectRatio)).toBe("800 / 600");
+  });
+
+  test("while selecting, a click on the audio strip selects the card", async ({ page, seed }) => {
+    await page.context().route("https://sounds.example/**", (route) => route.abort());
+    await seed.link({
+      url: "https://sounds.example/song.mp3",
+      title: "Song",
+      contentType: "AUDIO",
+      duration: 65,
+    });
+    await seed.link({ url: "https://alpha.example", title: "Alpha" });
+    await openHome(page);
+    await chooseView(page, "Grid");
+
+    const alpha = card(page, "Alpha");
+    await alpha.hover();
+    await alpha.getByRole("checkbox", { name: "Select Alpha" }).click();
+
+    // While selecting, the card's link leaves the accessibility tree: find
+    // the card by its text.
+    const song = cards(page).filter({ hasText: "sounds.example" });
+    // The controls step aside: out of reach of focus and clicks.
+    const play = song.locator('[inert] button[aria-label="Play Song"]');
+    await expect(play).toHaveCount(1);
+    // Inert: it can't take focus.
+    expect(
+      await play.evaluate((el: HTMLElement) => {
+        el.focus();
+        return document.activeElement === el;
+      }),
+    ).toBe(false);
+    // A click where the Play button sits lands on the card, not the button.
+    const box = await play.boundingBox();
+    if (!box) throw new Error("no Play button box");
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(song.getByRole("checkbox", { name: "Select Song" })).toBeChecked();
+    await expect(play).toHaveAttribute("aria-label", "Play Song");
   });
 
   test("one audio pearl plays at a time, and stops at its end", async ({ page, seed }) => {

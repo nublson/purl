@@ -3,11 +3,12 @@
 import { audioPlayerStore, useAudioPlayer } from "@/hooks/use-audio-player";
 import { useLiveCards } from "@/hooks/use-live-cards";
 import { cardAspectRatio } from "@/lib/link-kind";
+import { useIsSelectionActive } from "@/lib/link-selection";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/utils/format-duration";
 import type { Link } from "@/utils/links";
-import { Pause, Play, Video } from "reicon-react";
+import { Image as ImageIcon, Pause, Play, Video } from "reicon-react";
 import {
   useEffect,
   useRef,
@@ -16,7 +17,6 @@ import {
   type ReactNode,
   type SyntheticEvent,
 } from "react";
-import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
 
 type FaceProps = {
   link: Link;
@@ -51,7 +51,9 @@ export function ImageFace({
   badge,
 }: FaceProps & { eager?: boolean }) {
   const src = safeRemoteImgSrc(link.thumbnail ?? link.url);
-  if (!src) return <MediaFallback link={link} className={className} />;
+  if (!src) {
+    return <ImageFallback ratio={cardAspectRatio(link)} className={className} badge={badge} />;
+  }
   return (
     <ImageFaceImg
       key={src}
@@ -90,7 +92,15 @@ function ImageFaceImg({
     if (img?.complete && state === "loading") settle(img);
   };
 
-  if (state === "failed") return <MediaFallback link={link} className={className} />;
+  if (state === "failed") {
+    return (
+      <ImageFallback
+        ratio={natural ?? cardAspectRatio(link)}
+        className={className}
+        badge={badge}
+      />
+    );
+  }
 
   return (
     <div
@@ -241,7 +251,9 @@ export function VideoFace({ link, className, badge }: FaceProps) {
         </span>
       ) : null}
       {link.duration != null ? (
-        <span className="pointer-events-none absolute right-2 bottom-2 rounded-md bg-black/60 px-1.5 py-0.5 text-xs leading-4 font-medium text-white tabular-nums backdrop-blur-sm">
+        <span
+          aria-hidden
+          className="pointer-events-none absolute right-2 bottom-2 rounded-md bg-black/60 px-1.5 py-0.5 text-xs leading-4 font-medium text-white tabular-nums backdrop-blur-sm">
           {formatDuration(link.duration)}
         </span>
       ) : null}
@@ -258,6 +270,9 @@ export function VideoFace({ link, className, badge }: FaceProps) {
  */
 export function AudioFace({ link, className }: Omit<FaceProps, "badge">) {
   const { playing, toggle } = useAudioPlayer(link.id);
+  // While links are selected, a click on the card toggles it: the controls
+  // step aside (the shared card never selects).
+  const selecting = useIsSelectionActive();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [elapsed, setElapsed] = useState(0);
   const [length, setLength] = useState<number | null>(link.duration);
@@ -314,12 +329,16 @@ export function AudioFace({ link, className }: Omit<FaceProps, "badge">) {
         onError={() => audioPlayerStore.stop(id)}
       />
       {/* The controls take pointer events inside the owner's card (whose
-          content doesn't) and never open the link they sit in (the shared
-          card is one link). `data-card-menu`: a press here isn't the card's
-          long-press. */}
+          content doesn't), except while selecting, and never open the link
+          they sit in (the shared card is one link). `data-card-menu`: a
+          press here isn't the card's long-press. */}
       <div
         data-card-menu
-        className="pointer-events-auto relative z-[1] flex items-center gap-3"
+        inert={selecting}
+        className={cn(
+          "relative z-[1] flex items-center gap-3",
+          selecting ? "pointer-events-none" : "pointer-events-auto",
+        )}
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -364,13 +383,30 @@ export function AudioFace({ link, className }: Omit<FaceProps, "badge">) {
   );
 }
 
-/** The page card's fallback: the favicon (or globe) on a tint, at 16:10. */
-function MediaFallback({ link, className }: { link: Link; className?: string }) {
+/**
+ * An image that can't be shown: the kind's icon on the tint, at the face's
+ * ratio (never a broken image), with the folder badge kept.
+ */
+function ImageFallback({
+  ratio,
+  className,
+  badge,
+}: {
+  ratio: string;
+  className?: string;
+  badge?: ReactNode;
+}) {
   return (
-    <LinkPreviewThumbnail
-      link={link}
-      thumbnailSrc={null}
-      className={cn("aspect-[16/10] rounded-none", className)}
-    />
+    <div
+      data-face="image"
+      className={cn(
+        "relative flex w-full items-center justify-center overflow-hidden bg-muted",
+        className,
+      )}
+      style={{ aspectRatio: ratio }}
+    >
+      <ImageIcon className="size-10 text-muted-foreground" aria-hidden />
+      <FaceBadge badge={badge} />
+    </div>
   );
 }
