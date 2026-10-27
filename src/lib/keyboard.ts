@@ -16,6 +16,8 @@ export function isOverlayOpen(): boolean {
   return (
     document.body.hasAttribute("data-scroll-locked") ||
     document.querySelector('[data-slot="popover-content"][data-state="open"]') !==
-      null
+      null ||
+    // The media viewer (Base UI's dialog: its scroll lock sets no attribute).
+    document.querySelector("[data-media-viewer][data-open]") !== null
   );
 }

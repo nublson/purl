@@ -46,9 +46,11 @@ describe("isOverlayOpen", () => {
   function stubDocument({
     scrollLocked,
     openPopover,
+    openViewer = false,
   }: {
     scrollLocked: boolean;
     openPopover: boolean;
+    openViewer?: boolean;
   }) {
     Object.defineProperty(globalThis, "document", {
       value: {
@@ -61,6 +63,9 @@ describe("isOverlayOpen", () => {
             selector === '[data-slot="popover-content"][data-state="open"]' &&
             openPopover
           ) {
+            return {};
+          }
+          if (selector === "[data-media-viewer][data-open]" && openViewer) {
             return {};
           }
           return null;
@@ -83,6 +88,11 @@ describe("isOverlayOpen", () => {
 
   it("is true when a popover content panel is open", () => {
     stubDocument({ scrollLocked: false, openPopover: true });
+    expect(isOverlayOpen()).toBe(true);
+  });
+
+  it("is true while the media viewer is open", () => {
+    stubDocument({ scrollLocked: false, openPopover: false, openViewer: true });
     expect(isOverlayOpen()).toBe(true);
   });
 });

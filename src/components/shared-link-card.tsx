@@ -78,6 +78,7 @@ export function LinkCardContent({
   eagerThumbnail = false,
   badge,
   ownerControls = false,
+  mediaAnchor = false,
 }: {
   link: LinkType;
   eagerThumbnail?: boolean;
@@ -85,10 +86,14 @@ export function LinkCardContent({
   badge?: ReactNode;
   /** The owner's card: its checkbox and menu sit over the top edge. */
   ownerControls?: boolean;
+  /** The media viewer opens from this card: the face is its morph anchor. */
+  mediaAnchor?: boolean;
 }) {
   switch (linkKind(link)) {
     case "image":
-      return <ImageFace link={link} eager={eagerThumbnail} badge={badge} />;
+      return (
+        <ImageFace link={link} eager={eagerThumbnail} badge={badge} anchored={mediaAnchor} />
+      );
     case "video":
       return <VideoFace link={link} badge={badge} />;
     case "audio":

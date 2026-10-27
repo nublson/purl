@@ -15,6 +15,7 @@ import {
 } from "@/components/omnibox-add-section";
 import { DropHandler } from "@/components/drop-handler";
 import { PasteHandler } from "@/components/paste-handler";
+import { MediaViewerLazy } from "@/components/media-viewer-lazy";
 import { UploadInput } from "@/components/upload-input";
 import {
   LinkResultsSkeleton,
@@ -35,6 +36,7 @@ import {
 } from "@/lib/leaving-links";
 import { coolPreviews } from "@/lib/link-preview-warmth";
 import { linkSelection, setSelectableLinks } from "@/lib/link-selection";
+import { mediaViewer } from "@/lib/media-viewer";
 import { isSameLinkUrl, omniboxSaveUrl } from "@/lib/omnibox";
 import { captureFlip, playFlip, type FlipSnapshot } from "@/lib/flip";
 import { cn } from "@/lib/utils";
@@ -830,20 +832,31 @@ export function HomeShell({
   // selection as they go.
   // The list on screen and its cursor come from the same answer (`settled`).
   const listComplete = !settled.query && !settled.nextCursor;
+  // The media viewer steps through the same links (its image, video and
+  // audio pearls), in the same order.
   useEffect(() => {
     const shown: string[] = [];
+    const shownLinks: Link[] = [];
     const gone: string[] = [];
     for (const group of shownGroups) {
       for (const link of group.links) {
         const hidden =
           pendingDeletes.get(link.id) === "hidden" ||
           leavingLinks.get(link.id)?.phase === "hidden";
-        (hidden ? gone : shown).push(link.id);
+        if (hidden) {
+          gone.push(link.id);
+        } else {
+          shown.push(link.id);
+          shownLinks.push(link);
+        }
       }
     }
     if (gone.length) linkSelection.remove(gone);
     setSelectableLinks(shown, { complete: listComplete });
+    mediaViewer.register(shownLinks);
   }, [shownGroups, pendingDeletes, leavingLinks, listComplete]);
+  // Leaving the page takes its pearls (and an open viewer) with it.
+  useEffect(() => () => mediaViewer.register([]), []);
 
   // Each link loaded in this list, searches included, for the selection
   // bar: its folder ("Remove from folders"), also for selected links the
@@ -901,6 +914,7 @@ export function HomeShell({
         onSaveError={onSaveError}
         onBatchDone={onBatchDone}
       />
+      <MediaViewerLazy />
       {/* The other ways in: files dropped on the page (or a dragged link),
           and the + menu's "Upload files" / `U` picker. */}
       <DropHandler folder={folderId ? currentFolder : null} />

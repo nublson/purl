@@ -18,6 +18,11 @@ export function linkKind(link: Pick<Link, "contentType" | "embed">): LinkKind {
   }
 }
 
+/** Image, video and audio pearls: the ones the media viewer shows. */
+export function isMediaKind(kind: LinkKind): boolean {
+  return kind === "image" || kind === "video" || kind === "audio";
+}
+
 const DEFAULT_RATIO = "16 / 10";
 const MIN_RATIO = 1 / 3;
 const MAX_RATIO = 3;

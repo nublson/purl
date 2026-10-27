@@ -12,6 +12,7 @@ import {
 import { ARRIVE } from "@/lib/motion";
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
 import { haptic } from "@/lib/haptics";
+import { isMediaKind, linkKind } from "@/lib/link-kind";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
@@ -26,6 +27,7 @@ import {
   useLinkFolder,
 } from "./folder-tag";
 import { HapticTarget } from "./haptic-target";
+import { MediaOpenButton } from "./media-open-button";
 import { LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
 import { Checkbox } from "./ui/checkbox";
 
@@ -33,6 +35,10 @@ import { Checkbox } from "./ui/checkbox";
 const LinkMenu = dynamic(() => import("./link-menu").then((m) => m.LinkMenu), {
   loading: () => <div className="size-8" aria-hidden />,
 });
+
+/** The card's link or media button: over the whole card, under its controls. */
+const OPENER_CLASS =
+  "absolute inset-0 z-0 cursor-pointer rounded-lg outline-none [-webkit-touch-callout:none]";
 
 /**
  * A link in the owner's grid: the shared folder's card (same frame and
@@ -71,7 +77,21 @@ export function LinkCard({
   const badgeArrives = useFolderBadgeArrival(folderTag);
   const folderLabelId = React.useId();
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const anchorRef = React.useRef<HTMLAnchorElement>(null);
+  // The card's opener: a link to the page, or for an image, video or audio
+  // pearl the button that opens the media viewer (the demo has no viewer:
+  // its cards are links).
+  const kind = linkKind(link);
+  const media = !demo && isMediaKind(kind);
+  // An image's face is the viewer's morph anchor: it rounds and clips
+  // itself, so the card doesn't crop the morph back.
+  const anchoredFace = media && kind === "image";
+  const anchorRef = React.useRef<HTMLElement | null>(null);
+  const setAnchor = React.useCallback((el: HTMLElement | null) => {
+    anchorRef.current = el;
+  }, []);
+  // The day, then the folder (the favicon's badge is only its emoji).
+  const describedBy =
+    [dayHeadingId, folderTag && folderLabelId].filter(Boolean).join(" ") || undefined;
   const { handlers: longPress, consumeLongPress } = useLongPress(() => {
     linkSelection.toggle(link.id);
     haptic("selection");
@@ -91,10 +111,11 @@ export function LinkCard({
       data-selected={selected || undefined}
       className={cn(
         LINK_CARD_FRAME,
-        // The link (below) is the focus target: its ring is the card's.
-        "group/card relative select-none has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring",
+        // The opener (below) is the focus target: its ring is the card's.
+        "group/card relative select-none has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring has-[[data-pearl-button]:focus-visible]:ring-3 has-[[data-pearl-button]:focus-visible]:ring-ring",
         selected &&
           "ring-2 ring-primary [@media(hover:hover)]:hover:ring-primary",
+        anchoredFace && "overflow-visible",
         arriving && ARRIVE,
         (deletePhase === "fading" || leaving) &&
           "pointer-events-none animate-out fade-out-0 zoom-out-95 duration-200 ease-out-strong",
@@ -118,39 +139,50 @@ export function LinkCard({
         longPress.onPointerDown(event);
       }}
     >
-      <a
-        ref={anchorRef}
-        href={link.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={`${link.title} (opens in new tab)`}
-        // The day, then the folder (the favicon's badge is only its emoji).
-        aria-describedby={
-          [dayHeadingId, folderTag && folderLabelId].filter(Boolean).join(" ") ||
-          undefined
-        }
-        // While selecting, the checkbox is the keyboard and screen reader
-        // control; a click anywhere on the card toggles it.
-        aria-hidden={selecting || undefined}
-        tabIndex={selecting ? -1 : undefined}
-        className="absolute inset-0 z-0 rounded-lg outline-none [-webkit-touch-callout:none]"
-        onClick={(event) => {
-          if (consumeLongPress()) {
-            event.preventDefault();
-            return;
-          }
-          if (selecting) {
-            event.preventDefault();
-            linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-          }
-        }}
-      />
+      {media ? (
+        <MediaOpenButton
+          ref={setAnchor}
+          link={link}
+          selecting={selecting}
+          consumeLongPress={consumeLongPress}
+          aria-describedby={describedBy}
+          // While selecting, the checkbox is the keyboard and screen reader
+          // control; a click anywhere on the card toggles it.
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={OPENER_CLASS}
+          onClick={(event) => linkSelection.toggle(link.id, { shiftKey: event.shiftKey })}
+        />
+      ) : (
+        <a
+          ref={setAnchor}
+          href={link.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${link.title} (opens in new tab)`}
+          aria-describedby={describedBy}
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={OPENER_CLASS}
+          onClick={(event) => {
+            if (consumeLongPress()) {
+              event.preventDefault();
+              return;
+            }
+            if (selecting) {
+              event.preventDefault();
+              linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+            }
+          }}
+        />
+      )}
       {/* The content is a picture of the link: clicks go to the link. */}
       <div className="pointer-events-none flex flex-col">
         <LinkCardContent
           link={link}
           eagerThumbnail={eagerThumbnail}
           ownerControls
+          mediaAnchor={anchoredFace}
           badge={
             folderTag ? (
               <FolderBadge
@@ -210,7 +242,8 @@ export function LinkCard({
                 deleteLinkKeepingFocus({
                   linkId: link.id,
                   anchor: anchorRef.current,
-                  siblingsSelector: '[data-cy="link-card"] > a[href]',
+                  siblingsSelector:
+                    '[data-cy="link-card"] > a[href], [data-cy="link-card"] > [data-pearl-button]',
                   byKeyboard,
                   onDeleted: notifyLinksChanged,
                 })

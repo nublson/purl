@@ -6,9 +6,12 @@ import { expect, test, waitForHydration } from "./fixtures";
 // row's favicon slot is the image's preview.
 
 const cards = (page: Page) => page.locator('[data-cy="link-card"]');
+// A page's card is a link; a media pearl's card opens the viewer (a button).
 const card = (page: Page, title: string) =>
   cards(page).filter({
-    has: page.getByRole("link", { name: `${title} (opens in new tab)`, exact: true }),
+    has: page
+      .getByRole("link", { name: `${title} (opens in new tab)`, exact: true })
+      .or(page.getByRole("button", { name: title, exact: true })),
   });
 const row = (page: Page, title: string) =>
   page.locator('[data-cy="link-item"]').filter({ hasText: title });

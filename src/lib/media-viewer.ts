@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useSyncExternalStore } from "react";
-import { linkKind } from "@/lib/link-kind";
+import { isMediaKind, linkKind } from "@/lib/link-kind";
 import type { Link } from "@/utils/links";
 
 /**
@@ -59,8 +59,7 @@ function getSnapshot(): MediaViewerState {
 }
 
 function isMedia(link: Link) {
-  const kind = linkKind(link);
-  return kind !== "page" && kind !== "embed";
+  return isMediaKind(linkKind(link));
 }
 
 function sameItems(a: readonly Link[], b: readonly Link[]) {

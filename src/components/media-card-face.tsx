@@ -8,6 +8,7 @@ import { useIsSelectionActive } from "@/lib/link-selection";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/utils/format-duration";
+import { MediaAnchor } from "./media-face-anchor";
 import type { Link } from "@/utils/links";
 import { Image as ImageIcon, Pause, Play, Video } from "reicon-react";
 import {
@@ -50,10 +51,22 @@ export function ImageFace({
   eager = false,
   className,
   badge,
-}: FaceProps & { eager?: boolean }) {
+  anchored = false,
+}: FaceProps & {
+  eager?: boolean;
+  /**
+   * The media viewer opens from this face (the owner's grid): its box is
+   * the viewer's morph anchor (`MediaAnchor`).
+   */
+  anchored?: boolean;
+}) {
   const src = safeRemoteImgSrc(link.thumbnail ?? link.url);
   if (!src) {
-    return <ImageFallback ratio={cardAspectRatio(link)} className={className} badge={badge} />;
+    return (
+      <AnchorIf link={link} anchored={anchored}>
+        <ImageFallback ratio={cardAspectRatio(link)} className={className} badge={badge} />
+      </AnchorIf>
+    );
   }
   return (
     <ImageFaceImg
@@ -63,8 +76,22 @@ export function ImageFace({
       eager={eager}
       className={className}
       badge={badge}
+      anchored={anchored}
     />
   );
+}
+
+/** Wraps a face's box in `MediaAnchor` when the viewer opens from it. */
+function AnchorIf({
+  link,
+  anchored,
+  children,
+}: {
+  link: Link;
+  anchored: boolean;
+  children: ReactNode;
+}) {
+  return anchored ? <MediaAnchor link={link}>{children}</MediaAnchor> : children;
 }
 
 function ImageFaceImg({
@@ -73,7 +100,8 @@ function ImageFaceImg({
   eager,
   className,
   badge,
-}: FaceProps & { src: string; eager: boolean }) {
+  anchored,
+}: FaceProps & { src: string; eager: boolean; anchored: boolean }) {
   const known = Boolean(link.width && link.height);
   const [state, setState] = useState<"loading" | "loaded" | "failed">("loading");
   const [natural, setNatural] = useState<string | null>(null);
@@ -95,43 +123,47 @@ function ImageFaceImg({
 
   if (state === "failed") {
     return (
-      <ImageFallback
-        ratio={natural ?? cardAspectRatio(link)}
-        className={className}
-        badge={badge}
-      />
+      <AnchorIf link={link} anchored={anchored}>
+        <ImageFallback
+          ratio={natural ?? cardAspectRatio(link)}
+          className={className}
+          badge={badge}
+        />
+      </AnchorIf>
     );
   }
 
   return (
-    <div
-      data-face="image"
-      className={cn(
-        "relative w-full overflow-hidden",
-        state === "loading" && "bg-muted",
-        className,
-      )}
-      style={{ aspectRatio: natural ?? cardAspectRatio(link) }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element -- user-controlled media URLs; avoid next/image optimizer SSRF */}
-      <img
-        ref={ref}
-        src={src}
-        alt=""
-        width={link.width ?? undefined}
-        height={link.height ?? undefined}
-        loading={eager ? "eager" : "lazy"}
-        decoding="async"
-        referrerPolicy="strict-origin-when-cross-origin"
+    <AnchorIf link={link} anchored={anchored}>
+      <div
+        data-face="image"
         className={cn(
-          "absolute inset-0 size-full object-cover transition-opacity duration-150 ease-out",
-          state === "loaded" ? "opacity-100" : "opacity-0",
+          "relative w-full overflow-hidden",
+          state === "loading" && "bg-muted",
+          className,
         )}
-        onLoad={(event) => settle(event.currentTarget)}
-        onError={() => setState("failed")}
-      />
-      <FaceBadge badge={badge} />
-    </div>
+        style={{ aspectRatio: natural ?? cardAspectRatio(link) }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- user-controlled media URLs; avoid next/image optimizer SSRF */}
+        <img
+          ref={ref}
+          src={src}
+          alt=""
+          width={link.width ?? undefined}
+          height={link.height ?? undefined}
+          loading={eager ? "eager" : "lazy"}
+          decoding="async"
+          referrerPolicy="strict-origin-when-cross-origin"
+          className={cn(
+            "absolute inset-0 size-full object-cover transition-opacity duration-150 ease-out",
+            state === "loaded" ? "opacity-100" : "opacity-0",
+          )}
+          onLoad={(event) => settle(event.currentTarget)}
+          onError={() => setState("failed")}
+        />
+        <FaceBadge badge={badge} />
+      </div>
+    </AnchorIf>
   );
 }
 
