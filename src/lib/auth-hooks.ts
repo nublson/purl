@@ -58,13 +58,18 @@ export async function revokeSaveOnlyAppsOnSignOut(
 }
 
 /**
- * Better Auth `user.deleteUser.beforeDelete` handler: removes every file the
- * user uploaded (their `users/<id>/` prefix in Blob) before the account and
- * its links go. Best effort: `deleteUserBlobs` never throws, so Blob being
- * down never blocks the deletion. Imported on demand to keep Blob and the
- * links module out of the auth instance's startup.
+ * Better Auth `user.deleteUser.afterDelete` handler: removes every file the
+ * user uploaded (their `users/<id>/` prefix in Blob) once the account row and
+ * its cascaded links are gone, so a failed deletion never loses files. Best
+ * effort and never throws: the account is already deleted, and an error here
+ * would only turn that success into a failed response. Imported on demand to
+ * keep Blob and the links module out of the auth instance's startup.
  */
-export async function deleteUserBlobsBeforeDelete(user: { id: string }): Promise<void> {
-  const { deleteUserBlobs } = await import("@/lib/uploads");
-  await deleteUserBlobs(user.id);
+export async function deleteUserBlobsAfterDelete(user: { id: string }): Promise<void> {
+  try {
+    const { deleteUserBlobs } = await import("@/lib/uploads");
+    await deleteUserBlobs(user.id);
+  } catch (error) {
+    console.error("delete-user: deleting the user's files failed:", error);
+  }
 }

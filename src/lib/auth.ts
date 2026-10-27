@@ -13,7 +13,7 @@ import {
 } from "@/lib/auth-providers";
 import {
   assignUsernameOnCreate,
-  deleteUserBlobsBeforeDelete,
+  deleteUserBlobsAfterDelete,
   revokeSaveOnlyAppsOnSignOut,
 } from "@/lib/auth-hooks";
 import { ADVERTISED_SCOPES, SAVE_SCOPE } from "@/lib/oauth-scopes";
@@ -63,8 +63,8 @@ export const auth = betterAuth({
   user: {
     deleteUser: {
       enabled: true,
-      beforeDelete: async (user) => {
-        await deleteUserBlobsBeforeDelete(user);
+      afterDelete: async (user) => {
+        await deleteUserBlobsAfterDelete(user);
       },
     },
     additionalFields: {

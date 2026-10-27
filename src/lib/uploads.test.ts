@@ -632,22 +632,23 @@ describe("deleteBlobsFor", () => {
   });
 
   it("deletes the uploads' files and previews in one call, skipping pages and null previews", async () => {
-    await deleteBlobsFor([upload(A_FILE, A_PREVIEW), page, upload(B_FILE, null)]);
+    await deleteBlobsFor("u1", [upload(A_FILE, A_PREVIEW), page, upload(B_FILE, null)]);
 
     expect(del).toHaveBeenCalledTimes(1);
     expect(vi.mocked(del).mock.calls[0][0]).toEqual([A_FILE, A_PREVIEW, B_FILE]);
   });
 
-  it("keeps a URL another row still references", async () => {
+  it("keeps a URL another of the user's rows still references", async () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue([
       { url: "https://other.example/x", thumbnail: A_PREVIEW },
       { url: B_FILE, thumbnail: null },
     ] as never);
 
-    await deleteBlobsFor([upload(A_FILE, A_PREVIEW), upload(B_FILE, null)]);
+    await deleteBlobsFor("u1", [upload(A_FILE, A_PREVIEW), upload(B_FILE, null)]);
 
     expect(prisma.link.findMany).toHaveBeenCalledWith({
       where: {
+        userId: "u1",
         OR: [
           { url: { in: [A_FILE, A_PREVIEW, B_FILE] } },
           { thumbnail: { in: [A_FILE, A_PREVIEW, B_FILE] } },
@@ -662,20 +663,20 @@ describe("deleteBlobsFor", () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue([
       { url: A_FILE, thumbnail: null },
     ] as never);
-    await deleteBlobsFor([upload(A_FILE, null)]);
+    await deleteBlobsFor("u1", [upload(A_FILE, null)]);
     expect(del).not.toHaveBeenCalled();
   });
 
   it("does nothing without uploads", async () => {
-    await deleteBlobsFor([page]);
-    await deleteBlobsFor([]);
+    await deleteBlobsFor("u1", [page]);
+    await deleteBlobsFor("u1", []);
     expect(prisma.link.findMany).not.toHaveBeenCalled();
     expect(del).not.toHaveBeenCalled();
   });
 
   it("does nothing when uploads are disabled", async () => {
     vi.stubEnv("BLOB_READ_WRITE_TOKEN", "");
-    await deleteBlobsFor([upload(A_FILE, A_PREVIEW)]);
+    await deleteBlobsFor("u1", [upload(A_FILE, A_PREVIEW)]);
     expect(prisma.link.findMany).not.toHaveBeenCalled();
     expect(del).not.toHaveBeenCalled();
   });
@@ -684,7 +685,7 @@ describe("deleteBlobsFor", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(del).mockRejectedValue(new Error("blob down"));
 
-    await expect(deleteBlobsFor([upload(A_FILE, A_PREVIEW)])).resolves.toBeUndefined();
+    await expect(deleteBlobsFor("u1", [upload(A_FILE, A_PREVIEW)])).resolves.toBeUndefined();
     expect(error).toHaveBeenCalledWith("[uploads] del failed", expect.any(Error));
   });
 
@@ -692,7 +693,7 @@ describe("deleteBlobsFor", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(prisma.link.findMany).mockRejectedValue(new Error("db down"));
 
-    await expect(deleteBlobsFor([upload(A_FILE, null)])).resolves.toBeUndefined();
+    await expect(deleteBlobsFor("u1", [upload(A_FILE, null)])).resolves.toBeUndefined();
     expect(del).not.toHaveBeenCalled();
     expect(error).toHaveBeenCalledWith("[uploads] del failed", expect.any(Error));
   });
@@ -735,6 +736,27 @@ describe("deleteUserBlobs", () => {
       [[`${HOST}/users/u1/a/a.png`, `${HOST}/users/u1/a/preview.webp`]],
       [[`${HOST}/users/u1/b/b.mp3`]],
     ]);
+  });
+
+  it("keeps going when one page's del fails", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(list)
+      .mockResolvedValueOnce({
+        blobs: [blob("users/u1/a/a.png")],
+        hasMore: true,
+        cursor: "c2",
+      } as unknown as ListResult)
+      .mockResolvedValueOnce({
+        blobs: [blob("users/u1/b/b.mp3")],
+        hasMore: false,
+      } as unknown as ListResult);
+    vi.mocked(del).mockRejectedValueOnce(new Error("blob down"));
+
+    await expect(deleteUserBlobs("u1")).resolves.toBeUndefined();
+
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(del).mock.calls[1]).toEqual([[`${HOST}/users/u1/b/b.mp3`]]);
+    expect(error).toHaveBeenCalledWith("[uploads] del failed", expect.any(Error));
   });
 
   it("skips del for an empty page", async () => {

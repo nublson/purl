@@ -91,14 +91,23 @@ vi.mock("@/lib/uploads", () => ({
   deleteUserBlobs: (...args: unknown[]) => mockDeleteUserBlobs(...args),
 }));
 
-describe("deleteUserBlobsBeforeDelete", () => {
+describe("deleteUserBlobsAfterDelete", () => {
   beforeEach(() => {
     mockDeleteUserBlobs.mockReset().mockResolvedValue(undefined);
   });
 
-  it("deletes the user's uploaded files before the account goes", async () => {
-    const { deleteUserBlobsBeforeDelete } = await import("./auth-hooks");
-    await deleteUserBlobsBeforeDelete({ id: "user-1" });
+  it("deletes the user's uploaded files once the account is gone", async () => {
+    const { deleteUserBlobsAfterDelete } = await import("./auth-hooks");
+    await deleteUserBlobsAfterDelete({ id: "user-1" });
     expect(mockDeleteUserBlobs).toHaveBeenCalledWith("user-1");
+  });
+
+  it("never throws, so the deletion's response isn't an error", async () => {
+    const { deleteUserBlobsAfterDelete } = await import("./auth-hooks");
+    mockDeleteUserBlobs.mockRejectedValue(new Error("blob down"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(deleteUserBlobsAfterDelete({ id: "user-1" })).resolves.toBeUndefined();
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

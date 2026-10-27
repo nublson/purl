@@ -755,8 +755,13 @@ export async function updateLinkForUser(
   });
   if (!existing) return null;
   // An upload's URL is its file in Blob: re-pointing it would orphan the
-  // file and leave its size counted against the storage cap.
-  if (existing.fileKey && data.url !== undefined) {
+  // file and leave its size counted against the storage cap. Sending the
+  // same URL back (a client echoing the row) is fine.
+  if (
+    existing.fileKey &&
+    data.url !== undefined &&
+    data.url.trim() !== existing.url
+  ) {
     throw new InvalidUploadError("An upload's file can't be changed");
   }
 
@@ -932,7 +937,7 @@ export async function deleteLinksForUser(
   const { count } = await prisma.link.deleteMany({
     where: { id: { in: linkIds }, userId },
   });
-  await deleteBlobsFor(uploads);
+  await deleteBlobsFor(userId, uploads);
   return count;
 }
 
@@ -945,7 +950,7 @@ export async function deleteLink(id: string): Promise<boolean> {
   });
   if (!existing) return false;
   await prisma.link.delete({ where: { id } });
-  await deleteBlobsFor([existing]);
+  await deleteBlobsFor(userId, [existing]);
   return true;
 }
 

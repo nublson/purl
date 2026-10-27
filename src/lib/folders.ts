@@ -565,6 +565,6 @@ export async function deleteFolder(
     return { deletedLinks, uploads };
   });
   // Only once the rows are gone for good: a rolled-back delete keeps its files.
-  if (opts.withLinks) await deleteBlobsFor(uploads);
+  if (opts.withLinks) await deleteBlobsFor(userId, uploads);
   return { deletedLinks };
 }

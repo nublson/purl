@@ -1365,7 +1365,7 @@ describe("deleteLinksForUser", () => {
       where: { id: { in: ["l1", "l2"] }, userId: "user-123", fileKey: { not: null } },
       select: { url: true, fileKey: true, thumbnail: true },
     });
-    expect(deleteBlobsFor).toHaveBeenCalledWith(uploads);
+    expect(deleteBlobsFor).toHaveBeenCalledWith("user-123", uploads);
     expect(order).toEqual(["select", "delete", "blobs"]);
   });
 });
@@ -1595,6 +1595,21 @@ describe("updateLinkForUser", () => {
     expect(vi.mocked(ogs)).not.toHaveBeenCalled();
   });
 
+  it("accepts an upload's unchanged URL alongside a title edit", async () => {
+    const url = "https://abc.public.blob.vercel-storage.com/users/user-123/c1/a.png";
+    const row = { ...makeRow({ url }), fileKey: "users/user-123/c1/a.png" };
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue({ ...row, title: "New" } as never);
+
+    await updateLinkForUser("user-123", "link-1", { url, title: "New" });
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: "link-1" },
+      data: { title: "New" },
+    });
+    expect(vi.mocked(ogs)).not.toHaveBeenCalled();
+  });
+
   it("still edits an upload's title", async () => {
     const row = {
       ...makeRow({ url: "https://abc.public.blob.vercel-storage.com/users/user-123/c1/a.png" }),
@@ -1797,7 +1812,7 @@ describe("deleteLink", () => {
 
     expect(await deleteLink("link-42")).toBe(true);
 
-    expect(deleteBlobsFor).toHaveBeenCalledWith([selected]);
+    expect(deleteBlobsFor).toHaveBeenCalledWith("user-123", [selected]);
     expect(order).toEqual(["delete", "blobs"]);
   });
 });

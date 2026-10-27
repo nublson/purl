@@ -1080,7 +1080,7 @@ describe("deleteFolder", () => {
       where: { userId: "user-1", folderId: "folder-1", fileKey: { not: null } },
       select: { url: true, fileKey: true, thumbnail: true },
     });
-    expect(deleteBlobsFor).toHaveBeenCalledWith(uploads);
+    expect(deleteBlobsFor).toHaveBeenCalledWith("user-1", uploads);
     expect(order).toEqual(["select", "delete links", "commit", "blobs"]);
   });
 

@@ -287,11 +287,15 @@ export type BlobOwningRow = {
 /**
  * Best effort, after the rows' delete has committed: removes the blobs of
  * the uploads among `rows` (each file and its preview) in one `del`. A URL
- * that a remaining row (any user's) still uses by `url` or `thumbnail` is
- * kept. Page links (no `fileKey`) are skipped, and so is anything not on
+ * that one of the user's remaining rows still uses by `url` or `thumbnail`
+ * is kept; other accounts' rows don't count (a public Blob URL saved as
+ * someone else's page link can't keep the owner's file alive). Page links (no `fileKey`) are skipped, and so is anything not on
  * the Blob host. Never throws: a failure is logged and the blobs stay.
  */
-export async function deleteBlobsFor(rows: BlobOwningRow[]): Promise<void> {
+export async function deleteBlobsFor(
+  userId: string,
+  rows: BlobOwningRow[],
+): Promise<void> {
   if (!uploadsEnabled()) return;
   const urls = new Set<string>();
   for (const row of rows) {
@@ -305,6 +309,7 @@ export async function deleteBlobsFor(rows: BlobOwningRow[]): Promise<void> {
     const candidates = [...urls];
     const stillUsed = await prisma.link.findMany({
       where: {
+        userId,
         OR: [{ url: { in: candidates } }, { thumbnail: { in: candidates } }],
       },
       select: { url: true, thumbnail: true },
@@ -325,8 +330,8 @@ const LIST_PAGE_SIZE = 1000;
 
 /**
  * Best effort, when an account is deleted: removes every blob under the
- * user's prefix (`users/<userId>/`), a page at a time. Never throws, so the
- * account deletion goes ahead even when Blob is down.
+ * user's prefix (`users/<userId>/`), a page at a time. A page whose `del`
+ * fails is logged and skipped; a failed `list` ends the pass. Never throws.
  */
 export async function deleteUserBlobs(userId: string): Promise<void> {
   if (!uploadsEnabled()) return;
@@ -339,7 +344,11 @@ export async function deleteUserBlobs(userId: string): Promise<void> {
         limit: LIST_PAGE_SIZE,
       });
       if (page.blobs.length > 0) {
-        await del(page.blobs.map((blob) => blob.url));
+        try {
+          await del(page.blobs.map((blob) => blob.url));
+        } catch (error) {
+          console.error("[uploads] del failed", error);
+        }
       }
       cursor = page.hasMore ? page.cursor : undefined;
     } while (cursor);
