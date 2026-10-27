@@ -67,15 +67,54 @@ test.describe("Media viewer", () => {
     const dialog = page.getByRole("dialog", { name: "Shot A" });
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('img[alt="Shot A"]')).toBeVisible();
+    // The original loads once the morph has played, and takes over the name
+    // from the preview.
+    await expect(dialog.locator('img[src$="?a=1"]')).toHaveAttribute("alt", "Shot A");
+    await expect(dialog.locator('img[alt="Shot A"]')).toHaveCount(1);
     await expect(dialog.getByRole("button", { name: "Close" })).toBeVisible();
     // App shortcuts (folder digits, selection keys) stand down while it's open.
     await expect(page.locator("[data-media-viewer][data-open]")).toHaveCount(1);
     await expect.poll(() => new URL(page.url()).searchParams.get("pearl")).toBe(shotA);
 
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("dialog")).toHaveCount(0);
+    // At once, while it still morphs back: drawn, but inert (not announced,
+    // not focusable), so no dialog is reachable.
+    expect(
+      await page
+        .locator("[data-media-viewer]")
+        .evaluateAll((els) => els.length > 0 && els.every((el) => (el as HTMLElement).inert)),
+    ).toBe(true);
+    expect(await page.getByRole("dialog").count()).toBe(0);
+    expect(await page.getByRole("button", { name: "Close" }).count()).toBe(0);
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
     await expect.poll(() => new URL(page.url()).searchParams.has("pearl")).toBe(false);
     await expect(openButton(page, "Shot A")).toBeFocused();
+  });
+
+  test("an image that won't load shows the icon tile, never a broken image", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    const nope = `${baseURL}/nope.png`;
+    await seed.link({
+      url: nope,
+      title: "Gone",
+      contentType: "IMAGE",
+      thumbnail: nope,
+      width: 800,
+      height: 600,
+    });
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(1);
+
+    await openButton(page, "Gone").click();
+    const dialog = page.getByRole("dialog", { name: "Gone" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('[data-viewer-media="fallback"] svg')).toBeVisible();
+    // The original is tried after the morph and fails too: no image is left.
+    await expect(dialog.locator("img")).toHaveCount(0);
   });
 
   test("while selecting, a click on an image card toggles it and opens nothing", async ({

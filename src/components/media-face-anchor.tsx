@@ -12,8 +12,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
  * changes it, so its re-renders (the image loading, the masonry moving it)
  * never start a layout animation: only the shared transition with the
  * Popup does. The viewer gives its Popup the same value while it swaps
- * which face it belongs to (see `media-viewer.tsx`), which Motion reads as
- * "nothing to morph".
+ * which face it belongs to (see `media-viewer.tsx`): Motion reads equal
+ * dependencies on the Popup and a face as "nothing to morph". The Popup
+ * switching from `undefined` to this value (and back) is itself a
+ * dependency change, so Motion takes a snapshot of it then; that's
+ * harmless, since the Popup's box doesn't move.
  */
 export const FACE_LAYOUT_DEPENDENCY = "pearl-face";
 

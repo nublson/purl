@@ -7,7 +7,14 @@ import { linkSecondLine } from "@/lib/upload-meta";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
 import { Cambio } from "cambio";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import { Image as ImageIcon, X } from "reicon-react";
 import { FACE_LAYOUT_DEPENDENCY, MEDIA_RADIUS, pearlLayoutId } from "./media-face-anchor";
 
@@ -83,6 +90,29 @@ export function MediaViewer() {
   }));
   const mediaRef = useRef<HTMLDivElement>(null);
 
+  // The original file loads only once the morph has played (`ready`), so
+  // the preview the card already showed is what travels; reset each open.
+  const [ready, setReady] = useState(false);
+  const morphStarted = useRef(false);
+  const closed = currentId === null;
+  if (closed && ready) setReady(false);
+
+  // While it closes, the dialog stays drawn for the morph back
+  // (`hidden={false}` below) but is gone for assistive tech and focus:
+  // `inert`, plus `aria-hidden` for tools that don't read `inert` yet.
+  // Set on the elements, since the exiting Popup's props are frozen.
+  const popupRef = useRef<HTMLDivElement>(null);
+  const backdropRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (closed) morphStarted.current = false;
+    for (const el of [popupRef.current, backdropRef.current]) {
+      if (!el) continue;
+      el.inert = closed;
+      if (closed) el.setAttribute("aria-hidden", "true");
+      else el.removeAttribute("aria-hidden");
+    }
+  }, [closed]);
+
   return (
     <Cambio.Root
       open={currentId !== null}
@@ -93,18 +123,28 @@ export function MediaViewer() {
       motion={openedPreset}
       dismissible={false}
       modal
+      onOpenChangeComplete={(open: boolean) => {
+        // No morph (no card to grow from): ready once the dialog is open.
+        if (open && !morphStarted.current) setReady(true);
+      }}
     >
       <Cambio.Portal>
         {/* `hidden={false}`: Base UI hides a closed dialog's parts at once
             (Tailwind's `[hidden]` rule is !important), while Motion still
             fades the backdrop and morphs the Popup back into its card. */}
         <Cambio.Backdrop
+          ref={backdropRef}
           hidden={false}
           className="fixed inset-0 z-50 bg-background/85 backdrop-blur-[12px] data-closed:pointer-events-none"
         />
         <Cambio.Popup
           key={layoutId}
           data-media-viewer=""
+          ref={popupRef}
+          onLayoutAnimationStart={() => {
+            morphStarted.current = true;
+          }}
+          onLayoutAnimationComplete={() => setReady(true)}
           hidden={false}
           initialFocus={mediaRef}
           finalFocus={finalFocus}
@@ -121,7 +161,7 @@ export function MediaViewer() {
                 {linkSecondLine(current)}
               </Cambio.Description>
               <div ref={mediaRef} tabIndex={-1} className="outline-none">
-                <ViewerMedia key={current.id} link={current} />
+                <ViewerMedia key={current.id} link={current} ready={ready} />
               </div>
               <Cambio.Close
                 aria-label="Close"
@@ -137,10 +177,10 @@ export function MediaViewer() {
   );
 }
 
-function ViewerMedia({ link }: { link: Link }) {
+function ViewerMedia({ link, ready }: { link: Link; ready: boolean }) {
   switch (linkKind(link)) {
     case "image":
-      return <ViewerImage link={link} />;
+      return <ViewerImage link={link} ready={ready} />;
     default:
       // Video and audio arrive with the next step; until then, a quiet box.
       return (
@@ -152,57 +192,85 @@ function ViewerMedia({ link }: { link: Link }) {
   }
 }
 
+/** An image that can't be shown: the kind's icon on the tint (as on cards). */
+function ImageTile({ style }: { style?: CSSProperties }) {
+  return (
+    <div
+      data-viewer-media="fallback"
+      className={cn(
+        "flex items-center justify-center bg-muted",
+        !style && "aspect-[16/10] w-[min(640px,100vw-32px)]",
+      )}
+      style={style}
+    >
+      <ImageIcon className="size-10 text-muted-foreground" aria-hidden />
+    </div>
+  );
+}
+
 /**
  * An image: the preview the card showed (already loaded, so it's what
- * travels in the morph), under the original, which fades in once loaded.
- * With a known size the box is the image's ratio, as large as the viewer
- * allows but never past the image's own pixels; without one, the preview
- * sizes it.
+ * travels in the morph), then the original over it, requested once the
+ * morph has played (`ready`) and faded in on load. With a known size the
+ * box is the image's ratio, as large as the viewer allows but never past
+ * the image's own pixels; without one, the preview sizes it. A preview
+ * that fails shows the icon tile (the original still gets its chance); an
+ * original that fails leaves the preview, named for it.
  */
-function ViewerImage({ link }: { link: Link }) {
+function ViewerImage({ link, ready }: { link: Link; ready: boolean }) {
   const preview = safeRemoteImgSrc(link.thumbnail ?? link.url);
   const original = safeRemoteImgSrc(link.url);
+  const [previewFailed, setPreviewFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [originalFailed, setOriginalFailed] = useState(false);
   const known = Boolean(link.width && link.height);
-
-  if (!preview && !original) {
-    return (
-      <div className="flex aspect-[16/10] w-[min(640px,100vw-32px)] items-center justify-center bg-muted">
-        <ImageIcon className="size-10 text-muted-foreground" aria-hidden />
-      </div>
-    );
-  }
 
   const box: CSSProperties | undefined = known
     ? {
         aspectRatio: `${link.width} / ${link.height}`,
         width: `min(${link.width}px, ${MAX_WIDTH}, (${MAX_HEIGHT}) * ${link.width! / link.height!})`,
       }
-    : { maxHeight: MAX_HEIGHT };
+    : undefined;
+  const showOriginal = Boolean(original) && ready && !originalFailed;
+  const showPreview = Boolean(preview) && !previewFailed;
+
+  if (!showPreview && !showOriginal) return <ImageTile style={box} />;
+
+  // The original names the image; until it's there (or if it never is),
+  // the preview does.
+  const previewNamed = !showOriginal || !loaded;
 
   return (
-    <div data-viewer-media="image" className="relative" style={box}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- user-controlled media URLs; avoid next/image optimizer SSRF */}
-      <img
-        src={preview ?? original!}
-        alt=""
-        decoding="async"
-        draggable={false}
-        referrerPolicy="strict-origin-when-cross-origin"
-        className={cn(
-          "object-contain",
-          known ? "absolute inset-0 size-full" : "block max-h-[inherit] max-w-full",
-        )}
-      />
-      {original && !failed ? (
+    <div
+      data-viewer-media="image"
+      className="relative"
+      style={box ?? { maxHeight: MAX_HEIGHT }}
+    >
+      {showPreview ? (
+        // eslint-disable-next-line @next/next/no-img-element -- user-controlled media URLs; avoid next/image optimizer SSRF
+        <img
+          src={preview!}
+          alt={previewNamed ? link.title : ""}
+          decoding="async"
+          draggable={false}
+          referrerPolicy="strict-origin-when-cross-origin"
+          className={cn(
+            "object-contain",
+            known ? "absolute inset-0 size-full" : "block max-h-[inherit] max-w-full",
+          )}
+          onError={() => setPreviewFailed(true)}
+        />
+      ) : (
+        <ImageTile style={box} />
+      )}
+      {showOriginal ? (
         // eslint-disable-next-line @next/next/no-img-element -- user-controlled media URLs; avoid next/image optimizer SSRF
         <img
           ref={(img) => {
             if (img?.complete && img.naturalWidth > 0) setLoaded(true);
           }}
-          src={original}
-          alt={link.title}
+          src={original!}
+          alt={previewNamed ? "" : link.title}
           decoding="async"
           draggable={false}
           referrerPolicy="strict-origin-when-cross-origin"
@@ -211,7 +279,7 @@ function ViewerImage({ link }: { link: Link }) {
             loaded ? "opacity-100" : "opacity-0",
           )}
           onLoad={() => setLoaded(true)}
-          onError={() => setFailed(true)}
+          onError={() => setOriginalFailed(true)}
         />
       ) : null}
     </div>
