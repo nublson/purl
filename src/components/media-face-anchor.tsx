@@ -27,6 +27,12 @@ export const FACE_LAYOUT_DEPENDENCY = "pearl-face";
  */
 export const MEDIA_RADIUS = 10;
 
+/**
+ * A list row's icon radius, in px: the favicon's own (`rounded-[3px]` in
+ * `LinkIcon`), so a row's anchor clips its image pearl as the row drew it.
+ */
+export const ROW_ICON_RADIUS = 3;
+
 /** The `layoutId` a pearl's face and the viewer's Popup share. */
 export function pearlLayoutId(id: string): string {
   return `pearl-${id}`;
@@ -37,15 +43,16 @@ export function pearlLayoutId(id: string): string {
  * or only the top two (the audio strip, with the title strip under it).
  * Per corner, so Motion can correct each one while it scales the box.
  */
-const CORNERS: Record<"all" | "top", CSSProperties> = {
-  all: { borderRadius: MEDIA_RADIUS },
-  top: {
-    borderTopLeftRadius: MEDIA_RADIUS,
-    borderTopRightRadius: MEDIA_RADIUS,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-};
+function cornerStyle(corners: "all" | "top", radius: number): CSSProperties {
+  return corners === "all"
+    ? { borderRadius: radius }
+    : {
+        borderTopLeftRadius: radius,
+        borderTopRightRadius: radius,
+        borderBottomLeftRadius: 0,
+        borderBottomRightRadius: 0,
+      };
+}
 
 /**
  * What the media viewer morphs out of and back into: a face's media box,
@@ -59,12 +66,15 @@ const CORNERS: Record<"all" | "top", CSSProperties> = {
 export function MediaAnchor({
   link,
   corners = "all",
+  radius = MEDIA_RADIUS,
   className,
   children,
 }: {
   link: Pick<Link, "id">;
   /** Which of the face's corners are the card's (and so rounded). */
   corners?: "all" | "top";
+  /** Their radius in px: a card's by default; a list row's icon is smaller. */
+  radius?: number;
   className?: string;
   children: ReactNode;
 }) {
@@ -101,7 +111,7 @@ export function MediaAnchor({
           if (!open) setMorphing(false);
         }}
         className={cn("w-full overflow-hidden", morphing && "relative z-10", className)}
-        style={CORNERS[corners]}
+        style={cornerStyle(corners, radius)}
       >
         {children}
       </m.div>

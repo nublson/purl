@@ -2,6 +2,7 @@
 
 import { LINK_GRID_FRAME } from "@/lib/link-view";
 import { coolPreviews } from "@/lib/link-preview-warmth";
+import { mediaViewer } from "@/lib/media-viewer";
 import type { PublicLink } from "@/lib/public-folders";
 import type { Link } from "@/utils/links";
 import { Box } from "reicon-react";
@@ -18,6 +19,7 @@ import { SHARED_GRID_COLUMNS } from "@/lib/shared-folder-view";
 import { cn } from "@/lib/utils";
 import { SharedLinkCardSkeleton } from "./skeletons/shared-folder";
 import { SharedFolderDescription } from "./shared-folder-description";
+import { MediaViewerLazy } from "./media-viewer-lazy";
 import { SharedLinkCard } from "./shared-link-card";
 
 /**
@@ -154,6 +156,14 @@ export function SharedFolderList({
 
   useEffect(() => coolPreviews, []);
 
+  // The media viewer's pearls: the image, video and audio links on the
+  // page, in list order (`register` keeps only those), after each load.
+  useEffect(() => {
+    mediaViewer.register(links);
+  }, [links]);
+  // Leaving the page takes its pearls (and an open viewer) with it.
+  useEffect(() => () => mediaViewer.register([]), []);
+
   // Grid: room for four 210px cards and their 40px gaps (4×210 + 3×40).
   const frame = cn(
     // pb-28: the last links scroll clear of the fixed footer.
@@ -168,6 +178,7 @@ export function SharedFolderList({
   if (links.length === 0) {
     return (
       <div className={frame}>
+        <MediaViewerLazy />
         {descriptionLine}
         <Empty data-cy="link-group-empty">
           <EmptyHeader>
@@ -186,6 +197,9 @@ export function SharedFolderList({
 
   return (
     <div className={frame} onMouseLeave={coolPreviews}>
+      {/* One per page: binds `?pearl=` and mounts the dialog once a media
+          pearl is registered. */}
+      <MediaViewerLazy />
       {descriptionLine}
       {/* Keyed by view: switching remounts it, and after a switch (not on
           page load) the new layout fades in, opacity only, 150ms. */}

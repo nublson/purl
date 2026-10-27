@@ -53,6 +53,50 @@ async function seedPearls(
   return { page, shotA, shotB };
 }
 
+/**
+ * A public folder "Board" (slug `board`), newest first: Shot A, Shot B,
+ * a page link (Alpha), then an audio pearl (Song).
+ */
+async function seedSharedBoard(
+  seed: {
+    link: (link: Parameters<typeof seedLink>[1]) => Promise<string>;
+    folder: (folder: { name: string; slug: string; isPublic?: boolean }) => Promise<string>;
+  },
+  baseURL: string,
+) {
+  const icon = `${baseURL}/icon.png`;
+  const folderId = await seed.folder({ name: "Board", slug: "board", isPublic: true });
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 15));
+  await seed.link({
+    url: "https://sounds.example/song.wav",
+    title: "Song",
+    contentType: "AUDIO",
+    duration: 10,
+    folderId,
+  });
+  await pause();
+  await seed.link({ url: "https://alpha.example", title: "Alpha", folderId });
+  await pause();
+  const shotB = await seed.link({
+    url: `${icon}?b=1`,
+    title: "Shot B",
+    contentType: "IMAGE",
+    thumbnail: icon,
+    folderId,
+  });
+  await pause();
+  const shotA = await seed.link({
+    url: `${icon}?a=1`,
+    title: "Shot A",
+    contentType: "IMAGE",
+    thumbnail: icon,
+    width: 32,
+    height: 32,
+    folderId,
+  });
+  return { shotA, shotB };
+}
+
 test.describe("Media viewer", () => {
   test("an image card opens the viewer; Esc closes it back onto the card", async ({
     page,
@@ -276,5 +320,124 @@ test.describe("Media viewer", () => {
         page.evaluate(() => [...document.querySelectorAll("audio")].every((a) => a.paused)),
       )
       .toBe(true);
+  });
+  test("an image row opens the viewer; Esc gives focus back to the row", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    const { shotA } = await seedPearls(seed, baseURL!);
+    await openHome(page);
+    const row = page.locator('[data-cy="link-item"]').filter({ hasText: "Shot A" });
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(3);
+
+    // A click on the row's title (the row's button covers the whole row).
+    const title = (await row.getByText("Shot A", { exact: true }).boundingBox())!;
+    await page.mouse.click(title.x + title.width / 2, title.y + title.height / 2);
+    const dialog = page.getByRole("dialog", { name: "Shot A" });
+    await expect(dialog).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get("pearl")).toBe(shotA);
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect.poll(() => new URL(page.url()).searchParams.has("pearl")).toBe(false);
+    await expect(row.locator("[data-pearl-button]")).toBeFocused();
+    // A page link's row is still a link to a new tab.
+    await expect(
+      page.getByRole("link", { name: "Alpha (opens in new tab)", exact: true }),
+    ).toHaveAttribute("href", "https://alpha.example");
+  });
+
+  test("a media pearl's menu opens the file; a page link's keeps Open in new tab", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await seedPearls(seed, baseURL!);
+    await openHome(page);
+    const row = (title: string) =>
+      page.locator('[data-cy="link-item"]').filter({ hasText: title });
+
+    await row("Shot A").hover();
+    await row("Shot A").getByRole("button", { name: "Open link menu" }).click();
+    const openFile = page.getByRole("menuitem", { name: "Open file" });
+    await expect(openFile).toHaveAttribute("href", `${baseURL}/icon.png?a=1`);
+    await expect(openFile).toHaveAttribute("target", "_blank");
+    await expect(openFile).toHaveAttribute("rel", "noopener noreferrer");
+    await expect(page.getByRole("menuitem", { name: "Open in new tab" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(openFile).toHaveCount(0);
+
+    await row("Alpha").hover();
+    await row("Alpha").getByRole("button", { name: "Open link menu" }).click();
+    await expect(page.getByRole("menuitem", { name: "Open in new tab" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Open file" })).toHaveCount(0);
+  });
+
+  test("on a shared folder, an image card opens the viewer and audio plays in place", async ({
+    browser,
+    seed,
+    testUser,
+    baseURL,
+  }) => {
+    const { shotA } = await seedSharedBoard(seed, baseURL!);
+
+    // Signed out.
+    const context = await browser.newContext({ baseURL });
+    const page = await context.newPage();
+    await context.route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
+    await page.goto(`/@${testUser.username}/board`);
+    await waitForHydration(page, 'button[aria-label="Grid view"]');
+    await page.getByRole("button", { name: "Grid view" }).click();
+    await expect(cards(page)).toHaveCount(4);
+
+    await openButton(page, "Shot A").click();
+    const dialog = page.getByRole("dialog", { name: "Shot A" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('img[src$="?a=1"]')).toHaveAttribute("alt", "Shot A");
+    await expect.poll(() => new URL(page.url()).searchParams.get("pearl")).toBe(shotA);
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect.poll(() => new URL(page.url()).searchParams.has("pearl")).toBe(false);
+    await expect(openButton(page, "Shot A")).toBeFocused();
+
+    // The audio card's Play plays in place: no viewer, no new entry.
+    const songCard = cards(page).filter({ has: openButton(page, "Song") });
+    await songCard.getByRole("button", { name: "Play Song" }).click();
+    await expect(songCard.getByRole("button", { name: "Pause Song" })).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(new URL(page.url()).searchParams.has("pearl")).toBe(false);
+    await context.close();
+  });
+
+  // Needs Task 7's keys (ArrowRight) in the viewer.
+  test.fixme("on a shared folder, → moves to the next media pearl, past page links", async ({
+    browser,
+    seed,
+    testUser,
+    baseURL,
+  }) => {
+    const { shotB } = await seedSharedBoard(seed, baseURL!);
+    const context = await browser.newContext({ baseURL });
+    const page = await context.newPage();
+    await page.goto(`/@${testUser.username}/board`);
+    await waitForHydration(page, 'button[aria-label="Grid view"]');
+    await page.getByRole("button", { name: "Grid view" }).click();
+    await expect(cards(page)).toHaveCount(4);
+
+    await openButton(page, "Shot A").click();
+    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("dialog", { name: "Shot B" })).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get("pearl")).toBe(shotB);
+    // Past the page link (Alpha), onto the audio pearl.
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("dialog", { name: "Song" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await context.close();
   });
 });

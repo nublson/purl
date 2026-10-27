@@ -12,6 +12,8 @@ import {
 } from "@/lib/link-selection";
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
 import { haptic } from "@/lib/haptics";
+import { isMediaKind, linkKind } from "@/lib/link-kind";
+import { mediaViewer, useIsMediaOpen } from "@/lib/media-viewer";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
 import { linkSecondLine } from "@/lib/upload-meta";
@@ -29,6 +31,8 @@ import {
 import { HapticTarget } from "./haptic-target";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
+import { MediaAnchor, ROW_ICON_RADIUS } from "./media-face-anchor";
+import { MediaOpenButton } from "./media-open-button";
 import { Typography } from "./typography";
 import { Checkbox } from "./ui/checkbox";
 import {
@@ -46,6 +50,14 @@ import {
 const LONG_PRESS_MS = 500;
 /** Finger travel that turns a long-press into a scroll. */
 const LONG_PRESS_SLOP = 10;
+
+/**
+ * The row's link or media button: over the whole row, under its controls.
+ * ring-inset: the list clips each row to its box (content-visibility), so a
+ * ring drawn outside it would be cut to the corners.
+ */
+const OPENER_CLASS =
+  "absolute inset-0 z-0 w-full rounded-md outline-none [-webkit-touch-callout:none] focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset";
 
 const LinkMenu = dynamic(() => import("./link-menu").then((m) => m.LinkMenu), {
   loading: () => <div className="size-8" aria-hidden />,
@@ -86,6 +98,11 @@ export const LinkItem = React.forwardRef<
   const folderTag = useFolderTag(link);
   const linkFolder = useLinkFolder(link);
   const badgeArrives = useFolderBadgeArrival(folderTag);
+  // An image, video or audio pearl opens the media viewer (its row's icon
+  // is what the viewer morphs out of); a page opens in a new tab. The
+  // landing demo has no viewer: its rows are links.
+  const media = !demo && isMediaKind(linkKind(link));
+  const viewerOpen = useIsMediaOpen(link.id);
   const longPressRef = React.useRef<{
     timer: ReturnType<typeof setTimeout>;
     x: number;
@@ -109,7 +126,10 @@ export const LinkItem = React.forwardRef<
   const openedByPointerRef = React.useRef(false);
   const descriptionId = React.useId();
   const folderLabelId = React.useId();
-  const anchorRef = React.useRef<HTMLAnchorElement>(null);
+  const anchorRef = React.useRef<HTMLElement | null>(null);
+  const setAnchor = React.useCallback((el: HTMLElement | null) => {
+    anchorRef.current = el;
+  }, []);
   const hoveringActionsRef = React.useRef(false);
   const hoveringPreviewRef = React.useRef(false);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -135,6 +155,8 @@ export const LinkItem = React.forwardRef<
       if (hoveringActionsRef.current) return;
       // No previews while selecting: the pointer is busy picking rows.
       if (linkSelection.selectedIds().length > 0) return;
+      // Nor over the media viewer this row (or another) just opened.
+      if (mediaViewer.getSnapshot().currentId !== null) return;
       openedByPointerRef.current = true;
       setPreviewOpen(true);
     }, previewOpenDelay());
@@ -156,10 +178,11 @@ export const LinkItem = React.forwardRef<
     };
   }, [clearCloseTimer, clearOpenTimer]);
 
-  // Entering selection mode closes an open preview.
+  // Entering selection mode, or opening this pearl in the media viewer,
+  // closes an open preview.
   React.useEffect(() => {
-    if (selecting) setPreviewOpen(false);
-  }, [selecting]);
+    if (selecting || viewerOpen) setPreviewOpen(false);
+  }, [selecting, viewerOpen]);
 
   const cancelLongPress = React.useCallback(() => {
     if (longPressRef.current) clearTimeout(longPressRef.current.timer);
@@ -179,10 +202,35 @@ export const LinkItem = React.forwardRef<
     deleteLinkKeepingFocus({
       linkId: link.id,
       anchor: anchorRef.current,
-      siblingsSelector: '[data-cy="link-item"] > a[href]',
+      siblingsSelector:
+        '[data-cy="link-item"] > a[href], [data-cy="link-item"] > [data-pearl-button]',
       byKeyboard,
       onDeleted: notifyLinksChanged,
     });
+
+  // The description, then the folder (the badge is only its emoji).
+  const describedBy =
+    [link.description && descriptionId, folderTag && folderLabelId]
+      .filter(Boolean)
+      .join(" ") || undefined;
+  // Keyboard users get the same preview mouse users get on hover.
+  const openPreviewOnFocus = (event: React.FocusEvent<HTMLElement>) => {
+    if (!event.currentTarget.matches(":focus-visible")) return;
+    clearCloseTimer();
+    openedByPointerRef.current = false;
+    setPreviewOpen(true);
+  };
+  const closePreviewOnBlur = () => {
+    if (!hoveringPreviewRef.current) setPreviewOpen(false);
+  };
+
+  const icon = arriving ? (
+    <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
+      <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
+    </Typography>
+  ) : (
+    <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
+  );
 
   const content = (
     <Item
@@ -269,46 +317,56 @@ export const LinkItem = React.forwardRef<
       }}
       {...rest}
     >
-      <a
-        ref={anchorRef}
-        href={link.url}
-        aria-label={`${link.title} (opens in new tab)`}
-        // The description, then the folder (the badge is only its emoji).
-        aria-describedby={
-          [link.description && descriptionId, folderTag && folderLabelId]
-            .filter(Boolean)
-            .join(" ") || undefined
-        }
-        target="_blank"
-        rel="noopener noreferrer"
-        // While selecting, the row's checkbox is the keyboard and screen
-        // reader control; a click anywhere on the row toggles it.
-        aria-hidden={selecting || undefined}
-        tabIndex={selecting ? -1 : undefined}
-        // ring-inset: the list clips each row to its box (content-visibility),
-        // so a ring drawn outside the link would be cut to the corners.
-        className="absolute inset-0 z-0 w-full rounded-md outline-none [-webkit-touch-callout:none] focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset"
-        onClick={(event) => {
-          if (longPressedRef.current) {
+      {media ? (
+        <MediaOpenButton
+          ref={setAnchor}
+          link={link}
+          preset="snappy"
+          selecting={selecting}
+          consumeLongPress={() => {
+            if (!longPressedRef.current) return false;
             longPressedRef.current = false;
-            event.preventDefault();
-            return;
+            return true;
+          }}
+          aria-describedby={describedBy}
+          // While selecting, the row's checkbox is the keyboard and screen
+          // reader control; a click anywhere on the row toggles it.
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={cn(OPENER_CLASS, "cursor-pointer")}
+          onClick={(event) =>
+            linkSelection.toggle(link.id, { shiftKey: event.shiftKey })
           }
-          if (!selecting) return;
-          event.preventDefault();
-          linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-        }}
-        onFocus={(event) => {
-          // Keyboard users get the same preview mouse users get on hover.
-          if (!event.currentTarget.matches(":focus-visible")) return;
-          clearCloseTimer();
-          openedByPointerRef.current = false;
-          setPreviewOpen(true);
-        }}
-        onBlur={() => {
-          if (!hoveringPreviewRef.current) setPreviewOpen(false);
-        }}
-      />
+          onFocus={openPreviewOnFocus}
+          onBlur={closePreviewOnBlur}
+        />
+      ) : (
+        <a
+          ref={setAnchor}
+          href={link.url}
+          aria-label={`${link.title} (opens in new tab)`}
+          aria-describedby={describedBy}
+          target="_blank"
+          rel="noopener noreferrer"
+          // While selecting, the row's checkbox is the keyboard and screen
+          // reader control; a click anywhere on the row toggles it.
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={OPENER_CLASS}
+          onClick={(event) => {
+            if (longPressedRef.current) {
+              longPressedRef.current = false;
+              event.preventDefault();
+              return;
+            }
+            if (!selecting) return;
+            event.preventDefault();
+            linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+          }}
+          onFocus={openPreviewOnFocus}
+          onBlur={closePreviewOnBlur}
+        />
+      )}
       {link.description ? (
         <span id={descriptionId} className="sr-only">
           {link.description}
@@ -344,12 +402,18 @@ export const LinkItem = React.forwardRef<
                     "[@media(hover:hover)]:group-hover/item:opacity-0 motion-safe:[@media(hover:hover)]:group-hover/item:scale-80 group-has-[:focus-visible]/media:opacity-0 motion-safe:group-has-[:focus-visible]/media:scale-80",
             )}
           >
-            {arriving ? (
-              <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
-                <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
-              </Typography>
+            {/* A media pearl's icon is the viewer's morph anchor (the
+                badge stays outside it: it overhangs the icon's corner). */}
+            {media ? (
+              <MediaAnchor
+                link={link}
+                radius={ROW_ICON_RADIUS}
+                className="flex size-5 max-md:size-6"
+              >
+                {icon}
+              </MediaAnchor>
             ) : (
-              <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
+              icon
             )}
             {/* Home, with folder tags on: the link's folder on the favicon's
                 corner. Fades with the favicon when the checkbox shows. */}

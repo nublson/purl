@@ -2,10 +2,11 @@ import type { ReactNode } from "react";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
-import { linkKind } from "@/lib/link-kind";
+import { isMediaKind, linkKind } from "@/lib/link-kind";
 import { linkSecondLine } from "@/lib/upload-meta";
 import { LinkIcon } from "./link-icon";
 import { AudioFace, ImageFace, VideoFace } from "./media-card-face";
+import { MediaOpenButton } from "./media-open-button";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
 import { Typography } from "./typography";
 
@@ -19,7 +20,10 @@ export const LINK_CARD_FRAME =
 /**
  * A link in the shared folder's grid: the page's thumbnail full-bleed on
  * top (favicon on a tint when there's none), then the favicon, title (two
- * lines at most) and domain. Cards keep their natural height.
+ * lines at most) and domain. Cards keep their natural height. An image,
+ * video or audio pearl's card opens the media viewer (its face is the
+ * morph's anchor, clipping itself, so the card doesn't crop the morph);
+ * a page's card is a link to a new tab.
  */
 export function SharedLinkCard({
   link,
@@ -28,28 +32,43 @@ export function SharedLinkCard({
   link: LinkType;
   eagerThumbnail?: boolean;
 }) {
-  const label = `${link.title} (opens in new tab)`;
-  if (linkKind(link) === "audio") {
-    // The player's controls can't sit inside a link: the card is a frame
-    // holding the strip and a link over everything else (`after:`), so
-    // clicks beside the controls still open the file. The frame draws the
-    // link's focus ring, as the owner's card does for its overlay link.
+  const kind = linkKind(link);
+  if (kind === "audio") {
+    // The player's controls can't sit inside the card's button: the card
+    // is a frame holding the strip and a button over everything else
+    // (`after:`), so clicks beside the controls still open the viewer. The
+    // frame draws the button's focus ring, as the owner's card does.
     return (
       <div
         data-cy="link-card"
-        className={cn(LINK_CARD_FRAME, "relative has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring")}
+        className={cn(
+          LINK_CARD_FRAME,
+          "relative overflow-visible has-[[data-pearl-button]:focus-visible]:ring-3 has-[[data-pearl-button]:focus-visible]:ring-ring",
+        )}
       >
-        <AudioFace link={link} />
-        <a
-          href={link.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={label}
-          className="flex flex-col outline-none after:absolute after:inset-0 after:rounded-lg after:content-['']"
+        <AudioFace link={link} anchored />
+        <MediaOpenButton
+          link={link}
+          selecting={false}
+          className="flex w-full cursor-pointer flex-col text-start outline-none after:absolute after:inset-0 after:rounded-lg after:content-['']"
         >
           <LinkCardStrip link={link} />
-        </a>
+        </MediaOpenButton>
       </div>
+    );
+  }
+  if (isMediaKind(kind)) {
+    return (
+      <MediaOpenButton
+        link={link}
+        selecting={false}
+        data-cy="link-card"
+        // w-full: a button shrinks to its content (the face has none of
+        // its own: it takes the card's width), unlike the link it replaces.
+        className={cn(LINK_CARD_FRAME, "w-full cursor-pointer overflow-visible text-start")}
+      >
+        <LinkCardContent link={link} eagerThumbnail={eagerThumbnail} mediaAnchor />
+      </MediaOpenButton>
     );
   }
   return (
@@ -57,7 +76,7 @@ export function SharedLinkCard({
       href={link.url}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label={label}
+      aria-label={`${link.title} (opens in new tab)`}
       data-cy="link-card"
       className={LINK_CARD_FRAME}
     >
