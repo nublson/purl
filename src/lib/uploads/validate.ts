@@ -19,14 +19,14 @@ export function validateUploadFile(file: {
     ? reported
     : extensionToMime(file.name);
 
-  if (!mimeType || file.size <= 0) {
+  if (!mimeType || !(file.size > 0)) {
     return {
       ok: false,
       reason: "type",
       message: `${file.name} isn't a supported file`,
     };
   }
-  if (file.size > MAX_UPLOAD_FILE_BYTES) {
+  if (!(file.size <= MAX_UPLOAD_FILE_BYTES)) {
     return {
       ok: false,
       reason: "size",

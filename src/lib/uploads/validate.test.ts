@@ -96,4 +96,10 @@ describe("validateUploadFile", () => {
       validateUploadFile({ name: "a.png", type: "image/png", size: 0 }),
     ).toMatchObject({ ok: false, reason: "type" });
   });
+
+  it("fails closed on a NaN size", () => {
+    expect(
+      validateUploadFile({ name: "a.png", type: "image/png", size: NaN }),
+    ).toMatchObject({ ok: false });
+  });
 });

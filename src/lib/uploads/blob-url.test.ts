@@ -14,6 +14,15 @@ describe("isBlobUrl", () => {
     ).toBe(true);
   });
 
+  it("accepts an uppercase host and rejects a port", () => {
+    expect(
+      isBlobUrl("https://ABC.PUBLIC.BLOB.VERCEL-STORAGE.COM/users/u1/a.png"),
+    ).toBe(true);
+    expect(
+      isBlobUrl("https://abc.public.blob.vercel-storage.com:8443/a.png"),
+    ).toBe(false);
+  });
+
   it("rejects other hosts, lookalikes, http and garbage", () => {
     expect(isBlobUrl("https://example.com/a.png")).toBe(false);
     expect(
@@ -47,6 +56,21 @@ describe("blobPathnameOf", () => {
     ).toBe("users/u1/c1/my file.png");
   });
 
+  it("keeps double-encoded dots encoded, so the path check rejects them", () => {
+    const single = blobPathnameOf(
+      "https://abc.public.blob.vercel-storage.com/users/u1/%2e%2e/u2/x",
+    );
+    // the URL parser resolves %2e%2e itself, landing outside the user prefix
+    expect(single).toBe("users/u2/x");
+    expect(isOwnBlobPathname(single!, "u1")).toBe(false);
+
+    const double = blobPathnameOf(
+      "https://abc.public.blob.vercel-storage.com/users/u1/%252e%252e/u2/x",
+    );
+    expect(double).toBe("users/u1/%2e%2e/u2/x");
+    expect(isOwnBlobPathname(double!, "u1")).toBe(false);
+  });
+
   it("returns null for non-blob URLs", () => {
     expect(blobPathnameOf("https://example.com/users/u1/a.png")).toBeNull();
     expect(blobPathnameOf("nope")).toBeNull();
@@ -71,6 +95,24 @@ describe("isOwnBlobPathname", () => {
 
   it("rejects a user id that is a prefix of another", () => {
     expect(isOwnBlobPathname("users/u10/c/a.png", "u1")).toBe(false);
+  });
+
+  it("rejects empty, dot and escaped segments", () => {
+    expect(isOwnBlobPathname("users/u1//x", "u1")).toBe(false);
+    expect(isOwnBlobPathname("users/u1/./x", "u1")).toBe(false);
+    expect(isOwnBlobPathname("users/u1//", "u1")).toBe(false);
+    expect(isOwnBlobPathname("users/u1/c1/", "u1")).toBe(false);
+    expect(isOwnBlobPathname("users/u1/%2e%2e/u2/x", "u1")).toBe(false);
+    expect(isOwnBlobPathname("users/u1/c1/my file.png", "u1")).toBe(false);
+  });
+
+  it("accepts what uploads write", () => {
+    expect(
+      isOwnBlobPathname("users/u1/ckx9abc/My-Shot--1--aB3xY9.png", "u1"),
+    ).toBe(true);
+    expect(isOwnBlobPathname("users/u1/ckx9abc/preview-Zq81.webp", "u1")).toBe(
+      true,
+    );
   });
 
   it("rejects backslashes, leading slashes and the bare prefix", () => {

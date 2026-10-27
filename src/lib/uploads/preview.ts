@@ -115,17 +115,23 @@ async function imagePreview(
   }
 }
 
-/** Resolves once `done` is called or the timeout passes. */
+/** Resolves true when `done` was called, false on `fail` or timeout. */
 function waitFor(
-  setup: (done: () => void) => void,
+  setup: (done: () => void, fail: () => void) => void,
   timeoutMs = MEDIA_TIMEOUT_MS,
-): Promise<void> {
+): Promise<boolean> {
   return new Promise((resolve) => {
-    const timer = setTimeout(resolve, timeoutMs);
-    setup(() => {
-      clearTimeout(timer);
-      resolve();
-    });
+    const timer = setTimeout(() => resolve(false), timeoutMs);
+    setup(
+      () => {
+        clearTimeout(timer);
+        resolve(true);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(false);
+      },
+    );
   });
 }
 
@@ -169,22 +175,25 @@ async function videoPreview(file: File): Promise<PreviewResult> {
     if (!width || !height) return { ...EMPTY, duration };
 
     // A frame at 0.1 s skips a black first frame; a clip shorter than that
-    // has only its first frame to give.
+    // has only its first frame to give. Only the success events count: an
+    // error or a timeout leaves no frame to draw.
+    let ready: boolean;
     if (duration !== null && duration >= 0.1) {
-      await waitFor((done) => {
+      ready = await waitFor((done, fail) => {
         video.addEventListener("seeked", done, { once: true });
-        video.addEventListener("error", done, { once: true });
+        video.addEventListener("error", fail, { once: true });
         video.currentTime = 0.1;
       });
+    } else if (video.readyState >= 2) {
+      ready = true;
     } else {
-      await waitFor((done) => {
-        if (video.readyState >= 2) {
-          done();
-          return;
-        }
+      ready = await waitFor((done, fail) => {
         video.addEventListener("loadeddata", done, { once: true });
-        video.addEventListener("error", done, { once: true });
+        video.addEventListener("error", fail, { once: true });
       });
+    }
+    if (!ready || video.readyState < 2) {
+      return { blob: null, width, height, duration };
     }
 
     const target = fitWithin(width, height);
