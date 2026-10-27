@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@vercel/blob", () => ({
   head: vi.fn(),
   del: vi.fn(),
+  list: vi.fn(),
   BlobNotFoundError: class BlobNotFoundError extends Error {},
 }));
 
@@ -13,6 +14,7 @@ vi.mock("@/lib/prisma", () => {
       count: vi.fn(),
       aggregate: vi.fn(),
       findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
     $executeRaw: vi.fn(),
     $transaction: vi.fn(),
@@ -31,15 +33,20 @@ vi.mock("@/lib/folders", () => ({
   },
 }));
 
-const { head, del, BlobNotFoundError } = await import("@vercel/blob");
+const { head, del, list, BlobNotFoundError } = await import("@vercel/blob");
 const prisma = (await import("@/lib/prisma")).default;
 const { assertFolderOwned, FolderNotFoundError } = await import("@/lib/folders");
 const { StorageLimitError, SaveLimitError } = await import("@/lib/entitlements");
 const { MAX_UPLOAD_BYTES_PER_ACCOUNT, MAX_UPLOAD_PREVIEW_BYTES } = await import(
   "@/lib/limits"
 );
-const { createUploadForUser, InvalidUploadError, parseUploadInput } =
-  await import("./uploads");
+const {
+  createUploadForUser,
+  deleteBlobsFor,
+  deleteUserBlobs,
+  InvalidUploadError,
+  parseUploadInput,
+} = await import("./uploads");
 
 const HOST = "https://abc123.public.blob.vercel-storage.com";
 const FILE_PATH = "users/u1/c1/My-Shot-x1.png";
@@ -595,5 +602,161 @@ describe("parseUploadInput", () => {
     { ...VALID, duration: {} },
   ])("returns null for %j", (value) => {
     expect(parseUploadInput(value)).toBeNull();
+  });
+});
+
+describe("deleteBlobsFor", () => {
+  const A_FILE = `${HOST}/users/u1/a/a-x1.png`;
+  const A_PREVIEW = `${HOST}/users/u1/a/preview-x2.webp`;
+  const B_FILE = `${HOST}/users/u1/b/b-x3.mp3`;
+  const upload = (url: string, thumbnail: string | null) => ({
+    url,
+    fileKey: url.slice(HOST.length + 1),
+    thumbnail,
+  });
+  const page = {
+    url: "https://example.com/post",
+    fileKey: null,
+    thumbnail: "https://example.com/og.png",
+  };
+
+  beforeEach(() => {
+    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "token");
+    vi.mocked(del).mockReset().mockResolvedValue(undefined);
+    vi.mocked(prisma.link.findMany).mockReset().mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("deletes the uploads' files and previews in one call, skipping pages and null previews", async () => {
+    await deleteBlobsFor([upload(A_FILE, A_PREVIEW), page, upload(B_FILE, null)]);
+
+    expect(del).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(del).mock.calls[0][0]).toEqual([A_FILE, A_PREVIEW, B_FILE]);
+  });
+
+  it("keeps a URL another row still references", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([
+      { url: "https://other.example/x", thumbnail: A_PREVIEW },
+      { url: B_FILE, thumbnail: null },
+    ] as never);
+
+    await deleteBlobsFor([upload(A_FILE, A_PREVIEW), upload(B_FILE, null)]);
+
+    expect(prisma.link.findMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { url: { in: [A_FILE, A_PREVIEW, B_FILE] } },
+          { thumbnail: { in: [A_FILE, A_PREVIEW, B_FILE] } },
+        ],
+      },
+      select: { url: true, thumbnail: true },
+    });
+    expect(vi.mocked(del).mock.calls[0][0]).toEqual([A_FILE]);
+  });
+
+  it("does nothing when every URL is still referenced", async () => {
+    vi.mocked(prisma.link.findMany).mockResolvedValue([
+      { url: A_FILE, thumbnail: null },
+    ] as never);
+    await deleteBlobsFor([upload(A_FILE, null)]);
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("does nothing without uploads", async () => {
+    await deleteBlobsFor([page]);
+    await deleteBlobsFor([]);
+    expect(prisma.link.findMany).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when uploads are disabled", async () => {
+    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "");
+    await deleteBlobsFor([upload(A_FILE, A_PREVIEW)]);
+    expect(prisma.link.findMany).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("logs and resolves when del rejects", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(del).mockRejectedValue(new Error("blob down"));
+
+    await expect(deleteBlobsFor([upload(A_FILE, A_PREVIEW)])).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalledWith("[uploads] del failed", expect.any(Error));
+  });
+
+  it("logs and resolves, deleting nothing, when the reference check fails", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(prisma.link.findMany).mockRejectedValue(new Error("db down"));
+
+    await expect(deleteBlobsFor([upload(A_FILE, null)])).resolves.toBeUndefined();
+    expect(del).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledWith("[uploads] del failed", expect.any(Error));
+  });
+});
+
+describe("deleteUserBlobs", () => {
+  type ListResult = Awaited<ReturnType<typeof list>>;
+  const blob = (pathname: string) => ({ url: `${HOST}/${pathname}`, pathname });
+
+  beforeEach(() => {
+    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "token");
+    vi.mocked(del).mockReset().mockResolvedValue(undefined);
+    vi.mocked(list).mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("deletes every page of the user's prefix, following the cursor", async () => {
+    vi.mocked(list)
+      .mockResolvedValueOnce({
+        blobs: [blob("users/u1/a/a.png"), blob("users/u1/a/preview.webp")],
+        hasMore: true,
+        cursor: "c2",
+      } as unknown as ListResult)
+      .mockResolvedValueOnce({
+        blobs: [blob("users/u1/b/b.mp3")],
+        hasMore: false,
+      } as unknown as ListResult);
+
+    await deleteUserBlobs("u1");
+
+    expect(vi.mocked(list).mock.calls).toEqual([
+      [{ prefix: "users/u1/", cursor: undefined, limit: 1000 }],
+      [{ prefix: "users/u1/", cursor: "c2", limit: 1000 }],
+    ]);
+    expect(vi.mocked(del).mock.calls).toEqual([
+      [[`${HOST}/users/u1/a/a.png`, `${HOST}/users/u1/a/preview.webp`]],
+      [[`${HOST}/users/u1/b/b.mp3`]],
+    ]);
+  });
+
+  it("skips del for an empty page", async () => {
+    vi.mocked(list).mockResolvedValueOnce({
+      blobs: [],
+      hasMore: false,
+    } as unknown as ListResult);
+    await deleteUserBlobs("u1");
+    expect(del).not.toHaveBeenCalled();
+  });
+
+  it("logs and resolves when Blob fails", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(list).mockRejectedValue(new Error("blob down"));
+
+    await expect(deleteUserBlobs("u1")).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalledWith("[uploads] del failed", expect.any(Error));
+  });
+
+  it("does nothing when uploads are disabled", async () => {
+    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "");
+    await deleteUserBlobs("u1");
+    expect(list).not.toHaveBeenCalled();
   });
 });

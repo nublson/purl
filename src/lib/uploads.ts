@@ -1,6 +1,6 @@
 import "server-only";
 
-import { BlobNotFoundError, del, head } from "@vercel/blob";
+import { BlobNotFoundError, del, head, list } from "@vercel/blob";
 import { insertWithinSaveLimit } from "@/lib/entitlements";
 import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
 import { mapRowToLink } from "@/lib/links";
@@ -274,5 +274,76 @@ export async function createUploadForUser(
     await discardBlobs(userId, file.pathname, urls);
     if (isForeignKeyConstraintError(error)) throw new FolderNotFoundError();
     throw error;
+  }
+}
+
+/** What `deleteBlobsFor` needs of a row about to go (or gone). */
+export type BlobOwningRow = {
+  url: string;
+  fileKey: string | null;
+  thumbnail: string | null;
+};
+
+/**
+ * Best effort, after the rows' delete has committed: removes the blobs of
+ * the uploads among `rows` (each file and its preview) in one `del`. A URL
+ * that a remaining row (any user's) still uses by `url` or `thumbnail` is
+ * kept. Page links (no `fileKey`) are skipped, and so is anything not on
+ * the Blob host. Never throws: a failure is logged and the blobs stay.
+ */
+export async function deleteBlobsFor(rows: BlobOwningRow[]): Promise<void> {
+  if (!uploadsEnabled()) return;
+  const urls = new Set<string>();
+  for (const row of rows) {
+    if (!row.fileKey) continue;
+    for (const url of [row.url, row.thumbnail]) {
+      if (url && isBlobUrl(url)) urls.add(url);
+    }
+  }
+  if (urls.size === 0) return;
+  try {
+    const candidates = [...urls];
+    const stillUsed = await prisma.link.findMany({
+      where: {
+        OR: [{ url: { in: candidates } }, { thumbnail: { in: candidates } }],
+      },
+      select: { url: true, thumbnail: true },
+    });
+    for (const row of stillUsed) {
+      urls.delete(row.url);
+      if (row.thumbnail) urls.delete(row.thumbnail);
+    }
+    if (urls.size === 0) return;
+    await del([...urls]);
+  } catch (error) {
+    console.error("[uploads] del failed", error);
+  }
+}
+
+/** Blob's `list` page size (its maximum). */
+const LIST_PAGE_SIZE = 1000;
+
+/**
+ * Best effort, when an account is deleted: removes every blob under the
+ * user's prefix (`users/<userId>/`), a page at a time. Never throws, so the
+ * account deletion goes ahead even when Blob is down.
+ */
+export async function deleteUserBlobs(userId: string): Promise<void> {
+  if (!uploadsEnabled()) return;
+  try {
+    let cursor: string | undefined;
+    do {
+      const page = await list({
+        prefix: `users/${userId}/`,
+        cursor,
+        limit: LIST_PAGE_SIZE,
+      });
+      if (page.blobs.length > 0) {
+        await del(page.blobs.map((blob) => blob.url));
+      }
+      cursor = page.hasMore ? page.cursor : undefined;
+    } while (cursor);
+  } catch (error) {
+    console.error("[uploads] del failed", error);
   }
 }

@@ -85,3 +85,20 @@ describe("revokeSaveOnlyAppsOnSignOut", () => {
     spy.mockRestore();
   });
 });
+
+const mockDeleteUserBlobs = vi.fn();
+vi.mock("@/lib/uploads", () => ({
+  deleteUserBlobs: (...args: unknown[]) => mockDeleteUserBlobs(...args),
+}));
+
+describe("deleteUserBlobsBeforeDelete", () => {
+  beforeEach(() => {
+    mockDeleteUserBlobs.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("deletes the user's uploaded files before the account goes", async () => {
+    const { deleteUserBlobsBeforeDelete } = await import("./auth-hooks");
+    await deleteUserBlobsBeforeDelete({ id: "user-1" });
+    expect(mockDeleteUserBlobs).toHaveBeenCalledWith("user-1");
+  });
+});

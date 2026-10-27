@@ -26,6 +26,13 @@ vi.mock("@/lib/folders", () => {
   return { FolderNotFoundError, assertFolderOwned: vi.fn() };
 });
 
+vi.mock("@/lib/uploads", () => ({
+  InvalidUploadError: class InvalidUploadError extends Error {
+    readonly name = "InvalidUploadError";
+    readonly code = "INVALID_UPLOAD";
+  },
+}));
+
 vi.mock("@/lib/realtime-broadcast", () => ({
   broadcastLinksChanged: vi.fn().mockResolvedValue(undefined),
 }));
@@ -55,6 +62,7 @@ const {
 const { FolderNotFoundError, assertFolderOwned } = await import("@/lib/folders");
 const { broadcastLinksChanged } = await import("@/lib/realtime-broadcast");
 const { auth } = await import("@/lib/auth");
+const { InvalidUploadError } = await import("@/lib/uploads");
 
 const { GET, PATCH, DELETE: DELETE_HANDLER } = await import("./route");
 
@@ -292,6 +300,41 @@ describe("links/[id] API route", () => {
 
       expect(res.status).toBe(401);
       expect(await res.json()).toEqual({ error: "Unauthorized" });
+    });
+
+    it("returns 400 INVALID_UPLOAD when the url of an upload is changed", async () => {
+      vi.mocked(updateLink).mockRejectedValue(
+        new InvalidUploadError("An upload's file can't be changed"),
+      );
+
+      const res = await PATCH(
+        patchRequest({ url: "https://example.com/other", title: "New" }),
+        { params: Promise.resolve({ id: ID }) },
+      );
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "An upload's file can't be changed",
+        code: "INVALID_UPLOAD",
+      });
+      expect(vi.mocked(broadcastLinksChanged)).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 INVALID_UPLOAD when an upload's url changes along with a move", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue({
+        user: { id: "user-1" },
+      } as never);
+      vi.mocked(updateLinkForUser).mockRejectedValue(
+        new InvalidUploadError("An upload's file can't be changed"),
+      );
+
+      const res = await PATCH(
+        patchRequest({ url: "https://example.com/other", folderId: null }),
+        { params: Promise.resolve({ id: ID }) },
+      );
+
+      expect(res.status).toBe(400);
+      expect((await res.json()).code).toBe("INVALID_UPLOAD");
     });
 
     it("returns 400 when folderId is not a string or null", async () => {

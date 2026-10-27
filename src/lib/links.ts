@@ -13,6 +13,7 @@ import prisma, { type Prisma } from "@/lib/prisma";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
 import { getSessionUser } from "@/lib/session";
 import { detectContentType } from "@/lib/server-detect-content-type";
+import { deleteBlobsFor, InvalidUploadError } from "@/lib/uploads";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
 import { timeoutSignal } from "@/utils/abort-signal";
 import { getUrlDomain } from "@/utils/formatter";
@@ -753,6 +754,11 @@ export async function updateLinkForUser(
     where: { id, userId },
   });
   if (!existing) return null;
+  // An upload's URL is its file in Blob: re-pointing it would orphan the
+  // file and leave its size counted against the storage cap.
+  if (existing.fileKey && data.url !== undefined) {
+    throw new InvalidUploadError("An upload's file can't be changed");
+  }
 
   const nextUrl = data.url?.trim();
   const urlChanged =
@@ -906,6 +912,10 @@ export async function moveLinksToFolder(
     notFound: linkIds.filter((id) => !previousById.has(id)),
   };
 }
+
+/** What a deleted row's blobs are found from (`deleteBlobsFor`). */
+const BLOB_FIELDS = { url: true, fileKey: true, thumbnail: true } as const;
+
 /**
  * Deletes every link in `linkIds` owned by `userId` in one write; ids that
  * aren't the user's are ignored. Returns how many links were deleted.
@@ -914,9 +924,15 @@ export async function deleteLinksForUser(
   userId: string,
   linkIds: string[],
 ): Promise<number> {
+  // The uploads among them, read first: their blobs go once the rows have.
+  const uploads = await prisma.link.findMany({
+    where: { id: { in: linkIds }, userId, fileKey: { not: null } },
+    select: BLOB_FIELDS,
+  });
   const { count } = await prisma.link.deleteMany({
     where: { id: { in: linkIds }, userId },
   });
+  await deleteBlobsFor(uploads);
   return count;
 }
 
@@ -925,9 +941,11 @@ export async function deleteLink(id: string): Promise<boolean> {
   const userId = await getCurrentUserId();
   const existing = await prisma.link.findFirst({
     where: { id, userId },
+    select: BLOB_FIELDS,
   });
   if (!existing) return false;
   await prisma.link.delete({ where: { id } });
+  await deleteBlobsFor([existing]);
   return true;
 }
 
