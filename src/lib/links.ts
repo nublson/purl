@@ -216,7 +216,7 @@ type LinkRow = {
   embed?: boolean;
 };
 
-function mapRowToLink(row: LinkRow): Link {
+export function mapRowToLink(row: LinkRow): Link {
   return {
     id: row.id,
     url: row.url,
