@@ -110,6 +110,10 @@ export function MediaAnchor({
         onLayoutAnimationComplete={() => {
           if (!open) setMorphing(false);
         }}
+        // While it morphs (open, then back): lists lift their rows'
+        // `content-visibility` containment, which would clip the morph to
+        // the row, and rows keep a hovered row's icon shown (`LinkItem`).
+        data-pearl-morphing={morphing || undefined}
         className={cn("w-full overflow-hidden", morphing && "relative z-10", className)}
         style={cornerStyle(corners, radius)}
       >

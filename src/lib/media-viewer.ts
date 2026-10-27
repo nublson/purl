@@ -156,6 +156,32 @@ function step(delta: 1 | -1) {
   setState({ ...state, currentId: target.id });
 }
 
+/**
+ * Set by the viewer right before it hands focus back to a pearl's button
+ * on close, so that focus isn't taken for keyboard navigation (rows open
+ * their hover preview on keyboard focus). One focus consumes it; it lapses
+ * on its own shortly after, in case focus went nowhere.
+ */
+let returningFocus = false;
+let returningFocusTimer: ReturnType<typeof setTimeout> | undefined;
+const RETURNING_FOCUS_MS = 500;
+
+export function markReturningFocus() {
+  returningFocus = true;
+  clearTimeout(returningFocusTimer);
+  returningFocusTimer = setTimeout(() => {
+    returningFocus = false;
+  }, RETURNING_FOCUS_MS);
+}
+
+/** True once right after the viewer gave focus back (see above). */
+export function consumeReturningFocus(): boolean {
+  if (!returningFocus) return false;
+  returningFocus = false;
+  clearTimeout(returningFocusTimer);
+  return true;
+}
+
 export type MediaViewerView = MediaViewerState & {
   /** Position of the current pearl, -1 while closed. */
   index: number;

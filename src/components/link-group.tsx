@@ -100,11 +100,13 @@ export const LinkGroup = ({
           // content-visibility skips layout/paint for off-screen rows; the
           // intrinsic size (one row) keeps the scrollbar stable. Adjacent
           // selected rows join into one shape: square the corners they share.
+          // While a media pearl's icon morphs to or from the viewer, the
+          // containment lifts so the morph isn't clipped to the row.
           <div
             key={link.id}
             role="listitem"
             data-flip={`link:${link.id}`}
-            className="[content-visibility:auto] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px] [&:has(+div_[data-selected])_[data-selected]]:rounded-b-none [&:has([data-selected])+div_[data-selected]]:rounded-t-none"
+            className="[content-visibility:auto] has-[[data-pearl-morphing]]:[content-visibility:visible] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px] [&:has(+div_[data-selected])_[data-selected]]:rounded-b-none [&:has([data-selected])+div_[data-selected]]:rounded-t-none"
           >
             <LinkItem
               link={link}

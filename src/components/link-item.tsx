@@ -13,7 +13,11 @@ import {
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
 import { haptic } from "@/lib/haptics";
 import { isMediaKind, linkKind } from "@/lib/link-kind";
-import { mediaViewer, useIsMediaOpen } from "@/lib/media-viewer";
+import {
+  consumeReturningFocus,
+  mediaViewer,
+  useIsMediaOpen,
+} from "@/lib/media-viewer";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
 import { linkSecondLine } from "@/lib/upload-meta";
@@ -214,7 +218,10 @@ export const LinkItem = React.forwardRef<
       .filter(Boolean)
       .join(" ") || undefined;
   // Keyboard users get the same preview mouse users get on hover.
+  // Not when the media viewer hands focus back on close: the row's icon is
+  // still morphing back, and nobody navigated here.
   const openPreviewOnFocus = (event: React.FocusEvent<HTMLElement>) => {
+    if (consumeReturningFocus()) return;
     if (!event.currentTarget.matches(":focus-visible")) return;
     clearCloseTimer();
     openedByPointerRef.current = false;
@@ -399,7 +406,9 @@ export const LinkItem = React.forwardRef<
                   ? "opacity-0 motion-safe:scale-80"
                   : // Keyboard focus only: a mouse click leaves focus on the
                     // checkbox, and the favicon must come back once you move away.
-                    "[@media(hover:hover)]:group-hover/item:opacity-0 motion-safe:[@media(hover:hover)]:group-hover/item:scale-80 group-has-[:focus-visible]/media:opacity-0 motion-safe:group-has-[:focus-visible]/media:scale-80",
+                    // While its icon morphs to or from the media viewer it
+                    // stays whole, hovered or not: the morph lands in it.
+                    "[@media(hover:hover)]:group-hover/item:opacity-0 motion-safe:[@media(hover:hover)]:group-hover/item:scale-80 group-has-[:focus-visible]/media:opacity-0 motion-safe:group-has-[:focus-visible]/media:scale-80 group-has-[[data-pearl-morphing]]/item:opacity-100! group-has-[[data-pearl-morphing]]/item:scale-100!",
             )}
           >
             {/* A media pearl's icon is the viewer's morph anchor (the
@@ -434,7 +443,8 @@ export const LinkItem = React.forwardRef<
                   "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background max-md:size-5 transition-[opacity,scale,box-shadow] duration-150 ease-out-strong",
                   selecting
                     ? "opacity-100"
-                    : "opacity-0 motion-safe:scale-125 focus-visible:opacity-100 motion-safe:focus-visible:scale-100 [@media(hover:hover)]:group-hover/item:opacity-100 motion-safe:[@media(hover:hover)]:group-hover/item:scale-100",
+                    : // Hidden while the icon morphs (the favicon shows).
+                      "opacity-0 motion-safe:scale-125 focus-visible:opacity-100 motion-safe:focus-visible:scale-100 [@media(hover:hover)]:group-hover/item:opacity-100 motion-safe:[@media(hover:hover)]:group-hover/item:scale-100 group-has-[[data-pearl-morphing]]/item:opacity-0!",
                 )}
                 onClick={(event) => {
                   event.preventDefault();

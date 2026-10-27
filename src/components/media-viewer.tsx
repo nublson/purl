@@ -3,7 +3,12 @@
 import { audioPlayerStore, viewerAudioId } from "@/hooks/use-audio-player";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { linkKind } from "@/lib/link-kind";
-import { mediaViewer, useIsMediaOpen, useMediaViewer } from "@/lib/media-viewer";
+import {
+  markReturningFocus,
+  mediaViewer,
+  useIsMediaOpen,
+  useMediaViewer,
+} from "@/lib/media-viewer";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { linkSecondLine } from "@/lib/upload-meta";
 import { cn } from "@/lib/utils";
@@ -87,9 +92,13 @@ export function MediaViewer() {
   const [finalFocus] = useState(() => ({
     get current(): HTMLElement | null {
       const id = returnTo.current;
-      return id
+      const target = id
         ? document.querySelector<HTMLElement>(`[data-pearl-button="${CSS.escape(id)}"]`)
         : null;
+      // Read as focus goes back: the row it lands on mustn't take it for
+      // keyboard navigation (no hover preview over the morph back).
+      if (target) markReturningFocus();
+      return target;
     },
   }));
   const mediaRef = useRef<HTMLDivElement>(null);

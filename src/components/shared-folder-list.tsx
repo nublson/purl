@@ -178,7 +178,6 @@ export function SharedFolderList({
   if (links.length === 0) {
     return (
       <div className={frame}>
-        <MediaViewerLazy />
         {descriptionLine}
         <Empty data-cy="link-group-empty">
           <EmptyHeader>
@@ -268,7 +267,9 @@ export function SharedFolderList({
               <div
                 key={link.id}
                 role="listitem"
-                className="[content-visibility:auto] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px]"
+                // Containment lifts while the row's icon morphs to or from
+                // the media viewer, so the morph isn't clipped to the row.
+                className="[content-visibility:auto] has-[[data-pearl-morphing]]:[content-visibility:visible] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px]"
               >
                 <SharedLinkItem link={link} eagerFavicon={index < EAGER_ROWS} />
               </div>

@@ -338,10 +338,56 @@ test.describe("Media viewer", () => {
     await expect(dialog).toBeVisible();
     await expect.poll(() => new URL(page.url()).searchParams.get("pearl")).toBe(shotA);
 
+    // The pointer is still over the row, which hides its favicon for the
+    // checkbox; while the icon morphs (open, then back) the favicon stays
+    // whole, so the morph back lands in it, and its list item lifts its
+    // `content-visibility` containment (which would clip the morph to the
+    // row). Sampled every frame until the morph back has played.
+    await page.waitForTimeout(200);
+    await page.evaluate(() => {
+      const w = window as unknown as { samples: string[][]; sampled: boolean };
+      w.samples = [];
+      w.sampled = false;
+      const tick = () => {
+        const anchor = document.querySelector('[data-cy="link-item"] [data-pearl-morphing]');
+        if (!anchor) {
+          w.sampled = true;
+          return;
+        }
+        const style = getComputedStyle(anchor.closest('[data-cy="row-favicon"]')!);
+        const item = getComputedStyle(anchor.closest('[role="listitem"]')!);
+        w.samples.push([style.opacity, style.scale, item.contentVisibility]);
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
     await page.keyboard.press("Escape");
     await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
     await expect.poll(() => new URL(page.url()).searchParams.has("pearl")).toBe(false);
     await expect(row.locator("[data-pearl-button]")).toBeFocused();
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { sampled: boolean }).sampled))
+      .toBe(true);
+    const samples = await page.evaluate(
+      () => (window as unknown as { samples: string[][] }).samples,
+    );
+    expect(samples.length).toBeGreaterThan(3);
+    for (const [opacity, scale, contentVisibility] of samples) {
+      expect(opacity).toBe("1");
+      expect(["none", "1"]).toContain(scale);
+      expect(contentVisibility).toBe("visible");
+    }
+    // By keyboard, with the pointer elsewhere: focus comes back from the
+    // viewer, not by keyboard navigation, so no preview pops up beside the
+    // row while its icon morphs back.
+    await page.mouse.move(5, 400);
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect(row.locator("[data-pearl-button]")).toBeFocused();
+    await page.waitForTimeout(300);
+    await expect(page.locator('[data-slot="hover-card-content"]')).toHaveCount(0);
     // A page link's row is still a link to a new tab.
     await expect(
       page.getByRole("link", { name: "Alpha (opens in new tab)", exact: true }),

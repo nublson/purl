@@ -2,7 +2,11 @@
 
 import { isMediaKind, linkKind } from "@/lib/link-kind";
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
-import { mediaViewer, useIsMediaOpen } from "@/lib/media-viewer";
+import {
+  consumeReturningFocus,
+  mediaViewer,
+  useIsMediaOpen,
+} from "@/lib/media-viewer";
 import { linkSecondLine } from "@/lib/upload-meta";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
@@ -69,8 +73,10 @@ export function SharedLinkItem({
     if (viewerOpen) setPreviewOpen(false);
   }, [viewerOpen]);
 
-  // Keyboard users get the same preview mouse users get on hover.
+  // Keyboard users get the same preview mouse users get on hover; not when
+  // the media viewer hands focus back on close (its icon is morphing back).
   const openPreviewOnFocus = (event: React.FocusEvent<HTMLElement>) => {
+    if (consumeReturningFocus()) return;
     if (!hasPreview || !event.currentTarget.matches(":focus-visible")) return;
     clearTimers();
     openedByPointerRef.current = false;
