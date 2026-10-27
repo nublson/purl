@@ -545,6 +545,29 @@ async function refreshExistingLink(
 }
 
 /**
+ * Re-saving an upload's own URL (Copy link → paste, the folder page's "saved
+ * elsewhere" row, v1, MCP) must not re-resolve it: the file would read as a
+ * media link, titled after the suffixed blob name, on the store's host, and a
+ * video would lose its preview (which the sweep then deletes). Only the
+ * folder may change, and `createdAt` is never bumped. Returns the row as it
+ * is (`moved: false`) when `folderId` is absent or already its folder.
+ */
+async function resaveUploadRow(
+  row: RefreshLinkResult,
+  folderId: string | undefined,
+  db: Pick<Prisma.TransactionClient, "link"> = prisma,
+): Promise<RefreshLinkResult & { moved: boolean }> {
+  if (folderId === undefined || folderId === row.folderId) {
+    return { ...row, moved: false };
+  }
+  const moved = await db.link.update({
+    where: { id: row.id },
+    data: { folderId },
+  });
+  return { ...moved, moved: true };
+}
+
+/**
  * Saves a link from already-resolved metadata under the per-user save lock
  * (`insertWithinSaveLimit`). The URL is looked up again there: `Link` has no
  * URL uniqueness, and the lookup that found nothing (or the row since
@@ -589,6 +612,9 @@ async function insertResolvedLink(
           const folderChanged =
             folderId !== undefined && folderId !== row.folderId;
           try {
+            if (row.fileKey != null) {
+              return await resaveUploadRow(row, folderId, tx);
+            }
             const refreshed = await refreshExistingLink(
               row,
               resolved,
@@ -636,7 +662,8 @@ export async function createLink(
  * the folder is only changed when `opts.folderId` is explicitly provided and
  * differs from the link's current folder — re-saving with no `folderId`
  * leaves the link's folder untouched. `moved` reports whether the folder
- * changed as a result of this call.
+ * changed as a result of this call. An existing upload (`fileKey` set) is
+ * never re-resolved or bumped: only its folder can change.
  */
 export async function createLinkForUser(
   userId: string,
@@ -656,6 +683,20 @@ export async function createLinkForUser(
     const folderChanged =
       requestedFolderId !== undefined &&
       requestedFolderId !== existing.folderId;
+
+    if (existing.fileKey != null) {
+      try {
+        return await resaveUploadRow(existing, requestedFolderId);
+      } catch (error) {
+        if (isForeignKeyConstraintError(error)) {
+          throw new FolderNotFoundError();
+        }
+        // No resolve runs first, so the row can only vanish in the instant
+        // before this write; its blobs go with it, so there is nothing to
+        // save fresh.
+        throw error;
+      }
+    }
 
     const resolved = await resolveLinkFromUrl(existing.url);
     try {

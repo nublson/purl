@@ -78,6 +78,20 @@ describe("POST /api/uploads/token", () => {
     expect(issueUploadToken).not.toHaveBeenCalled();
   });
 
+  it("never passes a client's callbackUrl on to the token", async () => {
+    vi.mocked(issueUploadToken).mockResolvedValue({ clientToken: "tok" });
+    const res = await POST(
+      post({
+        ...TOKEN_BODY,
+        payload: { ...TOKEN_BODY.payload, callbackUrl: "https://evil.test/hook" },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const [, body] = vi.mocked(issueUploadToken).mock.calls[0]!;
+    expect(body).toEqual(TOKEN_BODY);
+    expect("callbackUrl" in (body as { payload: object }).payload).toBe(false);
+  });
+
   describe("per-user token limit", () => {
     it("answers 429 with Retry-After once the user is over it", async () => {
       vi.mocked(getUploadsTokenUserRateLimiter).mockReturnValue({

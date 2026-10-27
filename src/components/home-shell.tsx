@@ -57,6 +57,7 @@ import {
   uploadFiles,
   type UploadHandlers,
 } from "@/lib/save-uploads";
+import { requestUsageRefresh } from "@/lib/usage-events";
 import {
   countGroupedLinks,
   groupLinksByDate,
@@ -718,8 +719,11 @@ export function HomeShell({
           updatePending(list, id, { status: "failed" }),
         ),
       onBatchDone: ({ uploaded }) => {
+        if (uploaded === 0) return;
+        // Settings → Usage's storage line.
+        requestUsageRefresh();
         // A save here files the pearls into this folder: its count changed.
-        if (uploaded > 0 && folderId) refreshFolders();
+        if (folderId) refreshFolders();
       },
     };
   }, [userId, folderId, glide, onSaveSuccess, refreshFolders]);

@@ -15,7 +15,12 @@ vi.mock("sonner", () => ({
 }));
 
 import type { PendingUpload } from "./pending-upload";
-import { forgetUpload, retryUpload, uploadFiles } from "./save-uploads";
+import {
+  forgetUpload,
+  rateLimitedMessage,
+  retryUpload,
+  uploadFiles,
+} from "./save-uploads";
 
 const USER = "user1";
 const BLOB_HOST = "https://store.public.blob.vercel-storage.com";
@@ -109,7 +114,7 @@ function payloadOf(call: Call) {
     pathname: payload.pathname as string,
     clientPayload: JSON.parse(payload.clientPayload as string) as Json,
     multipart: payload.multipart,
-    callbackUrl: payload.callbackUrl,
+    hasCallbackUrl: "callbackUrl" in payload,
   };
 }
 
@@ -208,7 +213,9 @@ describe("uploadFiles", () => {
       size: 1234,
     });
     expect(fileToken.multipart).toBe(true);
-    expect(fileToken.callbackUrl).toBe("https://purl.test/api/uploads/token");
+    // No upload-completed callback: Purl creates the pearl itself.
+    expect(fileToken.hasCallbackUrl).toBe(false);
+    expect(previewToken.hasCallbackUrl).toBe(false);
     expect(fileToken.pathname).toMatch(/^users\/user1\/[0-9a-f]{32}\/My-photo\.png$/);
     expect(previewToken.clientPayload).toEqual({
       kind: "preview",
@@ -372,6 +379,29 @@ describe("uploadFiles", () => {
     const failedId = h.onError.mock.calls[0][0];
     const b = h.onStart.mock.calls.find(([item]) => item.name === "b.png")?.[0];
     expect(failedId).toBe(b?.id);
+  });
+
+  it("words the 429 toast from Retry-After", async () => {
+    stubFetch((call) =>
+      call.url === "/api/uploads/token"
+        ? new Response(JSON.stringify({ error: "Too many requests" }), {
+            status: 429,
+            headers: { "content-type": "application/json", "Retry-After": "1750" },
+          })
+        : undefined,
+    );
+    const h = handlers();
+
+    await uploadFiles([png("a.png")], h);
+
+    expect(toastError).toHaveBeenCalledWith(
+      "Too many uploads at once. Try again in 30 minutes.",
+      { id: "upload-rate-limited" },
+    );
+    expect(h.onError).toHaveBeenCalledWith(
+      expect.any(String),
+      "Too many uploads at once. Try again in 30 minutes.",
+    );
   });
 
   it("cancels the queue when uploads aren't available", async () => {
@@ -553,5 +583,34 @@ describe("retryUpload", () => {
 
     expect(h.onStart).toHaveBeenCalledTimes(1);
     expect(URL.revokeObjectURL).toHaveBeenCalled();
+  });
+});
+
+describe("rateLimitedMessage", () => {
+  it("says a minute without Retry-After, or with an unreadable one", () => {
+    expect(rateLimitedMessage(null)).toBe(
+      "Too many uploads at once. Try again in a minute.",
+    );
+    expect(rateLimitedMessage("soon")).toBe(
+      "Too many uploads at once. Try again in a minute.",
+    );
+  });
+
+  it("says a minute under 90 seconds", () => {
+    expect(rateLimitedMessage("1")).toBe(
+      "Too many uploads at once. Try again in a minute.",
+    );
+    expect(rateLimitedMessage("89")).toBe(
+      "Too many uploads at once. Try again in a minute.",
+    );
+  });
+
+  it("counts minutes, rounded up, from 90 seconds", () => {
+    expect(rateLimitedMessage("90")).toBe(
+      "Too many uploads at once. Try again in 2 minutes.",
+    );
+    expect(rateLimitedMessage("3600")).toBe(
+      "Too many uploads at once. Try again in 60 minutes.",
+    );
   });
 });

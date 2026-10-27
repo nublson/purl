@@ -1,9 +1,16 @@
 /** Longest title a link keeps (the same cut every scraped title gets). */
 const MAX_TITLE_LENGTH = 500;
 
-/** A file name without its extension, whitespace collapsed, cut to 500; "" when nothing is left. */
+/**
+ * Control characters other than whitespace (which collapses to a space): a
+ * NUL would fail the row's insert, and none of them belong in a title.
+ */
+const CONTROL_CHARACTERS = /[\u0000-\u0008\u000e-\u001f\u007f]/g;
+
+/** A file name without its extension, control characters dropped, whitespace collapsed, cut to 500; "" when nothing is left. */
 function baseName(name: string): string {
   return name
+    .replace(CONTROL_CHARACTERS, "")
     .replace(/\.[a-z0-9]+\s*$/i, "")
     .replace(/\s+/g, " ")
     .trim()

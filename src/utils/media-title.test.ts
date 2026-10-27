@@ -14,6 +14,13 @@ describe("titleFromFileName", () => {
     expect(titleFromFileName("  My \t  Shot\n.png ")).toBe("My Shot");
   });
 
+  it("drops control characters", () => {
+    expect(titleFromFileName("Holiday\u0000 photo\u007f.PNG")).toBe(
+      "Holiday photo",
+    );
+    expect(titleFromFileName("\u0000\u001f.png")).toBe("file");
+  });
+
   it("falls back to 'file' when nothing is left", () => {
     expect(titleFromFileName(".png")).toBe("file");
     expect(titleFromFileName("")).toBe("file");
@@ -42,6 +49,11 @@ describe("mediaTitleFromUrl", () => {
     expect(mediaTitleFromUrl("https://cdn.test/.png", "cdn.test")).toBe(
       "cdn.test",
     );
+  });
+
+  it("drops control characters, a decoded NUL included", () => {
+    expect(mediaTitleFromUrl("https://x/a%00.png", "x")).toBe("a");
+    expect(mediaTitleFromUrl("https://x/%00%1F.png", "x")).toBe("x");
   });
 
   it("ignores the query and hash", () => {

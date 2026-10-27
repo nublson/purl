@@ -12,7 +12,6 @@ import { parseJsonLinks, type Link } from "@/utils/links";
 
 const TOKEN_ROUTE = "/api/uploads/token";
 const PREVIEW_MIME_TYPE = "image/webp";
-const RATE_LIMITED_MESSAGE = "Too many uploads at once. Try again in a minute.";
 const UNAVAILABLE_MESSAGE = "Uploads aren't available here";
 /** Object URLs outlive their item a moment, until what replaced it is drawn. */
 const REVOKE_DELAY_MS = 1000;
@@ -86,6 +85,8 @@ class UploadRequestError extends Error {
     readonly status: number,
     message: string,
     readonly code?: string,
+    /** A 429's `Retry-After` header (seconds), as sent. */
+    readonly retryAfter: string | null = null,
   ) {
     super(message);
   }
@@ -100,7 +101,21 @@ async function readError(res: Response): Promise<UploadRequestError> {
     res.status,
     typeof data.error === "string" ? data.error : "",
     typeof data.code === "string" ? data.code : undefined,
+    res.headers.get("Retry-After"),
   );
+}
+
+/**
+ * The 429 toast, worded from `Retry-After` (seconds): the per-IP limit resets
+ * within a minute, the per-user one (240 tokens an hour) can take longer.
+ */
+export function rateLimitedMessage(retryAfter: string | null): string {
+  const seconds = retryAfter === null ? NaN : Number(retryAfter);
+  const wait =
+    Number.isFinite(seconds) && seconds >= 90
+      ? `${Math.ceil(seconds / 60)} minutes`
+      : "a minute";
+  return `Too many uploads at once. Try again in ${wait}.`;
 }
 
 /** A Blob client token for exactly this pathname, type and size. */
@@ -116,7 +131,6 @@ async function requestClientToken(
       type: "blob.generate-client-token",
       payload: {
         pathname,
-        callbackUrl: location.origin + TOKEN_ROUTE,
         clientPayload: JSON.stringify(payload),
         multipart,
       },
@@ -272,8 +286,9 @@ function failureMessage(error: unknown, file: File, batch: Batch): string {
   }
   if (error.status === 429) {
     // One toast however many files a batch has rate-limited.
-    toast.error(RATE_LIMITED_MESSAGE, { id: "upload-rate-limited" });
-    return RATE_LIMITED_MESSAGE;
+    const message = rateLimitedMessage(error.retryAfter);
+    toast.error(message, { id: "upload-rate-limited" });
+    return message;
   }
   return error.message || fallback;
 }

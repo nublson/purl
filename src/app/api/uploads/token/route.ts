@@ -9,8 +9,10 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+type TokenEvent = Extract<HandleUploadBody, { type: "blob.generate-client-token" }>;
+
 /** Only token requests are answered here (Purl asks for no upload callbacks). */
-function isTokenEvent(body: unknown): body is HandleUploadBody {
+function isTokenEvent(body: unknown): body is TokenEvent {
   if (typeof body !== "object" || body === null) return false;
   const { type, payload } = body as Record<string, unknown>;
   return (
@@ -55,8 +57,17 @@ export async function POST(request: Request) {
     );
   }
 
+  // Only the fields Blob's token event defines go on: a `callbackUrl` (or
+  // anything else) a client adds never reaches `handleUpload`, so no client
+  // can have Blob POST an upload-completed callback anywhere.
+  const { pathname, clientPayload, multipart } = body.payload;
+  const event: TokenEvent = {
+    type: "blob.generate-client-token",
+    payload: { pathname, clientPayload, multipart },
+  };
+
   try {
-    return NextResponse.json(await issueUploadToken(userId, body, request));
+    return NextResponse.json(await issueUploadToken(userId, event, request));
   } catch (e) {
     if (e instanceof UploadRejectedError) {
       return NextResponse.json({ error: e.message, code: e.code }, { status: 400 });

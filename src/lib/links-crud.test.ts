@@ -1052,6 +1052,109 @@ describe("createLinkForUser – folders", () => {
     expect(vi.mocked(prisma.link.update)).toHaveBeenCalledTimes(1);
     expect(result.moved).toBe(false);
   });
+
+  // An upload's own URL (Copy link → paste, the folder page's "saved
+  // elsewhere" row, v1, MCP) must never be re-resolved as a media link: that
+  // would rename it after the suffixed blob, put the store's host in its
+  // domain and drop a video's preview (which the sweep then deletes).
+  // No extension on purpose: re-resolving it would have to fetch, so a
+  // fetch or scrape spy proves resolveLinkFromUrl never ran.
+  const UPLOAD_URL =
+    "https://abc.public.blob.vercel-storage.com/users/user-123/c1/clip-Xy12";
+  function makeUploadRow(folderId: string | null) {
+    return {
+      ...makeRow({
+        url: UPLOAD_URL,
+        title: "clip",
+        domain: "purl.live",
+        thumbnail:
+          "https://abc.public.blob.vercel-storage.com/users/user-123/c1/preview-Ab34.webp",
+        contentType: "VIDEO" as never,
+        folderId,
+      }),
+      favicon: "/icon.png",
+      fileKey: "users/user-123/c1/clip-Xy12",
+      fileSize: 1234,
+      mimeType: "video/mp4",
+      width: 1920,
+      height: 1080,
+      duration: 12,
+    };
+  }
+
+  it("re-saving an upload's URL into another folder only moves it", async () => {
+    const existing = makeUploadRow("folder-1");
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
+    vi.mocked(prisma.link.update).mockImplementation(
+      (async ({ data }: { data: object }) => ({ ...existing, ...data })) as never,
+    );
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    fetchSpy.mockClear();
+
+    const result = await createLinkForUser("user-123", UPLOAD_URL, {
+      folderId: "folder-2",
+    });
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: existing.id },
+      data: { folderId: "folder-2" },
+    });
+    expect(result).toEqual({ ...existing, folderId: "folder-2", moved: true });
+    expect(result.createdAt).toBe(existing.createdAt);
+    expect(vi.mocked(ogs)).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("re-saving an upload's URL with no folder leaves it untouched", async () => {
+    const existing = makeUploadRow("folder-1");
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    fetchSpy.mockClear();
+
+    const result = await createLinkForUser("user-123", UPLOAD_URL);
+
+    expect(result).toEqual({ ...existing, moved: false });
+    expect(vi.mocked(prisma.link.update)).not.toHaveBeenCalled();
+    expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
+    // resolveLinkFromUrl never ran: no HEAD/sniff, no scrape.
+    expect(vi.mocked(ogs)).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("re-saving an upload's URL into its own folder leaves it untouched", async () => {
+    const existing = makeUploadRow("folder-1");
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
+
+    const result = await createLinkForUser("user-123", UPLOAD_URL, {
+      folderId: "folder-1",
+    });
+
+    expect(result).toEqual({ ...existing, moved: false });
+    expect(vi.mocked(prisma.link.update)).not.toHaveBeenCalled();
+  });
+
+  it("an upload row a concurrent save finds under the lock is only moved, never refreshed", async () => {
+    // Nothing found before the scrape; the upload row is there under the lock.
+    const upload = makeUploadRow(null);
+    vi.mocked(prisma.link.findFirst)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(upload as never);
+    vi.mocked(prisma.link.update).mockImplementation(
+      (async ({ data }: { data: object }) => ({ ...upload, ...data })) as never,
+    );
+
+    const result = await createLinkForUser("user-123", UPLOAD_URL, {
+      folderId: "folder-2",
+    });
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: upload.id },
+      data: { folderId: "folder-2" },
+    });
+    expect(result).toEqual({ ...upload, folderId: "folder-2", moved: true });
+    expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
+  });
 });
 
 // ─── moveLinkToFolder ──────────────────────────────────────────────────────────

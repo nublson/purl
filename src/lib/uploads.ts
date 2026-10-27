@@ -255,8 +255,7 @@ export async function createUploadForUser(
         tx.link.create({
           data: {
             url: file.url,
-            // Strip control characters (a NUL would fail the insert).
-            title: titleFromFileName(input.name.replace(/[\u0000-\u001f\u007f]/g, "")),
+            title: titleFromFileName(input.name),
             favicon: UPLOAD_FAVICON,
             domain: uploadDomain(),
             contentType,
