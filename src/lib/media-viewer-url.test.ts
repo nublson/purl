@@ -171,6 +171,37 @@ describe("ViewerUrl", () => {
     expect(mediaViewer.getSnapshot().currentId).toBeNull();
   });
 
+  it("Back off the viewer closes through the viewer's own close, without going back", () => {
+    mediaViewer.register([link("a"), link("b")]);
+    const f = page("/home");
+    mediaViewer.open("a");
+    mediaViewer.next();
+    const request = vi.fn();
+    const unregister = mediaViewer.setCloseRequest(request);
+    f.history.back();
+    // Not closed yet: the viewer closes a few frames later, as with Esc.
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(mediaViewer.getSnapshot().currentId).toBe("b");
+    mediaViewer.close();
+    expect(f.history.back).toHaveBeenCalledTimes(1);
+    expect(f.history.replaceState).toHaveBeenCalledTimes(1); // the move to b
+    expect(f.state.href).toBe("/home");
+    unregister();
+    f.binder.dispose();
+  });
+
+  it("a pop onto another pearl closes at once, without the viewer's close", () => {
+    mediaViewer.register([link("a"), link("b")]);
+    mediaViewer.open("b");
+    const request = vi.fn();
+    const unregister = mediaViewer.setCloseRequest(request);
+    const { viewerUrl } = fake("/home?pearl=a");
+    viewerUrl.onPopState("?pearl=a");
+    expect(request).not.toHaveBeenCalled();
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+    unregister();
+  });
+
   it("onPopState with a param leaves the store alone", () => {
     mediaViewer.register([link("x")]);
     mediaViewer.open("x");

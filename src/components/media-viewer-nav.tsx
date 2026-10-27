@@ -222,6 +222,8 @@ function ViewerSlide({
       // Past the first or last pearl, the media only gives a little.
       dragConstraints={{ left: hasNext ? undefined : 0, right: hasPrev ? undefined : 0 }}
       onPointerDown={(event) => {
+        // The main button (or a touch, or a pen's tip) of the first pointer.
+        if (event.button !== 0 || !event.isPrimary) return;
         const target = event.target;
         if (target instanceof Element && target.closest(NOT_A_HANDLE)) return;
         // Reset here: Motion locks the axis before it calls `onDragStart`.

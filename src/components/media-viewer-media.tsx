@@ -37,14 +37,23 @@ export function preloadOriginal(link: Link) {
   image.src = src;
 }
 
-export function ViewerMedia({ link, ready }: { link: Link; ready: boolean }) {
+export function ViewerMedia({
+  link,
+  ready,
+  roomForArrows,
+}: {
+  link: Link;
+  ready: boolean;
+  /** The viewer shows Previous / Next on the media's sides. */
+  roomForArrows: boolean;
+}) {
   switch (linkKind(link)) {
     case "image":
       return <ViewerImage link={link} ready={ready} />;
     case "video":
       return <ViewerVideo link={link} ready={ready} />;
     case "audio":
-      return <ViewerAudio link={link} />;
+      return <ViewerAudio link={link} roomForArrows={roomForArrows} />;
     default:
       // Only media pearls are registered; nothing else reaches the viewer.
       return null;
@@ -266,13 +275,18 @@ function ViewerVideo({ link, ready }: { link: Link; ready: boolean }) {
  * An audio pearl: the title, then the card's player at the viewer's size
  * (a 56px play button, the scrubber and the time), on the card's surface.
  * It has its own player, which starts stopped; the card's strip stopped
- * when the viewer opened (`MediaViewer`).
+ * when the viewer opened (`MediaViewer`). With Previous / Next on its
+ * sides (8px in, up to 40px wide on touch), 56px gutters on both sides keep
+ * the player between them, the title lined up with it.
  */
-function ViewerAudio({ link }: { link: Link }) {
+function ViewerAudio({ link, roomForArrows }: { link: Link; roomForArrows: boolean }) {
   return (
     <div
       data-viewer-media="audio"
-      className="flex w-[min(480px,100vw-32px)] flex-col gap-4 bg-card p-5 md:p-6"
+      className={cn(
+        "flex w-[min(480px,100vw-32px)] flex-col gap-4 bg-card p-5 md:p-6",
+        roomForArrows && "px-14 md:px-14",
+      )}
     >
       {/* Clear of the close button in the top-right corner. */}
       <p className="line-clamp-2 pr-10 text-base leading-6 font-medium wrap-anywhere text-foreground">

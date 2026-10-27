@@ -14,8 +14,13 @@ export const SWIPE_VELOCITY = 400;
 /**
  * `lock` is the axis Motion locked the drag to (`dragDirectionLock`), null
  * when it never moved far enough to pick one. Across, the sign decides: a
- * drag to the left shows the next pearl, to the right the previous one,
- * unless it was flicked back the other way. Up or down closes either way.
+ * drag to the left shows the next pearl, to the right the previous one.
+ * Up or down closes either way.
+ *
+ * One rule beyond the thresholds: a drag across that's let go while
+ * moving back the other way at 400px/s or more does nothing, even past
+ * 80px (the reader changed their mind; snapping back reads as "cancel").
+ * A vertical drag has no such rule: either way is a close.
  */
 export function decideDrag(offset: Vector, velocity: Vector, lock: "x" | "y" | null): DragOutcome {
   if (lock === null) return "none";

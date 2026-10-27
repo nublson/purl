@@ -56,7 +56,7 @@ export function forgetPushedEntry() {
 
 type ViewerStore = Pick<
   typeof mediaViewer,
-  "subscribe" | "getSnapshot" | "open" | "close"
+  "subscribe" | "getSnapshot" | "open" | "close" | "requestClose"
 >;
 
 export class ViewerUrl {
@@ -109,7 +109,11 @@ export class ViewerUrl {
    * The browser moved through history. A URL without the param, or naming a
    * different pearl than the one showing, closes the viewer; that close must
    * not go back again. (A hash-only move that still names the pushed pearl
-   * keeps the push record.)
+   * keeps the push record.) Back off the viewer closes it as Esc does
+   * (`requestClose`: it morphs into the card of the pearl shown, a few
+   * frames later; by then no entry is pushed and the URL has no param, so
+   * that close leaves the URL alone). A move onto another pearl's entry
+   * closes at once, so that pearl opens in its place.
    */
   onPopState(search: string) {
     const popped = pearlParam(search);
@@ -118,7 +122,8 @@ export class ViewerUrl {
     if (currentId === null || currentId === popped) return;
     this.handlingPop = true;
     try {
-      this.store.close();
+      if (popped === null) this.store.requestClose();
+      else this.store.close();
     } finally {
       this.handlingPop = false;
     }

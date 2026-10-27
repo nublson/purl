@@ -84,6 +84,10 @@ export function MediaViewer() {
     }
   }, []);
 
+  // Back closes through here too (`ViewerUrl.onPopState`), so it morphs
+  // into the pearl shown, like Esc.
+  useEffect(() => mediaViewer.setCloseRequest(requestClose), [requestClose]);
+
   useEffect(() => {
     if (!closing) return;
     const frame = requestAnimationFrame(() => {
@@ -266,7 +270,11 @@ export function MediaViewer() {
                   reducedMotion={reducedMotion}
                   onDragOutcome={onDragOutcome}
                 >
-                  <ViewerMedia link={current} ready={ready} />
+                  <ViewerMedia
+                    link={current}
+                    ready={ready}
+                    roomForArrows={hasPrev || hasNext}
+                  />
                 </ViewerStage>
               </div>
               <ViewerArrows hasPrev={hasPrev} hasNext={hasNext} onMove={move} />

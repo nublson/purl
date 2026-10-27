@@ -39,6 +39,7 @@ const INITIAL: MediaViewerState = {
 };
 
 let state: MediaViewerState = INITIAL;
+let closeRequest: (() => void) | null = null;
 const listeners = new Set<() => void>();
 
 function setState(next: MediaViewerState) {
@@ -141,6 +142,24 @@ export const mediaViewer = {
   /** Moves to the previous pearl; stays on the first. */
   prev() {
     step(-1);
+  },
+
+  /**
+   * Asks the mounted viewer to close the way Esc does (morphing back into
+   * the card of the pearl it shows, which may take a few frames); closes
+   * at once when no viewer has registered.
+   */
+  requestClose() {
+    if (closeRequest) closeRequest();
+    else mediaViewer.close();
+  },
+
+  /** The viewer registers its close; the returned function unregisters it. */
+  setCloseRequest(request: () => void): () => void {
+    closeRequest = request;
+    return () => {
+      if (closeRequest === request) closeRequest = null;
+    };
   },
 
   /** Moves to the first pearl. */

@@ -196,4 +196,29 @@ describe("mediaViewer", () => {
     markCloseSettled(null);
     expect(listener).toHaveBeenCalledTimes(1);
   });
+
+  it("requestClose goes through the registered close, else closes at once", () => {
+    mediaViewer.register([link("a")]);
+    mediaViewer.open("a");
+    const request = vi.fn();
+    const unregister = mediaViewer.setCloseRequest(request);
+    mediaViewer.requestClose();
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(mediaViewer.getSnapshot().currentId).toBe("a");
+    unregister();
+    mediaViewer.requestClose();
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+  });
+
+  it("unregistering an older close keeps the newer one", () => {
+    const first = vi.fn();
+    const second = vi.fn();
+    const stopFirst = mediaViewer.setCloseRequest(first);
+    const stopSecond = mediaViewer.setCloseRequest(second);
+    stopFirst();
+    mediaViewer.requestClose();
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(first).not.toHaveBeenCalled();
+    stopSecond();
+  });
 });

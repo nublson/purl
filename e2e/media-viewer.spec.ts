@@ -122,6 +122,73 @@ async function seedThreeShots(
 const viewerStatus = (page: Page) =>
   page.locator("[data-media-viewer] [data-viewer-status]");
 
+/** Shot A, then an audio pearl (Song), then Shot C: the audio has both neighbours. */
+async function seedAudioBetween(
+  seed: { link: (link: Parameters<typeof seedLink>[1]) => Promise<string> },
+  baseURL: string,
+) {
+  const icon = `${baseURL}/icon.png`;
+  const pause = () => new Promise((resolve) => setTimeout(resolve, 15));
+  await seed.link({
+    url: `${icon}?c=1`,
+    title: "Shot C",
+    contentType: "IMAGE",
+    thumbnail: icon,
+    width: 800,
+    height: 600,
+  });
+  await pause();
+  await seed.link({
+    url: "https://sounds.example/song.wav",
+    title: "Song",
+    contentType: "AUDIO",
+    duration: 10,
+  });
+  await pause();
+  await seed.link({
+    url: `${icon}?a=1`,
+    title: "Shot A",
+    contentType: "IMAGE",
+    thumbnail: icon,
+    width: 800,
+    height: 600,
+  });
+}
+
+/**
+ * On an audio pearl with neighbours, Previous / Next (with their invisible
+ * hit area) stay clear of Play and the scrubber. Boxes may be mid-morph,
+ * but a scale along the axes keeps boxes that don't overlap apart.
+ */
+async function expectArrowsClearOfPlayer(page: Page) {
+  const dialog = page.getByRole("dialog", { name: "Song" });
+  await expect(dialog).toBeVisible();
+  const boxes = await dialog.evaluate((root) => {
+    const rect = (el: Element | null, grow = 0) => {
+      const r = el!.getBoundingClientRect();
+      return { l: r.left - grow, t: r.top - grow, r: r.right + grow, b: r.bottom + grow };
+    };
+    const hit = (name: string) => {
+      const el = root.querySelector(`button[aria-label="${name}"]`)!;
+      return rect(el, -parseFloat(getComputedStyle(el, "::after").top));
+    };
+    return {
+      arrows: [hit("Previous pearl"), hit("Next pearl")],
+      controls: [
+        rect(root.querySelector('button[aria-label="Play Song"]')),
+        rect(root.querySelector('input[aria-label="Seek Song"]')),
+      ],
+    };
+  });
+  for (const arrow of boxes.arrows) {
+    for (const control of boxes.controls) {
+      const overlap =
+        arrow.l < control.r && control.l < arrow.r && arrow.t < control.b && control.t < arrow.b;
+      expect(overlap, JSON.stringify({ arrow, control })).toBe(false);
+    }
+  }
+}
+
 test.describe("Media viewer", () => {
   test("an image card opens the viewer; Esc closes it back onto the card", async ({
     page,
@@ -603,6 +670,19 @@ test.describe("Media viewer", () => {
     await expect(page.locator("[data-pearl-morphing]")).toHaveCount(0, { timeout: 500 });
   });
 
+  test("on an audio pearl, the arrows stay clear of the player", async ({ page, seed, baseURL }) => {
+    await seedAudioBetween(seed, baseURL!);
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(3);
+
+    await openButton(page, "Shot A").click();
+    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
+    await page.keyboard.press("ArrowRight");
+    await page.getByRole("dialog").hover();
+    await expectArrowsClearOfPlayer(page);
+  });
+
   test("on a shared folder, → moves to the next media pearl, past page links", async ({
     browser,
     seed,
@@ -669,5 +749,63 @@ test.describe("Media viewer on phones", () => {
     expect(new URL(page.url()).pathname).toBe("/home");
     expect(new URL(page.url()).searchParams.has("pearl")).toBe(false);
     await expect(page.locator('[data-cy="link-item"]')).toHaveCount(3);
+  });
+
+  test("Back after moving closes onto the pearl shown and gives it focus", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    const { shotB } = await seedThreeShots(seed, baseURL!);
+    await openHome(page);
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(3);
+
+    await openButton(page, "Shot A").tap();
+    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("dialog", { name: "Shot B" })).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get("pearl")).toBe(shotB);
+
+    // Which row's icon the box morphs back into: Motion moves that one.
+    await page.evaluate(() => {
+      const w = window as unknown as { moved: string[]; watching: boolean };
+      w.moved = [];
+      w.watching = true;
+      const tick = () => {
+        for (const row of document.querySelectorAll('[data-cy="link-item"]')) {
+          const anchor = row.querySelector<HTMLElement>("[data-pearl-morphing]");
+          const transform = anchor?.style.transform ?? "";
+          if (transform && transform !== "none") {
+            const title = row.querySelector("[data-pearl-button]")?.getAttribute("aria-label");
+            if (title && !w.moved.includes(title)) w.moved.push(title);
+          }
+        }
+        if (w.watching) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await page.goBack();
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await page.evaluate(() => {
+      (window as unknown as { watching: boolean }).watching = false;
+    });
+    expect(new URL(page.url()).pathname).toBe("/home");
+    expect(new URL(page.url()).searchParams.has("pearl")).toBe(false);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(openButton(page, "Shot B")).toBeFocused();
+    // Into Shot B's row (the pearl shown), not Shot A's (opened from).
+    const moved = await page.evaluate(() => (window as unknown as { moved: string[] }).moved);
+    expect(moved).toEqual(["Shot B"]);
+    // Nothing is left raised for a morph once the close has settled.
+    await expect(page.locator("[data-pearl-morphing]")).toHaveCount(0, { timeout: 500 });
+  });
+
+  test("on an audio pearl, the arrows stay clear of the player", async ({ page, seed, baseURL }) => {
+    await seedAudioBetween(seed, baseURL!);
+    await openHome(page);
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(3);
+
+    await openButton(page, "Song").tap();
+    await expectArrowsClearOfPlayer(page);
   });
 });
