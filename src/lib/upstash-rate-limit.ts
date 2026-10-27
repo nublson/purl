@@ -39,6 +39,8 @@ function makeLimiter(
 
 const authLimiter = () => makeLimiter("auth", 30, "1 m");
 const linksPostLimiter = () => makeLimiter("links_post", 30, "1 m");
+// Each uploaded file asks for two tokens (the file and its preview).
+const uploadsTokenLimiter = () => makeLimiter("uploads_token", 30, "1 m");
 // A bookmarks import sends a chunk of up to 200 links per request.
 const linksImportLimiter = () => makeLimiter("links_import", 30, "1 m");
 const feedbackPostLimiter = () => makeLimiter("feedback_post", 10, "1 m");
@@ -57,6 +59,7 @@ const mcpLimiter = () => makeLimiter("mcp", 60, "1 m");
 
 let cachedAuth: Ratelimit | null | undefined;
 let cachedLinksPost: Ratelimit | null | undefined;
+let cachedUploadsToken: Ratelimit | null | undefined;
 let cachedLinksImport: Ratelimit | null | undefined;
 let cachedV1: Ratelimit | null | undefined;
 let cachedV1Post: Ratelimit | null | undefined;
@@ -75,6 +78,13 @@ export function getAuthRateLimiter(): Ratelimit | null {
 export function getLinksPostRateLimiter(): Ratelimit | null {
   if (cachedLinksPost === undefined) cachedLinksPost = linksPostLimiter();
   return cachedLinksPost;
+}
+
+export function getUploadsTokenRateLimiter(): Ratelimit | null {
+  if (cachedUploadsToken === undefined) {
+    cachedUploadsToken = uploadsTokenLimiter();
+  }
+  return cachedUploadsToken;
 }
 
 export function getLinksImportRateLimiter(): Ratelimit | null {

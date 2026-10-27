@@ -7,6 +7,7 @@ import {
   getUsernameCheckRateLimiter,
   getLinkPreviewRateLimiter,
   getPublicFolderRateLimiter,
+  getUploadsTokenRateLimiter,
   getV1PostRateLimiter,
   getV1RateLimiter,
 } from "@/lib/upstash-rate-limit";
@@ -71,8 +72,8 @@ function tooManyRequests(reset: number) {
  * Edge rate limits for sensitive API routes. Returns a response when the limit is exceeded.
  * For `/api/auth/*`, returns `NextResponse.next()` when allowed so the rest of the proxy can skip session work.
  * Also limits POST `/api/feedback`, POST `/api/links/import` (bookmark import
- * chunks), the username availability check, link
- * previews (`/api/links/preview`, which fetch the page) and shared folder
+ * chunks), POST `/api/uploads/token` (Blob upload tokens), the username
+ * availability check, link previews (`/api/links/preview`, which fetch the page) and shared folder
  * pages (`/@username/slug`, `/api/public/folders/...` and their preview
  * images).
  * Username changes are limited per user in their route, after the session
@@ -115,6 +116,15 @@ export async function rateLimitApiRequest(
 
   if (pathname === "/api/links" && request.method === "POST") {
     const limiter = getLinksPostRateLimiter();
+    if (limiter) {
+      const { success, reset } = await limiter.limit(ip);
+      if (!success) return tooManyRequests(reset);
+    }
+    return null;
+  }
+
+  if (pathname === "/api/uploads/token" && request.method === "POST") {
+    const limiter = getUploadsTokenRateLimiter();
     if (limiter) {
       const { success, reset } = await limiter.limit(ip);
       if (!success) return tooManyRequests(reset);
