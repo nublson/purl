@@ -9,6 +9,7 @@ import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { isApplePlatform } from "@/lib/platform";
 import { parsePastedUrls } from "@/lib/pasted-urls";
 import { requestSaveUrl, saveLink } from "@/lib/save-link";
+import { cn } from "@/lib/utils";
 import {
   NO_UPLOAD_PAGE_MESSAGE,
   openUploadPicker,
@@ -51,7 +52,8 @@ function safeHttpsUrl(value: string | undefined) {
 }
 
 /**
- * The header's + menu (pointer devices): teaches paste-anywhere and offers
+ * The header's + menu (pointer devices, and touch screens too when uploads
+ * are on): teaches paste-anywhere and offers
  * "Paste link" for people who can't easily press the shortcut (voice
  * control, switch access, trackpad-only). On a folder page it also offers
  * "Add links" (also `A`), which opens `AddLinksPopover` under the + button.
@@ -159,7 +161,12 @@ export function HeaderAddMenu() {
           aria-label="Add"
           variant="ghost"
           size="icon-sm"
-          className="hidden cursor-pointer text-muted-foreground [@media(hover:hover)]:inline-flex"
+          className={cn(
+            "cursor-pointer text-muted-foreground",
+            // With uploads on, "Upload files" is the way in on touch
+            // screens too; otherwise the menu is for pointers that hover.
+            canUpload ? "inline-flex" : "hidden [@media(hover:hover)]:inline-flex",
+          )}
         >
           <Plus />
         </Button>

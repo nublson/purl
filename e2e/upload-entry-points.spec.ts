@@ -80,14 +80,24 @@ async function drag(
   );
 }
 
-async function dragLeave(page: Page) {
-  await page.evaluate(() => {
-    const transfer = new DataTransfer();
-    transfer.items.add(new File(["x"], "x.png", { type: "image/png" }));
-    document.body.dispatchEvent(
-      new DragEvent("dragleave", { bubbles: true, cancelable: true, dataTransfer: transfer }),
-    );
-  });
+/** A `dragleave` on `document.body` at (`x`, `y`); 0,0 is how a leave out of the window reads. */
+async function dragLeave(page: Page, { x = 0, y = 0 }: { x?: number; y?: number } = {}) {
+  await page.evaluate(
+    ({ x, y }) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(["x"], "x.png", { type: "image/png" }));
+      document.body.dispatchEvent(
+        new DragEvent("dragleave", {
+          bubbles: true,
+          cancelable: true,
+          dataTransfer: transfer,
+          clientX: x,
+          clientY: y,
+        }),
+      );
+    },
+    { x, y },
+  );
 }
 
 test.describe("Upload entry points", () => {
@@ -174,6 +184,24 @@ test.describe("Upload entry points", () => {
     await expect(overlay(page)).toHaveCount(0);
   });
 
+  test("a leave out of the window or the window losing focus hides the overlay", async ({ page }) => {
+    await openHome(page);
+    // Two enters (the page, then an element in it): one leave inside the
+    // window keeps the overlay.
+    await drag(page, { file: true }, { drop: false });
+    await drag(page, { file: true }, { drop: false });
+    await dragLeave(page, { x: 100, y: 100 });
+    await expect(overlay(page)).toBeVisible();
+    // Out of the window: gone, however many enters are unpaired.
+    await dragLeave(page, { x: -5, y: 100 });
+    await expect(overlay(page)).toHaveCount(0);
+
+    await drag(page, { file: true }, { drop: false });
+    await expect(overlay(page)).toBeVisible();
+    await page.evaluate(() => window.dispatchEvent(new Event("blur")));
+    await expect(overlay(page)).toHaveCount(0);
+  });
+
   test("on a folder page the overlay names the folder, and the empty state mentions dropping", async ({ page, seed }) => {
     await seed.folder({ name: "Reading", slug: "reading", emoji: "📚" });
     await refuseTokens(page);
@@ -214,5 +242,37 @@ test.describe("Upload entry points", () => {
     await page.waitForTimeout(300);
     await expect(overlay(page)).toHaveCount(0);
     await expect(pending(page)).toHaveCount(0);
+  });
+
+  test("on another Settings tab a dropped file is taken, never uploaded", async ({ page }) => {
+    await refuseTokens(page);
+    await page.goto("/home?settings=usage");
+    await waitForHydration(page, "[data-settings-dialog]");
+    // Taken: the browser doesn't open the file and leave the app.
+    expect(await drag(page, { file: true })).toBe(false);
+    await expect(overlay(page)).toHaveCount(0);
+    await page.waitForTimeout(300);
+    await expect(pending(page)).toHaveCount(0);
+  });
+});
+
+test.describe("Upload entry points on a phone", () => {
+  test.use({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+  });
+
+  test("the + button shows on touch, and Upload files opens the picker", async ({ page }) => {
+    await refuseTokens(page);
+    await page.goto("/home");
+    await waitForHydration(page, 'button[aria-label="Add"]');
+    const add = page.getByRole("button", { name: "Add", exact: true });
+    await expect(add).toBeVisible();
+    await add.tap();
+    const chooser = page.waitForEvent("filechooser");
+    await page.getByRole("menuitem", { name: "Upload files" }).tap();
+    await (await chooser).setFiles(PIXEL);
+    await expectFailedUpload(page);
   });
 });

@@ -10,7 +10,10 @@ import type { PendingSave } from "@/lib/pending-save";
 import { SAVE_URL_EVENT, saveLink } from "@/lib/save-link";
 import { batchSummary, saveLinks } from "@/lib/save-links";
 import { requestUploadFiles } from "@/lib/save-uploads";
-import { NO_UPLOAD_PAGE_MESSAGE } from "@/lib/upload-picker";
+import {
+  NO_UPLOAD_PAGE_MESSAGE,
+  UPLOADS_UNAVAILABLE_MESSAGE,
+} from "@/lib/upload-picker";
 
 export function PasteHandler({
   onPasteStart,
@@ -122,11 +125,14 @@ export function PasteHandler({
       if (isInputTarget) return;
 
       // Files (a copied image or file) upload; the text browsers put beside
-      // them is only a placeholder name, so it's never saved too.
+      // them is only a placeholder name, so it's never saved, uploads on or
+      // off.
       const files = e.clipboardData?.files;
-      if (uploadsEnabled && files && files.length > 0) {
+      if (files && files.length > 0) {
         e.preventDefault();
-        if (!requestUploadFiles(Array.from(files))) {
+        if (!uploadsEnabled) {
+          toast.error(UPLOADS_UNAVAILABLE_MESSAGE);
+        } else if (!requestUploadFiles(Array.from(files))) {
           toast.error(NO_UPLOAD_PAGE_MESSAGE);
         }
         return;
