@@ -1,0 +1,255 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { cardAspectRatio } from "@/lib/link-kind";
+import type { PendingUpload } from "@/lib/pending-upload";
+import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { Image as ImageIcon, MusicNote, Refresh, Video, X } from "reicon-react";
+
+/** What a failed item's buttons do (Retry keeps its slot; Dismiss drops it). */
+export type PendingUploadActions = {
+  onRetry: (id: string) => void;
+  onDismiss: (id: string) => void;
+};
+
+type Props = { item: PendingUpload } & PendingUploadActions;
+
+const KIND_ICON = { image: ImageIcon, video: Video, audio: MusicNote } as const;
+
+function KindIcon({
+  kind,
+  className,
+}: {
+  kind: PendingUpload["kind"];
+  className?: string;
+}) {
+  const Icon = KIND_ICON[kind];
+  return <Icon aria-hidden className={className} />;
+}
+
+/**
+ * The local preview: an image as itself; a video's file as a paused first
+ * frame until its poster (an image) arrives; else the kind's icon.
+ */
+function LocalPreview({
+  src,
+  kind,
+  className,
+  iconClassName,
+}: {
+  src: string;
+  kind: PendingUpload["kind"];
+  className?: string;
+  iconClassName?: string;
+}) {
+  const [as, setAs] = useState<"img" | "video" | "icon">("img");
+  if (as === "icon") return <KindIcon kind={kind} className={iconClassName} />;
+  if (as === "video") {
+    return (
+      <video
+        src={src}
+        muted
+        playsInline
+        preload="metadata"
+        aria-hidden
+        className={className}
+        onError={() => setAs("icon")}
+      />
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- a local object URL
+    <img
+      src={src}
+      alt=""
+      decoding="async"
+      className={className}
+      // A video's own file isn't an image: show it as a video instead.
+      onError={() => setAs(kind === "video" ? "video" : "icon")}
+    />
+  );
+}
+
+/** The upload's progress as a ring; steady and quiet (HomeShell announces). */
+function ProgressRing({ progress }: { progress: number }) {
+  const radius = 9;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - Math.min(100, Math.max(0, progress)) / 100);
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className="size-6 -rotate-90"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r={radius}
+        fill="none"
+        strokeWidth="2.5"
+        className="stroke-foreground/15"
+      />
+      <circle
+        cx="12"
+        cy="12"
+        r={radius}
+        fill="none"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        className="stroke-foreground transition-[stroke-dashoffset] duration-150 ease-out motion-reduce:transition-none"
+      />
+    </svg>
+  );
+}
+
+function FailedActions({
+  item,
+  onRetry,
+  onDismiss,
+  compact = false,
+}: Props & { compact?: boolean }) {
+  return (
+    <>
+      <Button
+        type="button"
+        variant={compact ? "ghost" : "secondary"}
+        size="sm"
+        aria-label={`Retry uploading ${item.name}`}
+        onClick={() => onRetry(item.id)}
+      >
+        <Refresh aria-hidden />
+        Retry
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size={compact ? "icon-sm" : "sm"}
+        aria-label={`Dismiss ${item.name}`}
+        onClick={() => onDismiss(item.id)}
+      >
+        <X aria-hidden />
+        {compact ? null : "Dismiss"}
+      </Button>
+    </>
+  );
+}
+
+/**
+ * A file uploading, in the grid: its local preview at the pearl's ratio (an
+ * audio file is the kind's icon on the card's tint), a progress ring in the
+ * top-right corner. Failed: a scrim with Retry and Dismiss.
+ */
+export function PendingUploadCard({ item, onRetry, onDismiss }: Props) {
+  const failed = item.status === "failed";
+  return (
+    <div
+      aria-busy={failed ? undefined : true}
+      data-cy="pending-upload"
+      data-status={item.status}
+      className="relative flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 animate-in fade-in-0 duration-300"
+    >
+      <div
+        className="relative grid w-full place-items-center overflow-hidden bg-muted text-muted-foreground"
+        style={{ aspectRatio: cardAspectRatio(item) }}
+      >
+        {item.previewUrl ? (
+          <LocalPreview
+            key={item.previewUrl}
+            src={item.previewUrl}
+            kind={item.kind}
+            className="absolute inset-0 size-full object-cover"
+            iconClassName="size-6"
+          />
+        ) : (
+          <KindIcon kind={item.kind} className="size-6" />
+        )}
+      </div>
+      <span className="sr-only">
+        {failed ? `${item.name}, couldn't upload` : item.name}
+      </span>
+      {failed ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/80 p-3 text-center backdrop-blur-sm">
+          <p aria-hidden className="text-sm text-muted-foreground">
+            Couldn&rsquo;t upload
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-1">
+            <FailedActions item={item} onRetry={onRetry} onDismiss={onDismiss} />
+          </div>
+        </div>
+      ) : (
+        <span className="absolute top-2 right-2 grid size-8 place-items-center rounded-full bg-background/80 backdrop-blur-sm">
+          <ProgressRing progress={item.progress} />
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A file uploading, in the list: its preview in the favicon's slot, its name,
+ * "42%" on the right where a row's ⋯ sits. Failed: Retry and Dismiss there.
+ */
+export function PendingUploadRow({ item, onRetry, onDismiss }: Props) {
+  const failed = item.status === "failed";
+  return (
+    <Item
+      aria-busy={failed ? undefined : true}
+      data-cy="pending-upload"
+      data-status={item.status}
+      className="relative grid h-12 grid-cols-[20px_1fr_auto] gap-4 border-0 p-2 animate-in fade-in-0 slide-in-from-bottom-2 duration-300 max-md:h-14 max-md:grid-cols-[24px_1fr_auto]"
+    >
+      <ItemMedia
+        variant="image"
+        // Where LinkItem's favicon sits, so the pearl's row doesn't jump.
+        className="size-5 translate-y-0.5 overflow-hidden rounded text-muted-foreground max-md:size-6"
+      >
+        {item.previewUrl ? (
+          <LocalPreview
+            key={item.previewUrl}
+            src={item.previewUrl}
+            kind={item.kind}
+            className="size-full object-cover"
+            iconClassName="size-4"
+          />
+        ) : (
+          <KindIcon kind={item.kind} className="size-4" />
+        )}
+      </ItemMedia>
+      <ItemContent className="min-w-0">
+        <ItemTitle className="block w-full">
+          <p
+            className={cn(
+              "truncate text-sm font-normal text-muted-foreground max-md:text-base",
+              !failed && "animate-pulse",
+            )}
+          >
+            {item.name}
+            {failed ? <span className="sr-only">, couldn&rsquo;t upload</span> : null}
+          </p>
+        </ItemTitle>
+      </ItemContent>
+      {failed ? (
+        <div className="flex items-center gap-1">
+          <FailedActions
+            item={item}
+            onRetry={onRetry}
+            onDismiss={onDismiss}
+            compact
+          />
+        </div>
+      ) : (
+        // Steady, tabular figures, so the number never jitters.
+        <span
+          aria-hidden
+          className="flex min-w-8 items-center justify-end text-sm text-muted-foreground tabular-nums max-md:text-base"
+        >
+          {item.progress}%
+        </span>
+      )}
+    </Item>
+  );
+}
