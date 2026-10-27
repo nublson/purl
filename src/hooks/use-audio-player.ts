@@ -36,6 +36,16 @@ export const audioPlayerStore = {
 };
 
 /**
+ * The store id of the media viewer's player for pearl `id`. Not the card's
+ * own id: the card's strip and the viewer each have their own element, and
+ * sharing an id would start both. As its own id, starting one stops the
+ * other like any two cards. The viewer also stops the card when it opens.
+ */
+export function viewerAudioId(id: string): string {
+  return `viewer:${id}`;
+}
+
+/**
  * Whether this card's audio is playing. The hook owns no `<audio>` element:
  * the card face wires its element to `playing`.
  */

@@ -95,11 +95,11 @@ export function LinkCardContent({
         <ImageFace link={link} eager={eagerThumbnail} badge={badge} anchored={mediaAnchor} />
       );
     case "video":
-      return <VideoFace link={link} badge={badge} />;
+      return <VideoFace link={link} badge={badge} anchored={mediaAnchor} />;
     case "audio":
       return (
         <>
-          <AudioFace link={link} controls={ownerControls} />
+          <AudioFace link={link} controls={ownerControls} anchored={mediaAnchor} />
           <LinkCardStrip link={link} badge={badge} />
         </>
       );

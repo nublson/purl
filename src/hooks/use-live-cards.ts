@@ -51,7 +51,9 @@ function subscribe(listener: () => void) {
 /**
  * Whether this card may play: it is wanted, within 200px of the viewport, and
  * among the first `MAX_LIVE_CARDS` cards to claim a slot. A slot freed by a
- * card leaving view (or unmounting) goes to the next one waiting.
+ * card leaving view (or unmounting) goes to the next one waiting. Callers
+ * pass `wanted` false while their pearl is open in the media viewer
+ * (`useIsMediaOpen`), which plays it instead, so the card's loop pauses.
  */
 export function useLiveCards(
   ref: React.RefObject<Element | null>,

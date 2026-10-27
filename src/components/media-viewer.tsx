@@ -1,7 +1,9 @@
 "use client";
 
+import { audioPlayerStore, viewerAudioId } from "@/hooks/use-audio-player";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { linkKind } from "@/lib/link-kind";
-import { mediaViewer, useMediaViewer } from "@/lib/media-viewer";
+import { mediaViewer, useIsMediaOpen, useMediaViewer } from "@/lib/media-viewer";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { linkSecondLine } from "@/lib/upload-meta";
 import { cn } from "@/lib/utils";
@@ -10,12 +12,14 @@ import { Cambio } from "cambio";
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
 } from "react";
-import { Image as ImageIcon, X } from "reicon-react";
+import { Image as ImageIcon, Video, X } from "reicon-react";
+import { AudioControls } from "./media-card-face";
 import { FACE_LAYOUT_DEPENDENCY, MEDIA_RADIUS, pearlLayoutId } from "./media-face-anchor";
 
 /** The viewer's box: 16px from every edge (and the safe areas), 1200px at most. */
@@ -104,7 +108,9 @@ export function MediaViewer() {
   const popupRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    if (closed) morphStarted.current = false;
+    // Each open and each close starts without a morph seen: an open with no
+    // card to grow from (a deep link) is ready through the fallback below.
+    morphStarted.current = false;
     for (const el of [popupRef.current, backdropRef.current]) {
       if (!el) continue;
       el.inert = closed;
@@ -112,6 +118,15 @@ export function MediaViewer() {
       else el.removeAttribute("aria-hidden");
     }
   }, [closed]);
+
+  // Playback hand-off: the viewer starts fresh, so the card's audio strip
+  // stops when the viewer shows its pearl (the card's video loop pauses on
+  // its own, `useIsMediaOpen`); leaving a pearl stops the viewer's player.
+  useEffect(() => {
+    if (currentId === null) return;
+    audioPlayerStore.stop(currentId);
+    return () => audioPlayerStore.stop(viewerAudioId(currentId));
+  }, [currentId]);
 
   return (
     <Cambio.Root
@@ -181,14 +196,13 @@ function ViewerMedia({ link, ready }: { link: Link; ready: boolean }) {
   switch (linkKind(link)) {
     case "image":
       return <ViewerImage link={link} ready={ready} />;
+    case "video":
+      return <ViewerVideo link={link} ready={ready} />;
+    case "audio":
+      return <ViewerAudio link={link} />;
     default:
-      // Video and audio arrive with the next step; until then, a quiet box.
-      return (
-        <div
-          data-viewer-media="placeholder"
-          className="flex aspect-[16/10] w-[min(640px,100vw-32px)] items-center justify-center bg-muted"
-        />
-      );
+      // Only media pearls are registered; nothing else reaches the viewer.
+      return null;
   }
 }
 
@@ -282,6 +296,129 @@ function ViewerImage({ link, ready }: { link: Link; ready: boolean }) {
           onError={() => setOriginalFailed(true)}
         />
       ) : null}
+    </div>
+  );
+}
+
+/** The line under a video's poster when the file can't play. */
+const CANT_PLAY = "Can't play this video";
+/** Room for that line (`py-3` around a 20px line), kept off the video. */
+const CANT_PLAY_HEIGHT = "2.75rem";
+const MIN_RATIO = 1 / 3;
+const MAX_RATIO = 3;
+
+/** A video's width over height: its own (clamped like a card's), else 16:10. */
+function videoRatio(link: Link): number {
+  if (!link.width || !link.height) return 16 / 10;
+  return Math.min(MAX_RATIO, Math.max(MIN_RATIO, link.width / link.height));
+}
+
+/**
+ * A video: the poster (`thumbnail`) travels in the morph, then the player
+ * takes its place once the morph has played (`ready`): native controls,
+ * with sound, playing at once (it was opened by a click) unless the reader
+ * asked for reduced motion. A file that can't play keeps the poster and
+ * the controls, with a line saying so under it. The box is the video's
+ * ratio (16:10 when unknown; the file is fitted inside), as large as the
+ * viewer allows. The player pauses as soon as the viewer closes, while the
+ * box still morphs back into its card.
+ */
+function ViewerVideo({ link, ready }: { link: Link; ready: boolean }) {
+  const reducedMotion = usePrefersReducedMotion();
+  const open = useIsMediaOpen(link.id);
+  const src = safeRemoteImgSrc(link.url);
+  const poster = link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
+  const [failed, setFailed] = useState(false);
+  const [posterFailed, setPosterFailed] = useState(false);
+  // Once the player has a frame of its own, the poster under it goes (so
+  // it never shows around a video of another shape).
+  const [hasFrame, setHasFrame] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const messageId = useId();
+  const cantPlay = !src || failed;
+  const ratio = videoRatio(link);
+  const room = cantPlay ? `(${MAX_HEIGHT} - ${CANT_PLAY_HEIGHT})` : `(${MAX_HEIGHT})`;
+
+  useEffect(() => {
+    if (!open) videoRef.current?.pause();
+  }, [open]);
+
+
+  return (
+    <div data-viewer-media="video" className="flex flex-col">
+      <div
+        className="relative bg-muted"
+        style={{
+          aspectRatio: String(ratio),
+          width: `min(${MAX_WIDTH}, ${room} * ${ratio})`,
+        }}
+      >
+        {/* Under the player: the poster until it plays (and if it never
+            does), else the kind's icon. */}
+        {hasFrame ? null : poster && !posterFailed ? (
+          // eslint-disable-next-line @next/next/no-img-element -- user-controlled media URLs; avoid next/image optimizer SSRF
+          <img
+            src={poster}
+            alt=""
+            decoding="async"
+            draggable={false}
+            referrerPolicy="strict-origin-when-cross-origin"
+            className="absolute inset-0 size-full object-contain"
+            onError={() => setPosterFailed(true)}
+          />
+        ) : (
+          <span className="absolute inset-0 flex items-center justify-center">
+            <Video className="size-10 text-muted-foreground" aria-hidden />
+          </span>
+        )}
+        {src && ready ? (
+          // A failed player is replaced by an empty one (no source): WebKit
+          // draws a failed player black, with a broken-play glyph, over its
+          // poster, and keeps doing so after its source is removed. An empty
+          // one shows the poster under its (idle) controls everywhere.
+          <video
+            key={failed ? "failed" : "file"}
+            ref={videoRef}
+            src={failed ? undefined : src}
+            poster={poster ?? undefined}
+            controls
+            autoPlay={!reducedMotion && !failed}
+            playsInline
+            preload="metadata"
+            aria-label={link.title}
+            aria-describedby={failed ? messageId : undefined}
+            className="absolute inset-0 size-full object-contain"
+            onLoadedData={() => setHasFrame(true)}
+            onError={() => setFailed(true)}
+          />
+        ) : null}
+      </div>
+      {cantPlay ? (
+        <p id={messageId} className="px-4 py-3 text-sm leading-5 text-muted-foreground">
+          {CANT_PLAY}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * An audio pearl: the title, then the card's player at the viewer's size
+ * (a 56px play button, the scrubber and the time), on the card's surface.
+ * It has its own player, which starts stopped; the card's strip stopped
+ * when the viewer opened (`MediaViewer`).
+ */
+function ViewerAudio({ link }: { link: Link }) {
+  return (
+    <div
+      data-viewer-media="audio"
+      className="flex w-[min(480px,100vw-32px)] flex-col gap-4 bg-card p-5 md:p-6"
+    >
+      {/* Clear of the close button in the top-right corner. */}
+      <p className="line-clamp-2 pr-10 text-base leading-6 font-medium wrap-anywhere text-foreground">
+        {link.title}
+      </p>
+      <AudioControls link={link} size="viewer" />
     </div>
   );
 }

@@ -82,9 +82,10 @@ export function LinkCard({
   // its cards are links).
   const kind = linkKind(link);
   const media = !demo && isMediaKind(kind);
-  // An image's face is the viewer's morph anchor: it rounds and clips
-  // itself, so the card doesn't crop the morph back.
-  const anchoredFace = media && kind === "image";
+  // A media face (the image, the video, the audio strip) is the viewer's
+  // morph anchor: it rounds and clips itself, so the card doesn't crop the
+  // morph back.
+  const anchoredFace = media;
   const anchorRef = React.useRef<HTMLElement | null>(null);
   const setAnchor = React.useCallback((el: HTMLElement | null) => {
     anchorRef.current = el;

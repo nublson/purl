@@ -5,7 +5,7 @@ import { loadMotionFeatures } from "@/lib/motion-features-loader";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
 import { LazyMotion, m } from "motion/react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 /**
  * Faces and the viewer's Popup share this `layoutDependency`. A face never
@@ -33,6 +33,21 @@ export function pearlLayoutId(id: string): string {
 }
 
 /**
+ * Every corner rounded (an image or video face, which is the whole card),
+ * or only the top two (the audio strip, with the title strip under it).
+ * Per corner, so Motion can correct each one while it scales the box.
+ */
+const CORNERS: Record<"all" | "top", CSSProperties> = {
+  all: { borderRadius: MEDIA_RADIUS },
+  top: {
+    borderTopLeftRadius: MEDIA_RADIUS,
+    borderTopRightRadius: MEDIA_RADIUS,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+};
+
+/**
  * What the media viewer morphs out of and back into: a face's media box,
  * tagged with the pearl's `layoutId`. No `layout` prop: the face itself
  * never animates on its own; Motion hides it while the viewer is open and
@@ -43,10 +58,13 @@ export function pearlLayoutId(id: string): string {
  */
 export function MediaAnchor({
   link,
+  corners = "all",
   className,
   children,
 }: {
   link: Pick<Link, "id">;
+  /** Which of the face's corners are the card's (and so rounded). */
+  corners?: "all" | "top";
   className?: string;
   children: ReactNode;
 }) {
@@ -83,7 +101,7 @@ export function MediaAnchor({
           if (!open) setMorphing(false);
         }}
         className={cn("w-full overflow-hidden", morphing && "relative z-10", className)}
-        style={{ borderRadius: MEDIA_RADIUS }}
+        style={CORNERS[corners]}
       >
         {children}
       </m.div>

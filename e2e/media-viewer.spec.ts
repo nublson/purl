@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test, waitForHydration } from "./fixtures";
 import type { seedLink } from "./support/db";
+import { silentWav } from "./support/media";
 
 // The media viewer: an image pearl's card in the owner's grid opens it (the
 // card morphs into the dialog), Esc closes it back onto the card, and the
@@ -156,5 +157,124 @@ test.describe("Media viewer", () => {
     await page.getByRole("link", { name: "Alpha (opens in new tab)", exact: true }).click();
     await (await popup).close();
     await expect(page.getByRole("dialog")).toHaveCount(0);
+  });
+
+  test("a video card opens the player, and the card's loop pauses meanwhile", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    // A file that never arrives: no codec needed, and no error either, so
+    // the card's muted loop is live (play() was called) until the viewer
+    // takes over.
+    await page.context().route("https://loops.example/**", () => {});
+    const icon = `${baseURL}/icon.png`;
+    await seed.link({
+      url: "https://loops.example/clip.mp4",
+      title: "Clip",
+      contentType: "VIDEO",
+      thumbnail: icon,
+      duration: 14,
+    });
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(1);
+
+    const cardVideo = cards(page).first().locator("video");
+    await expect.poll(() => cardVideo.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+
+    await openButton(page, "Clip").click();
+    const dialog = page.getByRole("dialog", { name: "Clip" });
+    await expect(dialog).toBeVisible();
+    const player = dialog.locator("video[controls]");
+    await expect(player).toHaveCount(1);
+    await expect(player).toHaveAttribute("poster", icon);
+    await expect(player).toHaveAttribute("autoplay", "");
+    await expect.poll(() => cardVideo.evaluate((v: HTMLVideoElement) => v.paused)).toBe(true);
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    // Back on the grid, the card's loop picks up again.
+    await expect.poll(() => cardVideo.evaluate((v: HTMLVideoElement) => v.paused)).toBe(false);
+  });
+
+  test("a video that can't play keeps its poster, the controls and a line saying so", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await page.context().route("https://clips.example/**", (route) => route.abort());
+    const icon = `${baseURL}/icon.png`;
+    await seed.link({
+      url: "https://clips.example/clip.mp4",
+      title: "Broken clip",
+      contentType: "VIDEO",
+      thumbnail: icon,
+      duration: 14,
+    });
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(1);
+
+    await openButton(page, "Broken clip").click();
+    const dialog = page.getByRole("dialog", { name: "Broken clip" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("Can't play this video", { exact: true })).toBeVisible();
+    const player = dialog.locator("video[controls]");
+    await expect(player).toHaveCount(1);
+    await expect(player).toHaveAttribute("poster", icon);
+  });
+
+  test("an audio card opens the player at viewer size; the card's strip stops", async ({
+    page,
+    seed,
+  }) => {
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
+    await seed.link({
+      url: "https://sounds.example/song.wav",
+      title: "Song",
+      contentType: "AUDIO",
+      duration: 10,
+    });
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(1);
+
+    const card = cards(page).first();
+    await card.getByRole("button", { name: "Play Song" }).click();
+    await expect(card.getByRole("button", { name: "Pause Song" })).toBeVisible();
+
+    // The card's button, below the player's controls (on the title strip).
+    const opener = openButton(page, "Song");
+    const box = (await opener.boundingBox())!;
+    await opener.click({ position: { x: 12, y: box.height - 12 } });
+    const dialog = page.getByRole("dialog", { name: "Song" });
+    await expect(dialog).toBeVisible();
+    // The title, shown above the player (not only as the dialog's name).
+    await expect(
+      dialog.locator('[data-viewer-media="audio"]').getByText("Song", { exact: true }),
+    ).toBeVisible();
+    const play = dialog.getByRole("button", { name: "Play Song" });
+    await expect(play).toBeVisible();
+    // The viewer starts fresh: the card's strip stopped when it opened.
+    await expect(card.locator('button[aria-label="Play Song"]')).toHaveCount(1);
+    // 56px (its layout size: the box may still be scaling in the morph).
+    expect(await play.evaluate((el: HTMLElement) => el.offsetWidth)).toBe(56);
+
+    // The viewer's player plays on its own; the card's strip stays stopped.
+    await play.click();
+    await expect(dialog.getByRole("button", { name: "Pause Song" })).toBeVisible();
+    await expect(card.locator('button[aria-label="Play Song"]')).toHaveCount(1);
+
+    // Closing stops it.
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect
+      .poll(() =>
+        page.evaluate(() => [...document.querySelectorAll("audio")].every((a) => a.paused)),
+      )
+      .toBe(true);
   });
 });
