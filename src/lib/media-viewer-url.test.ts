@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Link } from "@/utils/links";
 import { mediaViewer } from "./media-viewer";
 import {
@@ -9,6 +9,7 @@ import {
   withPearl,
   withoutPearl,
   type HistoryLike,
+  type ViewerUrlBinder,
 } from "./media-viewer-url";
 
 function link(id: string): Link {
@@ -53,13 +54,26 @@ function fake(initial: string) {
   return { state, history, viewerUrl, forward, getSearch };
 }
 
+/**
+ * Every binder a test binds, disposed after it: one left subscribed by a
+ * failed assertion would act on the next test's store changes.
+ */
+const bound: ViewerUrlBinder[] = [];
+function track(binder: ViewerUrlBinder) {
+  bound.push(binder);
+  return binder;
+}
+afterEach(() => {
+  for (const binder of bound.splice(0)) binder.dispose();
+});
+
 /** A fake page: history + the bound store, as the hook wires them. */
 function page(initial: string, ids: string[] = ["a", "b", "c"]) {
   const f = fake(initial);
   mediaViewer.register(ids.map(link));
   const pending: Array<string | null> = [];
-  const binder = bindViewerUrl(mediaViewer, f.viewerUrl, f.getSearch, (id) =>
-    pending.push(id),
+  const binder = track(
+    bindViewerUrl(mediaViewer, f.viewerUrl, f.getSearch, (id) => pending.push(id)),
   );
   f.state.onPop = () => binder.onPopState();
   return { ...f, binder, pending };
@@ -338,6 +352,125 @@ describe("bindViewerUrl", () => {
     expect(mediaViewer.getSnapshot().currentId).toBeNull();
     expect(binder.pendingId()).toBe("x");
     expect(state.href).toBe("/home?pearl=x");
+    binder.dispose();
+  });
+
+  it("a pearl the list doesn't have stays pending; appended, it opens standalone", () => {
+    const { binder, history, state, pending } = page("/home?pearl=z");
+    expect(binder.pendingId()).toBe("z");
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+    // The page fetched it on its own and appends it to what it registered.
+    mediaViewer.register([...mediaViewer.getSnapshot().items, link("z")]);
+    mediaViewer.open("z", { standalone: true });
+    const snapshot = mediaViewer.getSnapshot();
+    expect(snapshot.currentId).toBe("z");
+    expect(snapshot.standalone).toBe(true);
+    expect(binder.pendingId()).toBeNull();
+    expect(pending).toEqual(["z", null]);
+    // No neighbours: moving goes nowhere, and the URL is left as it was.
+    mediaViewer.prev();
+    expect(mediaViewer.getSnapshot().currentId).toBe("z");
+    expect(history.pushState).not.toHaveBeenCalled();
+    expect(history.replaceState).not.toHaveBeenCalled();
+    expect(state.href).toBe("/home?pearl=z");
+    binder.dispose();
+  });
+
+  it("dismissPending(id) gives up only on that pearl", () => {
+    const { binder, state } = page("/home?pearl=z");
+    binder.dismissPending("other");
+    expect(binder.pendingId()).toBe("z");
+    expect(state.href).toBe("/home?pearl=z");
+    binder.dismissPending("z");
+    expect(binder.pendingId()).toBeNull();
+    expect(state.href).toBe("/home");
+    binder.dispose();
+  });
+
+  it("an empty registration while a pearl is pending keeps it and the URL", () => {
+    const { binder, history, state } = page("/home?pearl=b", []);
+    expect(binder.pendingId()).toBe("b");
+    mediaViewer.register([]);
+    expect(binder.pendingId()).toBe("b");
+    mediaViewer.register(["a", "b", "c"].map(link));
+    expect(mediaViewer.getSnapshot().currentId).toBe("b");
+    expect(history.replaceState).not.toHaveBeenCalled();
+    expect(history.pushState).not.toHaveBeenCalled();
+    expect(state.href).toBe("/home?pearl=b");
+    binder.dispose();
+  });
+
+  it("StrictMode's remount (register, unregister, dispose, rebind) still opens the URL's pearl", () => {
+    // Mount: the binder binds first (child effects run first), then the page
+    // registers its pearls, which opens the one the URL names.
+    const first = page("/home?pearl=b", []);
+    mediaViewer.register(["a", "b", "c"].map(link));
+    expect(mediaViewer.getSnapshot().currentId).toBe("b");
+    // The simulated unmount: the page's cleanup unregisters before the
+    // binder is disposed. Items vanishing isn't a close: the URL stays.
+    mediaViewer.register([]);
+    expect(first.state.href).toBe("/home?pearl=b");
+    first.binder.dispose();
+    // The remount.
+    const second = track(
+      bindViewerUrl(
+        mediaViewer,
+        new ViewerUrl(first.history, () => first.state.href),
+        first.getSearch,
+      ),
+    );
+    mediaViewer.register(["a", "b", "c"].map(link));
+    expect(mediaViewer.getSnapshot().currentId).toBe("b");
+    expect(first.state.href).toBe("/home?pearl=b");
+    expect(first.history.replaceState).not.toHaveBeenCalled();
+    expect(first.history.pushState).not.toHaveBeenCalled();
+    expect(first.history.back).not.toHaveBeenCalled();
+    second.dispose();
+  });
+
+  it("a remount while open from a card keeps the entry it pushed, and Esc goes back once", () => {
+    const first = page("/home");
+    mediaViewer.open("a");
+    expect(first.history.pushState).toHaveBeenCalledTimes(1);
+    mediaViewer.register([]);
+    expect(first.history.back).not.toHaveBeenCalled();
+    expect(first.state.href).toBe("/home?pearl=a");
+    first.binder.dispose();
+    const second = track(
+      bindViewerUrl(
+        mediaViewer,
+        new ViewerUrl(first.history, () => first.state.href),
+        first.getSearch,
+      ),
+    );
+    mediaViewer.register(["a", "b", "c"].map(link));
+    expect(mediaViewer.getSnapshot().currentId).toBe("a");
+    expect(first.history.pushState).toHaveBeenCalledTimes(1);
+    mediaViewer.close();
+    expect(first.history.back).toHaveBeenCalledTimes(1);
+    expect(first.state.href).toBe("/home");
+    second.dispose();
+  });
+
+  it("pearls replaced by others still close the viewer and clean the URL", () => {
+    const { binder, history, state } = page("/home");
+    mediaViewer.open("a");
+    mediaViewer.register(["x", "y"].map(link));
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+    expect(history.back).toHaveBeenCalledTimes(1);
+    expect(state.href).toBe("/home");
+    expect(binder.pendingId()).toBeNull();
+    binder.dispose();
+  });
+
+  it("an empty registration after the page moved on is a plain close", () => {
+    const { binder, history, state } = page("/home");
+    mediaViewer.open("a");
+    state.href = "/folders/x"; // navigated away; then the old page unmounts
+    mediaViewer.register([]);
+    expect(history.back).not.toHaveBeenCalled();
+    expect(history.replaceState).not.toHaveBeenCalled();
+    expect(binder.pendingId()).toBeNull();
     binder.dispose();
   });
 

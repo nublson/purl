@@ -189,6 +189,30 @@ async function expectArrowsClearOfPlayer(page: Page) {
   }
 }
 
+/**
+ * Waits for a move's slide (200ms) to finish: one slide left, and nothing
+ * between the player and the dialog's box translated any more.
+ */
+async function expectSlideSettled(page: Page) {
+  await expect
+    .poll(() =>
+      page.locator("[data-media-viewer]").evaluate((popup) => {
+        if (popup.querySelectorAll("[data-viewer-media]").length !== 1) return false;
+        const identity = new Set(["none", "matrix(1, 0, 0, 1, 0, 0)"]);
+        let el = popup.querySelector("[data-viewer-media]")?.parentElement ?? null;
+        while (el && el !== popup) {
+          if (!identity.has(getComputedStyle(el).transform)) return false;
+          el = el.parentElement;
+        }
+        return true;
+      }),
+    )
+    .toBe(true);
+}
+
+/** The page's view of the URL's `?pearl=`. */
+const pearlInUrl = (page: Page) => new URL(page.url()).searchParams.get("pearl");
+
 test.describe("Media viewer", () => {
   test("an image card opens the viewer; Esc closes it back onto the card", async ({
     page,
@@ -680,6 +704,7 @@ test.describe("Media viewer", () => {
     await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
     await page.keyboard.press("ArrowRight");
     await page.getByRole("dialog").hover();
+    await expectSlideSettled(page);
     await expectArrowsClearOfPlayer(page);
   });
 
@@ -707,6 +732,132 @@ test.describe("Media viewer", () => {
     await expect(page.getByRole("dialog", { name: "Song" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await context.close();
+  });
+});
+
+test.describe("Media viewer from the URL", () => {
+  test("/home?pearl= opens the viewer on that pearl, and Esc leaves the page clean", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    const { shotB } = await seedPearls(seed, baseURL!);
+    await page.goto(`/home?pearl=${shotB}`);
+    await waitForHydration(page, '[data-cy="link-item"], [data-cy="link-card"]');
+
+    const dialog = page.getByRole("dialog", { name: "Shot B" });
+    await expect(dialog).toBeVisible();
+    // No card to grow from: the original still loads once it's open.
+    await expect(dialog.locator('img[src$="?b=1"]')).toHaveAttribute("alt", "Shot B");
+    expect(pearlInUrl(page)).toBe(shotB);
+    // Opened from the list: its neighbours are there.
+    await dialog.hover();
+    await expect(page.getByRole("button", { name: "Previous pearl" })).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect.poll(() => pearlInUrl(page)).toBeNull();
+    expect(new URL(page.url()).pathname).toBe("/home");
+  });
+
+  test("/home?pearl=nope opens nothing, says nothing, and drops the param", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await seedPearls(seed, baseURL!);
+    await page.goto("/home?ref=mail&pearl=nope");
+    await waitForHydration(page, '[data-cy="link-item"], [data-cy="link-card"]');
+    await expect.poll(() => pearlInUrl(page)).toBeNull();
+    // Only `pearl` goes.
+    expect(new URL(page.url()).search).toBe("?ref=mail");
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
+  });
+
+  test("a pearl past the first page opens on its own, with no neighbours", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    const icon = `${baseURL}/icon.png`;
+    // The oldest of 31 links: Home's first page is 30.
+    const old = await seed.link({
+      url: `${icon}?old=1`,
+      title: "Old shot",
+      contentType: "IMAGE",
+      thumbnail: icon,
+      width: 800,
+      height: 600,
+    });
+    for (let i = 0; i < 30; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await seed.link(
+        i % 10 === 0
+          ? {
+              url: `${icon}?n=${i}`,
+              title: `Shot ${i}`,
+              contentType: "IMAGE",
+              thumbnail: icon,
+              width: 800,
+              height: 600,
+            }
+          : { url: `https://page-${i}.example`, title: `Page ${i}` },
+      );
+    }
+
+    await page.goto(`/home?pearl=${old}`);
+    await waitForHydration(page, '[data-cy="link-item"], [data-cy="link-card"]');
+    const dialog = page.getByRole("dialog", { name: "Old shot" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('img[src$="?old=1"]')).toHaveAttribute("alt", "Old shot");
+    expect(pearlInUrl(page)).toBe(old);
+    // On its own: no Previous / Next, and the arrow keys go nowhere.
+    await dialog.hover();
+    await expect(page.getByRole("button", { name: "Previous pearl" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Next pearl" })).toHaveCount(0);
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByRole("dialog", { name: "Old shot" })).toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect.poll(() => pearlInUrl(page)).toBeNull();
+    // The list itself is unchanged: it isn't on the first page.
+    await expect(openButton(page, "Old shot")).toHaveCount(0);
+    // Shot 20 (a pearl on the page) still opens with its neighbours.
+    await openButton(page, "Shot 20").click();
+    await expect(page.getByRole("dialog", { name: "Shot 20" })).toBeVisible();
+    await page.getByRole("dialog").hover();
+    await expect(page.getByRole("button", { name: "Next pearl" })).toBeVisible();
+  });
+
+  test("a shared folder opens the URL's pearl, and drops one it doesn't show", async ({
+    browser,
+    seed,
+    testUser,
+    baseURL,
+  }) => {
+    const { shotB } = await seedSharedBoard(seed, baseURL!);
+    const context = await browser.newContext({ baseURL });
+    const page = await context.newPage();
+
+    await page.goto(`/@${testUser.username}/board?pearl=nope`);
+    await waitForHydration(page, 'button[aria-label="Grid view"]');
+    await expect.poll(() => pearlInUrl(page)).toBeNull();
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
+
+    await page.goto(`/@${testUser.username}/board?pearl=${shotB}`);
+    await waitForHydration(page, 'button[aria-label="Grid view"]');
+    const dialog = page.getByRole("dialog", { name: "Shot B" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('img[src$="?b=1"]')).toHaveAttribute("alt", "Shot B");
+    expect(pearlInUrl(page)).toBe(shotB);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect.poll(() => pearlInUrl(page)).toBeNull();
     await context.close();
   });
 });

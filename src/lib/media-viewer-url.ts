@@ -137,8 +137,11 @@ export type ViewerUrlBinder = {
   onPopState(): void;
   /** Asks to show a pearl from the URL once the page has registered it. */
   request(id: string | null): void;
-  /** Gives up on the pending pearl (e.g. its fetch failed) and clears the URL. */
-  dismissPending(): void;
+  /**
+   * Gives up on the pending pearl (e.g. its fetch failed) and clears the URL.
+   * With an id, only while that pearl is the one pending.
+   */
+  dismissPending(id?: string): void;
   /** The pearl the URL names while it isn't registered yet, else null. */
   pendingId(): string | null;
   dispose(): void;
@@ -181,12 +184,22 @@ export function bindViewerUrl(
   };
 
   const sync = () => {
-    const { currentId } = store.getSnapshot();
+    const { currentId, items } = store.getSnapshot();
     if (currentId !== previous) {
       const before = previous;
       previous = currentId;
-      if (currentId === null) viewerUrl.close();
-      else if (before === null) viewerUrl.open(currentId);
+      if (currentId === null) {
+        if (before !== null && items.length === 0 && pearlParam(getSearch()) === before) {
+          // The page took every pearl away while the URL still names this
+          // one: it's unmounting (or React's StrictMode is simulating that),
+          // not the viewer closing. Leave the URL alone and keep the pearl
+          // pending, so a page that registers it again shows it again. (A
+          // close is `close()`, which keeps the items.)
+          setRequested(before);
+        } else {
+          viewerUrl.close();
+        }
+      } else if (before === null) viewerUrl.open(currentId);
       else viewerUrl.navigate(currentId);
     }
     satisfy();
@@ -211,8 +224,8 @@ export function bindViewerUrl(
       if (store.getSnapshot().currentId === null) request(pearlParam(search));
       else sync();
     },
-    dismissPending() {
-      if (requested === null) return;
+    dismissPending(id?: string) {
+      if (requested === null || (id !== undefined && requested !== id)) return;
       setRequested(null);
       viewerUrl.strip();
     },

@@ -15,13 +15,15 @@ import {
  * `router.push` would rerender the server tree. The logic is
  * `bindViewerUrl`; this is the React wiring.
  *
- * `pendingId` is the pearl the URL names while the page hasn't registered it
- * yet (so a page can fetch an unknown id); null otherwise. `dismissPending`
- * gives up on it (the fetch failed) and clears the param from the URL.
+ * Call it once per page, in the component that registers the page's pearls
+ * (`HomeShell`, `SharedFolderList`): `pendingId` is the pearl the URL names
+ * while the page hasn't registered it yet (so the page can fetch an unknown
+ * id); null otherwise. `dismissPending(id)` gives up on it (the fetch failed)
+ * and clears the param from the URL, if that pearl is still the one pending.
  */
 export function useMediaViewerUrl(): {
   pendingId: string | null;
-  dismissPending: () => void;
+  dismissPending: (id?: string) => void;
 } {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const binder = useRef<ViewerUrlBinder | null>(null);
@@ -51,6 +53,9 @@ export function useMediaViewerUrl(): {
     };
   }, []);
 
-  const dismissPending = useCallback(() => binder.current?.dismissPending(), []);
+  const dismissPending = useCallback(
+    (id?: string) => binder.current?.dismissPending(id),
+    [],
+  );
   return { pendingId, dismissPending };
 }

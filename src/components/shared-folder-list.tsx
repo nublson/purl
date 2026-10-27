@@ -3,6 +3,7 @@
 import { LINK_GRID_FRAME } from "@/lib/link-view";
 import { coolPreviews } from "@/lib/link-preview-warmth";
 import { mediaViewer } from "@/lib/media-viewer";
+import { useMediaViewerUrl } from "@/lib/media-viewer-url-hook";
 import type { PublicLink } from "@/lib/public-folders";
 import type { Link } from "@/utils/links";
 import { Box } from "reicon-react";
@@ -155,6 +156,14 @@ export function SharedFolderList({
   }, [nextCursor, loadMore, loadFailed]);
 
   useEffect(() => coolPreviews, []);
+
+  // `?pearl=<id>`: the viewer opens on it once it's registered below. One
+  // the page doesn't show (past the first page, not media, not in this
+  // folder) is dropped quietly: visitors have no endpoint for one link.
+  const { pendingId, dismissPending } = useMediaViewerUrl();
+  useEffect(() => {
+    if (pendingId !== null) dismissPending(pendingId);
+  }, [pendingId, dismissPending]);
 
   // The media viewer's pearls: the image, video and audio links on the
   // page, in list order (`register` keeps only those), after each load.

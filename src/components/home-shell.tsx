@@ -36,7 +36,10 @@ import {
 } from "@/lib/leaving-links";
 import { coolPreviews } from "@/lib/link-preview-warmth";
 import { linkSelection, setSelectableLinks } from "@/lib/link-selection";
-import { mediaViewer } from "@/lib/media-viewer";
+import { isMediaKind, linkKind } from "@/lib/link-kind";
+import { mediaViewer, onCloseSettled } from "@/lib/media-viewer";
+import { pearlParam } from "@/lib/media-viewer-url";
+import { useMediaViewerUrl } from "@/lib/media-viewer-url-hook";
 import { isSameLinkUrl, omniboxSaveUrl } from "@/lib/omnibox";
 import { captureFlip, playFlip, type FlipSnapshot } from "@/lib/flip";
 import { cn } from "@/lib/utils";
@@ -65,6 +68,7 @@ import {
   groupLinksByDate,
   mergeLinkGroups,
   parseJsonLinkGroups,
+  parseJsonLinks,
   type Link,
   type LinkGroup as LinkGroupType,
 } from "@/utils/links";
@@ -832,6 +836,54 @@ export function HomeShell({
   // selection as they go.
   // The list on screen and its cursor come from the same answer (`settled`).
   const listComplete = !settled.query && !settled.nextCursor;
+  // `?pearl=<id>` (a reload, a shared link, Back onto a pearl's entry): the
+  // viewer opens on it once the list below registers it. A pearl the list
+  // doesn't have (past the first page, which is already here from the
+  // server) is fetched on its own and opens standalone: no neighbours, and
+  // no card to morph from, so the dialog fades. Not found, not media or not
+  // reachable: the param goes, quietly.
+  const { pendingId, dismissPending } = useMediaViewerUrl();
+  const [deepLinked, setDeepLinked] = useState<Link | null>(null);
+  useEffect(() => {
+    if (pendingId === null) return;
+    const id = pendingId;
+    let stale = false;
+    // Stale once the page moved on: unmounted or another pending pearl
+    // (cleanup), the URL no longer naming it (Back), or the viewer showing
+    // something else meanwhile.
+    const current = () =>
+      !stale &&
+      pearlParam(location.search) === id &&
+      mediaViewer.getSnapshot().currentId === null;
+    void (async () => {
+      let link: Link | undefined;
+      try {
+        const response = await fetch(`/api/links/${encodeURIComponent(id)}`);
+        if (response.ok) link = parseJsonLinks([await response.json()])[0];
+      } catch {
+        // Offline or a bad answer: the same as not found.
+      }
+      if (!current()) return;
+      if (!link || link.id !== id || !isMediaKind(linkKind(link))) {
+        dismissPending(id);
+        return;
+      }
+      setDeepLinked(link);
+      const { items } = mediaViewer.getSnapshot();
+      mediaViewer.register([...items.filter((item) => item.id !== id), link]);
+      mediaViewer.open(link.id, { standalone: true });
+    })();
+    return () => {
+      stale = true;
+    };
+  }, [pendingId, dismissPending]);
+  // It stays registered until the viewer has closed (the dialog unmounts
+  // with the last pearl), then leaves with the list's next registration.
+  useEffect(() => {
+    if (deepLinked === null) return;
+    return onCloseSettled(() => setDeepLinked(null));
+  }, [deepLinked]);
+
   // The media viewer steps through the same links (its image, video and
   // audio pearls), in the same order.
   useEffect(() => {
@@ -853,8 +905,12 @@ export function HomeShell({
     }
     if (gone.length) linkSelection.remove(gone);
     setSelectableLinks(shown, { complete: listComplete });
+    // A pearl opened from the URL that the list doesn't show, last.
+    if (deepLinked && !shownLinks.some((link) => link.id === deepLinked.id)) {
+      shownLinks.push(deepLinked);
+    }
     mediaViewer.register(shownLinks);
-  }, [shownGroups, pendingDeletes, leavingLinks, listComplete]);
+  }, [shownGroups, pendingDeletes, leavingLinks, listComplete, deepLinked]);
   // Leaving the page takes its pearls (and an open viewer) with it.
   useEffect(() => () => mediaViewer.register([]), []);
 
