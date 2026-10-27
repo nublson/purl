@@ -14,7 +14,7 @@ import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
 import { haptic } from "@/lib/haptics";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
-import { formatDomain } from "@/utils/formatter";
+import { linkSecondLine } from "@/lib/upload-meta";
 import { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
@@ -426,7 +426,7 @@ export const LinkItem = React.forwardRef<
               arriving && ARRIVE_LATE,
             )}
           >
-            {formatDomain(link.domain)}
+            {linkSecondLine(link)}
           </Typography>
           {/* The favicon's folder badge, named for screen readers (and the
               link's description). */}

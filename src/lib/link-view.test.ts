@@ -31,6 +31,8 @@ describe("link view", () => {
     expect(parseLayoutChange({})).toBeNull();
     expect(parseLayoutChange({ view: "cards" })).toBeNull();
     expect(parseLayoutChange({ folderTags: 1 })).toBeNull();
+    expect(parseLayoutChange({ playVideos: "no" })).toBeNull();
+    expect(parseLayoutChange({ playVideos: false })).toEqual({ playVideos: false });
     expect(parseLayoutChange(null)).toBeNull();
   });
 });

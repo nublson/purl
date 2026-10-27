@@ -21,7 +21,7 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import { UserItem } from "./user-item";
-import { FolderTagsMenuItem, ViewModeMenu } from "./view-mode-menu";
+import { FolderTagsMenuItem, PlayVideosMenuItem, ViewModeMenu } from "./view-mode-menu";
 
 export function User() {
   const { user } = useCurrentUser();
@@ -119,6 +119,7 @@ export function User() {
           </DropdownMenuLabel>
           <ViewModeMenu />
           <FolderTagsMenuItem />
+          <PlayVideosMenuItem />
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>

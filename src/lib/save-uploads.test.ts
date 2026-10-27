@@ -187,7 +187,9 @@ describe("uploadFiles", () => {
 
     await uploadFiles([heic, png("ok.png")], h);
 
-    expect(toastError).toHaveBeenCalledWith("photo.heic isn't a supported file");
+    expect(toastError).toHaveBeenCalledWith(
+      "photo.heic isn't a supported format. Use JPEG, PNG, GIF, WebP, AVIF or SVG for images.",
+    );
     expect(h.onStart).toHaveBeenCalledTimes(1);
     expect(h.onStart.mock.calls[0][0].name).toBe("ok.png");
     expect(

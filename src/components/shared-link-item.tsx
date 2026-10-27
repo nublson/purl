@@ -1,7 +1,7 @@
 "use client";
 
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
-import { formatDomain } from "@/utils/formatter";
+import { linkSecondLine } from "@/lib/upload-meta";
 import type { Link as LinkType } from "@/utils/links";
 import * as React from "react";
 import { LinkIcon } from "./link-icon";
@@ -123,7 +123,7 @@ export function SharedLinkItem({
             size="small"
             className="hidden font-normal text-muted-foreground md:block"
           >
-            {formatDomain(link.domain)}
+            {linkSecondLine(link)}
           </Typography>
         </ItemTitle>
       </ItemContent>

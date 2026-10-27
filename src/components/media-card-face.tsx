@@ -2,6 +2,7 @@
 
 import { audioPlayerStore, useAudioPlayer } from "@/hooks/use-audio-player";
 import { useLiveCards } from "@/hooks/use-live-cards";
+import { usePlayVideos } from "@/contexts/link-view-context";
 import { cardAspectRatio } from "@/lib/link-kind";
 import { useIsSelectionActive } from "@/lib/link-selection";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
@@ -155,13 +156,16 @@ function usePrefersReducedMotion(): boolean {
  * A video pearl: the file, muted and looping, full-bleed at its ratio, with
  * the poster (`thumbnail`) until it plays. It plays while it holds one of the
  * page's live slots (`useLiveCards`: in view, a few at a time); under reduced
- * motion it stays on its poster and plays only while hovered. The length
+ * motion, or with "Play videos" off in the user menu, it stays on its poster
+ * and plays only while hovered. The length
  * sits in a pill in the bottom-right corner.
  */
 export function VideoFace({ link, className, badge }: FaceProps) {
   const boxRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const reducedMotion = usePrefersReducedMotion();
+  // The account's "Play videos" (off: play on hover only, like reduced motion).
+  const playVideos = usePlayVideos();
   const [hovering, setHovering] = useState(false);
   const [failed, setFailed] = useState(false);
   const [natural, setNatural] = useState<string | null>(null);
@@ -171,7 +175,7 @@ export function VideoFace({ link, className, badge }: FaceProps) {
 
   const live = useLiveCards(
     boxRef,
-    Boolean(src) && !failed && (!reducedMotion || hovering),
+    Boolean(src) && !failed && ((playVideos && !reducedMotion) || hovering),
   );
 
   // React sets `muted` as a property only; `defaultMuted` also writes the
@@ -253,7 +257,8 @@ export function VideoFace({ link, className, badge }: FaceProps) {
       {link.duration != null ? (
         <span
           aria-hidden
-          className="pointer-events-none absolute right-2 bottom-2 rounded-md bg-black/60 px-1.5 py-0.5 text-xs leading-4 font-medium text-white tabular-nums backdrop-blur-sm">
+          // 6px in from the card's 8px corners, so its 2px radius is concentric.
+          className="pointer-events-none absolute right-1.5 bottom-1.5 rounded-[2px] bg-black/60 px-1.5 py-0.5 text-xs leading-4 font-medium text-white tabular-nums backdrop-blur-sm">
           {formatDuration(link.duration)}
         </span>
       ) : null}
@@ -266,9 +271,14 @@ export function VideoFace({ link, className, badge }: FaceProps) {
  * An audio pearl's player strip, on the card's tint: play/pause, elapsed
  * over the length, and a scrubber. One `<audio preload="none">` (nothing
  * loads until played), wired to `useAudioPlayer`, so starting one stops the
- * other. The top keeps room for the owner's checkbox and menu.
+ * other. With `controls`, the top keeps room for the owner's checkbox and
+ * menu (the shared card and the hover preview have none).
  */
-export function AudioFace({ link, className }: Omit<FaceProps, "badge">) {
+export function AudioFace({
+  link,
+  className,
+  controls = false,
+}: Omit<FaceProps, "badge"> & { controls?: boolean }) {
   const { playing, toggle } = useAudioPlayer(link.id);
   // While links are selected, a click on the card toggles it: the controls
   // step aside (the shared card never selects).
@@ -310,7 +320,11 @@ export function AudioFace({ link, className }: Omit<FaceProps, "badge">) {
   return (
     <div
       data-face="audio"
-      className={cn("flex flex-col bg-muted px-3 pt-10 pb-3 md:px-4", className)}
+      className={cn(
+        "flex flex-col bg-muted px-3 pb-3 md:px-4",
+        controls ? "pt-10" : "pt-4",
+        className,
+      )}
     >
       <audio
         ref={audioRef}
@@ -348,7 +362,7 @@ export function AudioFace({ link, className }: Omit<FaceProps, "badge">) {
           type="button"
           disabled={!src}
           aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
-          className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring active:scale-95 disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100"
+          className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100"
           onClick={toggle}
         >
           {playing ? (
@@ -374,7 +388,9 @@ export function AudioFace({ link, className }: Omit<FaceProps, "badge">) {
               if (audioRef.current) audioRef.current.currentTime = next;
             }}
           />
-          <span className="text-xs leading-4 text-muted-foreground tabular-nums">
+          {/* `text-foreground/70`, like Kbd: `text-muted-foreground` on
+              `bg-muted` is 4.3:1 in light mode, under 4.5:1 for 12px text. */}
+          <span className="text-xs leading-4 text-foreground/70 tabular-nums">
             {time}
           </span>
         </div>

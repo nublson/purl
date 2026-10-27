@@ -45,6 +45,8 @@ model User {
   linkView      LinkView  @default(LIST)
   /// Whether Home tags each link with its folder (emoji and name).
   showFolderTags Boolean  @default(false)
+  /// Whether video pearls play (muted) in the grid while in view; off plays on hover only.
+  playVideos    Boolean   @default(true)
 
   @@unique([email])
   @@map("users")

@@ -13,6 +13,8 @@ export type PendingUpload = {
   /** 0–100. */
   progress: number;
   status: "uploading" | "failed";
+  /** Why it failed, as the user should read it; null while uploading. */
+  message: string | null;
   width: number | null;
   height: number | null;
 };

@@ -6,7 +6,7 @@ import { useIsPhone } from "@/hooks/use-is-phone";
 import { parseLinkView } from "@/lib/link-view";
 import { haptic } from "@/lib/haptics";
 import { cn } from "@/lib/utils";
-import { ChevronDown, Grid, List3, Tag5 } from "reicon-react";
+import { ChevronDown, Grid, List3, Tag5, Video } from "reicon-react";
 import * as React from "react";
 import { HapticTarget } from "./haptic-target";
 import {
@@ -116,6 +116,36 @@ export function FolderTagsMenuItem() {
       <Tag5 />
       Folder tags
       <SwitchIndicator on={folderTags} />
+      <HapticTarget />
+    </DropdownMenuCheckboxItem>
+  );
+}
+
+/**
+ * "Play videos" in the user menu's Layout group: whether video pearls play
+ * (muted, looping) in the grid while in view. Off, they stay on their
+ * poster and play only while hovered, as under reduced motion; it is the
+ * pause control WCAG 2.2.2 asks for on moving content that starts by
+ * itself. A checkbox item drawn with a switch, like Folder tags.
+ */
+export function PlayVideosMenuItem() {
+  const { playVideos, setPlayVideos } = useLinkView();
+  const isDemo = useIsDemo();
+  return (
+    <DropdownMenuCheckboxItem
+      checked={playVideos}
+      disabled={isDemo}
+      data-cy="play-videos-toggle"
+      className="pr-2 [&>[data-slot=dropdown-menu-checkbox-item-indicator]]:hidden"
+      onSelect={(event) => event.preventDefault()}
+      onCheckedChange={(checked) => {
+        haptic("selection");
+        setPlayVideos(checked === true);
+      }}
+    >
+      <Video />
+      Play videos
+      <SwitchIndicator on={playVideos} />
       <HapticTarget />
     </DropdownMenuCheckboxItem>
   );

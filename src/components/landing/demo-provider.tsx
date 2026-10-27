@@ -10,7 +10,7 @@ import type { FolderSummary } from "@/lib/folders";
 import type { SessionUser } from "@/lib/session";
 import { useMemo, useState, type ReactNode } from "react";
 
-const DEMO_LAYOUT = { view: "list", folderTags: false } as const;
+const DEMO_LAYOUT = { view: "list", folderTags: false, playVideos: true } as const;
 
 /**
  * The app's real providers filled with demo data and local state. No

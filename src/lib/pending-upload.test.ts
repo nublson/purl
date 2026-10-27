@@ -16,6 +16,7 @@ function item(id: string, patch: Partial<PendingUpload> = {}): PendingUpload {
     previewUrl: null,
     progress: 0,
     status: "uploading",
+    message: null,
     width: null,
     height: null,
     ...patch,

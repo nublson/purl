@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { cardAspectRatio } from "@/lib/link-kind";
+import { titleFromFileName } from "@/utils/media-title";
 import type { PendingUpload } from "@/lib/pending-upload";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
@@ -118,6 +119,12 @@ function FailedActions({
         type="button"
         variant={compact ? "ghost" : "secondary"}
         size="sm"
+        // Compact (a row): a 44px target to the touch, like the row's ⋯.
+        className={
+          compact
+            ? "relative pointer-coarse:after:absolute pointer-coarse:after:-inset-1.5"
+            : undefined
+        }
         aria-label={`Retry uploading ${item.name}`}
         onClick={() => onRetry(item.id)}
       >
@@ -149,8 +156,12 @@ function FailedActions({
  * audio file is the kind's icon on the card's tint), a progress ring in the
  * top-right corner. Failed: a scrim with Retry and Dismiss.
  */
+const FAILED_MESSAGE = "Couldn\u2019t upload";
+
 export function PendingUploadCard({ item, onRetry, onDismiss }: Props) {
   const failed = item.status === "failed";
+  const title = titleFromFileName(item.name);
+  const message = item.message ?? FAILED_MESSAGE;
   return (
     <div
       aria-busy={failed ? undefined : true}
@@ -174,13 +185,13 @@ export function PendingUploadCard({ item, onRetry, onDismiss }: Props) {
           <KindIcon kind={item.kind} className="size-6" />
         )}
       </div>
-      <span className="sr-only">
-        {failed ? `${item.name}, couldn't upload` : item.name}
-      </span>
+      <span className="sr-only">{failed ? `${title}, ${message}` : title}</span>
       {failed ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/80 p-3 text-center backdrop-blur-sm">
-          <p aria-hidden className="text-sm text-muted-foreground">
-            Couldn&rsquo;t upload
+        // A 90% scrim over the user's own image: `text-foreground` on it stays
+        // over 15:1 above a black photo; muted text on 80% fell to 3:1.
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/90 p-3 text-center backdrop-blur-sm">
+          <p aria-hidden className="text-sm text-foreground">
+            {message}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-1">
             <FailedActions item={item} onRetry={onRetry} onDismiss={onDismiss} />
@@ -201,6 +212,8 @@ export function PendingUploadCard({ item, onRetry, onDismiss }: Props) {
  */
 export function PendingUploadRow({ item, onRetry, onDismiss }: Props) {
   const failed = item.status === "failed";
+  const title = titleFromFileName(item.name);
+  const message = item.message ?? FAILED_MESSAGE;
   return (
     <Item
       aria-busy={failed ? undefined : true}
@@ -228,13 +241,22 @@ export function PendingUploadRow({ item, onRetry, onDismiss }: Props) {
       <ItemContent className="min-w-0">
         <ItemTitle className="block w-full">
           <p
+            // The pearl's title (no extension), as the row will read once it
+            // lands; the full file name (and a failure's reason, which a narrow
+            // row truncates) in the tooltip.
+            title={failed ? `${item.name}: ${message}` : item.name}
             className={cn(
               "truncate text-sm font-normal text-muted-foreground max-md:text-base",
               !failed && "animate-pulse",
             )}
           >
-            {item.name}
-            {failed ? <span className="sr-only">, couldn&rsquo;t upload</span> : null}
+            {title}
+            {failed ? (
+              <>
+                <span aria-hidden> · </span>
+                <span>{message}</span>
+              </>
+            ) : null}
           </p>
         </ItemTitle>
       </ItemContent>

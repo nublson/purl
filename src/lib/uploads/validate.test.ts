@@ -45,7 +45,8 @@ describe("validateUploadFile", () => {
     ).toEqual({
       ok: false,
       reason: "type",
-      message: "photo.heic isn't a supported file",
+      message:
+        "photo.heic isn't a supported format. Use JPEG, PNG, GIF, WebP, AVIF or SVG for images.",
     });
   });
 
@@ -53,7 +54,8 @@ describe("validateUploadFile", () => {
     expect(validateUploadFile({ name: "notes", type: "", size: 10 })).toEqual({
       ok: false,
       reason: "type",
-      message: "notes isn't a supported file",
+      message:
+        "notes isn't a supported format. Upload an image, video or audio file.",
     });
   });
 
@@ -101,5 +103,20 @@ describe("validateUploadFile", () => {
     expect(
       validateUploadFile({ name: "a.png", type: "image/png", size: NaN }),
     ).toMatchObject({ ok: false });
+  });
+});
+
+describe("unsupportedFormatMessage", () => {
+  it("names the kind's formats when the extension says which kind", async () => {
+    const { unsupportedFormatMessage } = await import("./validate");
+    expect(unsupportedFormatMessage("clip.avi")).toBe(
+      "clip.avi isn't a supported format. Use MP4, WebM or MOV for video.",
+    );
+    expect(unsupportedFormatMessage("song.aiff")).toBe(
+      "song.aiff isn't a supported format. Use MP3, M4A, WAV, OGG or FLAC for audio.",
+    );
+    expect(unsupportedFormatMessage("Scan.TIFF")).toBe(
+      "Scan.TIFF isn't a supported format. Use JPEG, PNG, GIF, WebP, AVIF or SVG for images.",
+    );
   });
 });

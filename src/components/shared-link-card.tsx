@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
-import { formatDomain } from "@/utils/formatter";
+import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
 import { linkKind } from "@/lib/link-kind";
+import { linkSecondLine } from "@/lib/upload-meta";
 import { LinkIcon } from "./link-icon";
 import { AudioFace, ImageFace, VideoFace } from "./media-card-face";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
@@ -27,12 +28,36 @@ export function SharedLinkCard({
   link: LinkType;
   eagerThumbnail?: boolean;
 }) {
+  const label = `${link.title} (opens in new tab)`;
+  if (linkKind(link) === "audio") {
+    // The player's controls can't sit inside a link: the card is a frame
+    // holding the strip and a link over everything else (`after:`), so
+    // clicks beside the controls still open the file. The frame draws the
+    // link's focus ring, as the owner's card does for its overlay link.
+    return (
+      <div
+        data-cy="link-card"
+        className={cn(LINK_CARD_FRAME, "relative has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring")}
+      >
+        <AudioFace link={link} />
+        <a
+          href={link.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={label}
+          className="flex flex-col outline-none after:absolute after:inset-0 after:rounded-lg after:content-['']"
+        >
+          <LinkCardStrip link={link} />
+        </a>
+      </div>
+    );
+  }
   return (
     <a
       href={link.url}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label={`${link.title} (opens in new tab)`}
+      aria-label={label}
       data-cy="link-card"
       className={LINK_CARD_FRAME}
     >
@@ -52,11 +77,14 @@ export function LinkCardContent({
   link,
   eagerThumbnail = false,
   badge,
+  ownerControls = false,
 }: {
   link: LinkType;
   eagerThumbnail?: boolean;
   /** On the favicon's corner (the owner's grid: the link's folder badge). */
   badge?: ReactNode;
+  /** The owner's card: its checkbox and menu sit over the top edge. */
+  ownerControls?: boolean;
 }) {
   switch (linkKind(link)) {
     case "image":
@@ -66,7 +94,7 @@ export function LinkCardContent({
     case "audio":
       return (
         <>
-          <AudioFace link={link} />
+          <AudioFace link={link} controls={ownerControls} />
           <LinkCardStrip link={link} badge={badge} />
         </>
       );
@@ -122,7 +150,7 @@ function LinkCardStrip({ link, badge }: { link: LinkType; badge?: ReactNode }) {
         size="small"
         className="col-start-2 truncate"
       >
-        {formatDomain(link.domain)}
+        {linkSecondLine(link)}
       </Typography>
     </span>
   );

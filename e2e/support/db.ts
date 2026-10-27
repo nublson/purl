@@ -39,7 +39,7 @@ export async function resetTestUserData(userId: string): Promise<void> {
   // The layout is saved on the account: every test starts in the list,
   // without folder tags.
   await pool.query(
-    `UPDATE "users" SET "linkView" = 'LIST', "showFolderTags" = false WHERE "id" = $1`,
+    `UPDATE "users" SET "linkView" = 'LIST', "showFolderTags" = false, "playVideos" = true WHERE "id" = $1`,
     [userId],
   );
 }

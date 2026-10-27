@@ -714,9 +714,9 @@ export function HomeShell({
         landedUploadsRef.current.add(id);
         await onSaveSuccess(link.id, { quiet: true });
       },
-      onError: (id) =>
+      onError: (id, message) =>
         setPendingUploads((list) =>
-          updatePending(list, id, { status: "failed" }),
+          updatePending(list, id, { status: "failed", message }),
         ),
       onBatchDone: ({ uploaded }) => {
         if (uploaded === 0) return;
@@ -755,7 +755,7 @@ export function HomeShell({
       onRetry: (id: string) => {
         if (!uploadHandlers) return;
         setPendingUploads((list) =>
-          updatePending(list, id, { status: "uploading", progress: 0 }),
+          updatePending(list, id, { status: "uploading", progress: 0, message: null }),
         );
         void retryUpload(id, {
           ...uploadHandlers,

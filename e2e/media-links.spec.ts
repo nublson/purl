@@ -243,14 +243,19 @@ test.describe("Media pearls", () => {
     await expect(shotA.locator(`img[src="${icon}"]`)).toBeVisible();
     await expect(shotA).not.toContainText("Shot A");
 
-    const song = sharedCard("Song");
+    // An audio card's controls sit beside its link, never inside it (a
+    // button can't live in a link): the card holds both.
+    const songCard = cards(page).filter({ has: sharedCard("Song") });
+    await expect(sharedCard("Song").getByRole("button")).toHaveCount(0);
     let popups = 0;
     page.on("popup", () => popups++);
     const url = page.url();
-    await song.getByRole("button", { name: "Play Song" }).click();
-    await expect(song.getByRole("button", { name: "Play Song" })).toBeVisible();
+    await songCard.getByRole("button", { name: "Play Song" }).click();
+    await expect(songCard.getByRole("button", { name: "Play Song" })).toBeVisible();
     expect(popups).toBe(0);
     expect(page.url()).toBe(url);
+    // The link still covers the rest of the card (a media link: its domain).
+    await expect(sharedCard("Song")).toContainText("sounds.example");
     await context.close();
   });
 

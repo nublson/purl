@@ -129,7 +129,11 @@ function RemoteFavicon({
         referrerPolicy="no-referrer"
         className={cn(
           "aspect-square transition-opacity duration-150 ease-out",
-          cover ? "object-cover" : "object-contain",
+          cover
+            ? // An image pearl's preview gets the card strip's 1px edge, so a
+              // light photo doesn't dissolve into the row.
+              "object-cover outline outline-black/10 -outline-offset-1 dark:outline-white/10"
+            : "object-contain",
           box,
           state === "loaded" ? "opacity-100" : "opacity-0",
         )}

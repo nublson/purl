@@ -150,6 +150,7 @@ export function LinkCard({
         <LinkCardContent
           link={link}
           eagerThumbnail={eagerThumbnail}
+          ownerControls
           badge={
             folderTag ? (
               <FolderBadge

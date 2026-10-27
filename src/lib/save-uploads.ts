@@ -178,6 +178,7 @@ async function uploadOne(
       previewUrl,
       progress: 0,
       status: "uploading",
+      message: null,
       width: null,
       height: null,
     });
