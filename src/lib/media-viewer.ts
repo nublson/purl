@@ -143,17 +143,55 @@ export const mediaViewer = {
     step(-1);
   },
 
+  /** Moves to the first pearl. */
+  first() {
+    jump(0);
+  },
+
+  /** Moves to the last pearl. */
+  last() {
+    jump(state.items.length - 1);
+  },
+
   subscribe,
   getSnapshot,
 };
 
+/** Where the current pearl sits, or -1 when there's nowhere to move. */
+function movableIndex(): number {
+  if (state.currentId === null || state.standalone) return -1;
+  return state.items.findIndex((item) => item.id === state.currentId);
+}
+
 function step(delta: 1 | -1) {
-  if (state.currentId === null) return;
-  const at = state.items.findIndex((item) => item.id === state.currentId);
+  const at = movableIndex();
   if (at === -1) return;
-  const target = state.items[at + delta];
-  if (!target) return;
+  jump(at + delta);
+}
+
+function jump(index: number) {
+  if (movableIndex() === -1) return;
+  const target = state.items[index];
+  if (!target || target.id === state.currentId) return;
   setState({ ...state, currentId: target.id });
+}
+
+/**
+ * The viewer's close has completed (the dialog let go). Faces raised for
+ * the morph lower themselves then, except the one the viewer morphed back
+ * into (`into`), which lowers once its own morph has played.
+ */
+const closeSettledListeners = new Set<(into: string | null) => void>();
+
+export function markCloseSettled(into: string | null) {
+  for (const listener of closeSettledListeners) listener(into);
+}
+
+export function onCloseSettled(listener: (into: string | null) => void): () => void {
+  closeSettledListeners.add(listener);
+  return () => {
+    closeSettledListeners.delete(listener);
+  };
 }
 
 /**

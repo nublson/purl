@@ -97,6 +97,31 @@ async function seedSharedBoard(
   return { shotA, shotB };
 }
 
+/** Three images, newest first: Shot A, Shot B, Shot C (800×600 boxes). */
+async function seedThreeShots(
+  seed: { link: (link: Parameters<typeof seedLink>[1]) => Promise<string> },
+  baseURL: string,
+) {
+  const icon = `${baseURL}/icon.png`;
+  const ids: Record<string, string> = {};
+  for (const name of ["C", "B", "A"]) {
+    ids[name] = await seed.link({
+      url: `${icon}?${name.toLowerCase()}=1`,
+      title: `Shot ${name}`,
+      contentType: "IMAGE",
+      thumbnail: icon,
+      width: 800,
+      height: 600,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 15));
+  }
+  return { shotA: ids.A, shotB: ids.B, shotC: ids.C };
+}
+
+/** The viewer's live region (the dialog's own; announced on each move). */
+const viewerStatus = (page: Page) =>
+  page.locator("[data-media-viewer] [data-viewer-status]");
+
 test.describe("Media viewer", () => {
   test("an image card opens the viewer; Esc closes it back onto the card", async ({
     page,
@@ -459,8 +484,126 @@ test.describe("Media viewer", () => {
     await context.close();
   });
 
-  // Needs Task 7's keys (ArrowRight) in the viewer.
-  test.fixme("on a shared folder, → moves to the next media pearl, past page links", async ({
+  test("arrows, keys and buttons move between pearls; Esc lands on the one shown", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    const { shotA, shotB } = await seedThreeShots(seed, baseURL!);
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(3);
+
+    await openButton(page, "Shot A").click();
+    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.get("pearl")).toBe(shotA);
+    const entries = await page.evaluate(() => history.length);
+    // Nothing to go back to on the first.
+    await expect(page.getByRole("button", { name: "Previous pearl" })).toHaveCount(0);
+
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("dialog", { name: "Shot B" })).toBeVisible();
+    await expect(viewerStatus(page)).toHaveText("2 of 3: Shot B");
+    await expect(viewerStatus(page)).toHaveAttribute("role", "status");
+    // The param is replaced in place: no new history entry.
+    await expect.poll(() => new URL(page.url()).searchParams.get("pearl")).toBe(shotB);
+    expect(await page.evaluate(() => history.length)).toBe(entries);
+
+    await page.keyboard.press("Home");
+    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
+    await expect(viewerStatus(page)).toHaveText("1 of 3: Shot A");
+
+    // Two presses in quick succession both count.
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("dialog", { name: "Shot C" })).toBeVisible();
+    await expect(viewerStatus(page)).toHaveText("3 of 3: Shot C");
+    await expect(page.getByRole("button", { name: "Next pearl" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Previous pearl" })).toHaveAttribute(
+      "aria-keyshortcuts",
+      "ArrowLeft",
+    );
+
+    // The buttons (shown on hover).
+    await page.getByRole("dialog").hover();
+    await page.getByRole("button", { name: "Previous pearl" }).click();
+    await expect(page.getByRole("dialog", { name: "Shot B" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Next pearl" })).toHaveAttribute(
+      "aria-keyshortcuts",
+      "ArrowRight",
+    );
+    await page.getByRole("button", { name: "Next pearl" }).click();
+    await expect(page.getByRole("dialog", { name: "Shot C" })).toBeVisible();
+    // The last pearl's button is gone; focus stays in the viewer.
+    await expect
+      .poll(() =>
+        page.evaluate(() => Boolean(document.activeElement?.closest("[data-media-viewer]"))),
+      )
+      .toBe(true);
+
+    await page.keyboard.press("Home");
+    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
+    await page.keyboard.press("End");
+    await expect(page.getByRole("dialog", { name: "Shot C" })).toBeVisible();
+    await expect(page.getByRole("dialog").locator('img[src$="?c=1"]')).toHaveAttribute(
+      "alt",
+      "Shot C",
+    );
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect.poll(() => new URL(page.url()).searchParams.has("pearl")).toBe(false);
+    await expect(openButton(page, "Shot C")).toBeFocused();
+    // Shot A's card (opened from, never morphed back into) isn't left raised.
+    await expect(page.locator("[data-pearl-morphing]")).toHaveCount(0, { timeout: 500 });
+  });
+
+  test("with reduced motion the viewer still opens and moves, and video doesn't autoplay", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.context().route("https://loops.example/**", () => {});
+    const icon = `${baseURL}/icon.png`;
+    await seed.link({
+      url: `${icon}?still=1`,
+      title: "Still",
+      contentType: "IMAGE",
+      thumbnail: icon,
+      width: 800,
+      height: 600,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    await seed.link({
+      url: "https://loops.example/clip.mp4",
+      title: "Clip",
+      contentType: "VIDEO",
+      thumbnail: icon,
+      duration: 14,
+    });
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(2);
+
+    await openButton(page, "Clip").click();
+    const dialog = page.getByRole("dialog", { name: "Clip" });
+    await expect(dialog).toBeVisible();
+    const player = dialog.locator("video[controls]");
+    await expect(player).toHaveCount(1);
+    await expect(player).not.toHaveAttribute("autoplay");
+
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("dialog", { name: "Still" })).toBeVisible();
+    await expect(viewerStatus(page)).toHaveText("2 of 2: Still");
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect(openButton(page, "Still")).toBeFocused();
+    // The card it didn't morph back into isn't left raised for the morph.
+    await expect(page.locator("[data-pearl-morphing]")).toHaveCount(0, { timeout: 500 });
+  });
+
+  test("on a shared folder, → moves to the next media pearl, past page links", async ({
     browser,
     seed,
     testUser,
@@ -485,5 +628,46 @@ test.describe("Media viewer", () => {
     await page.keyboard.press("Escape");
     await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
     await context.close();
+  });
+});
+
+test.describe("Media viewer on phones", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("Back closes the viewer and stays on the page; the buttons are finger-sized", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await seedThreeShots(seed, baseURL!);
+    await openHome(page);
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(3);
+
+    await openButton(page, "Shot B").tap();
+    await expect(page.getByRole("dialog", { name: "Shot B" })).toBeVisible();
+    await expect.poll(() => new URL(page.url()).searchParams.has("pearl")).toBe(true);
+
+    // Shown without hover on touch screens, 40px plus 2px of invisible hit
+    // area all round: 44px targets.
+    for (const name of ["Previous pearl", "Next pearl", "Close"]) {
+      const button = page.getByRole("button", { name });
+      await expect(button).toBeVisible();
+      await expect(button).toHaveCSS("opacity", "1");
+      const target = await button.evaluate((el: HTMLElement) => {
+        const hit = getComputedStyle(el, "::after");
+        return {
+          width: el.offsetWidth - 2 * parseFloat(hit.left),
+          height: el.offsetHeight - 2 * parseFloat(hit.top),
+        };
+      });
+      expect(target.width).toBeGreaterThanOrEqual(44);
+      expect(target.height).toBeGreaterThanOrEqual(44);
+    }
+
+    await page.goBack();
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    expect(new URL(page.url()).pathname).toBe("/home");
+    expect(new URL(page.url()).searchParams.has("pearl")).toBe(false);
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(3);
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useIsMediaOpen } from "@/lib/media-viewer";
+import { onCloseSettled, useIsMediaOpen } from "@/lib/media-viewer";
 import { loadMotionFeatures } from "@/lib/motion-features-loader";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
@@ -19,6 +19,14 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
  * harmless, since the Popup's box doesn't move.
  */
 export const FACE_LAYOUT_DEPENDENCY = "pearl-face";
+
+/**
+ * The viewer's Popup's `layoutDependency` while it's open: fixed, so moving
+ * between pearls (a re-render with a new size) never morphs its box. It
+ * still changes to `FACE_LAYOUT_DEPENDENCY` and back while the viewer
+ * swaps faces before closing, and the close itself is a presence change.
+ */
+export const VIEWER_LAYOUT_DEPENDENCY = "pearl-viewer";
 
 /**
  * A card's corner radius (`rounded-lg`, 10px), in px: Motion keeps a
@@ -82,12 +90,20 @@ export function MediaAnchor({
   const [morphing, setMorphing] = useState(false);
   if (open && !morphing) setMorphing(true);
   const ref = useRef<HTMLDivElement>(null);
-  // Closed onto another card, this one never morphs back: lower it anyway.
+  // A face that won't morph back (the viewer closed onto another card, or
+  // moved past this one, or there's no morph under reduced motion) lowers
+  // as soon as the viewer's close completes; the timer is the fallback.
   useEffect(() => {
     if (open || !morphing) return;
     const timer = setTimeout(() => setMorphing(false), 1000);
-    return () => clearTimeout(timer);
-  }, [open, morphing]);
+    const stop = onCloseSettled((into) => {
+      if (into !== link.id) setMorphing(false);
+    });
+    return () => {
+      clearTimeout(timer);
+      stop();
+    };
+  }, [open, morphing, link.id]);
   // Motion hid this face when the viewer opened from it. If the viewer then
   // closed onto another card, Motion shows it again without a morph, and
   // without a morph it never clears the `visibility: hidden` it wrote: clear

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Link } from "@/utils/links";
-import { mediaViewer } from "./media-viewer";
+import { markCloseSettled, mediaViewer, onCloseSettled } from "./media-viewer";
 
 function link(id: string, contentType: Link["contentType"] = "IMAGE"): Link {
   return { id, contentType, embed: null, title: id } as unknown as Link;
@@ -143,6 +143,31 @@ describe("mediaViewer", () => {
     expect(mediaViewer.getSnapshot().currentId).toBe("c");
   });
 
+  it("first and last jump to the ends", () => {
+    mediaViewer.register([link("a"), link("b"), link("c")]);
+    mediaViewer.open("b");
+    mediaViewer.last();
+    expect(mediaViewer.getSnapshot()).toMatchObject({ openedId: "b", currentId: "c" });
+    mediaViewer.first();
+    expect(mediaViewer.getSnapshot().currentId).toBe("a");
+  });
+
+  it("a standalone pearl has no neighbours to move to", () => {
+    mediaViewer.register([link("a"), link("b"), link("c")]);
+    mediaViewer.open("b", { standalone: true });
+    mediaViewer.next();
+    mediaViewer.prev();
+    mediaViewer.first();
+    mediaViewer.last();
+    expect(mediaViewer.getSnapshot().currentId).toBe("b");
+  });
+
+  it("first and last do nothing while closed", () => {
+    mediaViewer.register([link("a"), link("b")]);
+    mediaViewer.last();
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+  });
+
   it("close clears both ids but keeps items", () => {
     mediaViewer.register([link("a"), link("b")]);
     mediaViewer.open("a");
@@ -159,6 +184,16 @@ describe("mediaViewer", () => {
     expect(listener).toHaveBeenCalledTimes(1);
     unsubscribe();
     mediaViewer.close();
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells listeners the close settled, with the pearl it morphed into, until they stop", () => {
+    const listener = vi.fn();
+    const stop = onCloseSettled(listener);
+    markCloseSettled("b");
+    expect(listener).toHaveBeenCalledWith("b");
+    stop();
+    markCloseSettled(null);
     expect(listener).toHaveBeenCalledTimes(1);
   });
 });
