@@ -21,3 +21,12 @@ export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
 
 /** Longest folder name, in UTF-16 units (`String#length`). */
 export const MAX_FOLDER_NAME_LENGTH = 60;
+
+/** Largest single file an upload accepts. */
+export const MAX_UPLOAD_FILE_BYTES = 25 * 1024 * 1024;
+
+/** Per-account storage for uploaded files (the sum of `Link.fileSize`). */
+export const MAX_UPLOAD_BYTES_PER_ACCOUNT = 250 * 1024 * 1024;
+
+/** Most files the client uploads at once; the rest wait their turn. */
+export const MAX_CONCURRENT_UPLOADS = 3;
