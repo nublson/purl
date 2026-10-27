@@ -14,6 +14,30 @@ beforeEach(() => {
 });
 
 describe("mediaViewer", () => {
+  it("unregisterPage empties and closes, marked as the page leaving, until the next register", () => {
+    mediaViewer.register([link("a"), link("b")]);
+    mediaViewer.open("a");
+    mediaViewer.unregisterPage();
+    expect(mediaViewer.getSnapshot()).toMatchObject({
+      items: [],
+      currentId: null,
+      openedId: null,
+      pageLeft: true,
+    });
+    mediaViewer.register([link("a")]);
+    expect(mediaViewer.getSnapshot().pageLeft).toBe(false);
+    mediaViewer.unregisterPage();
+    mediaViewer.register([]);
+    expect(mediaViewer.getSnapshot().pageLeft).toBe(false);
+  });
+
+  it("a plain register([]) while open is a close, not the page leaving", () => {
+    mediaViewer.register([link("a")]);
+    mediaViewer.open("a");
+    mediaViewer.register([]);
+    expect(mediaViewer.getSnapshot()).toMatchObject({ currentId: null, pageLeft: false });
+  });
+
   it("registers media pearls only, in order", () => {
     mediaViewer.register([
       link("a", "IMAGE"),

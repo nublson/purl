@@ -15,7 +15,7 @@ import {
 } from "@/components/omnibox-add-section";
 import { DropHandler } from "@/components/drop-handler";
 import { PasteHandler } from "@/components/paste-handler";
-import { MediaViewerLazy } from "@/components/media-viewer-lazy";
+import { MediaViewerLazy, loadMediaViewer } from "@/components/media-viewer-lazy";
 import { UploadInput } from "@/components/upload-input";
 import {
   LinkResultsSkeleton,
@@ -841,13 +841,17 @@ export function HomeShell({
   // doesn't have (past the first page, which is already here from the
   // server) is fetched on its own and opens standalone: no neighbours, and
   // no card to morph from, so the dialog fades. Not found, not media or not
-  // reachable: the param goes, quietly.
+  // reachable: the param goes, quietly. Declared before the unmount
+  // cleanup below, so the URL binding is disposed first when the page goes.
   const { pendingId, dismissPending } = useMediaViewerUrl();
   const [deepLinked, setDeepLinked] = useState<Link | null>(null);
   useEffect(() => {
     if (pendingId === null) return;
     const id = pendingId;
     let stale = false;
+    // The dialog's chunk loads alongside, not after the fetch. A failed
+    // prefetch is fine: mounting the viewer loads it again.
+    void loadMediaViewer().catch(() => {});
     // Stale once the page moved on: unmounted or another pending pearl
     // (cleanup), the URL no longer naming it (Back), or the viewer showing
     // something else meanwhile.
@@ -911,8 +915,9 @@ export function HomeShell({
     }
     mediaViewer.register(shownLinks);
   }, [shownGroups, pendingDeletes, leavingLinks, listComplete, deepLinked]);
-  // Leaving the page takes its pearls (and an open viewer) with it.
-  useEffect(() => () => mediaViewer.register([]), []);
+  // Leaving the page takes its pearls (and an open viewer) with it,
+  // without counting as a close (the URL keeps `?pearl=`).
+  useEffect(() => () => mediaViewer.unregisterPage(), []);
 
   // Each link loaded in this list, searches included, for the selection
   // bar: its folder ("Remove from folders"), also for selected links the

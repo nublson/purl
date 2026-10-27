@@ -23,6 +23,12 @@ export type MediaViewerState = {
   openedPreset: MediaViewerPreset;
   /** Opened on its own (no neighbours to move to). */
   standalone: boolean;
+  /**
+   * The page took its pearls away because it's leaving (`unregisterPage`):
+   * the viewer is closed, but nobody closed it, so the URL keeps its pearl.
+   * Cleared by the next `register` or `open`.
+   */
+  pageLeft: boolean;
 };
 
 export type OpenOptions = {
@@ -36,6 +42,7 @@ const INITIAL: MediaViewerState = {
   currentId: null,
   openedPreset: "smooth",
   standalone: false,
+  pageLeft: false,
 };
 
 let state: MediaViewerState = INITIAL;
@@ -91,7 +98,10 @@ export const mediaViewer = {
   /** Registers the media pearls on screen, in display order. */
   register(links: Link[]) {
     const items = links.filter(isMedia);
-    if (sameItems(items, state.items)) return;
+    if (sameItems(items, state.items)) {
+      if (state.pageLeft) setState({ ...state, pageLeft: false });
+      return;
+    }
     const ids = new Set(items.map((item) => item.id));
     let { openedId, currentId } = state;
     let closed = false;
@@ -107,7 +117,17 @@ export const mediaViewer = {
       setState({ ...INITIAL, items });
       return;
     }
-    setState({ ...state, items, openedId, currentId });
+    setState({ ...state, items, openedId, currentId, pageLeft: false });
+  },
+
+  /**
+   * The page is unmounting (its effect cleanup): takes its pearls and an
+   * open viewer away without that counting as a close, so the URL keeps
+   * `?pearl=` (StrictMode's simulated unmount remounts right after). A live
+   * list that empties calls `register([])`, which is a close.
+   */
+  unregisterPage() {
+    setState({ ...INITIAL, pageLeft: true });
   },
 
   /** Opens the viewer on `id`; ignored when that pearl isn't registered. */
@@ -119,6 +139,7 @@ export const mediaViewer = {
       currentId: id,
       openedPreset: options?.preset ?? "smooth",
       standalone: options?.standalone ?? false,
+      pageLeft: false,
     });
   },
 

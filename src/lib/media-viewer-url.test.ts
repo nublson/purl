@@ -400,15 +400,17 @@ describe("bindViewerUrl", () => {
     binder.dispose();
   });
 
-  it("StrictMode's remount (register, unregister, dispose, rebind) still opens the URL's pearl", () => {
-    // Mount: the binder binds first (child effects run first), then the page
-    // registers its pearls, which opens the one the URL names.
+  it("StrictMode's remount (register, unregisterPage, dispose, rebind) still opens the URL's pearl", () => {
+    // Mount: the binder binds, then the page registers its pearls, which
+    // opens the one the URL names.
     const first = page("/home?pearl=b", []);
     mediaViewer.register(["a", "b", "c"].map(link));
     expect(mediaViewer.getSnapshot().currentId).toBe("b");
-    // The simulated unmount: the page's cleanup unregisters before the
-    // binder is disposed. Items vanishing isn't a close: the URL stays.
-    mediaViewer.register([]);
+    // The simulated unmount, in the worse order (the page's cleanup before
+    // the binder's): leaving the page isn't a close, so the URL stays.
+    mediaViewer.unregisterPage();
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+    expect(first.binder.pendingId()).toBe("b");
     expect(first.state.href).toBe("/home?pearl=b");
     first.binder.dispose();
     // The remount.
@@ -432,7 +434,7 @@ describe("bindViewerUrl", () => {
     const first = page("/home");
     mediaViewer.open("a");
     expect(first.history.pushState).toHaveBeenCalledTimes(1);
-    mediaViewer.register([]);
+    mediaViewer.unregisterPage();
     expect(first.history.back).not.toHaveBeenCalled();
     expect(first.state.href).toBe("/home?pearl=a");
     first.binder.dispose();
@@ -450,6 +452,59 @@ describe("bindViewerUrl", () => {
     expect(first.history.back).toHaveBeenCalledTimes(1);
     expect(first.state.href).toBe("/home");
     second.dispose();
+  });
+
+  it("request, unregisterPage, register: the pending pearl still opens, with its param", () => {
+    const { binder, history, state } = page("/home?pearl=b", []);
+    mediaViewer.unregisterPage();
+    expect(binder.pendingId()).toBe("b");
+    mediaViewer.register(["a", "b", "c"].map(link));
+    expect(mediaViewer.getSnapshot().currentId).toBe("b");
+    expect(mediaViewer.getSnapshot().pageLeft).toBe(false);
+    expect(history.replaceState).not.toHaveBeenCalled();
+    expect(history.pushState).not.toHaveBeenCalled();
+    expect(state.href).toBe("/home?pearl=b");
+    binder.dispose();
+  });
+
+  it("a live list losing its last pearl closes the viewer: back, no reopen, nothing pending", () => {
+    const { binder, history, state, pending } = page("/home");
+    mediaViewer.open("a");
+    expect(state.href).toBe("/home?pearl=a");
+    mediaViewer.register([]); // the last pearls left (deleted elsewhere, a search)
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+    expect(history.back).toHaveBeenCalledTimes(1);
+    expect(history.replaceState).not.toHaveBeenCalled();
+    expect(state.href).toBe("/home");
+    expect(binder.pendingId()).toBeNull();
+    expect(pending).toEqual([]);
+    // It coming back doesn't reopen anything.
+    mediaViewer.register(["a"].map(link));
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+    binder.dispose();
+  });
+
+  it("a live list losing its last pearl, opened from the URL, strips the param", () => {
+    const { binder, history, state } = page("/home?pearl=a&ref=mail");
+    expect(mediaViewer.getSnapshot().currentId).toBe("a");
+    mediaViewer.register([]);
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+    expect(history.back).not.toHaveBeenCalled();
+    expect(state.href).toBe("/home?ref=mail");
+    expect(binder.pendingId()).toBeNull();
+    binder.dispose();
+  });
+
+  it("a live list dropping the shown pearl but keeping others moves to a neighbour", () => {
+    const { binder, history, state } = page("/home");
+    mediaViewer.open("b");
+    mediaViewer.register(["a", "c"].map(link));
+    expect(mediaViewer.getSnapshot().currentId).toBe("c");
+    expect(history.pushState).toHaveBeenCalledTimes(1);
+    expect(history.back).not.toHaveBeenCalled();
+    expect(state.href).toBe("/home?pearl=c"); // replaced in place
+    expect(binder.pendingId()).toBeNull();
+    binder.dispose();
   });
 
   it("pearls replaced by others still close the viewer and clean the URL", () => {

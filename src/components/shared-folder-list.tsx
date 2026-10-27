@@ -157,6 +157,8 @@ export function SharedFolderList({
 
   useEffect(() => coolPreviews, []);
 
+  // Declared before the unmount cleanup below, so the URL binding is
+  // disposed first when the page goes (React runs cleanups in order).
   // `?pearl=<id>`: the viewer opens on it once it's registered below. One
   // the page doesn't show (past the first page, not media, not in this
   // folder) is dropped quietly: visitors have no endpoint for one link.
@@ -170,8 +172,9 @@ export function SharedFolderList({
   useEffect(() => {
     mediaViewer.register(links);
   }, [links]);
-  // Leaving the page takes its pearls (and an open viewer) with it.
-  useEffect(() => () => mediaViewer.register([]), []);
+  // Leaving the page takes its pearls (and an open viewer) with it,
+  // without counting as a close (the URL keeps `?pearl=`).
+  useEffect(() => () => mediaViewer.unregisterPage(), []);
 
   // Grid: room for four 210px cards and their 40px gaps (4×210 + 3×40).
   const frame = cn(
@@ -205,8 +208,8 @@ export function SharedFolderList({
 
   return (
     <div className={frame} onMouseLeave={coolPreviews}>
-      {/* One per page: binds `?pearl=` and mounts the dialog once a media
-          pearl is registered. */}
+      {/* One per page: mounts the dialog once a media pearl is registered
+          (`?pearl=` is bound above, by `useMediaViewerUrl`). */}
       <MediaViewerLazy />
       {descriptionLine}
       {/* Keyed by view: switching remounts it, and after a switch (not on

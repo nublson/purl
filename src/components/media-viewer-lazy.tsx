@@ -5,8 +5,9 @@ import dynamic from "next/dynamic";
 
 // Cambio brings Base UI's dialog and Motion's full `motion` components:
 // a chunk of its own, loaded once the page has a media pearl.
+export const loadMediaViewer = () => import("./media-viewer");
 const MediaViewer = dynamic(
-  () => import("./media-viewer").then((mod) => mod.MediaViewer),
+  () => loadMediaViewer().then((mod) => mod.MediaViewer),
   { ssr: false },
 );
 

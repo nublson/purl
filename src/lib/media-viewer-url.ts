@@ -184,18 +184,16 @@ export function bindViewerUrl(
   };
 
   const sync = () => {
-    const { currentId, items } = store.getSnapshot();
+    const { currentId, pageLeft } = store.getSnapshot();
     if (currentId !== previous) {
       const before = previous;
       previous = currentId;
       if (currentId === null) {
-        if (before !== null && items.length === 0 && pearlParam(getSearch()) === before) {
-          // The page took every pearl away while the URL still names this
-          // one: it's unmounting (or React's StrictMode is simulating that),
-          // not the viewer closing. Leave the URL alone and keep the pearl
-          // pending, so a page that registers it again shows it again. (A
-          // close is `close()`, which keeps the items.)
-          setRequested(before);
+        if (pageLeft) {
+          // The page is unmounting (or StrictMode is simulating that), not
+          // the viewer closing: leave the URL alone, and keep the pearl it
+          // names pending, so a page that registers it again shows it.
+          if (pearlParam(getSearch()) === before) setRequested(before);
         } else {
           viewerUrl.close();
         }

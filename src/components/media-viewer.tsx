@@ -42,6 +42,9 @@ const CENTER_TOP = "calc(50% + (env(safe-area-inset-top) - var(--bottom-inset)) 
 const CENTER_LEFT =
   "calc(50% + (env(safe-area-inset-left) - env(safe-area-inset-right)) / 2)";
 
+/** How long after the dialog opens an interrupted morph still makes `ready`. */
+const READY_FALLBACK_MS = 1000;
+
 /**
  * Closing onto another pearl's card (after next/previous): Motion reads a
  * `layoutId` only when an element mounts, so the Popup is remounted under
@@ -128,6 +131,14 @@ export function MediaViewer() {
   // the preview the card already showed is what travels; reset each open.
   const [ready, setReady] = useState(false);
   const morphStarted = useRef(false);
+  // Second path to `ready`, for a morph cut short (`onLayoutAnimationComplete`
+  // never comes): the dialog's open completes ~30ms into the morph (Base UI
+  // doesn't wait for Motion's JS-driven layout animation), so flipping
+  // `ready` there would load the original mid-morph; instead it arms this
+  // timer, longer than any preset's morph, which the morph's own completion
+  // beats in the normal case.
+  const readyFallback = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => () => clearTimeout(readyFallback.current), []);
   const closed = currentId === null;
   if (closed && ready) setReady(false);
 
@@ -141,6 +152,7 @@ export function MediaViewer() {
     // Each open and each close starts without a morph seen: an open with no
     // card to grow from (a deep link) is ready through the fallback below.
     morphStarted.current = false;
+    clearTimeout(readyFallback.current);
     for (const el of [popupRef.current, backdropRef.current]) {
       if (!el) continue;
       el.inert = closed;
@@ -205,7 +217,13 @@ export function MediaViewer() {
       modal
       onOpenChangeComplete={(open: boolean) => {
         // No morph (no card to grow from): ready once the dialog is open.
+        // With one, ready when it completes, or after the fallback (above)
+        // if it was interrupted.
         if (open && !morphStarted.current) setReady(true);
+        else if (open) {
+          clearTimeout(readyFallback.current);
+          readyFallback.current = setTimeout(() => setReady(true), READY_FALLBACK_MS);
+        }
         // Closed: faces raised for the morph lower now, except the one it
         // morphs back into (none under reduced motion), which waits for it.
         if (!open) markCloseSettled(reducedMotion ? null : morphInto.current);
