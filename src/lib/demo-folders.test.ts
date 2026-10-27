@@ -12,7 +12,8 @@ vi.mock("@/lib/prisma", () => ({
 const { getDemoFolders } = await import("./demo-folders");
 
 const USER = { id: "u1", name: "Purl", image: null, username: "purl" };
-const LINK = {
+/** What the demo shows for a link: `upload` instead of the file key. */
+const LINK_PUBLIC = {
   id: "l1",
   url: "https://a.example",
   title: "A",
@@ -22,7 +23,16 @@ const LINK = {
   favicon: "https://a.example/favicon.ico",
   contentType: "WEB",
   createdAt: new Date("2026-10-01T00:00:00Z"),
+  mimeType: null,
+  width: null,
+  height: null,
+  duration: null,
+  embed: false,
+  upload: false,
 };
+
+/** The row the database returns for it (`PUBLIC_LINK_SELECT`). */
+const LINK = { ...LINK_PUBLIC, upload: undefined, fileKey: null };
 
 describe("getDemoFolders", () => {
   beforeEach(() => {
@@ -83,7 +93,7 @@ describe("getDemoFolders", () => {
           emoji: "🦪",
           description: null,
           linkCount: 1,
-          links: [LINK],
+          links: [LINK_PUBLIC],
         },
       ],
     });
@@ -94,7 +104,7 @@ describe("getDemoFolders", () => {
       { id: "f1", name: "A", slug: "a", emoji: null, description: "", links: [LINK], _count: { links: 50 } },
     ]);
     const data = await getDemoFolders();
-    expect(data?.folders[0]).toMatchObject({ linkCount: 50, links: [LINK] });
+    expect(data?.folders[0]).toMatchObject({ linkCount: 50, links: [LINK_PUBLIC] });
     const args = mockFolderFindMany.mock.calls[0][0];
     expect(args.select._count).toEqual({ select: { links: { where: { userId: "u1" } } } });
   });

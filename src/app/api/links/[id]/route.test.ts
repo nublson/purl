@@ -124,6 +124,13 @@ describe("links/[id] API route", () => {
         contentType: "WEB",
         createdAt,
         folderId: null,
+        mimeType: null,
+        width: null,
+        height: null,
+        duration: null,
+        frameable: null,
+        embed: false,
+        upload: false,
       });
 
       const req = createRequest(`/api/links/${ID}`, { method: "GET" });
@@ -143,6 +150,13 @@ describe("links/[id] API route", () => {
         contentType: "WEB",
         createdAt: createdAt.toISOString(),
         folderId: null,
+        mimeType: null,
+        width: null,
+        height: null,
+        duration: null,
+        frameable: null,
+        embed: false,
+        upload: false,
       });
     });
   });
@@ -199,6 +213,14 @@ describe("links/[id] API route", () => {
         folderId: null,
         readAt: null,
         needsMetadata: false,
+        fileKey: null,
+        fileSize: null,
+        mimeType: null,
+        width: null,
+        height: null,
+        duration: null,
+        frameable: null,
+        embed: false,
       });
 
       const res = await PATCH(
@@ -230,6 +252,14 @@ describe("links/[id] API route", () => {
         folderId: null,
         readAt: null,
         needsMetadata: false,
+        fileKey: null,
+        fileSize: null,
+        mimeType: null,
+        width: null,
+        height: null,
+        duration: null,
+        frameable: null,
+        embed: false,
       });
 
       await PATCH(patchRequest({ description: null }), {
@@ -452,6 +482,14 @@ describe("links/[id] API route", () => {
           folderId: "folder-1",
           readAt: null,
           needsMetadata: false,
+          fileKey: null,
+          fileSize: null,
+          mimeType: null,
+          width: null,
+          height: null,
+          duration: null,
+          frameable: null,
+          embed: false,
         });
 
         const res = await PATCH(
@@ -501,6 +539,14 @@ describe("links/[id] API route", () => {
           folderId: null,
           readAt: null,
           needsMetadata: false,
+          fileKey: null,
+          fileSize: null,
+          mimeType: null,
+          width: null,
+          height: null,
+          duration: null,
+          frameable: null,
+          embed: false,
         });
 
         const res = await PATCH(

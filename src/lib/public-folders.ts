@@ -20,6 +20,12 @@ export type PublicLink = {
   favicon: string;
   contentType: ContentType;
   createdAt: Date;
+  mimeType: string | null;
+  width: number | null;
+  height: number | null;
+  duration: number | null;
+  embed: boolean;
+  upload: boolean;
 };
 
 /** The person sharing: what the page header shows. */
@@ -58,6 +64,13 @@ export const PUBLIC_LINK_SELECT = {
   favicon: true,
   contentType: true,
   createdAt: true,
+  mimeType: true,
+  width: true,
+  height: true,
+  duration: true,
+  embed: true,
+  /** Selected only to derive `upload`; never emitted. */
+  fileKey: true,
 } as const;
 
 /** The only user columns a shared page may show. */
@@ -183,6 +196,12 @@ export async function listPublicFolderLinks(
       favicon: link.favicon,
       contentType: link.contentType,
       createdAt: link.createdAt,
+      mimeType: link.mimeType,
+      width: link.width,
+      height: link.height,
+      duration: link.duration,
+      embed: link.embed,
+      upload: link.fileKey != null,
     })),
     nextCursor,
   };

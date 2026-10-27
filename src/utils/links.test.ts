@@ -19,6 +19,13 @@ function link(createdAt: Date, title: string, folderId: string | null = null): L
     thumbnail: null,
     createdAt,
     folderId,
+    mimeType: null,
+    width: null,
+    height: null,
+    duration: null,
+    frameable: null,
+    embed: false,
+    upload: false,
   };
 }
 

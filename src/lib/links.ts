@@ -205,6 +205,13 @@ type LinkRow = {
   thumbnail: string | null;
   createdAt: Date;
   folderId?: string | null;
+  fileKey?: string | null;
+  mimeType?: string | null;
+  width?: number | null;
+  height?: number | null;
+  duration?: number | null;
+  frameable?: boolean | null;
+  embed?: boolean;
 };
 
 function mapRowToLink(row: LinkRow): Link {
@@ -219,6 +226,13 @@ function mapRowToLink(row: LinkRow): Link {
     contentType: row.contentType,
     createdAt: row.createdAt,
     folderId: row.folderId ?? null,
+    mimeType: row.mimeType ?? null,
+    width: row.width ?? null,
+    height: row.height ?? null,
+    duration: row.duration ?? null,
+    frameable: row.frameable ?? null,
+    embed: row.embed ?? false,
+    upload: row.fileKey != null,
   };
 }
 

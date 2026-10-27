@@ -310,6 +310,13 @@ describe("POST /api/links", () => {
         contentType: "WEB",
         createdAt: CREATED_AT.toISOString(),
         folderId: null,
+        mimeType: null,
+        width: null,
+        height: null,
+        duration: null,
+        frameable: null,
+        embed: false,
+        upload: false,
         moved: false,
       });
     });
