@@ -26,7 +26,10 @@ export function UsageProvider({
     () => ({
       usageSummary:
         serverUsageSummary && total !== null
-          ? { saves: { ...serverUsageSummary.saves, used: total } }
+          ? {
+              ...serverUsageSummary,
+              saves: { ...serverUsageSummary.saves, used: total },
+            }
           : serverUsageSummary,
     }),
     [serverUsageSummary, total],
