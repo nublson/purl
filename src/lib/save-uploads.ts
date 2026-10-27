@@ -6,7 +6,7 @@ import { linksOriginHeaders } from "@/lib/links-origin";
 import { MAX_CONCURRENT_UPLOADS } from "@/lib/limits";
 import type { PendingUpload } from "@/lib/pending-upload";
 import { contentTypeForMime, sanitizeUploadName } from "@/lib/uploads/mime";
-import { makePreview } from "@/lib/uploads/preview";
+import { makePreview, roundDuration } from "@/lib/uploads/preview";
 import { validateUploadFile } from "@/lib/uploads/validate";
 import { parseJsonLinks, type Link } from "@/utils/links";
 
@@ -229,7 +229,8 @@ async function uploadOne(
         mimeType,
         width: preview.width,
         height: preview.height,
-        duration: preview.duration,
+        // Whole seconds, as the row requires (`makePreview` rounds already).
+        duration: roundDuration(preview.duration),
       },
     };
     if (handlers.folderId) body.folderId = handlers.folderId;

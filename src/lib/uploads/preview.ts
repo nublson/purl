@@ -135,8 +135,17 @@ function waitFor(
   });
 }
 
-function finiteDuration(value: number): number | null {
-  return Number.isFinite(value) && value > 0 ? value : null;
+/**
+ * A length in whole seconds, as the row stores it (`createUploadForUser`
+ * accepts only a positive integer): rounded, at least 1 for any positive
+ * length (a half-second clip isn't 0), null when unknown, not finite or not
+ * positive.
+ */
+export function roundDuration(seconds: number | null): number | null {
+  if (seconds === null || !Number.isFinite(seconds) || !(seconds > 0)) {
+    return null;
+  }
+  return Math.max(1, Math.round(seconds));
 }
 
 async function videoPreview(file: File): Promise<PreviewResult> {
@@ -169,7 +178,8 @@ async function videoPreview(file: File): Promise<PreviewResult> {
     video.src = url;
     if (!(await loaded)) return { ...EMPTY };
 
-    const duration = finiteDuration(video.duration);
+    const seconds = video.duration;
+    const duration = roundDuration(seconds);
     const width = video.videoWidth || null;
     const height = video.videoHeight || null;
     if (!width || !height) return { ...EMPTY, duration };
@@ -178,7 +188,7 @@ async function videoPreview(file: File): Promise<PreviewResult> {
     // has only its first frame to give. Only the success events count: an
     // error or a timeout leaves no frame to draw.
     let ready: boolean;
-    if (duration !== null && duration >= 0.1) {
+    if (Number.isFinite(seconds) && seconds >= 0.1) {
       ready = await waitFor((done, fail) => {
         video.addEventListener("seeked", done, { once: true });
         video.addEventListener("error", fail, { once: true });
@@ -238,7 +248,7 @@ async function audioDuration(file: File): Promise<PreviewResult> {
     });
     audio.src = url;
     if (!(await loaded)) return { ...EMPTY };
-    return { ...EMPTY, duration: finiteDuration(audio.duration) };
+    return { ...EMPTY, duration: roundDuration(audio.duration) };
   } finally {
     audio.removeAttribute("src");
     audio.load();

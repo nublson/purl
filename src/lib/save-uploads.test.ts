@@ -5,7 +5,11 @@ const makePreviewMock = vi.hoisted(() => vi.fn());
 const toastError = vi.hoisted(() => vi.fn());
 
 vi.mock("@vercel/blob/client", () => ({ put: putMock }));
-vi.mock("./uploads/preview", () => ({ makePreview: makePreviewMock }));
+// Only the browser-bound `makePreview` is faked; the pure helpers are real.
+vi.mock("./uploads/preview", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./uploads/preview")>()),
+  makePreview: makePreviewMock,
+}));
 vi.mock("sonner", () => ({
   toast: Object.assign(vi.fn(), { error: toastError, success: vi.fn() }),
 }));
@@ -270,6 +274,24 @@ describe("uploadFiles", () => {
     expect(upload.previewUrl).toBeNull();
     expect(upload.width).toBe(320);
     expect(rowCalls(calls)[0].body).not.toHaveProperty("folderId");
+  });
+
+  it("sends a video's duration in whole seconds", async () => {
+    const { calls } = stubFetch();
+    makePreviewMock.mockResolvedValue({
+      blob: new Blob([new Uint8Array(10)], { type: "image/webp" }),
+      width: 1920,
+      height: 1080,
+      duration: 14.533,
+    });
+    const clip = new File([new Uint8Array(100)], "clip.mp4", { type: "video/mp4" });
+
+    await uploadFiles([clip], handlers());
+
+    const upload = rowCalls(calls)[0].body.upload as Json;
+    expect(upload.mimeType).toBe("video/mp4");
+    expect(upload.duration).toBe(15);
+    expect(Number.isInteger(upload.duration)).toBe(true);
   });
 
   it("stops the remaining files at the storage limit, toasting once", async () => {

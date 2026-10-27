@@ -19,6 +19,10 @@ export function buildContentSecurityPolicy(): string {
     "frame-src 'self' https://vercel.live https://*.vercel.live https://www.youtube-nocookie.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https: http:",
+    // Video and audio pearls play their files from Vercel Blob or from any
+    // host a media link points at (the same reach as img-src), and pending
+    // uploads draw a video's local object URL (`blob:`).
+    "media-src 'self' blob: https: http:",
     "font-src 'self'",
     [
       "connect-src 'self'",
