@@ -417,13 +417,22 @@ test.describe("Shared folders, visited signed out", () => {
         "createdAt",
         "description",
         "domain",
+        "duration",
+        "embed",
         "favicon",
+        "height",
         "id",
+        "mimeType",
         "thumbnail",
         "title",
+        "upload",
         "url",
+        "width",
       ].sort(),
     );
+    // An upload's storage key and size never leave the server.
+    expect(body.links[0]).not.toHaveProperty("fileKey");
+    expect(body.links[0]).not.toHaveProperty("fileSize");
   });
 });
 
