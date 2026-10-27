@@ -3,6 +3,8 @@ import type { Link } from "@/utils/links";
 import { mediaViewer } from "./media-viewer";
 import {
   ViewerUrl,
+  bindViewerUrl,
+  forgetPushedEntry,
   pearlParam,
   withPearl,
   withoutPearl,
@@ -13,25 +15,60 @@ function link(id: string): Link {
   return { id, contentType: "IMAGE", embed: null, title: id } as unknown as Link;
 }
 
-/** A fake history over a mutable href, like the browser's. */
+/**
+ * A fake history over a stack of entries, like the browser's: `back()` and
+ * `forward()` move the index and then fire `onPop` (the popstate listener).
+ */
 function fake(initial: string) {
-  const state = { href: initial };
+  const state = {
+    entries: [initial],
+    index: 0,
+    onPop: null as null | (() => void),
+    get href() {
+      return this.entries[this.index];
+    },
+    set href(value: string) {
+      this.entries[this.index] = value;
+    },
+  };
   const history = {
     pushState: vi.fn((url: string) => {
-      state.href = url;
+      state.entries.splice(state.index + 1, Infinity, url);
+      state.index += 1;
     }),
     replaceState: vi.fn((url: string) => {
-      state.href = url;
+      state.entries[state.index] = url;
     }),
-    back: vi.fn(),
+    back: vi.fn(() => {
+      state.index -= 1;
+      state.onPop?.();
+    }),
   } satisfies HistoryLike;
+  const forward = () => {
+    state.index += 1;
+    state.onPop?.();
+  };
+  const getSearch = () => new URL(state.href, "http://x").search;
   const viewerUrl = new ViewerUrl(history, () => state.href);
-  return { state, history, viewerUrl };
+  return { state, history, viewerUrl, forward, getSearch };
+}
+
+/** A fake page: history + the bound store, as the hook wires them. */
+function page(initial: string, ids: string[] = ["a", "b", "c"]) {
+  const f = fake(initial);
+  mediaViewer.register(ids.map(link));
+  const pending: Array<string | null> = [];
+  const binder = bindViewerUrl(mediaViewer, f.viewerUrl, f.getSearch, (id) =>
+    pending.push(id),
+  );
+  f.state.onPop = () => binder.onPopState();
+  return { ...f, binder, pending };
 }
 
 beforeEach(() => {
   mediaViewer.close();
   mediaViewer.register([]);
+  forgetPushedEntry();
 });
 
 describe("pearl URL helpers", () => {
@@ -142,17 +179,148 @@ describe("ViewerUrl", () => {
     expect(mediaViewer.getSnapshot().currentId).toBe("x");
   });
 
-  it("closing the store from a pop does not go back again", () => {
-    mediaViewer.register([link("a")]);
-    mediaViewer.open("a");
-    const { history, viewerUrl } = fake("/home");
+  it("a pop onto another pearl closes the open store", () => {
+    mediaViewer.register([link("a"), link("b")]);
+    mediaViewer.open("b");
+    const { viewerUrl } = fake("/home?pearl=a");
+    viewerUrl.onPopState("?pearl=a");
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+  });
+
+  it("a hash-only pop keeps the push record", () => {
+    const { history, state, viewerUrl } = fake("/home");
     viewerUrl.open("a");
-    const unsubscribe = mediaViewer.subscribe(() => {
-      if (mediaViewer.getSnapshot().currentId === null) viewerUrl.close();
-    });
-    viewerUrl.onPopState("");
-    unsubscribe();
+    viewerUrl.onPopState("?pearl=a"); // same pearl, only the hash moved
+    state.href = "/home?pearl=a#top";
+    viewerUrl.close();
+    expect(history.back).toHaveBeenCalledTimes(1);
+  });
+
+  it("a remounted ViewerUrl still goes back for an entry the old one pushed", () => {
+    const first = fake("/home");
+    first.viewerUrl.open("a");
+    const remounted = new ViewerUrl(first.history, () => first.state.href);
+    remounted.close();
+    expect(first.history.back).toHaveBeenCalledTimes(1);
+  });
+
+  it("strip removes the param with a replace", () => {
+    const { history, state, viewerUrl } = fake("/home?pearl=a&settings=usage#x");
+    viewerUrl.strip();
+    expect(history.replaceState).toHaveBeenCalledWith("/home?settings=usage#x");
+    expect(state.href).toBe("/home?settings=usage#x");
+  });
+});
+
+describe("bindViewerUrl", () => {
+  it("drives open, two navigates and Esc end to end: one back, URL clean", () => {
+    const { binder, history, state } = page("/home?settings=usage");
+    mediaViewer.open("a");
+    expect(history.pushState).toHaveBeenCalledTimes(1);
+    mediaViewer.next();
+    mediaViewer.next();
+    expect(history.replaceState).toHaveBeenCalledTimes(2);
+    expect(state.href).toBe("/home?settings=usage&pearl=c");
+    mediaViewer.close(); // Esc
+    expect(history.back).toHaveBeenCalledTimes(1);
+    expect(state.href).toBe("/home?settings=usage");
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+    binder.dispose();
+  });
+
+  it("opens the pearl the URL names, without pushing a second entry", () => {
+    const { binder, history, state } = page("/home?pearl=b");
+    expect(mediaViewer.getSnapshot().currentId).toBe("b");
+    expect(history.pushState).not.toHaveBeenCalled();
+    mediaViewer.close();
     expect(history.back).not.toHaveBeenCalled();
+    expect(state.href).toBe("/home");
+    binder.dispose();
+  });
+
+  it("keeps an unknown pearl pending until the page registers it", () => {
+    const { binder, history, pending } = page("/home?pearl=z");
+    expect(binder.pendingId()).toBe("z");
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+    mediaViewer.register(["a", "z"].map(link));
+    expect(mediaViewer.getSnapshot().currentId).toBe("z");
+    expect(binder.pendingId()).toBeNull();
+    expect(history.pushState).not.toHaveBeenCalled();
+    expect(pending).toEqual(["z", null]);
+    binder.dispose();
+  });
+
+  it("dismissPending clears the pending id and the param, and stays closed", () => {
+    const { binder, state } = page("/home?pearl=z&settings=usage");
+    binder.dismissPending();
+    expect(binder.pendingId()).toBeNull();
+    expect(state.href).toBe("/home?settings=usage");
+    mediaViewer.register(["a", "z"].map(link));
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+    binder.dispose();
+  });
+
+  it("dismissPending with nothing pending leaves the URL alone", () => {
+    const { binder, history } = page("/home");
+    binder.dismissPending();
     expect(history.replaceState).not.toHaveBeenCalled();
+    binder.dispose();
+  });
+
+  it("Back from an open viewer closes it without another back", () => {
+    const { binder, history, state } = page("/home");
+    mediaViewer.open("a");
+    history.back(); // the browser's Back
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+    expect(history.back).toHaveBeenCalledTimes(1);
+    expect(state.href).toBe("/home");
+    binder.dispose();
+  });
+
+  it("Forward onto a pearl entry reopens it without pushing", () => {
+    const { binder, history, forward } = page("/home");
+    mediaViewer.open("a");
+    history.back();
+    forward();
+    expect(mediaViewer.getSnapshot().currentId).toBe("a");
+    expect(history.pushState).toHaveBeenCalledTimes(1);
+    binder.dispose();
+  });
+
+  it("Back onto a different registered pearl shows that pearl", () => {
+    // /home?pearl=x never resolved; opening y from a card pushed a new entry.
+    const { binder, history, state } = page("/home?pearl=x", ["a", "y"]);
+    expect(binder.pendingId()).toBe("x");
+    mediaViewer.open("y");
+    expect(state.entries).toEqual(["/home?pearl=x", "/home?pearl=y"]);
+    mediaViewer.register(["a", "x", "y"].map(link)); // x arrives meanwhile
+    history.back();
+    expect(mediaViewer.getSnapshot().currentId).toBe("x");
+    expect(state.href).toBe("/home?pearl=x");
+    binder.dispose();
+  });
+
+  it("Back onto a different unregistered pearl leaves it pending", () => {
+    const { binder, history, state } = page("/home?pearl=x", ["a", "y"]);
+    mediaViewer.open("y");
+    history.back();
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+    expect(binder.pendingId()).toBe("x");
+    expect(state.href).toBe("/home?pearl=x");
+    binder.dispose();
+  });
+
+  it("a remount while open still goes back on Esc", () => {
+    const first = page("/home");
+    mediaViewer.open("a");
+    first.binder.dispose();
+    const second = bindViewerUrl(
+      mediaViewer,
+      new ViewerUrl(first.history, () => first.state.href),
+      first.getSearch,
+    );
+    mediaViewer.close();
+    expect(first.history.back).toHaveBeenCalledTimes(1);
+    second.dispose();
   });
 });

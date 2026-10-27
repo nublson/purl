@@ -41,14 +41,31 @@ function pearlIn(href: string) {
   return pearlParam(new URL(href, BASE).search);
 }
 
+/**
+ * The pearl whose entry the viewer pushed, null when it pushed none. Module
+ * level, beside the store: a remount while the viewer is open (a new
+ * `ViewerUrl`) must still go `back()` on close instead of leaving a duplicate
+ * entry behind.
+ */
+let pushedEntryId: string | null = null;
+
+/** Forgets the pushed entry (for tests; the app never needs it). */
+export function forgetPushedEntry() {
+  pushedEntryId = null;
+}
+
+type ViewerStore = Pick<
+  typeof mediaViewer,
+  "subscribe" | "getSnapshot" | "open" | "close"
+>;
+
 export class ViewerUrl {
-  /** The pearl in the entry this instance pushed, null when it pushed none. */
-  private pushedId: string | null = null;
   private handlingPop = false;
 
   constructor(
     private readonly history: HistoryLike,
     private readonly getHref: () => string,
+    private readonly store: ViewerStore = mediaViewer,
   ) {}
 
   /** A pearl opened: push an entry, unless the URL already names it. */
@@ -56,44 +73,145 @@ export class ViewerUrl {
     const href = this.getHref();
     if (pearlIn(href) === id) return;
     this.history.pushState(withPearl(href, id));
-    this.pushedId = id;
+    pushedEntryId = id;
   }
 
   /** Next/previous: swap the param in place, no new entry. */
   navigate(id: string) {
     this.history.replaceState(withPearl(this.getHref(), id));
-    if (this.pushedId !== null) this.pushedId = id;
+    if (pushedEntryId !== null) pushedEntryId = id;
   }
 
   /**
-   * The viewer closed. Go back when this instance pushed the entry and the
-   * page is still on it; otherwise (opened from the URL, or the page moved
-   * on) just strip the param.
+   * The viewer closed. Go back when this app pushed the entry and the page is
+   * still on it; otherwise (opened from the URL, or the page moved on) just
+   * strip the param.
    */
   close() {
-    const pushedId = this.pushedId;
-    this.pushedId = null;
+    const pushedId = pushedEntryId;
+    pushedEntryId = null;
     if (this.handlingPop) return;
-    const href = this.getHref();
-    if (pushedId !== null && pearlIn(href) === pushedId) {
+    if (pushedId !== null && pearlIn(this.getHref()) === pushedId) {
       this.history.back();
       return;
     }
+    this.strip();
+  }
+
+  /** Removes the param from the current entry (replace), if it's there. */
+  strip() {
+    pushedEntryId = null;
+    const href = this.getHref();
     if (pearlIn(href) !== null) this.history.replaceState(withoutPearl(href));
   }
 
   /**
-   * The browser moved through history. A URL without the param closes the
-   * viewer; that close must not go back again.
+   * The browser moved through history. A URL without the param, or naming a
+   * different pearl than the one showing, closes the viewer; that close must
+   * not go back again. (A hash-only move that still names the pushed pearl
+   * keeps the push record.)
    */
   onPopState(search: string) {
-    this.pushedId = null;
-    if (pearlParam(search) !== null) return;
+    const popped = pearlParam(search);
+    if (popped !== pushedEntryId) pushedEntryId = null;
+    const { currentId } = this.store.getSnapshot();
+    if (currentId === null || currentId === popped) return;
     this.handlingPop = true;
     try {
-      mediaViewer.close();
+      this.store.close();
     } finally {
       this.handlingPop = false;
     }
   }
+}
+
+export type ViewerUrlBinder = {
+  /** Mirrors the store's latest change into the URL (and satisfies a request). */
+  sync(): void;
+  /** The browser moved through history. */
+  onPopState(): void;
+  /** Asks to show a pearl from the URL once the page has registered it. */
+  request(id: string | null): void;
+  /** Gives up on the pending pearl (e.g. its fetch failed) and clears the URL. */
+  dismissPending(): void;
+  /** The pearl the URL names while it isn't registered yet, else null. */
+  pendingId(): string | null;
+  dispose(): void;
+};
+
+/**
+ * Binds the store to the URL: store changes become `open` / `navigate` /
+ * `close` on `viewerUrl`, a pearl named by the URL opens once registered, and
+ * history moves reopen or close the viewer. Pure over its inputs, so it tests
+ * with a fake history; `useMediaViewerUrl` is a thin hook over it.
+ */
+export function bindViewerUrl(
+  store: ViewerStore,
+  viewerUrl: ViewerUrl,
+  getSearch: () => string,
+  onPendingChange?: (id: string | null) => void,
+): ViewerUrlBinder {
+  let previous: string | null = null;
+  let requested: string | null = null;
+
+  const setRequested = (id: string | null) => {
+    if (requested === id) return;
+    requested = id;
+    onPendingChange?.(id);
+  };
+
+  // Opens the requested pearl as soon as the page has registered it.
+  const satisfy = () => {
+    if (requested === null) return;
+    const { items, currentId } = store.getSnapshot();
+    if (currentId !== null) {
+      // Something is showing; a stale request must not reopen later.
+      setRequested(null);
+      return;
+    }
+    if (!items.some((item) => item.id === requested)) return;
+    const id = requested;
+    setRequested(null);
+    store.open(id);
+  };
+
+  const sync = () => {
+    const { currentId } = store.getSnapshot();
+    if (currentId !== previous) {
+      const before = previous;
+      previous = currentId;
+      if (currentId === null) viewerUrl.close();
+      else if (before === null) viewerUrl.open(currentId);
+      else viewerUrl.navigate(currentId);
+    }
+    satisfy();
+  };
+
+  const request = (id: string | null) => {
+    setRequested(id);
+    satisfy();
+  };
+
+  const unsubscribe = store.subscribe(sync);
+  request(pearlParam(getSearch()));
+  sync();
+
+  return {
+    sync,
+    request,
+    onPopState() {
+      const search = getSearch();
+      viewerUrl.onPopState(search);
+      // Back/Forward onto a pearl entry (re)opens it, or leaves it pending.
+      if (store.getSnapshot().currentId === null) request(pearlParam(search));
+      else sync();
+    },
+    dismissPending() {
+      if (requested === null) return;
+      setRequested(null);
+      viewerUrl.strip();
+    },
+    pendingId: () => requested,
+    dispose: unsubscribe,
+  };
 }
