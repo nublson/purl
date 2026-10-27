@@ -158,6 +158,7 @@ export async function enrichFlaggedLinks(): Promise<EnrichResult> {
             favicon: resolved.favicon,
             domain: resolved.domain,
             contentType: resolved.contentType,
+            mimeType: resolved.mimeType,
           },
         }),
         prisma.link.updateMany({

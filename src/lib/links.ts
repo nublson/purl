@@ -16,7 +16,9 @@ import { detectContentType } from "@/lib/server-detect-content-type";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
 import { timeoutSignal } from "@/utils/abort-signal";
 import { getUrlDomain } from "@/utils/formatter";
+import { detectContentTypeFromUrlRules } from "@/utils/link-content-type-shared";
 import type { Link } from "@/utils/links";
+import { mediaTitleFromUrl } from "@/utils/media-title";
 import { isPdfUrl } from "@/utils/pdf";
 import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
 import { isYouTubeUrl } from "@/utils/youtube";
@@ -236,6 +238,44 @@ function mapRowToLink(row: LinkRow): Link {
   };
 }
 
+export type MediaContentType = Extract<
+  ContentType,
+  "IMAGE" | "VIDEO" | "AUDIO"
+>;
+
+export type ScrapedLinkMetadata = {
+  title: string;
+  description: string | null;
+  favicon: string;
+  thumbnail: string | null;
+};
+
+function isMediaContentType(
+  contentType: ContentType,
+): contentType is MediaContentType {
+  return (
+    contentType === "IMAGE" || contentType === "VIDEO" || contentType === "AUDIO"
+  );
+}
+
+/**
+ * Metadata for an image, video or audio file, from its URL alone: the file
+ * name as the title, no description, the domain's favicon, and the image
+ * itself as an image's thumbnail. There is no page to read, so no fetch.
+ */
+export function mediaMetadata(
+  url: string,
+  domain: string,
+  contentType: MediaContentType,
+): ScrapedLinkMetadata {
+  return {
+    title: mediaTitleFromUrl(url, domain),
+    description: null,
+    favicon: getDefaultFaviconUrl(domain),
+    thumbnail: contentType === "IMAGE" ? url : null,
+  };
+}
+
 /**
  * Options for a lookup (`scrapeLinkMetadata`, `resolveLinkFromUrl`): `signal`
  * cancels every outbound request the lookup makes, on top of each request's
@@ -246,14 +286,16 @@ export type LookupOptions = { signal?: AbortSignal };
 export async function scrapeLinkMetadata(
   url: string,
   { signal }: LookupOptions = {},
-): Promise<{
-  title: string;
-  description: string | null;
-  favicon: string;
-  thumbnail: string | null;
-}> {
+): Promise<ScrapedLinkMetadata> {
   const domain = getUrlDomain(url);
   const defaultFavicon = getDefaultFaviconUrl(domain);
+  // A media file by its extension (the URL rules' order: YouTube and PDF win)
+  // has no page to scrape: fetching it would download the file itself.
+  const ruleType = detectContentTypeFromUrlRules(url);
+  if (ruleType !== null && isMediaContentType(ruleType)) {
+    return mediaMetadata(url, domain, ruleType);
+  }
+
   if (isPdfUrl(url)) {
     const pdfMetadata = await scrapePdfMetadata(url, domain, signal);
     return {
@@ -370,6 +412,8 @@ export type ResolvedLinkFields = {
   description: string | null;
   favicon: string;
   thumbnail: string | null;
+  /** The MIME type the HEAD sniff saw; null when the URL rules decided the type. */
+  mimeType: string | null;
 };
 
 /** Resolves domain, content type, and scraped metadata for a URL (shared by create/update and preview API). */
@@ -379,12 +423,18 @@ export async function resolveLinkFromUrl(
 ): Promise<ResolvedLinkFields> {
   const domain = getUrlDomain(url);
   // Independent network work: run the HEAD/sniff and the page scrape in parallel.
-  const [detected, { title, description, favicon, thumbnail }] =
-    await Promise.all([
-      detectContentType(url, options),
-      scrapeLinkMetadata(url, options),
-    ]);
+  const [detected, scraped] = await Promise.all([
+    detectContentType(url, options),
+    scrapeLinkMetadata(url, options),
+  ]);
   const contentType: ContentType = detected.contentType;
+  // A media file the sniff found (no telling extension, so the scrape read it
+  // as a page and fell back to the domain): describe the file instead.
+  const { title, description, favicon, thumbnail } = isMediaContentType(
+    contentType,
+  )
+    ? mediaMetadata(url, domain, contentType)
+    : scraped;
   return {
     url,
     domain,
@@ -393,6 +443,7 @@ export async function resolveLinkFromUrl(
     description,
     favicon,
     thumbnail,
+    mimeType: detected.mimeType,
   };
 }
 
@@ -461,8 +512,8 @@ function isRecordNotFoundError(error: unknown): boolean {
 
 /**
  * Writes freshly resolved metadata to `existing` — title, description,
- * favicon, thumbnail, domain, contentType, and a `createdAt` bump — plus
- * `folderId` when given, all in a single update scoped by `existing.id`.
+ * favicon, thumbnail, domain, contentType, mimeType, and a `createdAt` bump —
+ * plus `folderId` when given, all in a single update scoped by `existing.id`.
  *
  * It does not resolve the acting user from the session: `createLinkForUser`
  * already scoped `existing` to `userId` via `{ userId, url }` before calling
@@ -485,6 +536,7 @@ async function refreshExistingLink(
       thumbnail: resolved.thumbnail,
       domain: resolved.domain,
       contentType: resolved.contentType,
+      mimeType: resolved.mimeType,
       createdAt: new Date(),
       ...(folderId !== undefined ? { folderId } : {}),
     },
@@ -520,6 +572,7 @@ async function insertResolvedLink(
             thumbnail: resolved.thumbnail,
             domain: resolved.domain,
             contentType: resolved.contentType,
+            mimeType: resolved.mimeType,
             userId,
             ...(folderId !== undefined ? { folderId } : {}),
           },
@@ -719,6 +772,7 @@ export async function updateLinkForUser(
       favicon: resolved.favicon,
       thumbnail: resolved.thumbnail,
       contentType: resolved.contentType,
+      mimeType: resolved.mimeType,
     };
   } else {
     if (typeof data.title === "string") updatePayload.title = data.title;

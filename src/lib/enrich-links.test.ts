@@ -59,6 +59,7 @@ type Row = {
   favicon: string;
   domain: string;
   contentType: string;
+  mimeType: string | null;
   createdAt: Date;
 };
 
@@ -80,6 +81,7 @@ function storeRow(id: string, row: Partial<Row> = {}) {
     favicon: "https://example.com/default.ico",
     domain: "example.com",
     contentType: "WEB",
+    mimeType: null,
     createdAt: CREATED_AT,
     ...row,
   });
@@ -119,6 +121,7 @@ function resolved(url: string) {
     description: `About ${url}`,
     favicon: "https://example.com/favicon.ico",
     thumbnail: "https://example.com/og.png",
+    mimeType: "text/html",
   };
 }
 
@@ -218,6 +221,7 @@ describe("enrichFlaggedLinks", () => {
       favicon: "https://example.com/favicon.ico",
       domain: "example.com",
       contentType: "WEB",
+      mimeType: "text/html",
       createdAt: CREATED_AT,
     });
     expect(writtenIds()).toEqual(["link-1"]);
@@ -287,6 +291,7 @@ describe("enrichFlaggedLinks", () => {
       favicon: "https://example.com/favicon.ico",
       domain: "example.com",
       contentType: "WEB",
+      mimeType: "text/html",
       createdAt: CREATED_AT,
     });
   });

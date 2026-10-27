@@ -1,4 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from "vitest";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn().mockResolvedValue(new Headers()),
@@ -44,7 +52,8 @@ vi.mock("@/lib/folders", () => ({
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
 const { assertFolderOwned, FolderNotFoundError } = await import("@/lib/folders");
-const { getLinksPageForCurrentUser, UnauthorizedError, listLinks } = await import("./links");
+const { getLinksPageForCurrentUser, UnauthorizedError, listLinks, resolveLinkFromUrl } =
+  await import("./links");
 
 const MOCK_SESSION = { user: { id: "user-123", username: "user-123" }, session: {} };
 
@@ -300,5 +309,110 @@ describe("listLinks", () => {
     ).rejects.toThrow(FolderNotFoundError);
     expect(vi.mocked(assertFolderOwned)).toHaveBeenCalledWith("user-123", "");
     expect(vi.mocked(prisma.link.findMany)).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveLinkFromUrl – media links", () => {
+  let fetchSpy: MockInstance<typeof globalThis.fetch>;
+
+  /** The HTTP method of every outbound request the lookup made. */
+  function methods(): string[] {
+    return fetchSpy.mock.calls.map(
+      ([, init]) => init?.method ?? "GET",
+    );
+  }
+
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, "fetch");
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+  });
+
+  it("resolves a video URL from its file name without fetching the page", async () => {
+    fetchSpy.mockImplementation(
+      async () =>
+        new Response("<html><head><title>Page</title></head></html>", {
+          headers: { "content-type": "text/html" },
+        }),
+    );
+
+    const resolved = await resolveLinkFromUrl("https://cdn.test/clip.mov");
+
+    expect(resolved).toMatchObject({
+      url: "https://cdn.test/clip.mov",
+      domain: "cdn.test",
+      contentType: "VIDEO",
+      title: "clip",
+      description: null,
+      thumbnail: null,
+      mimeType: null,
+    });
+    // The extension decides it: no GET (the URL rules need no HEAD either).
+    expect(methods().filter((method) => method !== "HEAD")).toEqual([]);
+  });
+
+  it("resolves an audio URL from its file name without fetching the page", async () => {
+    fetchSpy.mockImplementation(
+      async () => new Response(null, { status: 200 }),
+    );
+
+    const resolved = await resolveLinkFromUrl(
+      "https://cdn.test/podcasts/Episode%2012.mp3",
+    );
+
+    expect(resolved).toMatchObject({
+      contentType: "AUDIO",
+      title: "Episode 12",
+      description: null,
+      thumbnail: null,
+    });
+    expect(methods().filter((method) => method !== "HEAD")).toEqual([]);
+  });
+
+  it("uses a sniffed image's own URL as its thumbnail, not the page's metadata", async () => {
+    const url = "https://cdn.test/asset";
+    fetchSpy.mockImplementation(async (_input, init) => {
+      if (init?.method === "HEAD") {
+        return new Response(null, {
+          headers: { "content-type": "image/png" },
+        });
+      }
+      return new Response(
+        '<html><head><meta property="og:title" content="A page"></head></html>',
+        { headers: { "content-type": "text/html" } },
+      );
+    });
+
+    const resolved = await resolveLinkFromUrl(url);
+
+    expect(resolved).toMatchObject({
+      url,
+      domain: "cdn.test",
+      contentType: "IMAGE",
+      mimeType: "image/png",
+      thumbnail: url,
+      title: "asset",
+      description: null,
+    });
+  });
+
+  it("records the sniffed MIME type of a web page", async () => {
+    fetchSpy.mockImplementation(
+      async () =>
+        new Response(
+          '<html><head><meta property="og:title" content="A page"></head></html>',
+          { headers: { "content-type": "text/html; charset=utf-8" } },
+        ),
+    );
+
+    const resolved = await resolveLinkFromUrl("https://cdn.test/post");
+
+    expect(resolved).toMatchObject({
+      contentType: "WEB",
+      mimeType: "text/html",
+      title: "A page",
+    });
   });
 });

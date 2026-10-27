@@ -608,6 +608,7 @@ describe("createLink", () => {
         thumbnail: "https://img.youtube.com/vi/abc/hqdefault.jpg",
         domain: "youtu.be",
         contentType: "YOUTUBE",
+        mimeType: null,
         createdAt: expect.any(Date),
         },
     });
@@ -843,6 +844,7 @@ describe("createLinkForUser – folders", () => {
         thumbnail: null,
         domain: expect.any(String),
         contentType: "WEB",
+        mimeType: null,
         createdAt: expect.any(Date),
         folderId: "folder-2",
       },
