@@ -5,13 +5,12 @@ import {
 } from "@/components/ui/hover-card";
 import type { FolderSummary } from "@/lib/folders";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
-import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
 import type { ReactNode } from "react";
 import { linkKind } from "@/lib/link-kind";
 import { FolderEmoji } from "./folder-emoji";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
-import { AudioBar } from "./audio-bar";
+import { AudioPreview } from "./audio-preview";
 import { ImageFace, VideoFace } from "./media-card-face";
 import { PdfThumbnail } from "./pdf-thumbnail";
 
@@ -81,7 +80,7 @@ const MEDIA_FACE = "max-h-80 rounded-t-lg";
 /**
  * What a preview card shows: the thumbnail (or favicon), or for an image
  * or video pearl the media itself, then the title and description (an
- * audio pearl: its bar, which holds the title, then the description),
+ * audio pearl: its player card, which holds the title, then the description),
  * then the folder when given. `pdfThumbnail: false` skips the PDF render (it needs the
  * signed-in PDF proxy) for the regular thumbnail.
  */
@@ -99,17 +98,14 @@ export function LinkPreviewBody({
   const thumbnailSrc = link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
   const kind = linkKind(link);
   if (kind === "audio") {
-    // The bar already shows the title: then the description and the
-    // folder, if any.
+    // The player card holds the title: then the description and the
+    // folder, if any, under its transport.
     const more = Boolean(link.description) || folder !== null;
     return (
       <>
-        <div className={cn("overflow-hidden", more ? "rounded-t-lg" : "rounded-lg")}>
-          {/* The bar, not the player: the preview doesn't expand. */}
-          <AudioBar link={link} expandable={false} />
-        </div>
+        <AudioPreview link={link} />
         {more ? (
-          <div className="flex flex-col gap-2 p-4 pt-3">
+          <div className="flex flex-col gap-2 px-4 pb-4">
             {link.description ? <PreviewDescription text={link.description} /> : null}
             {folder ? <PreviewFolder folder={folder} /> : null}
           </div>

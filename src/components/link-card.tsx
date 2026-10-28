@@ -27,7 +27,8 @@ import {
   useFolderTag,
   useLinkFolder,
 } from "./folder-tag";
-import { AUDIO_BAR, AudioBar, markAudioHostPress } from "./audio-bar";
+import { AUDIO_BAR, AudioBar, markAudioHostPress, useAudioBarMorph } from "./audio-bar";
+import { mix } from "./audio-player-tween";
 import { HapticTarget } from "./haptic-target";
 import { MediaOpenButton } from "./media-open-button";
 import { LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
@@ -90,6 +91,9 @@ export function LinkCard({
   const audio = kind === "audio";
   // Opened, the bar's words wrap short of the menu: no backing over them.
   const barOpen = useAudioExpanded(link.id).open;
+  // The bar's own morph, run alongside it: the menu's backing follows the
+  // shape on screen, not the state, so nothing is cut while it moves.
+  const barMorph = useAudioBarMorph(audio && barOpen);
   const media = !demo && isViewerKind(kind);
   // An image or video face is the viewer's morph anchor: it rounds and
   // clips itself, so the card doesn't crop the morph back.
@@ -281,15 +285,15 @@ export function LinkCard({
         // down through the words' band, fading in over 24px, so it covers
         // the words' end (which run to the bar's margin) cleanly, never
         // through a line. Opened, the words wrap short of it: no backing.
+        // Both follow the bar's morph (`barMorph`), not its state.
         // The backing takes no presses (they open the bar); its buttons do.
         <div
           inert={selecting}
           className={cn(
             "pointer-events-none absolute top-0 right-0 z-10 flex items-start bg-card pt-1.5 pe-1.5 *:pointer-events-auto",
-            !barOpen && "ps-6 [mask-image:linear-gradient(to_right,transparent,black_24px)]",
             menuReveal,
           )}
-          style={barOpen ? undefined : { height: AUDIO_BAR.pad + AUDIO_BAR.sleeve }}
+          style={barMorph >= 1 ? undefined : audioMenuBacking(barMorph)}
           data-card-menu
         >
           {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}
@@ -339,4 +343,22 @@ export function LinkCard({
       ) : null}
     </div>
   );
+}
+
+/** The backing's own measures: its fade (`ps`) and the button row's height (6 + 32). */
+const BACKING_FADE = 24;
+const BACKING_OPEN = 38;
+
+/**
+ * The audio card's menu backing at the bar's morph `p` (0 shut, 1 open):
+ * shut, from the top down through the words' band, fading in over 24px;
+ * the fade and the band give way as the bar opens and the words wrap short.
+ */
+function audioMenuBacking(p: number): React.CSSProperties {
+  const fade = BACKING_FADE * (1 - p);
+  return {
+    height: mix(AUDIO_BAR.pad + AUDIO_BAR.sleeve, BACKING_OPEN, p),
+    paddingInlineStart: fade,
+    maskImage: `linear-gradient(to right, transparent, black ${fade}px)`,
+  };
 }

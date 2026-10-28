@@ -24,6 +24,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ComponentPropsWithoutRef,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -124,10 +125,21 @@ export function markAudioHostPress(event: Event, id: string) {
  * row). Only clicks on the controls themselves: React bubbles a portal's
  * events through here too.
  */
-function keepClick(event: MouseEvent<HTMLElement>) {
+export function keepAudioClick(event: MouseEvent<HTMLElement>) {
   if (!event.currentTarget.contains(event.target as Node)) return;
   event.preventDefault();
   event.stopPropagation();
+}
+const keepClick = keepAudioClick;
+
+/**
+ * The bar's morph, 0 shut to 1 open: one tween, read everywhere. Its host
+ * (the owner's card, whose floating menu follows the bar's shape) runs the
+ * same tween off the same state, so the two stay in step frame for frame.
+ */
+export function useAudioBarMorph(open: boolean): number {
+  const reducedMotion = usePrefersReducedMotion();
+  return useTween(open ? 1 : 0, MORPH_MS, reducedMotion, QUART);
 }
 
 /**
@@ -179,10 +191,10 @@ const SIDE_BUTTON =
  * time (`audioExpansion`). Its height is its card's, so the masonry grid
  * follows it (`data-masonry-grow`: the cards below move down, none changes
  * column). Reduced motion: it jumps, and the late parts fade (150ms).
- * `expandable={false}` (the hover preview) keeps it a bar.
+ * `expandable={false}` keeps it a bar.
  *
  * It's a view of the page's one player (`useAudioPlayer`), like the hover
- * preview's bar and the list's audio row, so they all show one playback;
+ * preview's player card and the list's audio row, so they all show one playback;
  * opening never changes playback. An audio pearl never opens the media
  * viewer.
  *
@@ -209,15 +221,12 @@ export function AudioBar({
   /** The folder badge, on the sleeve's bottom-end corner. */
   badge?: ReactNode;
   describedBy?: string;
-  /** False: a bar only (the hover preview): no opener, no tween. */
+  /** False: a bar only: no opener, no tween. */
   expandable?: boolean;
   /** The opener (`data-expand`): the card's focus anchor. */
   expandRef?: (el: HTMLButtonElement | null) => void;
 }) {
-  const { playing, elapsed, length: playLength, toggle, restart } = useAudioPlayer(
-    link.id,
-    link.duration,
-  );
+  const { playing, toggle } = useAudioPlayer(link.id, link.duration);
   const reducedMotion = usePrefersReducedMotion();
   const selecting = useIsSelectionActive();
   const expansion = useAudioExpanded(link.id);
@@ -240,7 +249,7 @@ export function AudioBar({
   );
 
   /* 0 shut, 1 open. Tweened once, read everywhere. */
-  const p = useTween(open ? 1 : 0, MORPH_MS, reducedMotion, QUART);
+  const p = useAudioBarMorph(open);
 
   /* ── the swell, and why it is a SECOND number ────────────
      The bounce is not put back into `p`: `p` stays monotonic
@@ -594,38 +603,30 @@ export function AudioBar({
           {/* The TIMES belong to the opened player only: they ride
               `late`, under the rail. Plain text, not a live region: the
               range's value says the same. */}
-          <div
-            data-times=""
+          <AudioTimes
+            link={link}
             aria-hidden={!open || undefined}
-            className={cn(
-              "pointer-events-none absolute inset-x-[10px] flex items-center justify-between text-[11px] leading-none text-foreground/70 tabular-nums",
-              open && LATE_REDUCED,
-            )}
+            className={cn("pointer-events-none absolute inset-x-[10px]", open && LATE_REDUCED)}
             style={{
               top: railTop + RAIL_H + CLOCK_GAP,
               height: CLOCK_H,
               opacity: late,
               visibility: late > 0 ? undefined : "hidden",
             }}
-          >
-            <span data-elapsed="">{formatDuration(elapsed)}</span>
-            <span data-remaining="">
-              {playLength ? `−${formatDuration(Math.max(0, playLength - elapsed))}` : null}
-            </span>
-          </div>
+          />
           {/* ── the transport ───────────────────────────────────
               It belongs to the opened player alone, so it rides
               `late`, arriving after the box has stopped growing,
               and takes its hit area with it rather than sitting
               invisible over the bar. On the foot of the box, so it
               is never cut off while it fades in. */}
-          <div
-            data-transport=""
+          <AudioTransport
+            link={link}
             inert={!open || selecting}
             aria-hidden={!open || undefined}
             className={cn(
               // The gap gives way on the narrowest cards (116px of room).
-              "absolute inset-x-[10px] flex items-center justify-center gap-[clamp(4px,(100cqw-134px)/2,14px)]",
+              "absolute inset-x-[10px] gap-[clamp(4px,(100cqw-134px)/2,14px)]",
               open && LATE_REDUCED,
               late > 0.9 && !selecting ? "pointer-events-auto" : "pointer-events-none",
             )}
@@ -635,46 +636,108 @@ export function AudioBar({
               opacity: late,
               visibility: late > 0 ? undefined : "hidden",
             }}
-          >
-            <button
-              type="button"
-              disabled={!src || (elapsed === 0 && !playing)}
-              aria-label={`Restart ${link.title}`}
-              className={SIDE_BUTTON}
-              onClick={(event) => {
-                keepClick(event);
-                restart();
-              }}
-            >
-              <Restart className="size-4" aria-hidden />
-            </button>
-            <button
-              type="button"
-              disabled={!src}
-              aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
-              className="flex size-[46px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100"
-              onClick={(event) => {
-                keepClick(event);
-                if (src) toggle(src);
-              }}
-            >
-              <PlayMark playing={playing} size={18} reducedMotion={reducedMotion} />
-            </button>
-            {/* A real link, like the row menu's item: Cmd/Ctrl-click and
-                the browser's own link handling work as on any link. */}
-            <a
-              href={link.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Open file"
-              className={SIDE_BUTTON}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <Export5 className="size-4" aria-hidden />
-            </a>
-          </div>
+          />
         </>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * The times under the track: the elapsed at the left, and at the right the
+ * time remaining (`−1:05`, the opened bar's) or the length (`2:36`, the
+ * hover preview's). 11px tabular, `text-foreground/70`. Plain text, not a
+ * live region: the track's value says the same.
+ */
+export function AudioTimes({
+  link,
+  end = "remaining",
+  className,
+  ...rest
+}: ComponentPropsWithoutRef<"div"> & {
+  link: Link;
+  /** What the right-hand time says. */
+  end?: "remaining" | "length";
+}) {
+  const { elapsed, length } = useAudioPlayer(link.id, link.duration);
+  return (
+    <div
+      data-times=""
+      className={cn(
+        "flex items-center justify-between text-[11px] leading-none text-foreground/70 tabular-nums",
+        className,
+      )}
+      {...rest}
+    >
+      <span data-elapsed="">{formatDuration(elapsed)}</span>
+      {end === "remaining" ? (
+        <span data-remaining="">
+          {length ? `−${formatDuration(Math.max(0, length - elapsed))}` : null}
+        </span>
+      ) : (
+        <span data-length="">{length ? formatDuration(length) : null}</span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The player's transport, centred: Restart (34px, outlined; off at the
+ * start while paused), Play/Pause (46px, the drawn mark at 18px) and Open
+ * file (34px, a real link to the file). The opened bar and the hover
+ * preview's player card share it. Clicks stay in it (`keepAudioClick`):
+ * never the card's or the row's.
+ */
+export function AudioTransport({
+  link,
+  className,
+  ...rest
+}: ComponentPropsWithoutRef<"div"> & { link: Link }) {
+  const { playing, elapsed, toggle, restart } = useAudioPlayer(link.id, link.duration);
+  const reducedMotion = usePrefersReducedMotion();
+  const src = safeRemoteImgSrc(link.url);
+  return (
+    <div
+      data-transport=""
+      className={cn("flex items-center justify-center", className)}
+      {...rest}
+    >
+      <button
+        type="button"
+        disabled={!src || (elapsed === 0 && !playing)}
+        aria-label={`Restart ${link.title}`}
+        className={SIDE_BUTTON}
+        onClick={(event) => {
+          keepClick(event);
+          restart();
+        }}
+      >
+        <Restart className="size-4" aria-hidden />
+      </button>
+      <button
+        type="button"
+        disabled={!src}
+        aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
+        className="flex size-[46px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100"
+        onClick={(event) => {
+          keepClick(event);
+          if (src) toggle(src);
+        }}
+      >
+        <PlayMark playing={playing} size={18} reducedMotion={reducedMotion} />
+      </button>
+      {/* A real link, like the row menu's item: Cmd/Ctrl-click and the
+          browser's own link handling work as on any link. */}
+      <a
+        href={link.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Open file"
+        className={SIDE_BUTTON}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <Export5 className="size-4" aria-hidden />
+      </a>
     </div>
   );
 }

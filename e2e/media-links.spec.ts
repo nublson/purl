@@ -500,7 +500,7 @@ test.describe("Audio pearls: the now-playing bar", () => {
     await expect(song.locator("[data-expand]")).toHaveAttribute("aria-expanded", "false");
   });
 
-  test("the hover preview's bar and the card's are one playback", async ({ page, seed }) => {
+  test("the hover preview and the card are one playback", async ({ page, seed }) => {
     await page.context().route("https://sounds.example/**", (route) =>
       route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
     );
@@ -508,20 +508,11 @@ test.describe("Audio pearls: the now-playing bar", () => {
     await openHome(page);
 
     await row(page, "Song").hover();
-    const preview = page.locator('[data-slot="hover-card-content"] [data-face="audio"]');
+    const preview = page.locator('[data-slot="hover-card-content"] [data-face="audio-preview"]');
     await expect(preview).toBeVisible();
-    // The preview's bar doesn't expand: no opener.
+    // The preview is a player card, not the bar: it doesn't expand.
     await expect(preview.locator("[data-expand]")).toHaveCount(0);
-    // The same bar: the full second line, the sleeve is the play control.
-    expect(await secondLine(preview)).toBe("Audio · 2:36");
-    const previewPlay = preview.getByRole("button", { name: "Play Song" });
-    expect(
-      await previewPlay.evaluate(
-        (el) => el.hasAttribute("data-play") && el.closest("[data-sleeve]") !== null,
-      ),
-    ).toBe(true);
-    expect(await previewPlay.evaluate((el) => el.getBoundingClientRect().width)).toBe(40);
-    await previewPlay.click();
+    await preview.getByRole("button", { name: "Play Song" }).click();
     await expect(preview.getByRole("button", { name: "Pause Song" })).toBeVisible();
 
     // Closing the preview (the pointer leaves for the menu) keeps it playing.
@@ -1112,10 +1103,10 @@ test.describe("Audio pearls in the list: a row that plays", () => {
       await page.keyboard.press(tab);
     }
     await expect(button).toBeFocused();
-    // Keyboard focus opens the hover preview, as on other rows: its bar
-    // doesn't expand.
+    // Keyboard focus opens the hover preview, as on other rows: its player
+    // card doesn't expand.
     const preview = page.locator('[data-slot="hover-card-content"]');
-    await expect(preview.locator('[data-face="audio"]')).toBeVisible();
+    await expect(preview.locator('[data-face="audio-preview"]')).toBeVisible();
     await expect(preview.locator("[data-expand]")).toHaveCount(0);
     await page.keyboard.press("Enter");
     await expect(button).toHaveAttribute("aria-label", "Pause Song");
@@ -1134,6 +1125,89 @@ test.describe("Audio pearls in the list: a row that plays", () => {
     await expect
       .poll(() => page.evaluate(() => document.activeElement?.hasAttribute("data-audio-toggle")))
       .toBe(true);
+  });
+});
+
+/** The open hover preview's player card. */
+const audioPreview = (page: Page) =>
+  page.locator('[data-slot="hover-card-content"] [data-face="audio-preview"]');
+
+test.describe("Audio pearls: the hover preview is a player card", () => {
+  test("the sleeve art as its hero, the title over the fade, the track, the times and the transport", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
+    // Birds: a link with its page's image; Song: an upload without one.
+    await seed.link({
+      url: "https://sounds.example/birds.wav",
+      title: "Birds",
+      contentType: "AUDIO",
+      thumbnail: `${baseURL}/icon.png`,
+      duration: 156,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    await seedSong(seed);
+    await openHome(page);
+
+    // Birds: the image hero, the preview's full width, 180px tall.
+    await row(page, "Birds").hover();
+    const birds = audioPreview(page);
+    await expect(birds).toBeVisible();
+    const content = page.locator('[data-slot="hover-card-content"]');
+    const hero = birds.locator('img[data-hero="image"]');
+    await expect(hero).toBeVisible();
+    await expect(birds.locator('[data-hero="icon"]')).toHaveCount(0);
+    const heroBox = (await hero.boundingBox())!;
+    expect(Math.abs(heroBox.height - 180)).toBeLessThanOrEqual(0.5);
+    // The preview's own width (`w-64`).
+    const contentWidth = await content.evaluate((el) => el.clientWidth);
+    expect(contentWidth).toBe(256);
+    expect(Math.abs(heroBox.width - contentWidth)).toBeLessThanOrEqual(0.5);
+    await expect(hero).toHaveCSS("object-fit", "cover");
+    await expect(birds).toContainText("Birds");
+    await expect(birds).toContainText("sounds.example");
+    await expect(birds.getByRole("slider", { name: "Seek Birds" })).toBeVisible();
+    await expect(birds.locator("[data-times] [data-elapsed]")).toHaveText("0:00");
+    await expect(birds.locator("[data-times] [data-length]")).toHaveText("2:36");
+    await expect(birds.getByRole("button", { name: "Restart Birds" })).toBeDisabled();
+    await expect(birds.getByRole("button", { name: "Play Birds" })).toBeVisible();
+    await expect(birds.getByRole("link", { name: "Open file" })).toHaveAttribute(
+      "href",
+      "https://sounds.example/birds.wav",
+    );
+    // A player card, not the bar: nothing expands, no sleeve play.
+    await expect(birds.locator("[data-expand]")).toHaveCount(0);
+    await expect(birds.locator("[data-play]")).toHaveCount(0);
+
+    // Song: no image, the icon hero; the upload's facts as its second line.
+    await page.mouse.move(0, 0);
+    await expect(audioPreview(page)).toHaveCount(0);
+    await row(page, "Song").hover();
+    const song = audioPreview(page);
+    await expect(song).toBeVisible();
+    const iconHero = song.locator('[data-hero="icon"]');
+    await expect(iconHero).toBeVisible();
+    await expect(song.locator('[data-hero="image"]')).toHaveCount(0);
+    expect(Math.abs((await iconHero.boundingBox())!.height - 180)).toBeLessThanOrEqual(0.5);
+    await expect(song).toContainText("Song");
+    await expect(song).toContainText("Audio · 2:36");
+    await expect(song.getByRole("slider", { name: "Seek Song" })).toBeVisible();
+    await expect(song.locator("[data-times] [data-elapsed]")).toHaveText("0:00");
+    await expect(song.locator("[data-times] [data-length]")).toHaveText("2:36");
+    await expect(song.getByRole("button", { name: "Restart Song" })).toBeVisible();
+    await expect(song.getByRole("link", { name: "Open file" })).toBeVisible();
+    await expect(song.locator("[data-expand]")).toHaveCount(0);
+
+    // Its Play plays the row's pearl: one element, the row's mark shows.
+    await song.getByRole("button", { name: "Play Song" }).click();
+    await expect(song.getByRole("button", { name: "Pause Song" })).toBeVisible();
+    await expect(rowMark(row(page, "Song"))).toHaveAttribute("data-row-mark", "pause");
+    expect(await page.evaluate(() => document.querySelectorAll("audio").length)).toBe(1);
+    await expect(song.getByRole("button", { name: "Restart Song" })).toBeEnabled();
   });
 });
 
