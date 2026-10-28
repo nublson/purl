@@ -45,8 +45,8 @@ export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
   // "Go to …". The quick way there on every screen, touch included (the
   // row's own Go to folder button shows only with a pointer that hovers).
   const linkFolder = useLinkFolder(link);
-  // An image, video or audio pearl's row and card open the media viewer,
-  // so its menu is the way to the file itself.
+  // An image or video pearl's row and card open the media viewer, and an
+  // audio pearl's play in place, so its menu is the way to the file itself.
   const media = isMediaKind(linkKind(link));
 
   async function handleOpenInNewTab() {

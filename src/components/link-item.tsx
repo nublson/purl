@@ -13,7 +13,7 @@ import {
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
 import { haptic } from "@/lib/haptics";
 import { useAudioView } from "@/hooks/use-audio-player";
-import { isMediaKind, linkKind } from "@/lib/link-kind";
+import { isViewerKind, linkKind } from "@/lib/link-kind";
 import {
   consumeReturningFocus,
   mediaViewer,
@@ -103,13 +103,17 @@ export const LinkItem = React.forwardRef<
   const folderTag = useFolderTag(link);
   const linkFolder = useLinkFolder(link);
   const badgeArrives = useFolderBadgeArrival(folderTag);
-  // An image, video or audio pearl opens the media viewer (its row's icon
-  // is what the viewer morphs out of); a page opens in a new tab. The
-  // landing demo has no viewer: its rows are links.
-  const media = !demo && isMediaKind(linkKind(link));
+  // An image or video pearl opens the media viewer (its row's icon is what
+  // the viewer morphs out of); a page opens in a new tab. The landing demo
+  // has no viewer: its rows are links. An audio pearl never opens the
+  // viewer: its row opens nothing for now, and plays from its hover
+  // preview's bar.
+  const kind = linkKind(link);
+  const audio = !demo && kind === "audio";
+  const media = !demo && isViewerKind(kind);
   // An audio pearl's row is a view of its playback: what its hover preview
   // starts plays on once the preview closes, until the row leaves.
-  useAudioView(linkKind(link) === "audio" ? link.id : null);
+  useAudioView(kind === "audio" ? link.id : null);
   const viewerOpen = useIsMediaOpen(link.id);
   const longPressRef = React.useRef<{
     timer: ReturnType<typeof setTimeout>;
@@ -328,7 +332,23 @@ export const LinkItem = React.forwardRef<
       }}
       {...rest}
     >
-      {media ? (
+      {audio ? (
+        // A plain surface under the row's controls: while selecting, a
+        // click on it toggles the row; otherwise it opens nothing (the
+        // hover preview's bar plays the pearl).
+        <div
+          ref={setAnchor}
+          aria-hidden
+          className={cn(OPENER_CLASS, selecting && "cursor-pointer")}
+          onClick={(event) => {
+            if (longPressedRef.current) {
+              longPressedRef.current = false;
+              return;
+            }
+            if (selecting) linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+          }}
+        />
+      ) : media ? (
         <MediaOpenButton
           ref={setAnchor}
           link={link}

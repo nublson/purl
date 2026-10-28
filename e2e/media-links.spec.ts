@@ -9,12 +9,15 @@ import { silentWav } from "./support/media";
 // favicon slot is the image's preview.
 
 const cards = (page: Page) => page.locator('[data-cy="link-card"]');
-// A page's card is a link; a media pearl's card opens the viewer (a button).
+// A page's card is a link; an image or video pearl's card opens the viewer
+// (a button); an audio pearl's card is its bar (found by its track, whose
+// name never changes).
 const card = (page: Page, title: string) =>
   cards(page).filter({
     has: page
       .getByRole("link", { name: `${title} (opens in new tab)`, exact: true })
-      .or(page.getByRole("button", { name: title, exact: true })),
+      .or(page.getByRole("button", { name: title, exact: true }))
+      .or(page.locator(`[data-face="audio"] input[aria-label="Seek ${title}"]`)),
   });
 const row = (page: Page, title: string) =>
   page.locator('[data-cy="link-item"]').filter({ hasText: title });
@@ -71,7 +74,7 @@ async function insideBox(inner: Locator, outer: Locator) {
 
 /**
  * A real click at `target`'s centre, wherever it lands: the bar's words take
- * no pointer events of their own (the card's button lies under or over them).
+ * no pointer events of their own (the card's surface lies under them).
  */
 async function clickAt(page: Page, target: Locator) {
   const box = await target.boundingBox();
@@ -82,7 +85,7 @@ async function clickAt(page: Page, target: Locator) {
 /** The bar's second line as shown (under 200px an upload's is just its length). */
 function secondLine(scope: Locator) {
   return scope
-    .locator("[data-words] > * > :nth-child(2)")
+    .locator("[data-words] > :nth-child(2)")
     .evaluate((el) => (el as HTMLElement).innerText.trim());
 }
 
@@ -191,8 +194,7 @@ test.describe("Media pearls", () => {
     await alpha.hover();
     await alpha.getByRole("checkbox", { name: "Select Alpha" }).click();
 
-    // While selecting, the card's button leaves the accessibility tree: find
-    // the card by its bar.
+    // Find the card by its bar.
     const song = cards(page).filter({ has: page.locator('[data-face="audio"]') });
     const checkbox = song.getByRole("checkbox", { name: "Select Song" });
     // The checkbox takes the sleeve's place.
@@ -245,7 +247,7 @@ test.describe("Media pearls", () => {
     await expect(two.getByRole("button", { name: "Play Two" })).toBeVisible({ timeout: 5000 });
   });
 
-  test("a shared folder's grid shows the media, and Play opens nothing", async ({
+  test("a shared folder's grid shows the media; an audio card plays in place and opens nothing", async ({
     browser,
     seed,
     testUser,
@@ -286,10 +288,11 @@ test.describe("Media pearls", () => {
     await expect(shotA.locator(`img[src="${icon}"]`)).toBeVisible();
     await expect(shotA).not.toContainText("Shot A");
 
-    // An audio card's controls sit beside its button, never inside it (a
-    // button can't live in a button): the card holds both.
-    const songCard = cards(page).filter({ has: sharedCard("Song") });
-    await expect(sharedCard("Song").getByRole("button")).toHaveCount(0);
+    // An audio card is its bar: no button or link of its own (its controls
+    // are the bar's).
+    const songCard = cards(page).filter({ has: page.locator('[data-face="audio"]') });
+    await expect(sharedCard("Song")).toHaveCount(0);
+    await expect(songCard.locator("a")).toHaveCount(0);
     let popups = 0;
     page.on("popup", () => popups++);
     const url = page.url();
@@ -297,11 +300,14 @@ test.describe("Media pearls", () => {
     await expect(songCard.getByRole("button", { name: "Play Song" })).toBeVisible();
     expect(popups).toBe(0);
     expect(page.url()).toBe(url);
-    // The button covers the rest of the bar: a click on its words opens the
-    // viewer (the bar is what it morphs out of).
+    // A click on the bar away from its controls (its words) does nothing
+    // visible: an audio pearl never opens the media viewer.
     await expect(songCard.locator('[data-face="audio"]')).toContainText("sounds.example");
     await clickAt(page, songCard.locator("[data-words]"));
-    await expect(page.getByRole("dialog", { name: "Song" })).toBeVisible();
+    await page.waitForTimeout(300);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(popups).toBe(0);
+    expect(page.url()).toBe(url);
     await context.close();
   });
 
@@ -364,8 +370,9 @@ test.describe("Audio pearls: the now-playing bar", () => {
 
     const song = card(page, "Song");
     const birds = card(page, "Birds");
-    // The card is the button that opens the viewer, never a link.
+    // The card is its bar: never a link, and no button opens the viewer.
     await expect(song.locator("a")).toHaveCount(0);
+    await expect(song.getByRole("button", { name: "Song", exact: true })).toHaveCount(0);
     const bar = song.locator('[data-face="audio"]');
     await expect(bar.locator("[data-words]")).toContainText("Song");
     // At 210px the second line is the upload's facts in full; the sleeve
@@ -515,7 +522,7 @@ test.describe("Audio pearls on a phone", () => {
     expect((await song.boundingBox())!.width).toBeLessThanOrEqual(175);
     // Under 200px a link's second line stays its domain.
     expect(await secondLine(cards(page).filter({ hasText: "Birds" }))).toBe("birds.example");
-    const title = song.locator("[data-words] > * > :first-child");
+    const title = song.locator("[data-words] > :first-child");
     expect(await title.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
     expect(await secondLine(song)).toBe("2:36");
     await expect(song.getByRole("button", { name: "Open link menu" })).toBeVisible();

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
-import { isMediaKind, linkKind } from "@/lib/link-kind";
+import { isViewerKind, linkKind } from "@/lib/link-kind";
 import { linkSecondLine } from "@/lib/upload-meta";
 import { LinkIcon } from "./link-icon";
 import { AudioBar } from "./audio-bar";
@@ -21,10 +21,11 @@ export const LINK_CARD_FRAME =
 /**
  * A link in the shared folder's grid: the page's thumbnail full-bleed on
  * top (favicon on a tint when there's none), then the favicon, title (two
- * lines at most) and domain. Cards keep their natural height. An image,
- * video or audio pearl's card opens the media viewer (its face is the
- * morph's anchor, clipping itself, so the card doesn't crop the morph);
- * a page's card is a link to a new tab.
+ * lines at most) and domain. Cards keep their natural height. An image or
+ * video pearl's card opens the media viewer (its face is the morph's
+ * anchor, clipping itself, so the card doesn't crop the morph); an audio
+ * pearl's card is its bar, which plays in place; a page's card is a link
+ * to a new tab.
  */
 export function SharedLinkCard({
   link,
@@ -35,32 +36,15 @@ export function SharedLinkCard({
 }) {
   const kind = linkKind(link);
   if (kind === "audio") {
-    // The bar's controls can't sit inside the card's button: the card is a
-    // frame holding the button and, over it, the bar, which takes pointer
-    // events only on its controls, so clicks beside them still open the
-    // viewer. The frame draws the button's focus ring, as the owner's card
-    // does.
+    // A frame around the bar, whose controls are its own: an audio pearl
+    // never opens the media viewer.
     return (
-      <div
-        data-cy="link-card"
-        className={cn(
-          LINK_CARD_FRAME,
-          "relative overflow-visible has-[[data-pearl-button]:focus-visible]:ring-3 has-[[data-pearl-button]:focus-visible]:ring-ring",
-        )}
-      >
-        <MediaOpenButton
-          link={link}
-          selecting={false}
-          className="absolute inset-0 cursor-pointer rounded-lg outline-none"
-        />
-        {/* Over the button, taking pointer events only on its controls. */}
-        <div className="pointer-events-none">
-          <AudioBar link={link} anchored />
-        </div>
+      <div data-cy="link-card" className={LINK_CARD_FRAME}>
+        <AudioBar link={link} />
       </div>
     );
   }
-  if (isMediaKind(kind)) {
+  if (isViewerKind(kind)) {
     return (
       <MediaOpenButton
         link={link}
@@ -116,7 +100,7 @@ export function LinkCardContent({
     case "video":
       return <VideoFace link={link} badge={badge} anchored={mediaAnchor} />;
     case "audio":
-      return <AudioBar link={link} anchored={mediaAnchor} badge={badge} />;
+      return <AudioBar link={link} badge={badge} />;
     default: {
       const thumbnailSrc = link.thumbnail
         ? safeRemoteImgSrc(link.thumbnail)

@@ -38,14 +38,25 @@ describe("mediaViewer", () => {
     expect(mediaViewer.getSnapshot()).toMatchObject({ currentId: null, pageLeft: false });
   });
 
-  it("registers media pearls only, in order", () => {
+  it("registers image and video pearls only, in order (audio plays in place)", () => {
     mediaViewer.register([
       link("a", "IMAGE"),
       link("page", "WEB"),
+      link("s", "AUDIO"),
       link("b", "VIDEO"),
-      link("c", "AUDIO"),
     ]);
-    expect(ids()).toEqual(["a", "b", "c"]);
+    expect(ids()).toEqual(["a", "b"]);
+  });
+
+  it("never opens on an audio pearl, and next/prev skip it", () => {
+    mediaViewer.register([link("a"), link("s", "AUDIO"), link("c")]);
+    mediaViewer.open("s");
+    expect(mediaViewer.getSnapshot().currentId).toBeNull();
+    mediaViewer.open("a");
+    mediaViewer.next();
+    expect(mediaViewer.getSnapshot().currentId).toBe("c");
+    mediaViewer.prev();
+    expect(mediaViewer.getSnapshot().currentId).toBe("a");
   });
 
   it("open sets both ids; next/prev move currentId and clamp", () => {

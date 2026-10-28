@@ -2,7 +2,7 @@
 
 import { LINK_GRID_FRAME } from "@/lib/link-view";
 import { coolPreviews } from "@/lib/link-preview-warmth";
-import { mediaViewer } from "@/lib/media-viewer";
+import { isViewerLink, mediaViewer } from "@/lib/media-viewer";
 import { useMediaViewerUrl } from "@/lib/media-viewer-url-hook";
 import type { PublicLink } from "@/lib/public-folders";
 import type { Link } from "@/utils/links";
@@ -160,17 +160,18 @@ export function SharedFolderList({
   // Declared before the unmount cleanup below, so the URL binding is
   // disposed first when the page goes (React runs cleanups in order).
   // `?pearl=<id>`: the viewer opens on it once it's registered below. One
-  // the page doesn't show (past the first page, not media, not in this
-  // folder) is dropped quietly: visitors have no endpoint for one link.
+  // the page doesn't show (past the first page, not an image or video, not
+  // in this folder) is dropped quietly: visitors have no endpoint for one link.
   const { pendingId, dismissPending } = useMediaViewerUrl();
   useEffect(() => {
     if (pendingId !== null) dismissPending(pendingId);
   }, [pendingId, dismissPending]);
 
-  // The media viewer's pearls: the image, video and audio links on the
-  // page, in list order (`register` keeps only those), after each load.
+  // The media viewer's pearls: the image and video links on the page, in
+  // list order (audio plays in place; `register` keeps only those too),
+  // after each load.
   useEffect(() => {
-    mediaViewer.register(links);
+    mediaViewer.register(links.filter(isViewerLink));
   }, [links]);
   // Leaving the page takes its pearls (and an open viewer) with it,
   // without counting as a close (the URL keeps `?pearl=`).

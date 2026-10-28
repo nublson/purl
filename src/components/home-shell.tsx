@@ -36,8 +36,7 @@ import {
 } from "@/lib/leaving-links";
 import { coolPreviews } from "@/lib/link-preview-warmth";
 import { linkSelection, setSelectableLinks } from "@/lib/link-selection";
-import { isMediaKind, linkKind } from "@/lib/link-kind";
-import { mediaViewer, onCloseSettled } from "@/lib/media-viewer";
+import { isViewerLink, mediaViewer, onCloseSettled } from "@/lib/media-viewer";
 import { pearlParam } from "@/lib/media-viewer-url";
 import { useMediaViewerUrl } from "@/lib/media-viewer-url-hook";
 import { isSameLinkUrl, omniboxSaveUrl } from "@/lib/omnibox";
@@ -840,7 +839,8 @@ export function HomeShell({
   // viewer opens on it once the list below registers it. A pearl the list
   // doesn't have (past the first page, which is already here from the
   // server) is fetched on its own and opens standalone: no neighbours, and
-  // no card to morph from, so the dialog fades. Not found, not media or not
+  // no card to morph from, so the dialog fades. Not found, not an image or
+  // video (an audio pearl plays in place, never in the viewer) or not
   // reachable: the param goes, quietly. Declared before the unmount
   // cleanup below, so the URL binding is disposed first when the page goes.
   const { pendingId, dismissPending } = useMediaViewerUrl();
@@ -868,7 +868,7 @@ export function HomeShell({
         // Offline or a bad answer: the same as not found.
       }
       if (!current()) return;
-      if (!link || link.id !== id || !isMediaKind(linkKind(link))) {
+      if (!link || link.id !== id || !isViewerLink(link)) {
         dismissPending(id);
         return;
       }
@@ -889,8 +889,8 @@ export function HomeShell({
     return onCloseSettled(() => setDeepLinked(null));
   }, [deepLinked]);
 
-  // The media viewer steps through the same links (its image, video and
-  // audio pearls), in the same order.
+  // The media viewer steps through the same links (its image and video
+  // pearls; audio plays in place), in the same order.
   useEffect(() => {
     const shown: string[] = [];
     const shownLinks: Link[] = [];
@@ -914,7 +914,7 @@ export function HomeShell({
     if (deepLinked && !shownLinks.some((link) => link.id === deepLinked.id)) {
       shownLinks.push(deepLinked);
     }
-    mediaViewer.register(shownLinks);
+    mediaViewer.register(shownLinks.filter(isViewerLink));
   }, [shownGroups, pendingDeletes, leavingLinks, listComplete, deepLinked]);
   // Leaving the page takes its pearls (and an open viewer) with it,
   // without counting as a close (the URL keeps `?pearl=`).

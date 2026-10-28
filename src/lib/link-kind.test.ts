@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardAspectRatio, linkKind } from "./link-kind";
+import { cardAspectRatio, isMediaKind, isViewerKind, linkKind } from "./link-kind";
 
 describe("linkKind", () => {
   it("maps content types to kinds", () => {
@@ -14,6 +14,18 @@ describe("linkKind", () => {
   it("embed wins over the content type", () => {
     expect(linkKind({ contentType: "WEB", embed: true })).toBe("embed");
     expect(linkKind({ contentType: "VIDEO", embed: true })).toBe("embed");
+  });
+});
+
+describe("isMediaKind / isViewerKind", () => {
+  it("audio has a media face but isn't the viewer's", () => {
+    expect(["image", "video", "audio"].every((kind) => isMediaKind(kind as never))).toBe(true);
+    expect(isMediaKind("page")).toBe(false);
+    expect(isViewerKind("image")).toBe(true);
+    expect(isViewerKind("video")).toBe(true);
+    expect(isViewerKind("audio")).toBe(false);
+    expect(isViewerKind("page")).toBe(false);
+    expect(isViewerKind("embed")).toBe(false);
   });
 });
 

@@ -18,9 +18,17 @@ export function linkKind(link: Pick<Link, "contentType" | "embed">): LinkKind {
   }
 }
 
-/** Image, video and audio pearls: the ones the media viewer shows. */
+/** Image, video and audio pearls: the ones with a media face. */
 export function isMediaKind(kind: LinkKind): boolean {
   return kind === "image" || kind === "video" || kind === "audio";
+}
+
+/**
+ * Image and video pearls: the ones the media viewer shows. An audio pearl
+ * plays (and opens) in place, on its own bar, never in the viewer.
+ */
+export function isViewerKind(kind: LinkKind): boolean {
+  return kind === "image" || kind === "video";
 }
 
 const DEFAULT_RATIO = "16 / 10";

@@ -1,7 +1,7 @@
 "use client";
 
 import { EASE_OUT_STRONG } from "@/lib/motion";
-import motionFeatures from "@/lib/motion-features";
+import { loadMotionFeatures } from "@/lib/motion-features-loader";
 import { cn } from "@/lib/utils";
 import { decideDrag, type DragOutcome } from "@/lib/viewer-drag";
 import {
@@ -112,8 +112,8 @@ export function ViewerStatus({ text }: { text: string }) {
   );
 }
 
-/** Where a drag can't start: the player's own controls (Open file is a link). */
-const NOT_A_HANDLE = "video, input[type=range], button, a[href]";
+/** Where a drag can't start: the player's own controls. */
+const NOT_A_HANDLE = "video, input[type=range], button";
 
 /** How far a drag goes before the media has shrunk all the way (px). */
 const PULL_FOR_FULL_SCALE = 160;
@@ -162,12 +162,8 @@ export function ViewerStage({
     setShown({ id, index, direction: index >= shown.index ? 1 : -1 });
   }
 
-  // Its features synchronously (the viewer is its own chunk, loaded after
-  // the page's, so they're there already): with `loadMotionFeatures` the
-  // slide's contents would get Motion a render after the Popup mounts, too
-  // late for an audio player's sleeve and words to join the open's morph.
   return (
-    <LazyMotion features={motionFeatures} strict>
+    <LazyMotion features={loadMotionFeatures} strict>
       <AnimatePresence initial={false} mode="popLayout" custom={shown.direction}>
         <ViewerSlide
           key={id}

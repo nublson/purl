@@ -348,8 +348,8 @@ function viewReader(
 }
 
 /**
- * Pearl `id`'s view of the page's player (a card's bar, the viewer's
- * player). Mounted views keep the pearl playing; when its last one goes,
+ * Pearl `id`'s view of the page's player (a card's bar, a hover
+ * preview's bar). Mounted views keep the pearl playing; when its last one goes,
  * it stops. Only views whose own reading changed re-render (another pearl's
  * `timeupdate` doesn't).
  */

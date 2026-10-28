@@ -1,7 +1,7 @@
 "use client";
 
 import { useAudioView } from "@/hooks/use-audio-player";
-import { isMediaKind, linkKind } from "@/lib/link-kind";
+import { isViewerKind, linkKind } from "@/lib/link-kind";
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
 import {
   consumeReturningFocus,
@@ -23,8 +23,9 @@ import { Item, ItemContent, ItemMedia, ItemTitle } from "./ui/item";
  * A row on a shared folder page: the owner's `LinkItem`, read-only (no
  * checkbox, no menu). Same box, type and hover preview, so a shared folder
  * looks exactly like the owner's. PDFs get no preview: their thumbnail
- * goes through the signed-in PDF proxy. An image, video or audio pearl
- * opens the media viewer, morphing out of its icon; a page opens a tab.
+ * goes through the signed-in PDF proxy. An image or video pearl opens the
+ * media viewer, morphing out of its icon; a page opens a tab; an audio
+ * pearl opens nothing for now, and plays from its hover preview's bar.
  */
 export function SharedLinkItem({
   link,
@@ -42,10 +43,11 @@ export function SharedLinkItem({
   );
   const descriptionId = React.useId();
   const hasPreview = link.contentType !== "PDF";
-  const media = isMediaKind(linkKind(link));
+  const kind = linkKind(link);
+  const media = isViewerKind(kind);
   // An audio pearl's row is a view of its playback: what its hover preview
   // starts plays on once the preview closes, until the row leaves.
-  useAudioView(linkKind(link) === "audio" ? link.id : null);
+  useAudioView(kind === "audio" ? link.id : null);
   const viewerOpen = useIsMediaOpen(link.id);
 
   const clearTimers = React.useCallback(() => {
@@ -116,7 +118,10 @@ export function SharedLinkItem({
         if (hasPreview && event.pointerType !== "touch") scheduleClose();
       }}
     >
-      {media ? (
+      {kind === "audio" ? (
+        // A plain surface: an audio pearl never opens the media viewer.
+        <div aria-hidden className={openerClass} />
+      ) : media ? (
         <MediaOpenButton
           link={link}
           preset="snappy"

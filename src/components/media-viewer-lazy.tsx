@@ -13,7 +13,7 @@ const MediaViewer = dynamic(
 );
 
 /**
- * The page's media viewer: mounts the dialog once any image, video or audio
+ * The page's media viewer: mounts the dialog once any image or video
  * pearl is registered (mount once per page), and keeps it mounted from then
  * on, so a close that takes the last pearl with it (a live reload removing
  * them, a deep-linked pearl leaving once its close settles) still plays its

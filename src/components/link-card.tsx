@@ -12,7 +12,7 @@ import {
 import { ARRIVE } from "@/lib/motion";
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
 import { haptic } from "@/lib/haptics";
-import { isMediaKind, linkKind } from "@/lib/link-kind";
+import { isViewerKind, linkKind } from "@/lib/link-kind";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
@@ -80,14 +80,15 @@ export function LinkCard({
   const badgeArrives = useFolderBadgeArrival(folderTag);
   const folderLabelId = React.useId();
   const [menuOpen, setMenuOpen] = React.useState(false);
-  // The card's opener: a link to the page, or for an image, video or audio
-  // pearl the button that opens the media viewer (the demo has no viewer:
-  // its cards are links).
+  // The card's opener: a link to the page, or for an image or video pearl
+  // the button that opens the media viewer (the demo has no viewer: its
+  // cards are links). An audio pearl's card (outside the demo) has no
+  // opener: its bar plays in place, and never opens the viewer.
   const kind = linkKind(link);
-  const media = !demo && isMediaKind(kind);
-  // A media face (the image, the video, the audio bar) is the viewer's
-  // morph anchor: it rounds and clips itself, so the card doesn't crop the
-  // morph back.
+  const audio = kind === "audio";
+  const media = !demo && isViewerKind(kind);
+  // An image or video face is the viewer's morph anchor: it rounds and
+  // clips itself, so the card doesn't crop the morph back.
   const anchoredFace = media;
   const anchorRef = React.useRef<HTMLElement | null>(null);
   const setAnchor = React.useCallback((el: HTMLElement | null) => {
@@ -182,7 +183,19 @@ export function LinkCard({
         longPress.onPointerDown(event);
       }}
     >
-      {media ? (
+      {audio && !demo ? (
+        // A plain surface under the bar: while selecting, a click on it
+        // toggles the card (the bar's controls step aside then).
+        <div
+          ref={setAnchor}
+          aria-hidden
+          className={cn("absolute inset-0 z-0 rounded-lg", selecting && "cursor-pointer")}
+          onClick={(event) => {
+            if (consumeLongPress()) return;
+            if (selecting) linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+          }}
+        />
+      ) : media ? (
         <MediaOpenButton
           ref={setAnchor}
           link={link}
@@ -221,13 +234,12 @@ export function LinkCard({
       )}
       {/* The content is a picture of the link: clicks go to the link. */}
       <div className="pointer-events-none flex flex-col">
-        {kind === "audio" ? (
+        {audio ? (
           // The bar holds the owner's controls itself: the checkbox in the
           // sleeve's corner on hover, in its place while selecting; the
           // menu after the words (no thumbnail corners to put them in).
           <AudioBar
             link={link}
-            anchored={anchoredFace}
             badge={badge}
             describedBy={describedBy}
             owner={
@@ -260,7 +272,7 @@ export function LinkCard({
         )}
       </div>
       {folderTag ? <FolderTagLabel id={folderLabelId} folder={folderTag} /> : null}
-      {demo || kind === "audio" ? null : (
+      {demo || audio ? null : (
         <>
           <Checkbox
             checked={selected}

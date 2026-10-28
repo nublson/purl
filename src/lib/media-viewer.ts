@@ -1,15 +1,17 @@
 "use client";
 
 import { useMemo, useSyncExternalStore } from "react";
-import { isMediaKind, linkKind } from "@/lib/link-kind";
+import { isViewerKind, linkKind } from "@/lib/link-kind";
 import type { Link } from "@/utils/links";
 
 /**
  * The media viewer's state, outside React so the cards, rows, the dialog and
  * the URL sync all talk to one place (like `linkSelection`).
  *
- * `items` are the image, video and audio pearls on screen, in display order,
- * registered by the page whenever its list changes. `openedId` is the pearl
+ * `items` are the image and video pearls on screen, in display order,
+ * registered by the page whenever its list changes (an audio pearl plays
+ * and opens in place, on its own bar, so it's never one of them and
+ * Previous / Next skip it). `openedId` is the pearl
  * the viewer opened from (the card the dialog morphs out of and back into),
  * `currentId` the one showing now; they differ after next/prev, or once the
  * opened pearl has left the list (its id stays: the dialog is keyed by it,
@@ -68,8 +70,9 @@ function getSnapshot(): MediaViewerState {
   return state;
 }
 
-function isMedia(link: Link) {
-  return isMediaKind(linkKind(link));
+/** What the viewer shows: image and video pearls (never audio). */
+export function isViewerLink(link: Pick<Link, "contentType" | "embed">): boolean {
+  return isViewerKind(linkKind(link));
 }
 
 function sameItems(a: readonly Link[], b: readonly Link[]) {
@@ -97,9 +100,12 @@ function replacementFor(
 }
 
 export const mediaViewer = {
-  /** Registers the media pearls on screen, in display order. */
+  /**
+   * Registers the viewer's pearls on screen, in display order: whatever the
+   * page passes, only image and video pearls are kept.
+   */
   register(links: Link[]) {
-    const items = links.filter(isMedia);
+    const items = links.filter(isViewerLink);
     if (sameItems(items, state.items)) {
       if (state.pageLeft) setState({ ...state, pageLeft: false });
       return;
@@ -286,18 +292,6 @@ export function useMediaViewer(): MediaViewerView {
       hasNext: !snapshot.standalone && index !== -1 && index < count - 1,
     };
   }, [snapshot]);
-}
-
-/**
- * Whether the viewer opened from `id` and has moved on to another pearl
- * (it's still open); a card re-renders only when its own answer flips.
- */
-export function useIsMediaMovedOff(id: string): boolean {
-  return useSyncExternalStore(
-    subscribe,
-    () => state.openedId === id && state.currentId !== null && state.currentId !== id,
-    () => false,
-  );
 }
 
 /**

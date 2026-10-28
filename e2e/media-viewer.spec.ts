@@ -1,11 +1,12 @@
-import type { Locator, Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
 import { expect, test, waitForHydration } from "./fixtures";
 import type { seedLink } from "./support/db";
 import { silentWav } from "./support/media";
 
 // The media viewer: an image pearl's card in the owner's grid opens it (the
 // card morphs into the dialog), Esc closes it back onto the card, and the
-// URL carries `?pearl=<id>` while it's open. Page links still open a tab.
+// URL carries `?pearl=<id>` while it's open. Page links still open a tab;
+// audio pearls play in place and never open it.
 
 const cards = (page: Page) => page.locator('[data-cy="link-card"]');
 const openButton = (page: Page, title: string) =>
@@ -216,167 +217,14 @@ function sampleInlineSizes(page: Page, count: number) {
   );
 }
 
-/** One frame of the audio morph: the dialog's sleeve and words as drawn. */
-type MorphFrame = {
-  t: number;
-  sleeve: { x: number; y: number; w: number; h: number; transform: string } | null;
-  words: { x: number; y: number; w: number; h: number } | null;
-};
-
-/**
- * Starts recording, on every frame for the next `ms`, where the dialog's
- * sleeve and words are drawn (and the sleeve's inline transform: Motion's
- * projection). Read the frames with `readMorphFrames` once it's done.
- */
-async function startMorphFrames(page: Page, ms: number) {
-  await page.evaluate((ms) => {
-    const w = window as unknown as { __morph: unknown[] };
-    w.__morph = [];
-    const t0 = performance.now();
-    const tick = () => {
-      const popup = document.querySelector<HTMLElement>("[data-media-viewer]");
-      const sleeve = popup?.querySelector<HTMLElement>("[data-sleeve]") ?? null;
-      const words = popup?.querySelector<HTMLElement>("[data-words]") ?? null;
-      const box = (el: HTMLElement) => {
-        const r = el.getBoundingClientRect();
-        return { x: r.x, y: r.y, w: r.width, h: r.height };
-      };
-      w.__morph.push({
-        t: performance.now() - t0,
-        sleeve: sleeve ? { ...box(sleeve), transform: sleeve.style.transform } : null,
-        words: words ? box(words) : null,
-      });
-      if (performance.now() - t0 < ms) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, ms);
-}
-
-async function readMorphFrames(page: Page, ms: number): Promise<MorphFrame[]> {
-  await page.waitForTimeout(ms + 100);
-  return page.evaluate(
-    () => (window as unknown as { __morph: MorphFrame[] }).__morph,
-  );
-}
-
-type SleeveFrame = { x: number; y: number; w: number; h: number; transform: string };
-
-/** Tags a card, so `startSleeveFrames` finds its sleeve even while the page is hidden behind the viewer. */
-function tagCard(card: Locator, name: string) {
-  return card.evaluate((el, name) => el.setAttribute("data-probe", name), name);
-}
-
-/**
- * Starts recording, on every frame for the next `ms`, where each named
- * sleeve is drawn and its inline transform: a tagged card's (`tagCard`; a
- * remounted sleeve is still found) or the player's of the pearl titled
- * `player` (a slide's words name it). Read them with `readSleeveFrames`.
- */
-async function startSleeveFrames(
-  page: Page,
-  ms: number,
-  queries: Record<string, { card: string } | { player: string }>,
-) {
-  await page.evaluate(
-    ({ ms, queries }) => {
-      const w = window as unknown as { __sleeves: Record<string, unknown[]> };
-      w.__sleeves = Object.fromEntries(Object.keys(queries).map((name) => [name, []]));
-      const find = (q: { card: string } | { player: string }) => {
-        if ("card" in q) return document.querySelector<HTMLElement>(`[data-probe="${q.card}"] [data-sleeve]`);
-        const players = document.querySelectorAll<HTMLElement>('[data-media-viewer] [data-viewer-media="audio"]');
-        const player = [...players].find(
-          (el) => el.querySelector("[data-words] span")?.textContent === q.player,
-        );
-        return player?.querySelector<HTMLElement>("[data-sleeve]") ?? null;
-      };
-      const t0 = performance.now();
-      const tick = () => {
-        for (const [name, q] of Object.entries(queries)) {
-          const el = find(q);
-          if (!el) continue;
-          const r = el.getBoundingClientRect();
-          w.__sleeves[name].push({ x: r.x, y: r.y, w: r.width, h: r.height, transform: el.style.transform });
-        }
-        if (performance.now() - t0 < ms) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    },
-    { ms, queries },
-  );
-}
-
-async function readSleeveFrames(page: Page, ms: number): Promise<Record<string, SleeveFrame[]>> {
-  await page.waitForTimeout(ms + 100);
-  return page.evaluate(
-    () => (window as unknown as { __sleeves: Record<string, SleeveFrame[]> }).__sleeves,
-  );
-}
-
-/** A transform Motion leaves when it's done (or never wrote). */
-const restingTransform = (transform: string) =>
-  transform === "" || transform === "none";
-
-/**
- * After the morph: the dialog's sleeve is 64 square, untransformed, the
- * words beside it, and what only the player has (the track, the times, the
- * transport) fully shown.
- */
-async function expectPlayerSettled(page: Page) {
-  const dialog = page.getByRole("dialog", { name: "Song" });
-  const player = dialog.locator('[data-viewer-media="audio"]');
-  await expect
-    .poll(() =>
-      player.evaluate((root) => {
-        const sleeve = root.querySelector<HTMLElement>("[data-sleeve]")!;
-        const s = sleeve.getBoundingClientRect();
-        const words = root.querySelector<HTMLElement>("[data-words]")!.getBoundingClientRect();
-        const late = [...root.querySelectorAll<HTMLElement>("[data-late]")].map((el) =>
-          Number(getComputedStyle(el).opacity),
-        );
-        return {
-          w: Math.round(s.width),
-          h: Math.round(s.height),
-          transform: sleeve.style.transform || "none",
-          beside: words.left >= s.right && words.top < s.bottom && words.bottom > s.top,
-          late: late.length >= 3 && late.every((o) => o === 1),
-        };
-      }),
-    )
-    .toEqual({ w: 64, h: 64, transform: "none", beside: true, late: true });
-  await expect(dialog.getByRole("button", { name: "Play Song" })).toBeVisible();
-}
-
-/**
- * After closing: the card's sleeve is back in its place (the bar's 10px
- * margin), 40 square, untransformed, its mark shown.
- */
-async function expectCardSleeveBack(card: Locator) {
-  await expect
-    .poll(() =>
-      card.evaluate((root) => {
-        const bar = root.querySelector<HTMLElement>('[data-face="audio"]')!.getBoundingClientRect();
-        const sleeve = root.querySelector<HTMLElement>("[data-sleeve]")!;
-        const s = sleeve.getBoundingClientRect();
-        const play = root.querySelector<HTMLElement>("[data-play]")!;
-        return {
-          x: Math.round(s.left - bar.left),
-          y: Math.round(s.top - bar.top),
-          w: Math.round(s.width),
-          h: Math.round(s.height),
-          transform: sleeve.style.transform || "none",
-          visible: getComputedStyle(sleeve).visibility === "visible",
-          mark: getComputedStyle(play).opacity === "1",
-        };
-      }),
-    )
-    .toEqual({ x: 10, y: 10, w: 40, h: 40, transform: "none", visible: true, mark: true });
-}
-
 /** The viewer's live region (the dialog's own; announced on each move). */
 const viewerStatus = (page: Page) =>
   page.locator("[data-media-viewer] [data-viewer-status]");
 
-/** Shot A, then an audio pearl (Song), then Shot C: the audio has both neighbours. */
+/**
+ * Shot A, then an audio pearl (Song), then Shot C: the audio sits between
+ * two images, which the viewer steps between directly.
+ */
 async function seedAudioBetween(
   seed: { link: (link: Parameters<typeof seedLink>[1]) => Promise<string> },
   baseURL: string,
@@ -392,7 +240,7 @@ async function seedAudioBetween(
     height: 600,
   });
   await pause();
-  await seed.link({
+  const song = await seed.link({
     url: "https://sounds.example/song.wav",
     title: "Song",
     contentType: "AUDIO",
@@ -407,86 +255,7 @@ async function seedAudioBetween(
     width: 800,
     height: 600,
   });
-}
-
-/** An uploaded audio pearl, "Song", 2:36 long (its second line "Audio · 2:36"). */
-function seedUploadedSong(seed: {
-  link: (link: Parameters<typeof seedLink>[1]) => Promise<string>;
-}) {
-  return seed.link({
-    url: "https://sounds.example/song.wav",
-    title: "Song",
-    contentType: "AUDIO",
-    mimeType: "audio/wav",
-    duration: 156,
-    fileKey: "users/e2e/song/song.wav",
-    fileSize: 1000,
-  });
-}
-
-/** Opens an audio card: a click on its bar's words (the card's button, beside its controls). */
-async function openAudioCard(page: Page, card: Locator) {
-  const words = (await card.locator("[data-words]").boundingBox())!;
-  await page.mouse.click(words.x + words.width / 2, words.y + words.height / 2);
-}
-
-/**
- * On an audio pearl with neighbours, Previous / Next (with their invisible
- * hit area) stay clear of the track, its times and the transport. Boxes
- * may be mid-morph, but a scale along the axes keeps boxes that don't
- * overlap apart.
- */
-async function expectArrowsClearOfPlayer(page: Page) {
-  const dialog = page.getByRole("dialog", { name: "Song" });
-  await expect(dialog).toBeVisible();
-  const boxes = await dialog.evaluate((root) => {
-    const rect = (el: Element | null, grow = 0) => {
-      const r = el!.getBoundingClientRect();
-      return { l: r.left - grow, t: r.top - grow, r: r.right + grow, b: r.bottom + grow };
-    };
-    const hit = (name: string) => {
-      const el = root.querySelector(`button[aria-label="${name}"]`)!;
-      return rect(el, -parseFloat(getComputedStyle(el, "::after").top));
-    };
-    return {
-      arrows: [hit("Previous pearl"), hit("Next pearl")],
-      controls: [
-        rect(root.querySelector('button[aria-label="Restart Song"]')),
-        rect(root.querySelector('button[aria-label="Play Song"]')),
-        rect(root.querySelector('a[aria-label="Open file"]')),
-        rect(root.querySelector('input[aria-label="Seek Song"]')),
-        rect(root.querySelector("[data-times]")),
-      ],
-    };
-  });
-  for (const arrow of boxes.arrows) {
-    for (const control of boxes.controls) {
-      const overlap =
-        arrow.l < control.r && control.l < arrow.r && arrow.t < control.b && control.t < arrow.b;
-      expect(overlap, JSON.stringify({ arrow, control })).toBe(false);
-    }
-  }
-}
-
-/**
- * Waits for a move's slide (200ms) to finish: one slide left, and nothing
- * between the player and the dialog's box translated any more.
- */
-async function expectSlideSettled(page: Page) {
-  await expect
-    .poll(() =>
-      page.locator("[data-media-viewer]").evaluate((popup) => {
-        if (popup.querySelectorAll("[data-viewer-media]").length !== 1) return false;
-        const identity = new Set(["none", "matrix(1, 0, 0, 1, 0, 0)"]);
-        let el = popup.querySelector("[data-viewer-media]")?.parentElement ?? null;
-        while (el && el !== popup) {
-          if (!identity.has(getComputedStyle(el).transform)) return false;
-          el = el.parentElement;
-        }
-        return true;
-      }),
-    )
-    .toBe(true);
+  return { song };
 }
 
 /** The page's view of the URL's `?pearl=`. */
@@ -735,278 +504,6 @@ test.describe("Media viewer", () => {
     await expect(player).toHaveAttribute("poster", icon);
   });
 
-  test("an audio card opens the player: the bar, opened; playback carries on", async ({
-    page,
-    seed,
-  }) => {
-    await page.context().route("https://sounds.example/**", (route) =>
-      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(156) }),
-    );
-    await seedUploadedSong(seed);
-    await openHome(page);
-    await chooseGrid(page);
-    await expect(cards(page)).toHaveCount(1);
-
-    const card = cards(page).first();
-    await card.getByRole("button", { name: "Play Song" }).click();
-    await expect(card.getByRole("button", { name: "Pause Song" })).toBeVisible();
-
-    await openAudioCard(page, card);
-    const dialog = page.getByRole("dialog", { name: "Song" });
-    await expect(dialog).toBeVisible();
-    const player = dialog.locator('[data-viewer-media="audio"]');
-    // Layout sizes (the box may still be scaling in the morph): 320 wide,
-    // the stack's sum tall.
-    const size = await player.evaluate((el: HTMLElement) => ({
-      w: el.offsetWidth,
-      h: el.offsetHeight,
-    }));
-    expect(Math.abs(size.w - 320)).toBeLessThanOrEqual(1);
-    expect(Math.abs(size.h - 189)).toBeLessThanOrEqual(2);
-    // The words beside a 64px sleeve.
-    await expect(player.locator("[data-words]").getByText("Song", { exact: true })).toBeVisible();
-    await expect(player.locator("[data-words]").getByText("Audio · 2:36")).toBeVisible();
-    expect(await player.locator("[data-sleeve]").evaluate((el: HTMLElement) => el.offsetWidth)).toBe(
-      64,
-    );
-    await expect(dialog.getByRole("slider", { name: "Seek Song" })).toHaveCount(1);
-    // The same playback, carried on: elapsed at the left, remaining at the right.
-    await expect(player.locator("[data-elapsed]")).toHaveText(/^0:0\d$/);
-    await expect(player.locator("[data-remaining]")).toHaveText(/^\u22122:[23]\d$/);
-    await expect(dialog.getByRole("button", { name: "Restart Song" })).toBeVisible();
-    const pause = dialog.getByRole("button", { name: "Pause Song" });
-    await expect(pause).toBeVisible();
-    // The name says what a press does; no `aria-pressed` on top of it.
-    await expect(pause).not.toHaveAttribute("aria-pressed");
-    expect(await pause.evaluate((el: HTMLElement) => el.offsetWidth)).toBe(46);
-    const file = dialog.getByRole("link", { name: "Open file" });
-    await expect(file).toHaveAttribute("href", "https://sounds.example/song.wav");
-    await expect(file).toHaveAttribute("target", "_blank");
-    // One element for the page, still playing.
-    expect(await page.evaluate(() => document.querySelectorAll("audio").length)).toBe(1);
-    await expect
-      .poll(() => page.evaluate(() => document.querySelector("audio")?.paused))
-      .toBe(false);
-
-    // Restart: back to 0:00, still playing.
-    await expect(player.locator("[data-elapsed]")).not.toHaveText("0:00");
-    await dialog.getByRole("button", { name: "Restart Song" }).click();
-    await expect(player.locator("[data-elapsed]")).toHaveText("0:00");
-    await expect(pause).toBeVisible();
-
-    // Closing leaves it playing on the card.
-    await page.keyboard.press("Escape");
-    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
-    await expect(card.getByRole("button", { name: "Pause Song" })).toBeVisible();
-    expect(await page.evaluate(() => document.querySelectorAll("audio").length)).toBe(1);
-    await expect
-      .poll(() => page.evaluate(() => document.querySelector("audio")?.paused))
-      .toBe(false);
-  });
-
-  test("with reduced motion the audio player opens, and its mark swaps at once", async ({
-    page,
-    seed,
-  }) => {
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.context().route("https://sounds.example/**", (route) =>
-      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(156) }),
-    );
-    await seedUploadedSong(seed);
-    await openHome(page);
-    await chooseGrid(page);
-    await expect(cards(page)).toHaveCount(1);
-
-    await openAudioCard(page, cards(page).first());
-    const dialog = page.getByRole("dialog", { name: "Song" });
-    await expect(dialog).toBeVisible();
-    const player = dialog.locator('[data-viewer-media="audio"]');
-    // Not played yet: the stored length, before the file's metadata.
-    await expect(player.locator("[data-elapsed]")).toHaveText("0:00");
-    await expect(player.locator("[data-remaining]")).toHaveText("\u22122:36");
-
-    // Every frame from the press on draws the mark level and unscaled.
-    const transforms = await dialog
-      .getByRole("button", { name: "Play Song" })
-      .evaluate(
-        (button: HTMLElement) =>
-          new Promise<string[]>((resolve) => {
-            const seen = new Set<string>();
-            const t0 = performance.now();
-            button.click();
-            const tick = () => {
-              seen.add(button.querySelector("svg")!.style.transform);
-              if (performance.now() - t0 < 400) requestAnimationFrame(tick);
-              else resolve([...seen]);
-            };
-            requestAnimationFrame(tick);
-          }),
-      );
-    expect(transforms).toEqual(["rotate(0deg) scale(1, 1)"]);
-    await expect(dialog.getByRole("button", { name: "Pause Song" })).toBeVisible();
-  });
-
-  test("an audio card's sleeve and words travel into the player, and back on Esc", async ({
-    page,
-    seed,
-  }) => {
-    await page.emulateMedia({ reducedMotion: "no-preference" });
-    await seedUploadedSong(seed);
-    await openHome(page);
-    await chooseGrid(page);
-    await expect(cards(page)).toHaveCount(1);
-    const card = cards(page).first();
-
-    await startMorphFrames(page, 600);
-    await openAudioCard(page, card);
-    const frames = (await readMorphFrames(page, 600)).filter((f) => f.sleeve);
-    expect(frames.length).toBeGreaterThan(3);
-    // The first ~150ms: Motion carries the sleeve (an inline transform), and
-    // it grows from the card's 40 toward the player's 64, never back.
-    const early = frames.filter((f) => f.t - frames[0].t <= 150);
-    expect(early.length, JSON.stringify(frames)).toBeGreaterThan(1);
-    expect(early.some((f) => !restingTransform(f.sleeve!.transform)), JSON.stringify(early)).toBe(
-      true,
-    );
-    expect(Math.abs(early[0].sleeve!.w - 40), JSON.stringify(early)).toBeLessThanOrEqual(4);
-    for (let i = 1; i < frames.length; i++) {
-      expect(frames[i].sleeve!.w, JSON.stringify(frames)).toBeGreaterThanOrEqual(
-        frames[i - 1].sleeve!.w - 0.5,
-      );
-    }
-    await expectPlayerSettled(page);
-
-    await page.keyboard.press("Escape");
-    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
-    await expectCardSleeveBack(card);
-  });
-
-  test("with reduced motion the sleeve never travels, and both ends are the same", async ({
-    page,
-    seed,
-  }) => {
-    await page.emulateMedia({ reducedMotion: "reduce" });
-    await seedUploadedSong(seed);
-    await openHome(page);
-    await chooseGrid(page);
-    await expect(cards(page)).toHaveCount(1);
-    const card = cards(page).first();
-    await tagCard(card, "card");
-
-    await startMorphFrames(page, 400);
-    await openAudioCard(page, card);
-    const frames = (await readMorphFrames(page, 400)).filter((f) => f.sleeve);
-    expect(frames.length).toBeGreaterThan(3);
-    expect(frames.every((f) => restingTransform(f.sleeve!.transform)), JSON.stringify(frames)).toBe(
-      true,
-    );
-    await expectPlayerSettled(page);
-
-    // Closing: the card's sleeve doesn't travel back either.
-    await startSleeveFrames(page, 600, { card: { card: "card" } });
-    await page.keyboard.press("Escape");
-    const back = (await readSleeveFrames(page, 600)).card;
-    expect(back.length).toBeGreaterThan(3);
-    expect(back.every((f) => restingTransform(f.transform)), JSON.stringify(back)).toBe(true);
-    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
-    await expectCardSleeveBack(card);
-  });
-
-  test("moving from one audio pearl to the next doesn't fly from its card; closing lands in it", async ({
-    page,
-    seed,
-  }) => {
-    await page.emulateMedia({ reducedMotion: "no-preference" });
-    // Newest first: Song, then Tune.
-    await seed.link({
-      url: "https://sounds.example/tune.wav",
-      title: "Tune",
-      contentType: "AUDIO",
-      duration: 30,
-    });
-    await new Promise((resolve) => setTimeout(resolve, 15));
-    await seedUploadedSong(seed);
-    await openHome(page);
-    await chooseGrid(page);
-    await expect(cards(page)).toHaveCount(2);
-    const song = cards(page).filter({ has: openButton(page, "Song") });
-    const tune = cards(page).filter({ has: openButton(page, "Tune") });
-    await tagCard(song, "song");
-    await tagCard(tune, "tune");
-
-    await openAudioCard(page, song);
-    await expectPlayerSettled(page);
-    // Onto Tune: its player slides in at its own 64px, never out of its card.
-    await startSleeveFrames(page, 500, { tune: { player: "Tune" } });
-    await page.getByRole("button", { name: "Next pearl" }).click();
-    const arriving = (await readSleeveFrames(page, 500)).tune;
-    expect(arriving.length).toBeGreaterThan(3);
-    for (const f of arriving) {
-      expect(Math.abs(f.w - 64), JSON.stringify(arriving)).toBeLessThanOrEqual(0.5);
-      expect(Math.abs(f.h - 64), JSON.stringify(arriving)).toBeLessThanOrEqual(0.5);
-      expect(restingTransform(f.transform), JSON.stringify(arriving)).toBe(true);
-    }
-    await expect(page.getByRole("dialog", { name: "Tune" })).toBeVisible();
-    await expectSlideSettled(page);
-
-    // Closed onto Tune: it lands in Tune's card; Song's sleeve never moves.
-    await startSleeveFrames(page, 800, { song: { card: "song" } });
-    await page.keyboard.press("Escape");
-    const still = (await readSleeveFrames(page, 800)).song;
-    expect(still.length).toBeGreaterThan(3);
-    const rest = still[still.length - 1];
-    expect(Math.round(rest.w)).toBe(40);
-    for (const f of still) {
-      expect(
-        Math.abs(f.x - rest.x) + Math.abs(f.y - rest.y) + Math.abs(f.w - rest.w) + Math.abs(f.h - rest.h),
-        JSON.stringify(still),
-      ).toBeLessThanOrEqual(0.5);
-      expect(restingTransform(f.transform), JSON.stringify(still)).toBe(true);
-    }
-    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
-    await expectCardSleeveBack(page.locator('[data-probe="tune"]'));
-    await expectCardSleeveBack(page.locator('[data-probe="song"]'));
-  });
-
-  test("after moving off an audio pearl, its card's sleeve stays in place, wherever the viewer closes", async ({
-    page,
-    seed,
-    baseURL,
-  }) => {
-    await page.emulateMedia({ reducedMotion: "no-preference" });
-    await seedAudioBetween(seed, baseURL!);
-    await openHome(page);
-    await chooseGrid(page);
-    await expect(cards(page)).toHaveCount(3);
-    const song = cards(page).filter({ has: page.locator('[data-face="audio"]') });
-
-    // Onto the image after it, and closed there: the audio card wasn't
-    // the morph's end, and its sleeve is where it was.
-    await openAudioCard(page, song);
-    await expectPlayerSettled(page);
-    // The buttons, not the keys: focus may still be on its way back from
-    // the account menu.
-    const next = page.getByRole("button", { name: "Next pearl" });
-    const previous = page.getByRole("button", { name: "Previous pearl" });
-    await next.click();
-    await expect(page.getByRole("dialog", { name: "Shot C" })).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
-    await expectCardSleeveBack(song);
-
-    // Off and back, then closed: the sleeve travels back into its card.
-    await openAudioCard(page, song);
-    await expectPlayerSettled(page);
-    await previous.click();
-    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
-    await next.click();
-    await expect(page.getByRole("dialog", { name: "Song" })).toBeVisible();
-    await expectSlideSettled(page);
-    await page.keyboard.press("Escape");
-    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
-    await expectCardSleeveBack(song);
-  });
-
   test("an image row opens the viewer; Esc gives focus back to the row", async ({
     page,
     seed,
@@ -1137,12 +634,36 @@ test.describe("Media viewer", () => {
     await expect(openButton(page, "Shot A")).toBeFocused();
 
     // The audio card's Play plays in place: no viewer, no new entry.
-    const songCard = cards(page).filter({ has: openButton(page, "Song") });
+    const songCard = cards(page).filter({ has: page.locator('[data-face="audio"]') });
     await songCard.getByRole("button", { name: "Play Song" }).click();
     await expect(songCard.getByRole("button", { name: "Pause Song" })).toBeVisible();
     await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(new URL(page.url()).searchParams.has("pearl")).toBe(false);
     await context.close();
+  });
+
+  test("an audio pearl between two images is skipped by Next and Previous", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await seedAudioBetween(seed, baseURL!);
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(3);
+
+    await openButton(page, "Shot A").click();
+    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
+    await page.keyboard.press("ArrowRight");
+    // Past Song (it plays in place), onto Shot C: two pearls, not three.
+    await expect(page.getByRole("dialog", { name: "Shot C" })).toBeVisible();
+    await expect(viewerStatus(page)).toHaveText("2 of 2: Shot C");
+    await page.getByRole("dialog").hover();
+    await expect(page.getByRole("button", { name: "Next pearl" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Previous pearl" }).click();
+    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
+    await expect(viewerStatus(page)).toHaveText("1 of 2: Shot A");
+    await expect(page.getByRole("dialog", { name: "Song" })).toHaveCount(0);
   });
 
   test("arrows, keys and buttons move between pearls; Esc lands on the one shown", async ({
@@ -1381,21 +902,7 @@ test.describe("Media viewer", () => {
     await expect(page.locator("[data-pearl-morphing]")).toHaveCount(0, { timeout: 500 });
   });
 
-  test("on an audio pearl, the arrows stay clear of the player", async ({ page, seed, baseURL }) => {
-    await seedAudioBetween(seed, baseURL!);
-    await openHome(page);
-    await chooseGrid(page);
-    await expect(cards(page)).toHaveCount(3);
-
-    await openButton(page, "Shot A").click();
-    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
-    await page.keyboard.press("ArrowRight");
-    await page.getByRole("dialog").hover();
-    await expectSlideSettled(page);
-    await expectArrowsClearOfPlayer(page);
-  });
-
-  test("on a shared folder, → moves to the next media pearl, past page links", async ({
+  test("on a shared folder, → moves to the next image or video, past page links and audio", async ({
     browser,
     seed,
     testUser,
@@ -1414,9 +921,12 @@ test.describe("Media viewer", () => {
     await page.keyboard.press("ArrowRight");
     await expect(page.getByRole("dialog", { name: "Shot B" })).toBeVisible();
     await expect.poll(() => new URL(page.url()).searchParams.get("pearl")).toBe(shotB);
-    // Past the page link (Alpha), onto the audio pearl.
+    // Shot B is the last: past it are only a page link (Alpha) and an
+    // audio pearl (Song), which plays in place, so → stays.
+    await expect(viewerStatus(page)).toHaveText("2 of 2: Shot B");
     await page.keyboard.press("ArrowRight");
-    await expect(page.getByRole("dialog", { name: "Song" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Shot B" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Song" })).toHaveCount(0);
     await page.keyboard.press("Escape");
     await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
     await context.close();
@@ -1461,6 +971,22 @@ test.describe("Media viewer from the URL", () => {
     expect(new URL(page.url()).search).toBe("?ref=mail");
     await page.waitForLoadState("networkidle");
     await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
+  });
+
+  test("/home?pearl=<an audio pearl> opens nothing and drops the param, like an unknown one", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    const { song } = await seedAudioBetween(seed, baseURL!);
+    await page.goto(`/home?ref=mail&pearl=${song}`);
+    await waitForHydration(page, '[data-cy="link-item"], [data-cy="link-card"]');
+    await expect.poll(() => pearlInUrl(page)).toBeNull();
+    expect(new URL(page.url()).search).toBe("?ref=mail");
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.locator("[data-sonner-toast]")).toHaveCount(0);
   });
 
@@ -1682,14 +1208,5 @@ test.describe("Media viewer on phones", () => {
     expect(moved).toEqual(["Shot B"]);
     // Nothing is left raised for a morph once the close has settled.
     await expect(page.locator("[data-pearl-morphing]")).toHaveCount(0, { timeout: 500 });
-  });
-
-  test("on an audio pearl, the arrows stay clear of the player", async ({ page, seed, baseURL }) => {
-    await seedAudioBetween(seed, baseURL!);
-    await openHome(page);
-    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(3);
-
-    await openButton(page, "Song").tap();
-    await expectArrowsClearOfPlayer(page);
   });
 });

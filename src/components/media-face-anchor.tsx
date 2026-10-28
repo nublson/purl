@@ -47,15 +47,6 @@ export function pearlLayoutId(id: string): string {
 }
 
 /**
- * The `layoutId` of a part of an audio pearl's face that travels on its own
- * inside the morph (the sleeve, the words): the card's bar and the viewer's
- * player both draw it, so Motion carries it from one place to the other.
- */
-export function pearlPartLayoutId(id: string, part: "sleeve" | "words"): string {
-  return `${pearlLayoutId(id)}-${part}`;
-}
-
-/**
  * What the media viewer morphs out of and back into: a face's media box,
  * tagged with the pearl's `layoutId`. No `layout` prop: the face itself
  * never animates on its own; Motion hides it while the viewer is open and
