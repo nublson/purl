@@ -252,7 +252,7 @@ test.describe("Media pearls", () => {
     await expect(two.getByRole("button", { name: "Play Two" })).toBeVisible({ timeout: 5000 });
   });
 
-  test("a shared folder's grid shows the media; an audio card plays in place and opens nothing", async ({
+  test("a shared folder's grid shows the media; an audio card expands and plays in place", async ({
     browser,
     seed,
     testUser,
@@ -306,14 +306,30 @@ test.describe("Media pearls", () => {
     await expect(songCard.getByRole("button", { name: "Play Song" })).toBeVisible();
     expect(popups).toBe(0);
     expect(page.url()).toBe(url);
-    // A click on the bar away from its controls (its words) does nothing
-    // visible: an audio pearl never opens the media viewer.
+    // A click on the bar away from its controls (its words) expands it in
+    // place into the player: never the media viewer.
     await expect(songCard.locator('[data-face="audio"]')).toContainText("sounds.example");
     await clickAt(page, songCard.locator("[data-words]"));
-    await page.waitForTimeout(300);
+    // Settling at 189 is the wait: a dialog would have opened by then.
+    await expectOpen(songCard, "Song");
     await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(popups).toBe(0);
     expect(page.url()).toBe(url);
+    expect(page.url()).not.toContain("pearl");
+    // A visitor reaches the file from the opened transport: a real link.
+    const openFile = songCard.getByRole("link", { name: "Open file" });
+    await expect(openFile).toBeVisible();
+    await expect(openFile).toHaveAttribute("href", "https://sounds.example/song.mp3");
+    await expect(openFile).toHaveAttribute("target", "_blank");
+    // The transport's Play plays inline (the file fails here, so it comes
+    // back to Play; what matters is that nothing opened).
+    await songCard.getByRole("button", { name: "Play Song", exact: true }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(page.url()).not.toContain("pearl");
+    // Esc collapses it.
+    await page.keyboard.press("Escape");
+    await expectShut(songCard, "Song");
+    expect(popups).toBe(0);
     await context.close();
   });
 
@@ -431,8 +447,10 @@ test.describe("Audio pearls: the now-playing bar", () => {
     await openHome(page);
 
     await row(page, "Song").hover();
-    const preview = page.locator('[data-face="audio"]');
+    const preview = page.locator('[data-slot="hover-card-content"] [data-face="audio"]');
     await expect(preview).toBeVisible();
+    // The preview's bar doesn't expand: no opener.
+    await expect(preview.locator("[data-expand]")).toHaveCount(0);
     // The same bar: the full second line, the sleeve is the play control.
     expect(await secondLine(preview)).toBe("Audio · 2:36");
     const previewPlay = preview.getByRole("button", { name: "Play Song" });
@@ -878,6 +896,120 @@ test.describe("Audio pearls: the bar expands in place", () => {
     await page.keyboard.press("Enter");
     await expectOpen(sun, "Sun");
     // Into the transport, then Esc: shut, focus back on the opener.
+    await sun.getByRole("button", { name: "Play Sun", exact: true }).focus();
+    await page.keyboard.press("Escape");
+    await expectShut(sun, "Sun");
+    await expect(sun.getByRole("button", { name: "Expand Sun" })).toBeFocused();
+  });
+});
+
+test.describe("Audio pearls in the list: the row is the bar", () => {
+  test.beforeEach(async ({ page, seed }) => {
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
+    // Newest first: Alpha, Sun, then Bravo under it.
+    await seed.link({ url: "https://bravo.example", title: "Bravo" });
+    await seed.link({
+      url: "https://sounds.example/sun.wav",
+      title: "Sun",
+      contentType: "AUDIO",
+      duration: 10,
+    });
+    await seed.link({ url: "https://alpha.example", title: "Alpha" });
+  });
+
+  test("an audio row is the bar at the list's width; it expands in place and the rows below follow", async ({
+    page,
+  }) => {
+    await openHome(page);
+    const sun = row(page, "Sun");
+    const alpha = row(page, "Alpha");
+    const bravo = row(page, "Bravo");
+    await expect(bar(sun)).toBeVisible();
+    // The bar is the row: 78px, the row's width.
+    const sunBox = (await sun.boundingBox())!;
+    expect(Math.abs(sunBox.height - 78)).toBeLessThanOrEqual(1);
+    const barBox = (await bar(sun).boundingBox())!;
+    expect(Math.abs(barBox.width - sunBox.width)).toBeLessThanOrEqual(1);
+    expect(Math.abs(barBox.width - (await alpha.boundingBox())!.width)).toBeLessThanOrEqual(1);
+    await expectShut(sun, "Sun");
+    // No favicon column: its sleeve is the picture.
+    await expect(sun.locator('[data-cy="row-favicon"]')).toHaveCount(0);
+
+    const bravoTop = (await bravo.boundingBox())!.y;
+    await clickAt(page, sun.locator("[data-words]"));
+    await expectOpen(sun, "Sun");
+    expect(Math.abs((await sun.boundingBox())!.height - 189)).toBeLessThanOrEqual(2);
+    // The row below moved down by the growth.
+    expect(Math.abs((await bravo.boundingBox())!.y - bravoTop - 111)).toBeLessThanOrEqual(3);
+    // An expanded bar has no hover preview beside it.
+    await expect(page.locator('[data-slot="hover-card-content"]')).toHaveCount(0);
+
+    // It plays inline from the transport; nothing opens.
+    await sun.getByRole("button", { name: "Play Sun", exact: true }).click();
+    await expect(sun.getByRole("button", { name: "Pause Sun", exact: true })).toBeVisible();
+    await expect(sun.getByRole("link", { name: "Open file" })).toBeVisible();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(page.url()).not.toContain("pearl");
+
+    await page.keyboard.press("Escape");
+    await expectShut(sun, "Sun");
+    await expect.poll(async () => (await bravo.boundingBox())!.y).toBeCloseTo(bravoTop, 0);
+  });
+
+  test("the row's checkbox and menu work as on other rows", async ({ page }) => {
+    await openHome(page);
+    const sun = row(page, "Sun");
+    const checkbox = sun.getByRole("checkbox", { name: "Select Sun" });
+    // On hover, in the sleeve's corner; at rest, hidden.
+    await expect(checkbox).toHaveCSS("opacity", "0");
+    await sun.hover();
+    await expect(checkbox).toHaveCSS("opacity", "1");
+    await checkbox.click();
+    await expect(checkbox).toBeChecked();
+    await expect(sun).toHaveAttribute("data-selected", "true");
+    // While selecting, a click on the bar toggles the row; it doesn't open.
+    await clickAt(page, sun.locator("[data-words]"));
+    await expect(checkbox).not.toBeChecked();
+    await expect(expandButton(sun)).toHaveAttribute("aria-expanded", "false");
+
+    // The menu, in the bar's menu slot: on hover.
+    await sun.hover();
+    const menuButton = sun.getByRole("button", { name: "Open link menu" });
+    await expect(menuButton).toBeVisible();
+    expect(await insideBox(menuButton, bar(sun))).toBe(true);
+    await menuButton.click();
+    await expect(page.getByRole("menuitem", { name: "Open file" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(expandButton(sun)).toHaveAttribute("aria-expanded", "false");
+  });
+
+  test("by keyboard: Tab reaches its opener, which previews; Enter expands; Esc back to it", async ({
+    page,
+    browserName,
+  }) => {
+    // WebKit's Tab skips buttons; Option-Tab doesn't.
+    const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
+    await openHome(page);
+    const sun = row(page, "Sun");
+    const opener = sun.getByRole("button", { name: "Expand Sun" });
+    await page.getByRole("link", { name: "Alpha (opens in new tab)" }).focus();
+    for (let i = 0; i < 6; i++) {
+      if (await opener.evaluate((el) => el === document.activeElement)) break;
+      await page.keyboard.press(tab);
+    }
+    await expect(opener).toBeFocused();
+    // Keyboard focus opens the hover preview, as on other rows; its bar
+    // doesn't expand.
+    const preview = page.locator('[data-slot="hover-card-content"]');
+    await expect(preview.locator('[data-face="audio"]')).toBeVisible();
+    await expect(preview.locator("[data-expand]")).toHaveCount(0);
+
+    await page.keyboard.press("Enter");
+    await expectOpen(sun, "Sun");
+    await expect(preview).toHaveCount(0);
     await sun.getByRole("button", { name: "Play Sun", exact: true }).focus();
     await page.keyboard.press("Escape");
     await expectShut(sun, "Sun");

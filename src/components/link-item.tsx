@@ -13,6 +13,7 @@ import {
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
 import { haptic } from "@/lib/haptics";
 import { useAudioView } from "@/hooks/use-audio-player";
+import { audioExpansion, useAudioExpanded } from "@/lib/audio-expansion";
 import { isViewerKind, linkKind } from "@/lib/link-kind";
 import {
   consumeReturningFocus,
@@ -25,6 +26,7 @@ import { linkSecondLine } from "@/lib/upload-meta";
 import { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
+import { AudioBar } from "./audio-bar";
 import {
   FolderBadge,
   FolderLinkButton,
@@ -106,14 +108,17 @@ export const LinkItem = React.forwardRef<
   // An image or video pearl opens the media viewer (its row's icon is what
   // the viewer morphs out of); a page opens in a new tab. The landing demo
   // has no viewer: its rows are links. An audio pearl never opens the
-  // viewer: its row opens nothing for now, and plays from its hover
-  // preview's bar.
+  // viewer: its row is its now-playing bar, which expands in place into
+  // the player (the demo's too, without the owner's checkbox and menu).
   const kind = linkKind(link);
-  const audio = !demo && kind === "audio";
+  const audio = kind === "audio";
   const media = !demo && isViewerKind(kind);
   // An audio pearl's row is a view of its playback: what its hover preview
   // starts plays on once the preview closes, until the row leaves.
-  useAudioView(kind === "audio" ? link.id : null);
+  useAudioView(audio ? link.id : null);
+  // Expanded in place, the bar is the player: no preview beside it.
+  const barOpen = useAudioExpanded(link.id).open;
+  const [menuOpen, setMenuOpen] = React.useState(false);
   const viewerOpen = useIsMediaOpen(link.id);
   const longPressRef = React.useRef<{
     timer: ReturnType<typeof setTimeout>;
@@ -169,10 +174,12 @@ export const LinkItem = React.forwardRef<
       if (linkSelection.selectedIds().length > 0) return;
       // Nor over the media viewer this row (or another) just opened.
       if (mediaViewer.getSnapshot().currentId !== null) return;
+      // Nor beside this row's bar expanded into the player.
+      if (audioExpansion.getSnapshot() === link.id) return;
       openedByPointerRef.current = true;
       setPreviewOpen(true);
     }, previewOpenDelay());
-  }, [clearCloseTimer, clearOpenTimer]);
+  }, [clearCloseTimer, clearOpenTimer, link.id]);
 
   const scheduleClose = React.useCallback(() => {
     clearOpenTimer();
@@ -190,11 +197,11 @@ export const LinkItem = React.forwardRef<
     };
   }, [clearCloseTimer, clearOpenTimer]);
 
-  // Entering selection mode, or opening this pearl in the media viewer,
-  // closes an open preview.
+  // Entering selection mode, opening this pearl in the media viewer, or
+  // expanding its bar into the player closes an open preview.
   React.useEffect(() => {
-    if (selecting || viewerOpen) setPreviewOpen(false);
-  }, [selecting, viewerOpen]);
+    if (selecting || viewerOpen || barOpen) setPreviewOpen(false);
+  }, [selecting, viewerOpen, barOpen]);
 
   const cancelLongPress = React.useCallback(() => {
     if (longPressRef.current) clearTimeout(longPressRef.current.timer);
@@ -232,6 +239,7 @@ export const LinkItem = React.forwardRef<
   const openPreviewOnFocus = (event: React.FocusEvent<HTMLElement>) => {
     if (consumeReturningFocus()) return;
     if (!event.currentTarget.matches(":focus-visible")) return;
+    if (audioExpansion.getSnapshot() === link.id) return;
     clearCloseTimer();
     openedByPointerRef.current = false;
     setPreviewOpen(true);
@@ -248,7 +256,205 @@ export const LinkItem = React.forwardRef<
     <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
   );
 
-  const content = (
+  // The row's own handlers (an audio row's bar takes them too): a
+  // long-press selects on touch; a mouse or pen previews.
+  const hostHandlers = {
+    onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
+      if (demo || event.pointerType !== "touch") return;
+      // A press on the row's actions, or inside a portal (the open menu,
+      // whose React events bubble through here), isn't a long-press on
+      // the row: opening the menu takes the lift away from the row, so
+      // the press would select it behind the menu. Nor is a press on an
+      // audio row's menu or track (`data-card-menu`).
+      const target = event.target as Element;
+      if (
+        !event.currentTarget.contains(target) ||
+        target.closest("[data-row-actions], [data-card-menu]")
+      ) {
+        return;
+      }
+      cancelLongPress();
+      longPressedRef.current = false;
+      longPressRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+        timer: setTimeout(() => {
+          longPressRef.current = null;
+          longPressedRef.current = true;
+          linkSelection.toggle(link.id);
+          haptic("selection");
+        }, LONG_PRESS_MS),
+      };
+    },
+    onPointerMove: (event: React.PointerEvent<HTMLDivElement>) => {
+      const press = longPressRef.current;
+      if (
+        press &&
+        Math.hypot(event.clientX - press.x, event.clientY - press.y) >
+          LONG_PRESS_SLOP
+      ) {
+        cancelLongPress();
+      }
+    },
+    onPointerUp: cancelLongPress,
+    onPointerCancel: cancelLongPress,
+    onContextMenu: (event: React.MouseEvent<HTMLDivElement>) => {
+      // The long-press selected the row; no browser menu on top of it.
+      if (longPressedRef.current) event.preventDefault();
+    },
+    // Previews follow a real mouse only. A tap sends iOS Safari's
+    // emulated mouseover first, and it holds the tap's click until any
+    // short timer started then has run (it waits to see whether the page
+    // reacts to the "hover"): the preview's timers delayed every row tap
+    // by up to their 400ms. Pointer events report the actual pointer, so
+    // touch is skipped while a mouse or a hovering pen still previews.
+    onPointerEnter: (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType === "touch") return;
+      hoveringActionsRef.current = false;
+      scheduleOpen();
+    },
+    onPointerLeave: (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType === "touch") return;
+      hoveringActionsRef.current = false;
+      scheduleClose();
+    },
+  };
+
+  // A long-press selected the row: true once, for the click that follows.
+  const consumeLongPress = () => {
+    if (!longPressedRef.current) return false;
+    longPressedRef.current = false;
+    return true;
+  };
+
+  // An audio row is its now-playing bar at the list's width (78px), which
+  // expands in place into the player; the rows below flow down with it.
+  // The row's conventions ride on the bar: the checkbox in the sleeve's
+  // corner on hover and in its place while selecting, the `⋯` in the bar's
+  // menu slot, the folder badge on the sleeve, a long-press to select, and
+  // the hover preview (by pointer, or keyboard focus on the bar's opener).
+  const audioContent = audio ? (
+    <Item
+      ref={ref}
+      data-cy="link-item"
+      data-selected={selected || undefined}
+      className={cn(
+        // The bar's own surface, a card's: rounded (important: the list
+        // squares the corners neighbouring selected rows share), and its
+        // hairline drawn over it, inset, since the list clips each row to
+        // its box. `--audio-swell`: the close's dip takes the whole row.
+        "relative my-1 block w-full overflow-hidden rounded-lg! border-0 bg-card p-0 transition-none [transform:var(--audio-swell)]",
+        "after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:ring-1 after:ring-foreground/10 after:ring-inset after:transition-[box-shadow] after:duration-150 after:ease-out [@media(hover:hover)]:hover:after:ring-foreground/25",
+        // Touch: a long-press selects the row, so no text selection.
+        "[@media(pointer:coarse)]:select-none",
+        selected &&
+          "after:ring-2 after:ring-primary [@media(hover:hover)]:hover:after:ring-primary",
+        arriving && ARRIVE,
+        (deletePhase === "fading" || leaving) &&
+          "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
+        deletePhase === "restoring" &&
+          "animate-in fade-in-0 slide-in-from-left-2 duration-200 ease-out-strong motion-reduce:[--tw-enter-translate-x:0]",
+        className,
+      )}
+      {...hostHandlers}
+      {...rest}
+    >
+      {/* A plain surface under the bar: while selecting, a click on it
+          toggles the row (the bar's controls, its opener included, step
+          aside then). The row's focus anchor is the bar's opener. */}
+      <div
+        aria-hidden
+        className={cn(
+          "absolute inset-0 z-0 rounded-[inherit]",
+          selecting && "cursor-pointer",
+        )}
+        onClick={(event) => {
+          if (consumeLongPress()) return;
+          if (selecting) linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+        }}
+      />
+      {link.description ? (
+        <span id={descriptionId} className="sr-only">
+          {link.description}
+        </span>
+      ) : null}
+      {/* The bar is a picture of the row, but for its own controls. */}
+      <div className="pointer-events-none">
+        <AudioBar
+          link={link}
+          badge={
+            folderTag ? (
+              <FolderBadge
+                key={folderTag.id}
+                folder={folderTag}
+                inCard
+                arrive={badgeArrives || arriving}
+              />
+            ) : null
+          }
+          describedBy={describedBy}
+          expandRef={setAnchor}
+          onExpandFocus={openPreviewOnFocus}
+          onExpandBlur={closePreviewOnBlur}
+          owner={
+            demo
+              ? undefined
+              : {
+                  selected,
+                  onToggleSelect: ({ shiftKey }) => {
+                    if (consumeLongPress()) return;
+                    linkSelection.toggle(link.id, { shiftKey });
+                  },
+                  onTapSelect: tapToSelect,
+                  consumeLongPress,
+                  menu: (
+                    // Shown like a row's: on hover or keyboard focus with a
+                    // pointer, always on touch, and while open; hidden (and
+                    // inert) while selecting. No preview over it.
+                    <div
+                      inert={selecting}
+                      data-card-menu
+                      className={cn(
+                        "flex transition-opacity duration-150 ease-out-strong",
+                        selecting
+                          ? "invisible opacity-0"
+                          : menuOpen
+                            ? "opacity-100"
+                            : "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100",
+                      )}
+                      onPointerEnter={(event) => {
+                        if (event.pointerType === "touch") return;
+                        hoveringActionsRef.current = true;
+                        clearOpenTimer();
+                        clearCloseTimer();
+                      }}
+                      onPointerLeave={(event) => {
+                        if (event.pointerType === "touch") return;
+                        hoveringActionsRef.current = false;
+                        scheduleOpen();
+                      }}
+                    >
+                      <LinkMenu
+                        link={link}
+                        onDelete={deleteRow}
+                        onOpenChange={setMenuOpen}
+                      />
+                    </div>
+                  ),
+                }
+          }
+        />
+      </div>
+      {folderTag ? <FolderTagLabel id={folderLabelId} folder={folderTag} /> : null}
+      {/* While selecting, a tap anywhere on the row toggles it, with a
+          tick (touch); also where a long-press's lift lands. */}
+      {selecting ? (
+        <HapticTarget className="z-[5]" onTap={tapToSelect} />
+      ) : null}
+    </Item>
+  ) : null;
+
+  const content = audioContent ?? (
     <Item
       ref={ref}
       data-cy="link-item"
@@ -273,83 +479,10 @@ export const LinkItem = React.forwardRef<
           "animate-in fade-in-0 slide-in-from-left-2 duration-200 ease-out-strong motion-reduce:[--tw-enter-translate-x:0]",
         className,
       )}
-      onPointerDown={(event) => {
-        if (demo || event.pointerType !== "touch") return;
-        // A press on the row's actions, or inside a portal (the open menu,
-        // whose React events bubble through here), isn't a long-press on
-        // the row: opening the menu takes the lift away from the row, so
-        // the press would select it behind the menu.
-        const target = event.target as Element;
-        if (
-          !event.currentTarget.contains(target) ||
-          target.closest("[data-row-actions]")
-        ) {
-          return;
-        }
-        cancelLongPress();
-        longPressedRef.current = false;
-        longPressRef.current = {
-          x: event.clientX,
-          y: event.clientY,
-          timer: setTimeout(() => {
-            longPressRef.current = null;
-            longPressedRef.current = true;
-            linkSelection.toggle(link.id);
-            haptic("selection");
-          }, LONG_PRESS_MS),
-        };
-      }}
-      onPointerMove={(event) => {
-        const press = longPressRef.current;
-        if (
-          press &&
-          Math.hypot(event.clientX - press.x, event.clientY - press.y) >
-            LONG_PRESS_SLOP
-        ) {
-          cancelLongPress();
-        }
-      }}
-      onPointerUp={cancelLongPress}
-      onPointerCancel={cancelLongPress}
-      onContextMenu={(event) => {
-        // The long-press selected the row; no browser menu on top of it.
-        if (longPressedRef.current) event.preventDefault();
-      }}
-      // Previews follow a real mouse only. A tap sends iOS Safari's
-      // emulated mouseover first, and it holds the tap's click until any
-      // short timer started then has run (it waits to see whether the page
-      // reacts to the "hover"): the preview's timers delayed every row tap
-      // by up to their 400ms. Pointer events report the actual pointer, so
-      // touch is skipped while a mouse or a hovering pen still previews.
-      onPointerEnter={(event) => {
-        if (event.pointerType === "touch") return;
-        hoveringActionsRef.current = false;
-        scheduleOpen();
-      }}
-      onPointerLeave={(event) => {
-        if (event.pointerType === "touch") return;
-        hoveringActionsRef.current = false;
-        scheduleClose();
-      }}
+      {...hostHandlers}
       {...rest}
     >
-      {audio ? (
-        // A plain surface under the row's controls: while selecting, a
-        // click on it toggles the row; otherwise it opens nothing (the
-        // hover preview's bar plays the pearl).
-        <div
-          ref={setAnchor}
-          aria-hidden
-          className={cn(OPENER_CLASS, selecting && "cursor-pointer")}
-          onClick={(event) => {
-            if (longPressedRef.current) {
-              longPressedRef.current = false;
-              return;
-            }
-            if (selecting) linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-          }}
-        />
-      ) : media ? (
+      {media ? (
         <MediaOpenButton
           ref={setAnchor}
           link={link}

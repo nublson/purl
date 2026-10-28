@@ -89,7 +89,10 @@ export const AUDIO_BAR = {
   rail: RAIL_H,
 } as const;
 
-/** The owner's card: its checkbox on the sleeve, its menu after the words. */
+/**
+ * The owner's card or row: its checkbox on the sleeve, its menu after the
+ * words. The checkbox shows on its host's hover (`group/card`, `group/item`).
+ */
 export type AudioBarOwner = {
   selected: boolean;
   /** The checkbox's click (mouse, keyboard): toggles, no haptic. */
@@ -161,16 +164,17 @@ const SIDE_BUTTON =
  * over. Esc, or a press outside its card, closes it; one bar is open at a
  * time (`audioExpansion`). Its height is its card's, so the masonry grid
  * follows it (`data-masonry-grow`: the cards below move down, none changes
- * column). Reduced motion: it jumps, and the late parts fade (150ms).
+ * column); in a list it is the row, and the rows below flow down with it.
+ * Reduced motion: it jumps, and the late parts fade (150ms).
  * `expandable={false}` (the hover preview) keeps it a bar.
  *
  * It's a view of the page's one player (`useAudioPlayer`), like the hover
  * preview's bar and the list's row, so they all show one playback; opening
  * never changes playback. An audio pearl never opens the media viewer.
  *
- * The controls take pointer events inside the owner's card (whose content
- * doesn't), except while selecting, when they step aside (`inert`) and a
- * click anywhere selects the card.
+ * The controls take pointer events inside the owner's card or row (whose
+ * content doesn't), except while selecting, when they step aside (`inert`)
+ * and a click anywhere selects the card or row.
  *
  * The root is a size container, so it's a stacking context: its layers
  * (the opener 0, track 1, menu 2, play 3, badge 4, checkbox 10) stack
@@ -185,6 +189,7 @@ export function AudioBar({
   expandable = true,
   expandRef,
   onExpandFocus,
+  onExpandBlur,
 }: {
   link: Link;
   /** The owner's card only: the checkbox in the sleeve's corner, the menu slot. */
@@ -198,6 +203,8 @@ export function AudioBar({
   expandRef?: (el: HTMLButtonElement | null) => void;
   /** Focus on the opener (a row opens its preview for keyboard users). */
   onExpandFocus?: (event: FocusEvent<HTMLButtonElement>) => void;
+  /** Focus leaves the opener (a row closes that preview). */
+  onExpandBlur?: (event: FocusEvent<HTMLButtonElement>) => void;
 }) {
   const { playing, elapsed, length: playLength, toggle, restart } = useAudioPlayer(
     link.id,
@@ -396,6 +403,7 @@ export function AudioBar({
             borderRadius: mix(CARD_RADIUS, ART.r[1], p),
           }}
           onFocus={onExpandFocus}
+          onBlur={onExpandBlur}
           onClick={(event) => {
             keepClick(event);
             if (owner?.consumeLongPress()) return;
@@ -474,9 +482,10 @@ export function AudioBar({
                     ? // In the sleeve's place (centred), a 40px hit area.
                       "pointer-events-auto inset-0 m-auto opacity-100 after:-inset-3"
                     : // In the sleeve's corner, like an image card's: shown
-                      // on hover with a pointer (the sleeve stays play) or
-                      // keyboard focus; at rest it takes no taps.
-                      "pointer-events-none -top-0.5 -left-0.5 opacity-0 shadow-sm after:-inset-1 motion-safe:scale-125 focus-visible:opacity-100 motion-safe:focus-visible:scale-100 [@media(hover:hover)]:group-hover/card:pointer-events-auto [@media(hover:hover)]:group-hover/card:opacity-100 motion-safe:[@media(hover:hover)]:group-hover/card:scale-100",
+                      // on its card's or row's hover with a pointer (the
+                      // sleeve stays play) or keyboard focus; at rest it
+                      // takes no taps.
+                      "pointer-events-none -top-0.5 -left-0.5 opacity-0 shadow-sm after:-inset-1 motion-safe:scale-125 focus-visible:opacity-100 motion-safe:focus-visible:scale-100 [@media(hover:hover)]:group-hover/card:pointer-events-auto [@media(hover:hover)]:group-hover/card:opacity-100 motion-safe:[@media(hover:hover)]:group-hover/card:scale-100 [@media(hover:hover)]:group-hover/item:pointer-events-auto [@media(hover:hover)]:group-hover/item:opacity-100 motion-safe:[@media(hover:hover)]:group-hover/item:scale-100",
                 )}
                 onClick={(event) => {
                   event.preventDefault();

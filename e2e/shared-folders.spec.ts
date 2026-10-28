@@ -102,6 +102,58 @@ test.describe("Shared folders, visited signed out", () => {
     await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
   });
 
+  test("the list view's audio row is the bar: a Tab stop that expands in place, read-only", async ({
+    page,
+    seed,
+    testUser,
+    browserName,
+  }) => {
+    await page.context().route("https://sounds.example/**", (route) => route.abort());
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    await seed.link({
+      url: "https://sounds.example/song.mp3",
+      title: "Song",
+      contentType: "AUDIO",
+      duration: 65,
+      folderId: design,
+    });
+    await seed.link({ url: "https://alpha.example", title: "Alpha article", folderId: design });
+    await page.goto(`/@${testUser.username}/design`);
+    await waitForHydration(page, 'button[aria-label="Grid view"]');
+    await expect(page.getByRole("button", { name: "List view" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    const song = page.locator('[data-cy="link-item"]').filter({ hasText: "Song" });
+    await expect(song.locator('[data-face="audio"]')).toBeVisible();
+    expect(Math.abs((await song.boundingBox())!.height - 78)).toBeLessThanOrEqual(1);
+    // Read-only: no checkbox, no menu.
+    await expect(song.getByRole("checkbox")).toHaveCount(0);
+    await expect(song.getByRole("button", { name: "Open link menu" })).toHaveCount(0);
+
+    // Tab from the row above reaches its opener.
+    const opener = song.getByRole("button", { name: "Expand Song" });
+    await page.getByRole("link", { name: "Alpha article (opens in new tab)" }).focus();
+    // WebKit's Tab skips buttons; Option-Tab doesn't.
+    await page.keyboard.press(browserName === "webkit" ? "Alt+Tab" : "Tab");
+    await expect(opener).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(song.locator("[data-expand]")).toHaveAttribute("aria-expanded", "true");
+    await expect
+      .poll(() => song.locator('[data-face="audio"]').evaluate((el: HTMLElement) => el.offsetHeight))
+      .toBe(189);
+    await expect(song.getByRole("link", { name: "Open file" })).toHaveAttribute(
+      "href",
+      "https://sounds.example/song.mp3",
+    );
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(page.url()).not.toContain("pearl");
+    await page.keyboard.press("Escape");
+    await expect(song.locator("[data-expand]")).toHaveAttribute("aria-expanded", "false");
+    await expect(song.getByRole("button", { name: "Expand Song" })).toBeFocused();
+  });
+
   test("the grid has 2 columns on phones and 3 on small tablets, every card on screen", async ({
     page,
     seed,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useAudioView } from "@/hooks/use-audio-player";
+import { audioExpansion, useAudioExpanded } from "@/lib/audio-expansion";
 import { isViewerKind, linkKind } from "@/lib/link-kind";
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
 import {
@@ -12,6 +13,7 @@ import { linkSecondLine } from "@/lib/upload-meta";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
 import * as React from "react";
+import { AudioBar } from "./audio-bar";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
 import { MediaAnchor, ROW_ICON_RADIUS } from "./media-face-anchor";
@@ -25,7 +27,8 @@ import { Item, ItemContent, ItemMedia, ItemTitle } from "./ui/item";
  * looks exactly like the owner's. PDFs get no preview: their thumbnail
  * goes through the signed-in PDF proxy. An image or video pearl opens the
  * media viewer, morphing out of its icon; a page opens a tab; an audio
- * pearl opens nothing for now, and plays from its hover preview's bar.
+ * pearl's row is its now-playing bar (read-only), which expands in place
+ * into the player.
  */
 export function SharedLinkItem({
   link,
@@ -45,9 +48,12 @@ export function SharedLinkItem({
   const hasPreview = link.contentType !== "PDF";
   const kind = linkKind(link);
   const media = isViewerKind(kind);
+  const audio = kind === "audio";
   // An audio pearl's row is a view of its playback: what its hover preview
   // starts plays on once the preview closes, until the row leaves.
-  useAudioView(kind === "audio" ? link.id : null);
+  useAudioView(audio ? link.id : null);
+  // Expanded in place, the bar is the player: no preview beside it.
+  const barOpen = useAudioExpanded(link.id).open;
   const viewerOpen = useIsMediaOpen(link.id);
 
   const clearTimers = React.useCallback(() => {
@@ -63,6 +69,8 @@ export function SharedLinkItem({
     openTimerRef.current = setTimeout(() => {
       // Not over the media viewer this row (or another) just opened.
       if (mediaViewer.getSnapshot().currentId !== null) return;
+      // Nor beside this row's bar expanded into the player.
+      if (audioExpansion.getSnapshot() === link.id) return;
       openedByPointerRef.current = true;
       setPreviewOpen(true);
     }, previewOpenDelay());
@@ -74,16 +82,18 @@ export function SharedLinkItem({
     }, 100);
   };
 
-  // Opening this pearl in the media viewer closes its preview.
+  // Opening this pearl in the media viewer, or expanding its bar into the
+  // player, closes its preview.
   React.useEffect(() => {
-    if (viewerOpen) setPreviewOpen(false);
-  }, [viewerOpen]);
+    if (viewerOpen || barOpen) setPreviewOpen(false);
+  }, [viewerOpen, barOpen]);
 
   // Keyboard users get the same preview mouse users get on hover; not when
   // the media viewer hands focus back on close (its icon is morphing back).
   const openPreviewOnFocus = (event: React.FocusEvent<HTMLElement>) => {
     if (consumeReturningFocus()) return;
     if (!hasPreview || !event.currentTarget.matches(":focus-visible")) return;
+    if (audioExpansion.getSnapshot() === link.id) return;
     clearTimers();
     openedByPointerRef.current = false;
     setPreviewOpen(true);
@@ -104,24 +114,46 @@ export function SharedLinkItem({
     });
   }, [previewOpen]);
 
-  const row = (
+  // Not on touch: iOS holds a tap's click while timers started by its
+  // emulated mouseover run (see `LinkItem`). A mouse or pen previews.
+  const hoverHandlers = {
+    onPointerEnter: (event: React.PointerEvent<HTMLDivElement>) => {
+      if (hasPreview && event.pointerType !== "touch") scheduleOpen();
+    },
+    onPointerLeave: (event: React.PointerEvent<HTMLDivElement>) => {
+      if (hasPreview && event.pointerType !== "touch") scheduleClose();
+    },
+  };
+
+  // An audio row is its bar at the list's width (78px), read-only, which
+  // expands in place (the owner's row's look, without its checkbox and
+  // menu); its opener is the row's Tab stop and opens the preview on focus.
+  const row = audio ? (
+    <Item
+      data-cy="link-item"
+      className="relative my-1 block w-full overflow-hidden rounded-lg border-0 bg-card p-0 transition-none [transform:var(--audio-swell)] after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:ring-1 after:ring-foreground/10 after:ring-inset after:transition-[box-shadow] after:duration-150 after:ease-out [@media(hover:hover)]:hover:after:ring-foreground/25"
+      {...hoverHandlers}
+    >
+      {link.description ? (
+        <span id={descriptionId} className="sr-only">
+          {link.description}
+        </span>
+      ) : null}
+      <AudioBar
+        link={link}
+        describedBy={describedBy}
+        onExpandFocus={openPreviewOnFocus}
+        onExpandBlur={closePreviewOnBlur}
+      />
+    </Item>
+  ) : (
     <Item
       data-cy="link-item"
       // min-h-12: the owner's row gets its 48px from the menu button.
       className="relative grid min-h-12 w-full grid-cols-[20px_1fr] gap-4 border-0 p-2 transition-none hover:bg-accent/40 max-md:min-h-14 max-md:grid-cols-[24px_1fr] max-md:py-3"
-      // Not on touch: iOS holds a tap's click while timers started by its
-      // emulated mouseover run (see `LinkItem`). A mouse or pen previews.
-      onPointerEnter={(event) => {
-        if (hasPreview && event.pointerType !== "touch") scheduleOpen();
-      }}
-      onPointerLeave={(event) => {
-        if (hasPreview && event.pointerType !== "touch") scheduleClose();
-      }}
+      {...hoverHandlers}
     >
-      {kind === "audio" ? (
-        // A plain surface: an audio pearl never opens the media viewer.
-        <div aria-hidden className={openerClass} />
-      ) : media ? (
+      {media ? (
         <MediaOpenButton
           link={link}
           preset="snappy"

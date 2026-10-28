@@ -82,8 +82,8 @@ export function LinkCard({
   const [menuOpen, setMenuOpen] = React.useState(false);
   // The card's opener: a link to the page, or for an image or video pearl
   // the button that opens the media viewer (the demo has no viewer: its
-  // cards are links). An audio pearl's card (outside the demo) has no
-  // opener: its bar plays in place, and never opens the viewer.
+  // cards are links). An audio pearl's card (the demo's too) has no
+  // opener: its bar plays and expands in place, and never opens the viewer.
   const kind = linkKind(link);
   const audio = kind === "audio";
   const media = !demo && isViewerKind(kind);
@@ -184,7 +184,7 @@ export function LinkCard({
         longPress.onPointerDown(event);
       }}
     >
-      {audio && !demo ? (
+      {audio ? (
         // A plain surface under the bar: while selecting, a click on it
         // toggles the card (the bar's controls, its opener included, step
         // aside then). The card's focus anchor is the bar's opener.
