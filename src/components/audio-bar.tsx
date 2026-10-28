@@ -77,16 +77,14 @@ const WORDS_GAP = 10;
 const CARD_RADIUS = 10;
 
 /**
- * The bar's measures, in px. One margin (`pad`) all round, so nothing
- * slides inward when the bar opens into the player (`open` tall).
+ * The bar's measures its hosts read, in px: the margin (one, all round, so
+ * nothing slides inward when the bar opens) and the shut sleeve's size and
+ * corner (the card's menu backing, the pending upload's sleeve).
  */
 export const AUDIO_BAR = {
   pad: PAD,
-  height: SHUT,
-  open: OPEN,
   sleeve: ART.s[0],
   sleeveRadius: ART.r[0],
-  rail: RAIL_H,
 } as const;
 
 /**
@@ -190,7 +188,6 @@ const SIDE_BUTTON =
  * time (`audioExpansion`). Its height is its card's, so the masonry grid
  * follows it (`data-masonry-grow`: the cards below move down, none changes
  * column). Reduced motion: it jumps, and the late parts fade (150ms).
- * `expandable={false}` keeps it a bar.
  *
  * It's a view of the page's one player (`useAudioPlayer`), like the hover
  * preview's player card and the list's audio row, so they all show one playback;
@@ -211,7 +208,6 @@ export function AudioBar({
   owner,
   badge,
   describedBy,
-  expandable = true,
   expandRef,
 }: {
   link: Link;
@@ -220,8 +216,6 @@ export function AudioBar({
   /** The folder badge, on the sleeve's bottom-end corner. */
   badge?: ReactNode;
   describedBy?: string;
-  /** False: a bar only: no opener, no tween. */
-  expandable?: boolean;
   /** The opener (`data-expand`): the card's focus anchor. */
   expandRef?: (el: HTMLButtonElement | null) => void;
 }) {
@@ -229,7 +223,7 @@ export function AudioBar({
   const reducedMotion = usePrefersReducedMotion();
   const selecting = useIsSelectionActive();
   const expansion = useAudioExpanded(link.id);
-  const open = expandable && expansion.open;
+  const open = expansion.open;
   const closeExpansion = expansion.close;
   const src = safeRemoteImgSrc(link.url);
   const swapOut = owner ? sleeveSwapOut(selecting) : undefined;
@@ -274,7 +268,10 @@ export function AudioBar({
      problem: most of it simply stops existing, so the dip
      gives it a gather to go with it — subtractive, working
      WITH the shrink rather than against it. */
-  const u = useTween(open ? 1 : 0, MORPH_MS, reducedMotion, FLAT);
+  /* It runs on the close alone: opening jumps it to 1 (nothing to
+     draw: `zoom` is 1 while open), so a close always swells from
+     1 to 0, its start included. */
+  const u = useTween(open ? 1 : 0, MORPH_MS, reducedMotion || open, FLAT);
   const swell = Math.sin(Math.PI * clamp(u, 0, 1) ** 1.5);
   const zoom = open || reducedMotion ? 1 : 1 - 0.035 * swell;
 
@@ -319,38 +316,69 @@ export function AudioBar({
     link.upload && link.duration != null ? formatDuration(link.duration) : null;
 
   // Gone (deleted, filtered out, the page left): it doesn't stay open.
-  useEffect(() => {
-    if (!expandable) return;
-    return () => closeExpansion();
-  }, [expandable, closeExpansion]);
+  useEffect(() => () => closeExpansion(), [closeExpansion]);
 
   /* ── outside closes it ───────────────────────────────────
      Only while it is open, and only for a press that started
-     outside its card. `pointerdown` rather than click: a press
-     that begins outside and drifts in is still somebody
-     reaching past this player, and waiting for the click lets
-     it land on whatever is underneath first. A press its card
-     saw in React's tree is inside: the card's menu is a portal,
-     outside the card in the DOM (`markAudioHostPress`). */
+     outside its card. With a mouse or pen, on `pointerdown`
+     rather than click: a press that begins outside and drifts
+     in is still somebody reaching past this player, and waiting
+     for the click lets it land on whatever is underneath first.
+     With a finger, only once it lifts as a tap: a touch that
+     starts a scroll is a `pointerdown` too (then a
+     `pointercancel`, when the browser takes the scroll), and
+     scrolling the page to look at the next card must not
+     collapse the player you just opened. The lift is the tap's
+     `pointerup`, not its click: iOS Safari sends no click for a
+     tap on a plain area (the page's gutter, a heading), so a
+     document click listener would never hear it. A press its
+     card saw in React's tree is inside: the card's menu is a
+     portal, outside the card in the DOM (`markAudioHostPress`). */
   useEffect(() => {
     if (!open) return;
-    const away = (event: PointerEvent) => {
+    const outside = (event: PointerEvent) => {
       /* isTrusted: only a real hand dismisses this, never a
          scripted pointer bubbling to the document. */
-      if (!event.isTrusted || event === insidePress.current) return;
-      if (hostPresses.get(event) === link.id) return;
+      if (!event.isTrusted || event === insidePress.current) return false;
+      if (hostPresses.get(event) === link.id) return false;
       const root = rootRef.current;
       const host = root?.closest(HOST) ?? root;
-      if (host && !host.contains(event.target as Node)) closeExpansion();
+      return Boolean(host && !host.contains(event.target as Node));
+    };
+    // The finger down now, until it lifts or the browser takes it to scroll.
+    let touch: PointerEvent | null = null;
+    const onDown = (event: PointerEvent) => {
+      if (event.pointerType === "touch") return;
+      if (outside(event)) closeExpansion();
+    };
+    /* capture: what the page does with these presses never hides them */
+    const onTouchDown = (event: PointerEvent) => {
+      touch = event.pointerType === "touch" ? event : null;
+    };
+    const onCancel = (event: PointerEvent) => {
+      if (touch?.pointerId === event.pointerId) touch = null;
+    };
+    const onUp = (event: PointerEvent) => {
+      const down = touch;
+      if (!down || down.pointerId !== event.pointerId) return;
+      touch = null;
+      /* measured on the press: where it started, and whether its
+         card saw it (the marks are set by the time it lifts) */
+      if (event.isTrusted && outside(down)) closeExpansion();
     };
     /* the next tick, or the press that opened it closes it */
-    const id = window.setTimeout(
-      () => document.addEventListener("pointerdown", away),
-      0,
-    );
+    const id = window.setTimeout(() => {
+      document.addEventListener("pointerdown", onDown);
+      document.addEventListener("pointerdown", onTouchDown, true);
+      document.addEventListener("pointercancel", onCancel, true);
+      document.addEventListener("pointerup", onUp, true);
+    }, 0);
     return () => {
       window.clearTimeout(id);
-      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("pointerdown", onTouchDown, true);
+      document.removeEventListener("pointercancel", onCancel, true);
+      document.removeEventListener("pointerup", onUp, true);
     };
   }, [open, closeExpansion, link.id]);
 
@@ -386,7 +414,7 @@ export function AudioBar({
       data-open={p > 0 || undefined}
       // The part of its height that's a growth in place: the masonry keeps
       // every card in its column while it grows.
-      data-masonry-grow={expandable ? h - SHUT : undefined}
+      data-masonry-grow={h - SHUT}
       className={cn(
         "@container relative overflow-hidden bg-card",
         owner &&
@@ -399,49 +427,47 @@ export function AudioBar({
         insidePress.current = event.nativeEvent;
       }}
     >
-      {expandable ? (
-        /* ── the one thing you press to change shape ───────
-           Invisible, and it is the WHOLE bar when shut — the
-           track's band at the foot is part of the object, and
-           a bar that only answers along the row its sleeve is
-           in has a dead third nobody can see the edge of.
+      {/* ── the one thing you press to change shape ───────
+         Invisible, and it is the WHOLE bar when shut — the
+         track's band at the foot is part of the object, and
+         a bar that only answers along the row its sleeve is
+         in has a dead third nobody can see the edge of.
 
-           Opened, it is the sleeve and the words only, so a
-           player you have opened does not collapse because
-           you reached for the title.
+         Opened, it is the sleeve and the words only, so a
+         player you have opened does not collapse because
+         you reached for the title.
 
-           Declared BEFORE the controls on purpose: they paint
-           on top, and have to win a press that lands on both. */
-        <button
-          ref={setOpener}
-          type="button"
-          data-expand=""
-          inert={selecting}
-          aria-expanded={open}
-          aria-label={`${open ? "Collapse" : "Expand"} ${link.title}`}
-          aria-describedby={describedBy}
-          className={cn(
-            "absolute z-0 cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset [-webkit-touch-callout:none]",
-            selecting ? "pointer-events-none" : "pointer-events-auto",
-          )}
-          style={{
-            left: mix(0, PAD, p),
-            top: mix(0, PAD, p),
-            right: mix(0, PAD, p),
-            /* every pixel of the bar, and the sleeve's own height
-               once it is open */
-            height: mix(SHUT, ART.s[1], p),
-            borderRadius: mix(CARD_RADIUS, ART.r[1], p),
-          }}
-          // The card doesn't read the return mark: the opener uses it up.
-          onFocus={() => consumeReturningFocus()}
-          onClick={(event) => {
-            keepAudioClick(event);
-            if (owner?.consumeLongPress()) return;
-            expansion.toggle();
-          }}
-        />
-      ) : null}
+         Declared BEFORE the controls on purpose: they paint
+         on top, and have to win a press that lands on both. */}
+      <button
+        ref={setOpener}
+        type="button"
+        data-expand=""
+        inert={selecting}
+        aria-expanded={open}
+        aria-label={`${open ? "Collapse" : "Expand"} ${link.title}`}
+        aria-describedby={describedBy}
+        className={cn(
+          "absolute z-0 cursor-pointer outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset [-webkit-touch-callout:none]",
+          selecting ? "pointer-events-none" : "pointer-events-auto",
+        )}
+        style={{
+          left: mix(0, PAD, p),
+          top: mix(0, PAD, p),
+          right: mix(0, PAD, p),
+          /* every pixel of the bar, and the sleeve's own height
+             once it is open */
+          height: mix(SHUT, ART.s[1], p),
+          borderRadius: mix(CARD_RADIUS, ART.r[1], p),
+        }}
+        // The card doesn't read the return mark: the opener uses it up.
+        onFocus={() => consumeReturningFocus()}
+        onClick={(event) => {
+          keepAudioClick(event);
+          if (owner?.consumeLongPress()) return;
+          expansion.toggle();
+        }}
+      />
       <div
         className="pointer-events-none absolute"
         style={{ left: PAD, top: PAD }}
@@ -597,47 +623,43 @@ export function AudioBar({
           }
         />
       </div>
-      {expandable ? (
-        <>
-          {/* The TIMES belong to the opened player only: they ride
-              `late`, under the rail. Plain text, not a live region: the
-              range's value says the same. */}
-          <AudioTimes
-            link={link}
-            aria-hidden={!open || undefined}
-            className={cn("pointer-events-none absolute inset-x-[10px]", open && LATE_REDUCED)}
-            style={{
-              top: railTop + RAIL_H + CLOCK_GAP,
-              height: CLOCK_H,
-              opacity: late,
-              visibility: late > 0 ? undefined : "hidden",
-            }}
-          />
-          {/* ── the transport ───────────────────────────────────
-              It belongs to the opened player alone, so it rides
-              `late`, arriving after the box has stopped growing,
-              and takes its hit area with it rather than sitting
-              invisible over the bar. On the foot of the box, so it
-              is never cut off while it fades in. */}
-          <AudioTransport
-            link={link}
-            inert={!open || selecting}
-            aria-hidden={!open || undefined}
-            className={cn(
-              // The gap gives way on the narrowest cards (116px of room).
-              "absolute inset-x-[10px] gap-[clamp(4px,(100cqw-134px)/2,14px)]",
-              open && LATE_REDUCED,
-              late > 0.9 && !selecting ? "pointer-events-auto" : "pointer-events-none",
-            )}
-            style={{
-              top: h - PAD - LEAD,
-              height: LEAD,
-              opacity: late,
-              visibility: late > 0 ? undefined : "hidden",
-            }}
-          />
-        </>
-      ) : null}
+      {/* The TIMES belong to the opened player only: they ride
+          `late`, under the rail. Plain text, not a live region: the
+          range's value says the same. */}
+      <AudioTimes
+        link={link}
+        aria-hidden={!open || undefined}
+        className={cn("pointer-events-none absolute inset-x-[10px]", open && LATE_REDUCED)}
+        style={{
+          top: railTop + RAIL_H + CLOCK_GAP,
+          height: CLOCK_H,
+          opacity: late,
+          visibility: late > 0 ? undefined : "hidden",
+        }}
+      />
+      {/* ── the transport ───────────────────────────────────
+          It belongs to the opened player alone, so it rides
+          `late`, arriving after the box has stopped growing,
+          and takes its hit area with it rather than sitting
+          invisible over the bar. On the foot of the box, so it
+          is never cut off while it fades in. */}
+      <AudioTransport
+        link={link}
+        inert={!open || selecting}
+        aria-hidden={!open || undefined}
+        className={cn(
+          // The gap gives way on the narrowest cards (116px of room).
+          "absolute inset-x-[10px] gap-[clamp(4px,(100cqw-134px)/2,14px)]",
+          open && LATE_REDUCED,
+          late > 0.9 && !selecting ? "pointer-events-auto" : "pointer-events-none",
+        )}
+        style={{
+          top: h - PAD - LEAD,
+          height: LEAD,
+          opacity: late,
+          visibility: late > 0 ? undefined : "hidden",
+        }}
+      />
     </div>
   );
 }
@@ -749,11 +771,9 @@ export function AudioTransport({
  */
 export function AudioTrack({
   link,
-  className,
   rangeClassName,
 }: {
   link: Link;
-  className?: string;
   /** The range's own box (the bar anchors its touch area to its foot). */
   rangeClassName?: string;
 }) {
@@ -765,12 +785,7 @@ export function AudioTrack({
   const played = length ? Math.min(1, Math.max(0, elapsed / length)) : 0;
 
   return (
-    <div
-      className={cn(
-        "relative h-[3px] rounded-full bg-foreground/12 has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring",
-        className,
-      )}
-    >
+    <div className="relative h-[3px] rounded-full bg-foreground/12 has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring">
       <div
         data-run=""
         aria-hidden
@@ -834,7 +849,6 @@ export function AudioSleeve({
       style={{ width: size, height: size, borderRadius: radius }}
     >
       <div
-        data-sleeve-content=""
         className={cn(
           "absolute inset-0 flex items-center justify-center overflow-hidden rounded-[inherit] bg-muted text-muted-foreground transition-[opacity,scale] duration-150 ease-out-strong",
           contentClassName,

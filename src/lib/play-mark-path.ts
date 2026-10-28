@@ -25,10 +25,11 @@ export const SWING = (t: number) =>
    whole way, so there is no frame where the button is
    ambiguous about what it does.
 
-   The points are lucide's own, so it sits at the same weight
-   as the skip glyphs beside it: bars at x 6..10 and 14..18,
-   a triangle from 6.5 to 20, stroked 2 with a round join,
-   which is where the softened corners come from.
+   The points are Lucide's, so the mark sits at the same weight
+   as the Reicon icons beside it (Restart, Open file): bars at
+   x 6..10 and 14..18, a triangle from 6.5 to 20, stroked 2
+   with a round join, which is where the softened corners
+   come from.
 
    Wound the same way in both — top-left, top-right,
    bottom-right, bottom-left — or the halves would turn

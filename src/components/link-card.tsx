@@ -31,7 +31,7 @@ import { AUDIO_BAR, AudioBar, markAudioHostPress, useAudioBarMorph } from "./aud
 import { mix } from "./audio-player-tween";
 import { HapticTarget } from "./haptic-target";
 import { MediaOpenButton } from "./media-open-button";
-import { LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
+import { AUDIO_CARD_FRAME, LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
 import { Checkbox } from "./ui/checkbox";
 
 // Loaded on demand, like the rows' menu.
@@ -163,9 +163,11 @@ export function LinkCard({
       data-cy="link-card"
       data-selected={selected || undefined}
       className={cn(
-        LINK_CARD_FRAME,
-        // The opener (below) is the focus target: its ring is the card's.
-        "group/card relative select-none has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring has-[[data-pearl-button]:focus-visible]:ring-3 has-[[data-pearl-button]:focus-visible]:ring-ring",
+        audio ? AUDIO_CARD_FRAME : LINK_CARD_FRAME,
+        // The opener (below, a direct child) is the focus target: its ring
+        // is the card's. Not any link inside: the audio transport's Open
+        // file and the folder button ring themselves.
+        "group/card relative select-none has-[>a:focus-visible]:ring-3 has-[>a:focus-visible]:ring-ring has-[>[data-pearl-button]:focus-visible]:ring-3 has-[>[data-pearl-button]:focus-visible]:ring-ring",
         selected &&
           "ring-2 ring-primary [@media(hover:hover)]:hover:ring-primary",
         anchoredFace && "overflow-visible",
@@ -203,6 +205,7 @@ export function LinkCard({
         // aside then). The card's focus anchor is the bar's opener.
         <div
           aria-hidden
+          data-select-surface={selecting || undefined}
           className={cn("absolute inset-0 z-0 rounded-lg", selecting && "cursor-pointer")}
           onClick={(event) => {
             if (consumeLongPress()) return;

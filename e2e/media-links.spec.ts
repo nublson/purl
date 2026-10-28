@@ -663,6 +663,62 @@ test.describe("Audio pearls on a phone", () => {
     expect(play.x).toBeGreaterThanOrEqual(cardBox.x);
     expect(play.x + play.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
   });
+
+  test("a scroll that starts outside the open bar keeps it open; a tap outside closes it", async ({
+    page,
+    seed,
+    browserName,
+  }) => {
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
+    // Enough cards under the song for the page to scroll.
+    for (let i = 0; i < 24; i++) {
+      await seed.link({ url: `https://pages.example/${i}`, title: `Page ${i}` });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    await seedSong(seed);
+    const saved = await page.request.patch("/api/user/layout", { data: { view: "grid" } });
+    expect(saved.ok()).toBe(true);
+    await openHome(page);
+
+    const song = card(page, "Song");
+    const opener = song.locator("[data-expand]");
+    const words = (await song.locator("[data-words]").boundingBox())!;
+    await page.touchscreen.tap(words.x + words.width / 2, words.y + 4);
+    await expect(opener).toHaveAttribute("aria-expanded", "true");
+
+    // The page's gutter, left of the grid: outside every card.
+    const gutter = { x: 4, y: 600 };
+    const cardBox = (await song.boundingBox())!;
+    expect(cardBox.x).toBeGreaterThan(gutter.x);
+
+    // A finger drag there scrolls the page (real touches through the
+    // DevTools protocol: Chromium only), and the bar stays open.
+    if (browserName === "chromium") {
+      // The app's `main` is the scroller.
+      const scrolled = () => page.locator("main").evaluate((el) => el.scrollTop);
+      const before = await scrolled();
+      const cdp = await page.context().newCDPSession(page);
+      const touch = (
+        type: "touchStart" | "touchMove" | "touchEnd",
+        points: { x: number; y: number }[],
+      ) => cdp.send("Input.dispatchTouchEvent", { type, touchPoints: points });
+      await touch("touchStart", [gutter]);
+      for (let step = 1; step <= 12; step++) {
+        await touch("touchMove", [{ x: gutter.x, y: gutter.y - (200 * step) / 12 }]);
+      }
+      await touch("touchEnd", []);
+      await cdp.detach();
+      await expect.poll(scrolled).toBeGreaterThan(before);
+      await page.waitForTimeout(300);
+      await expect(opener).toHaveAttribute("aria-expanded", "true");
+    }
+
+    // A tap there closes it.
+    await page.touchscreen.tap(gutter.x, 300);
+    await expect(opener).toHaveAttribute("aria-expanded", "false");
+  });
 });
 
 /** Two audio pearls side by side (Sun, Tide) and an image card under Sun. */
