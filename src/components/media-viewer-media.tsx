@@ -288,10 +288,11 @@ function ViewerVideo({ link, ready }: { link: Link; ready: boolean }) {
 /**
  * An audio pearl: the title, then the card's player at the viewer's size
  * (a 56px play button, the scrubber and the time), on the card's surface.
- * It has its own player, which starts stopped; the card's strip stopped
- * when the viewer opened (`MediaViewer`). With Previous / Next on its
- * sides (8px in, up to 40px wide on touch), 56px gutters on both sides keep
- * the player between them, the title lined up with it.
+ * It's a view of the page's one player, like the card's strip, so a pearl
+ * playing on its card plays on here, and on the card after closing. With
+ * Previous / Next on its sides (8px in, up to 40px wide on touch), 56px
+ * gutters on both sides keep the player between them, the title lined up
+ * with it.
  */
 function ViewerAudio({ link, roomForArrows }: { link: Link; roomForArrows: boolean }) {
   return (

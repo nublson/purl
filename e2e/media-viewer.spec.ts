@@ -554,7 +554,7 @@ test.describe("Media viewer", () => {
     await expect(player).toHaveAttribute("poster", icon);
   });
 
-  test("an audio card opens the player at viewer size; the card's strip stops", async ({
+  test("an audio card opens the player at viewer size; playback continues in the viewer", async ({
     page,
     seed,
   }) => {
@@ -585,27 +585,27 @@ test.describe("Media viewer", () => {
     await expect(
       dialog.locator('[data-viewer-media="audio"]').getByText("Song", { exact: true }),
     ).toBeVisible();
-    const play = dialog.getByRole("button", { name: "Play Song" });
-    await expect(play).toBeVisible();
-    // The viewer starts fresh: the card's strip stopped when it opened.
-    await expect(card.locator('button[aria-label="Play Song"]')).toHaveCount(1);
+    // The same playback, carried on: the viewer's player reads Pause.
+    const pause = dialog.getByRole("button", { name: "Pause Song" });
+    await expect(pause).toBeVisible();
     // 56px (its layout size: the box may still be scaling in the morph).
-    expect(await play.evaluate((el: HTMLElement) => el.offsetWidth)).toBe(56);
+    expect(await pause.evaluate((el: HTMLElement) => el.offsetWidth)).toBe(56);
+    // One element for the page, still playing.
+    expect(await page.evaluate(() => document.querySelectorAll("audio").length)).toBe(1);
+    await expect
+      .poll(() => page.evaluate(() => document.querySelector("audio")?.paused))
+      .toBe(false);
 
-    // The viewer's player plays on its own; the card's strip stays stopped.
-    await play.click();
-    await expect(dialog.getByRole("button", { name: "Pause Song" })).toBeVisible();
-    await expect(card.locator('button[aria-label="Play Song"]')).toHaveCount(1);
-
-    // Closing stops it.
+    // Closing leaves it playing on the card.
     await page.keyboard.press("Escape");
     await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expect(card.getByRole("button", { name: "Pause Song" })).toBeVisible();
+    expect(await page.evaluate(() => document.querySelectorAll("audio").length)).toBe(1);
     await expect
-      .poll(() =>
-        page.evaluate(() => [...document.querySelectorAll("audio")].every((a) => a.paused)),
-      )
-      .toBe(true);
+      .poll(() => page.evaluate(() => document.querySelector("audio")?.paused))
+      .toBe(false);
   });
+
   test("an image row opens the viewer; Esc gives focus back to the row", async ({
     page,
     seed,

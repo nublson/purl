@@ -1,6 +1,5 @@
 "use client";
 
-import { audioPlayerStore, viewerAudioId } from "@/hooks/use-audio-player";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import {
   markCloseSettled,
@@ -220,15 +219,6 @@ export function MediaViewer() {
     preloadOriginal(prevSrc);
     preloadOriginal(nextSrc);
   }, [ready, prevSrc, nextSrc]);
-
-  // Playback hand-off: the viewer starts fresh, so the card's audio strip
-  // stops when the viewer shows its pearl (the card's video loop pauses on
-  // its own, `useIsMediaOpen`); leaving a pearl stops the viewer's player.
-  useEffect(() => {
-    if (currentId === null) return;
-    audioPlayerStore.stop(currentId);
-    return () => audioPlayerStore.stop(viewerAudioId(currentId));
-  }, [currentId]);
 
   return (
     <Cambio.Root

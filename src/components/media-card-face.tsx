@@ -1,6 +1,6 @@
 "use client";
 
-import { audioPlayerStore, useAudioPlayer, viewerAudioId } from "@/hooks/use-audio-player";
+import { useAudioPlayer } from "@/hooks/use-audio-player";
 import { useLiveCards } from "@/hooks/use-live-cards";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { usePlayVideos } from "@/contexts/link-view-context";
@@ -348,11 +348,11 @@ const AUDIO_SIZES = {
 
 /**
  * An audio pearl's player: play/pause, a scrubber, and elapsed over the
- * length. One `<audio preload="none">` (nothing loads until played), wired
- * to `useAudioPlayer`, so starting one stops the other. A card's (`card`)
- * steps aside while links are selected and never lets a click reach the
- * card; the viewer's (`viewer`, a 56px button) has its own player id, so
- * it never plays together with the card it opened from.
+ * length. It owns no element: it's a view of the page's one player
+ * (`useAudioPlayer`), so starting one pearl stops the other, and a card's
+ * strip and the viewer's player (`viewer`, a 56px button) show the same
+ * playback, which carries on from one into the other. A card's steps aside
+ * while links are selected and never lets a click reach the card.
  */
 export function AudioControls({
   link,
@@ -361,123 +361,75 @@ export function AudioControls({
   link: Link;
   size: "card" | "viewer";
 }) {
-  const id = size === "viewer" ? viewerAudioId(link.id) : link.id;
-  const { playing, toggle } = useAudioPlayer(id);
+  const { playing, elapsed, length, toggle, seek } = useAudioPlayer(link.id, link.duration);
   // While links are selected, a click on the card toggles it: the card's
   // controls step aside (the shared card never selects).
   const selecting = useIsSelectionActive() && size === "card";
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const [length, setLength] = useState<number | null>(link.duration);
   const src = safeRemoteImgSrc(link.url);
   const look = AUDIO_SIZES[size];
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    if (playing) {
-      audio.play().catch((error: unknown) => {
-        // A pause() that cut the play short isn't a failure.
-        if ((error as { name?: string } | null)?.name !== "AbortError") {
-          audioPlayerStore.stop(id);
-        }
-      });
-    } else {
-      audio.pause();
-    }
-  }, [playing, id]);
-
-  // A player that leaves (deleted, moved, remounted, the viewer closed)
-  // stops its sound, so it never starts again on its own.
-  useEffect(() => () => audioPlayerStore.stop(id), [id]);
-
-  function readLength(event: SyntheticEvent<HTMLAudioElement>) {
-    const { duration } = event.currentTarget;
-    if (Number.isFinite(duration) && duration > 0) setLength(duration);
-  }
 
   const time = length
     ? `${formatDuration(elapsed)} / ${formatDuration(length)}`
     : formatDuration(elapsed);
 
+  // The controls take pointer events inside the owner's card (whose
+  // content doesn't), except while selecting, and never open the link they
+  // sit in (the shared card is one link). `data-card-menu`: a press here
+  // isn't the card's long-press.
   return (
-    <>
-      <audio
-        ref={audioRef}
-        src={src ?? undefined}
-        preload="none"
-        onTimeUpdate={(event) => setElapsed(event.currentTarget.currentTime)}
-        onLoadedMetadata={readLength}
-        onDurationChange={readLength}
-        // Paused from outside (media keys) or at the end: the store follows.
-        onPause={() => audioPlayerStore.stop(id)}
-        onEnded={(event) => {
-          audioPlayerStore.stop(id);
-          event.currentTarget.currentTime = 0;
-          setElapsed(0);
-        }}
-        onError={() => audioPlayerStore.stop(id)}
-      />
-      {/* The controls take pointer events inside the owner's card (whose
-          content doesn't), except while selecting, and never open the link
-          they sit in (the shared card is one link). `data-card-menu`: a
-          press here isn't the card's long-press. */}
-      <div
-        data-card-menu={size === "card" ? "" : undefined}
-        inert={selecting}
+    <div
+      data-card-menu={size === "card" ? "" : undefined}
+      inert={selecting}
+      className={cn(
+        "relative z-[1] flex items-center",
+        look.gap,
+        selecting ? "pointer-events-none" : "pointer-events-auto",
+      )}
+      onClick={
+        size === "card"
+          ? (event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          : undefined
+      }
+    >
+      <button
+        type="button"
+        disabled={!src}
+        aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
         className={cn(
-          "relative z-[1] flex items-center",
-          look.gap,
-          selecting ? "pointer-events-none" : "pointer-events-auto",
+          "flex shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100",
+          look.button,
         )}
-        onClick={
-          size === "card"
-            ? (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-              }
-            : undefined
-        }
+        onClick={() => {
+          if (src) toggle(src);
+        }}
       >
-        <button
-          type="button"
-          disabled={!src}
-          aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
-          className={cn(
-            "flex shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100",
-            look.button,
-          )}
-          onClick={toggle}
-        >
-          {playing ? (
-            <Pause className={look.icon} aria-hidden />
-          ) : (
-            <Play className={cn(look.icon, "translate-x-px")} aria-hidden />
-          )}
-        </button>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <input
-            type="range"
-            min={0}
-            max={length ?? 0}
-            step="any"
-            value={Math.min(elapsed, length ?? 0)}
-            disabled={!src || !length}
-            aria-label={`Seek ${link.title}`}
-            aria-valuetext={time}
-            className="h-4 w-full cursor-pointer accent-foreground disabled:cursor-default"
-            onChange={(event) => {
-              const next = Number(event.currentTarget.value);
-              setElapsed(next);
-              if (audioRef.current) audioRef.current.currentTime = next;
-            }}
-          />
-          {/* `text-foreground/70`, like Kbd: `text-muted-foreground` on
-              `bg-muted` is 4.3:1 in light mode, under 4.5:1 for 12px text. */}
-          <span className={cn("text-foreground/70 tabular-nums", look.time)}>{time}</span>
-        </div>
+        {playing ? (
+          <Pause className={look.icon} aria-hidden />
+        ) : (
+          <Play className={cn(look.icon, "translate-x-px")} aria-hidden />
+        )}
+      </button>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <input
+          type="range"
+          min={0}
+          max={length ?? 0}
+          step="any"
+          value={Math.min(elapsed, length ?? 0)}
+          disabled={!src || !length}
+          aria-label={`Seek ${link.title}`}
+          aria-valuetext={time}
+          className="h-4 w-full cursor-pointer accent-foreground disabled:cursor-default"
+          onChange={(event) => seek(Number(event.currentTarget.value))}
+        />
+        {/* `text-foreground/70`, like Kbd: `text-muted-foreground` on
+            `bg-muted` is 4.3:1 in light mode, under 4.5:1 for 12px text. */}
+        <span className={cn("text-foreground/70 tabular-nums", look.time)}>{time}</span>
       </div>
-    </>
+    </div>
   );
 }
 
