@@ -212,8 +212,8 @@ export function PendingUploadCard({ item, onRetry, onDismiss }: Props) {
 
 /**
  * An audio file uploading, in the grid: the shape of the bar it becomes
- * (`AudioBar`): the icon sleeve, its title over "Uploading…", and the
- * progress ring where play will sit. Failed: a scrim with the reason,
+ * (`AudioBar`): the icon sleeve, its title over "Uploading…", the
+ * progress ring where play sits on a wide bar, and the empty rail. Failed: a scrim with the reason,
  * Retry and Dismiss.
  */
 function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
@@ -248,6 +248,11 @@ function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
           <ProgressRing progress={item.progress} />
         </span>
       </div>
+      {/* The bar's empty rail along the foot. */}
+      <span
+        aria-hidden
+        className="absolute inset-x-[10px] bottom-[10px] h-[3px] rounded-full bg-foreground/12"
+      />
       <span className="sr-only">{failed ? `${title}, ${message}` : title}</span>
       {failed ? (
         // The bar is short: the reason on one line, the compact actions.

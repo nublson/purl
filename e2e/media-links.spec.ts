@@ -79,6 +79,13 @@ async function clickAt(page: Page, target: Locator) {
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 }
 
+/** The bar's second line as shown (the narrow bar shows just the length). */
+function secondLine(scope: Locator) {
+  return scope
+    .locator("[data-words] > :nth-child(2)")
+    .evaluate((el) => (el as HTMLElement).innerText.trim());
+}
+
 /** The played run's width in px. */
 function runWidth(scope: Locator) {
   return scope.locator("[data-run]").evaluate((el) => el.getBoundingClientRect().width);
@@ -196,16 +203,18 @@ test.describe("Media pearls", () => {
     await clickAt(page, song.locator("[data-words]"));
     await expect(checkbox).toBeChecked();
 
-    // The controls step aside: out of reach of focus and clicks.
-    const play = song.locator('[inert] button[aria-label="Play Song"]');
-    await expect(play).toHaveCount(1);
+    // The controls step aside: out of reach of focus and clicks. A grid
+    // card's bar is narrow (under 240px): the sleeve is its play button.
+    const play = song.locator('[data-sleeve] button[data-play][aria-label="Play Song"]');
+    await expect(play).toHaveAttribute("inert", "");
     expect(
       await play.evaluate((el: HTMLElement) => {
         el.focus();
         return document.activeElement === el;
       }),
     ).toBe(false);
-    // A click where the Play button sits lands on the card, not the button.
+    // A click where the Play button sits lands on the card (its checkbox,
+    // in the sleeve's place), not the button.
     const box = await play.boundingBox();
     if (!box) throw new Error("no Play button box");
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
@@ -359,11 +368,18 @@ test.describe("Audio pearls: the now-playing bar", () => {
     await expect(song.locator("a")).toHaveCount(0);
     const bar = song.locator('[data-face="audio"]');
     await expect(bar.locator("[data-words]")).toContainText("Song");
-    await expect(bar.locator("[data-words]")).toContainText("Audio · 2:36");
-    await expect(song.locator('button[aria-label="Play Song"][aria-pressed="false"]')).toBeVisible();
+    // A grid card is under 240px wide (every one is, at most 210px): the
+    // narrow bar. Its second line is the length, its sleeve is play.
+    expect((await bar.boundingBox())!.width).toBeLessThan(240);
+    expect(await secondLine(bar)).toBe("2:36");
+    const songPlay = song.getByRole("button", { name: "Play Song" });
+    await expect(songPlay).toHaveAttribute("aria-pressed", "false");
+    expect(await songPlay.evaluate((el) => el.closest("[data-sleeve]") !== null)).toBe(true);
     await expect(song.getByRole("slider", { name: "Seek Song" })).toHaveCount(1);
-    // No preview image: the music icon; Birds' page image is its sleeve.
-    await expect(song.locator('[data-sleeve="icon"] svg')).toBeVisible();
+    // No preview image: the icon sleeve; Birds' page image is its sleeve.
+    // (Narrow: the mark is drawn on the icon's tint, the music note hidden.)
+    await expect(song.locator('[data-sleeve="icon"] [data-play] svg')).toBeVisible();
+    await expect(song.locator('[data-sleeve="icon"] svg.reicon')).toBeHidden();
     await expect(birds.locator('[data-sleeve="image"] img')).toBeVisible();
     const height = (await song.boundingBox())!.height;
     expect(Math.abs(height - 78)).toBeLessThanOrEqual(1);
@@ -403,7 +419,14 @@ test.describe("Audio pearls: the now-playing bar", () => {
     await row(page, "Song").hover();
     const preview = page.locator('[data-face="audio"]');
     await expect(preview).toBeVisible();
-    await preview.getByRole("button", { name: "Play Song" }).click();
+    // The preview's bar is wide: the full second line, play at the end.
+    expect((await preview.boundingBox())!.width).toBeGreaterThanOrEqual(240);
+    expect(await secondLine(preview)).toBe("Audio · 2:36");
+    await expect(preview.locator('[data-sleeve="icon"] svg.reicon')).toBeVisible();
+    const previewPlay = preview.getByRole("button", { name: "Play Song" });
+    expect(await previewPlay.evaluate((el) => el.closest("[data-sleeve]") === null)).toBe(true);
+    expect(await previewPlay.evaluate((el) => el.getBoundingClientRect().width)).toBe(30);
+    await previewPlay.click();
     await expect(preview.getByRole("button", { name: "Pause Song" })).toBeVisible();
 
     // Closing the preview (the pointer leaves for the menu) keeps it playing.
@@ -466,11 +489,13 @@ test.describe("Audio pearls: the now-playing bar", () => {
 test.describe("Audio pearls on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test("the phone grid's bar: truncated title, the length, 44px play, the menu", async ({
+  test("the phone grid's bar: the sleeve plays, the length, a truncated title, the menu", async ({
     page,
     seed,
   }) => {
-    await page.context().route("https://sounds.example/**", (route) => route.abort());
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
     await seedSong(seed, "Song for a long drive home");
     // The grid, saved on the account before the page loads.
     const saved = await page.request.patch("/api/user/layout", { data: { view: "grid" } });
@@ -481,19 +506,33 @@ test.describe("Audio pearls on a phone", () => {
     expect((await song.boundingBox())!.width).toBeLessThanOrEqual(175);
     const title = song.locator("[data-words] > :first-child");
     expect(await title.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
-    expect(
-      await song
-        .locator("[data-words] > :nth-child(2)")
-        .evaluate((el) => (el as HTMLElement).innerText.trim()),
-    ).toBe("2:36");
+    expect(await secondLine(song)).toBe("2:36");
+    await expect(song.getByRole("button", { name: "Open link menu" })).toBeVisible();
+
+    // The sleeve is play: 40px, 44px to the touch.
     const play = song.getByRole("button", { name: "Play Song for a long drive home" });
     const target = await play.evaluate((b) => {
       const box = b.getBoundingClientRect();
       const hit = getComputedStyle(b, "::after");
-      return { w: box.width, h: box.height, top: parseFloat(hit.top), left: parseFloat(hit.left) };
+      return {
+        sleeve: b.closest("[data-sleeve]") !== null && b.hasAttribute("data-play"),
+        w: box.width,
+        h: box.height,
+        top: parseFloat(hit.top),
+        left: parseFloat(hit.left),
+      };
     });
+    expect(target.sleeve).toBe(true);
+    expect(target.w).toBe(40);
     expect(target.w - 2 * target.left).toBeGreaterThanOrEqual(44);
     expect(target.h - 2 * target.top).toBeGreaterThanOrEqual(44);
-    await expect(song.getByRole("button", { name: "Open link menu" })).toBeVisible();
+
+    // A tap on the sleeve plays, and selects nothing.
+    await play.tap();
+    await expect(
+      song.getByRole("button", { name: "Pause Song for a long drive home" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByText("1 selected")).toHaveCount(0);
+    await expect(song).not.toHaveAttribute("data-selected", "true");
   });
 });

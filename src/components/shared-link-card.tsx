@@ -36,8 +36,8 @@ export function SharedLinkCard({
   const kind = linkKind(link);
   if (kind === "audio") {
     // The bar's controls can't sit inside the card's button: the card is a
-    // frame holding the bar and a button over the rest of it, under the
-    // controls (which lie above it), so clicks beside them still open the
+    // frame holding the button and, over it, the bar, which takes pointer
+    // events only on its controls, so clicks beside them still open the
     // viewer. The frame draws the button's focus ring, as the owner's card
     // does.
     return (
@@ -48,12 +48,15 @@ export function SharedLinkCard({
           "relative overflow-visible has-[[data-pearl-button]:focus-visible]:ring-3 has-[[data-pearl-button]:focus-visible]:ring-ring",
         )}
       >
-        <AudioBar link={link} anchored compact />
         <MediaOpenButton
           link={link}
           selecting={false}
           className="absolute inset-0 cursor-pointer rounded-lg outline-none"
         />
+        {/* Over the button, taking pointer events only on its controls. */}
+        <div className="pointer-events-none">
+          <AudioBar link={link} anchored />
+        </div>
       </div>
     );
   }
@@ -113,7 +116,7 @@ export function LinkCardContent({
     case "video":
       return <VideoFace link={link} badge={badge} anchored={mediaAnchor} />;
     case "audio":
-      return <AudioBar link={link} anchored={mediaAnchor} badge={badge} compact />;
+      return <AudioBar link={link} anchored={mediaAnchor} badge={badge} />;
     default: {
       const thumbnailSrc = link.thumbnail
         ? safeRemoteImgSrc(link.thumbnail)

@@ -108,6 +108,13 @@ export function LinkCard({
     linkSelection.toggle(link.id, { shiftKey });
   };
 
+  // The checkbox's click (mouse, keyboard): no haptic, the touch tap is
+  // `tapToSelect`'s.
+  const clickToSelect = ({ shiftKey }: { shiftKey: boolean }) => {
+    if (consumeLongPress()) return;
+    linkSelection.toggle(link.id, { shiftKey });
+  };
+
   const badge = folderTag ? (
     <FolderBadge key={folderTag.id} folder={folderTag} inCard arrive={badgeArrives} />
   ) : null;
@@ -221,14 +228,15 @@ export function LinkCard({
             link={link}
             anchored={anchoredFace}
             badge={badge}
-            compact
             describedBy={describedBy}
             owner={
               demo
                 ? undefined
                 : {
                     selected,
-                    onToggleSelect: tapToSelect,
+                    onToggleSelect: clickToSelect,
+                    onTapSelect: tapToSelect,
+                    consumeLongPress,
                     menu: (
                       <div
                         inert={selecting}
