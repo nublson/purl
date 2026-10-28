@@ -130,7 +130,6 @@ export function keepAudioClick(event: MouseEvent<HTMLElement>) {
   event.preventDefault();
   event.stopPropagation();
 }
-const keepClick = keepAudioClick;
 
 /**
  * The bar's morph, 0 shut to 1 open: one tween, read everywhere. Its host
@@ -437,7 +436,7 @@ export function AudioBar({
           // The card doesn't read the return mark: the opener uses it up.
           onFocus={() => consumeReturningFocus()}
           onClick={(event) => {
-            keepClick(event);
+            keepAudioClick(event);
             if (owner?.consumeLongPress()) return;
             expansion.toggle();
           }}
@@ -475,7 +474,7 @@ export function AudioBar({
               swapOut,
             )}
             onClick={(event) => {
-              keepClick(event);
+              keepAudioClick(event);
               if (owner?.consumeLongPress()) return;
               if (src) toggle(src);
             }}
@@ -583,7 +582,7 @@ export function AudioBar({
           selecting ? "pointer-events-none" : "pointer-events-auto",
         )}
         style={{ top: railTop }}
-        onClick={keepClick}
+        onClick={keepAudioClick}
       >
         <AudioTrack
           link={link}
@@ -708,7 +707,7 @@ export function AudioTransport({
         aria-label={`Restart ${link.title}`}
         className={SIDE_BUTTON}
         onClick={(event) => {
-          keepClick(event);
+          keepAudioClick(event);
           restart();
         }}
       >
@@ -720,7 +719,7 @@ export function AudioTransport({
         aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
         className="flex size-[46px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100"
         onClick={(event) => {
-          keepClick(event);
+          keepAudioClick(event);
           if (src) toggle(src);
         }}
       >
