@@ -1,5 +1,7 @@
 # Media Viewer — Design
 
+> **Superseded in part (2026-10-28).** Audio pearls no longer open the viewer: an audio pearl's card is a now-playing bar that expands in place into its player, its list row plays from the icon slot, and its hover preview is a player card. The viewer is for image and video pearls only (`isViewerKind`). The audio lines below are kept as written, each marked; the current design is `docs/superpowers/specs/2026-10-28-audio-now-playing-design.md`.
+
 ## Problem
 
 Image, video and audio pearls (uploads and media links) render as their media in cards and rows, but opening one still sends the reader to the file's URL in a new tab, out of Purl. A moodboard wants the opposite: the card grows into the picture, the picture steps to the next one, and it shrinks back to its card. This is the "lightbox" the media uploads spec (`2026-10-27-media-uploads-embeds-design.md`) left for its own plan.
@@ -11,7 +13,7 @@ Image, video and audio pearls (uploads and media links) render as their media in
 Settled with the user during brainstorming:
 
 - **Library: Cambio** (`cambio`, MIT, built on Base UI's Dialog and Motion's layout animations). It gives the accessible dialog, the morphing popup, motion presets and reduced-motion handling. It brings `@base-ui/react` beside the Radix the app uses for every other overlay; accepted for this one surface.
-- **Scope: media pearls everywhere.** Image, video and audio pearls (uploads and media links) open the viewer from grid cards, list rows and the shared folder page. Page links, PDFs and YouTube keep opening in a new tab until the embeds plan.
+- **Scope: media pearls everywhere.** Image, video and audio pearls (uploads and media links) open the viewer from grid cards, list rows and the shared folder page. Page links, PDFs and YouTube keep opening in a new tab until the embeds plan. *(Superseded 2026-10-28: audio pearls no longer open the viewer; see `2026-10-28-audio-now-playing-design.md`.)*
 - **Navigation within the list:** left/right arrows, on-screen buttons and swipe move between the media pearls shown in the current list (Home, the folder, or the shared page) without closing.
 - **Motion: morph on open and close only.** Open morphs from the card; close morphs back to whichever card you are on; next/previous slides the media inside the viewer (a crossfade under reduced motion).
 - **Chrome: media only.** No title bar, no actions; the title and kind/length line are the dialog's accessible name and description. Actions stay in the card and row menus.
@@ -26,7 +28,7 @@ Out of scope: a zoom or pinch gesture of our own (the browser's zoom works), a p
 
 `src/lib/media-viewer.ts`, a store outside React (`useSyncExternalStore`, like `linkSelection`):
 
-- `mediaViewer.register(links: Link[])`: the page's media pearls (kinds `image`, `video`, `audio` by `linkKind`) in display order. `HomeShell` calls it where it registers selectable links, after every reload; `SharedFolderList` calls it as pages load. Pearls that leave the list leave the viewer's list; if the current one leaves, the viewer moves to its neighbour (the next, else the previous) or closes when none is left.
+- `mediaViewer.register(links: Link[])`: the page's media pearls (kinds `image`, `video`, `audio` by `linkKind`) in display order. `HomeShell` calls it where it registers selectable links, after every reload; `SharedFolderList` calls it as pages load. Pearls that leave the list leave the viewer's list; if the current one leaves, the viewer moves to its neighbour (the next, else the previous) or closes when none is left. *(Superseded 2026-10-28: audio pearls no longer open the viewer; see `2026-10-28-audio-now-playing-design.md`.)*
 - `mediaViewer.open(id)`, `close()`, `next()`, `prev()`.
 - State `{ openedId: string | null; currentId: string | null; items: Link[] }`. `openedId` is the pearl the morph started from and stays fixed while open; `currentId` moves with navigation; both are equal until you navigate.
 - Hooks: `useMediaViewer()` (the viewer) and `useIsMediaOpen(id)` (a face).
@@ -48,11 +50,11 @@ The morph pairs two elements sharing a Motion `layoutId`: a face and Cambio's Po
 
 - Each media face wraps its media in `m.div layoutId={"pearl-" + link.id}` (the `m` components under the app's `LazyMotion`). The feature bundle in `src/lib/motion-features.ts` moves from `domAnimation` to `domMax` (layout animations), still loaded after hydration (about 15 KB more).
 - The viewer, Cambio included, is a `next/dynamic` chunk loaded when a page registers its first media pearl, so Home's first paint doesn't pay for it.
-- **Grid cards (owner):** the card's overlay `<a>` becomes a `<button>` for media pearls, named by the title (no "(opens in new tab)"), calling `mediaViewer.open(link.id)`. Checkbox, ⋯ menu, folder badge, long-press and selection are unchanged; while selecting, a click toggles the card. The audio strip's Play keeps playing inline; the card's button opens the viewer.
-- **Grid cards (shared page):** the `<a>` becomes the same button for media pearls; the audio card keeps its player beside the button (the structure from the interface review). Page links keep their anchors.
+- **Grid cards (owner):** the card's overlay `<a>` becomes a `<button>` for media pearls, named by the title (no "(opens in new tab)"), calling `mediaViewer.open(link.id)`. Checkbox, ⋯ menu, folder badge, long-press and selection are unchanged; while selecting, a click toggles the card. The audio strip's Play keeps playing inline; the card's button opens the viewer. *(Superseded 2026-10-28: audio pearls no longer open the viewer; see `2026-10-28-audio-now-playing-design.md`.)*
+- **Grid cards (shared page):** the `<a>` becomes the same button for media pearls; the audio card keeps its player beside the button (the structure from the interface review). Page links keep their anchors. *(Superseded 2026-10-28: audio pearls no longer open the viewer; see `2026-10-28-audio-now-playing-design.md`.)*
 - **List rows (owner and shared):** the row's main link becomes a button for media pearls; the row's preview square (the `LinkIcon`) carries the `layoutId`, so the morph grows out of the thumbnail, with Cambio's `snappy` preset for rows (the start rect is tiny). Hover previews are unchanged.
-- **What morphs per kind:** images morph their preview, and the original loads on top once the morph completes (`onOpenChangeComplete`), fading in over the preview, so nothing flashes; videos morph their poster (or current frame) and the viewer swaps in the player on completion; audio morphs its kind tile into the viewer's player; a failed image morphs its icon tile.
-- **Playback hand-off:** `useLiveCards` treats the open pearl's card as not wanted (`useIsMediaOpen`), so the grid's muted loop pauses while the viewer plays with sound; the audio store stops a card's playback when the viewer opens on it.
+- **What morphs per kind:** images morph their preview, and the original loads on top once the morph completes (`onOpenChangeComplete`), fading in over the preview, so nothing flashes; videos morph their poster (or current frame) and the viewer swaps in the player on completion; audio morphs its kind tile into the viewer's player; a failed image morphs its icon tile. *(Superseded 2026-10-28: audio pearls no longer open the viewer; see `2026-10-28-audio-now-playing-design.md`.)*
+- **Playback hand-off:** `useLiveCards` treats the open pearl's card as not wanted (`useIsMediaOpen`), so the grid's muted loop pauses while the viewer plays with sound; the audio store stops a card's playback when the viewer opens on it. *(Superseded 2026-10-28: audio pearls no longer open the viewer; see `2026-10-28-audio-now-playing-design.md`.)*
 - **Close target:** the Root's `layoutId` is `pearl-<openedId>` while open. On close after navigation, the viewer sets the Root's `layoutId` to `pearl-<currentId>` and closes on the next frame, so the Popup morphs back to the card you ended on. When that card isn't mounted, Motion has no target and the Popup fades: the intended fallback.
 
 ### Inside the viewer
@@ -62,7 +64,7 @@ The morph pairs two elements sharing a Motion `layoutId`: a face and Cambio's Po
 - **Layout:** the Popup is a fixed box sized to the media, `max-width: min(100vw - 32px, 1200px)`, `max-height: calc(100dvh - 32px)` with safe areas added on phones; the media `object-contain`, centered. The backdrop is `bg-background/85` with a 12px blur.
 - **Image:** `<img>` of the original (`link.url`), the preview underneath until it loads; `alt` is the title.
 - **Video:** `<video controls autoplay playsInline>` with sound (opened by a click, so autoplay is allowed), `poster` the preview. A file that can't play keeps the poster, a "Can't play this video" line and the native controls.
-- **Audio:** the card's player at viewer size: a 56px play button, the scrubber, time, the title above it, on `bg-card`.
+- **Audio:** the card's player at viewer size: a 56px play button, the scrubber, time, the title above it, on `bg-card`. *(Superseded 2026-10-28: audio pearls no longer open the viewer; see `2026-10-28-audio-now-playing-design.md`.)*
 - **Navigation:** previous/next as two round icon buttons at the left and right edges (absent when there's no neighbour; always shown on touch, on hover or focus with a pointer). Keys on the Popup: ←, →, Home, End. Swipe: a Motion `drag` on the media wrapper with `dragDirectionLock`; a horizontal drag past 80px or 400px/s commits to the neighbour, a vertical one past the same closes; the drag scales the media to 0.95 and fades the backdrop as it goes. The slide is 200ms on the project's `--ease-out-strong`, the leaving media out and the arriving one in; under reduced motion a 150ms opacity crossfade. The slide never morphs.
 - **Preloading:** the current pearl's two neighbours' originals are warmed (`new Image()` for images; videos get `preload="metadata"` only once current).
 - **Closing:** Esc and backdrop press (Base UI), the vertical drag, Back on phones, and a 44px X in the top-right (inside the safe area) for touch screen reader users. Focus returns to the opened card's button by default; after navigation, `finalFocus` is the current card's button, where the morph lands.
@@ -104,7 +106,7 @@ Changed: `package.json` (`cambio`), `src/lib/motion-features.ts` (`domMax`), the
 One branch, in order:
 
 1. `cambio`, `domMax`, the store and URL helpers with tests, `MediaViewer` with images only, the owner's grid cards as triggers (the morph lands with the first PR).
-2. Video and audio in the viewer, the playback hand-off, list rows, the shared page.
+2. Video and audio in the viewer, the playback hand-off, list rows, the shared page. *(Superseded 2026-10-28: audio pearls no longer open the viewer; see `2026-10-28-audio-now-playing-design.md`.)*
 3. Navigation: buttons, keys, swipe, preloading, the live region, phones.
 4. CLAUDE.md "Media viewer" bullets; closes the parked note from the uploads spec about audio controls inside the shared card's link.
 

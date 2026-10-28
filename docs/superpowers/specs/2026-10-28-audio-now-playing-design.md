@@ -7,7 +7,7 @@
 
 ## Summary
 
-An audio pearl's card becomes a compact **now-playing bar**: a sleeve, the title with its second line, a play button at the end, and a thin track along the foot. Opening the pearl (a click on the bar outside its controls, or from a row) morphs the bar into the media viewer's **opened player**, the same arrangement grown downward: the sleeve bigger, the words beside it, the track with its times, and the transport moved from the end of the bar to the middle. The sleeve, the words and the play button travel as one object through the morph; playback continues across it.
+An audio pearl's card becomes a compact **now-playing bar**: a sleeve that is its play control, the title with its second line, and a thin track along the foot. A press on the bar outside its controls expands it **in place**, inside the grid, into its **opened player**, the same arrangement grown downward: the sleeve bigger, the words beside it, the track with its times, and the transport (Restart, Play, Open file) under them. Audio pearls never open the media viewer (see the amendment below); playback is one element for the page, so the bar, the player, the row and the hover preview all show one playback.
 
 The waveform direction (stored peaks, wavesurfer) is dropped: no new column, no decoding, no new dependency.
 
@@ -15,13 +15,13 @@ The waveform direction (stored peaks, wavesurfer) is dropped: no new column, no 
 
 | Surface | Today | Now |
 | --- | --- | --- |
-| Owner's grid card (`LinkCard` → `LinkCardContent`) | `AudioFace` strip (big play, range, time) above `LinkCardStrip` | The bar is the whole card: no separate title strip |
-| Shared folder card (`SharedLinkCard`) | The same strip in a frame, a button over the rest | The bar in the frame, the open button over the rest |
-| Hover preview (`LinkPreviewBody`) | The strip, then title/description | The bar, then the description if any |
-| Media viewer (`ViewerAudio`) | Title above a 480px strip with a 56px play | The opened player, 320px wide |
-| List row | Icon slot, title, second line | Unchanged (the icon slot is the sleeve at 20px) |
+| Owner's grid card (`LinkCard`) | `AudioFace` strip (big play, range, time) above `LinkCardStrip` | The bar is the whole card (no separate title strip); it expands in place into the player |
+| Shared folder card (`SharedLinkCard`) | The same strip in a frame, a button over the rest | The bar in the frame; it expands in place like the owner's |
+| Hover preview (`LinkPreviewBody`) | The strip, then title/description | A 256px player card (`AudioPreview`): the sleeve art as a hero, the title and second line over its fade, the track with its times, the transport; it doesn't expand |
+| Media viewer (`ViewerAudio`) | Title above a 480px strip with a 56px play | Gone: audio pearls never open the viewer |
+| List row | Icon slot, title, second line | The row layout kept (`AudioRow`): a click on the row plays and pauses; while the pearl is loaded the icon slot draws the play/pause mark and the second line reads "0:22 / 2:36"; rows don't expand |
 | Pending upload (audio) | Icon on a tint at the card ratio, a progress ring | The bar's shape: the icon sleeve, the file name, the ring where play sits |
-| Landing demo | The strip, play works, nothing opens | The bar, play works, nothing opens |
+| Landing demo | The strip, play works, nothing opens | The bar, play works, it expands in place like the owner's |
 
 ## The bar
 
@@ -68,9 +68,9 @@ Today each `AudioControls` owns an `<audio>` and the viewer's player has its own
 
 ## Accessibility
 
-- The bar's play has the name "Play <title>" / "Pause <title>" and `aria-pressed`; the range is "Seek <title>" with `aria-valuetext` "0:22 / 2:36"; Restart "Restart <title>"; Open file is a link named "Open file".
-- The opened player's dialog name and description are the viewer's `Cambio.Title`/`Description` as today (title, second line); the times are plain text, not a live region.
-- Touch: play is 30px drawn with the project's `pointer-coarse:` extension to 44px; the range is 16px tall with a 44px hit area; the checkbox over the sleeve 40px.
+- The bar's play (the sleeve) has the name "Play <title>" / "Pause <title>", the name flipping with the state (no `aria-pressed`); the range is "Seek <title>" with `aria-valuetext` "0:22 / 2:36"; Restart "Restart <title>"; Open file is a link named "Open file".
+- The bar's opener is a button named "Expand <title>" / "Collapse <title>" with `aria-expanded`; the times are plain text, not a live region.
+- Touch: the sleeve's play is 40px drawn with the project's `pointer-coarse:` extension to 44px; the range is 16px tall with a 44px hit area; the checkbox over the sleeve 40px.
 - Contrast: times and the second line use `text-foreground/70` on the card, as the current strip does (the muted pair fails 4.5:1 at 12px in light mode).
 - Forced colours and the hover preview follow the card.
 
@@ -81,7 +81,8 @@ Waveforms, likes, queues or skipping between files, a mini player that persists 
 ## Tests
 
 - Unit: the store's snapshot transitions (toggle, stop, seek, ended, error, switching pearls), `PlayMark`'s path interpolation at t = 0, 0.5 and 1.
-- e2e (`e2e/media-links.spec.ts`, `e2e/media-viewer.spec.ts`, `e2e/owner-grid.spec.ts`): the bar's parts and names; play on the card then open the viewer → the player shows the same elapsed and "Pause"; close → the card still plays; one element at a time across two cards; seek by keyboard; selecting clicks on the bar select; the shared card's play works inline; reduced motion; the pending audio card's shape.
+- Unit: the expansion store (`audio-expansion`, one open at a time) and the masonry's growth in place (`masonry.test.ts`: a growing card keeps its column).
+- e2e (`e2e/media-links.spec.ts`, `e2e/media-viewer.spec.ts`, `e2e/link-row-phone.spec.ts`, `e2e/bulk-selection.spec.ts`): the bar's parts and names; one pearl plays at a time; a file that won't load goes back to Play; the bar expands in place and the grid follows it frame by frame, and Esc or a press outside its card collapses it (a press in the card's menu doesn't; on a phone a scroll that starts outside doesn't, a tap outside does); reduced motion jumps; the keyboard path (the opener, Esc back to it); selecting clicks on the bar select; the shared card expands and plays in place; the audio row plays from a click and draws the mark in its icon slot; the hover preview's player card and the card are one playback; audio pearls never open the viewer; the pending audio card's shape.
 
 ## Amendment (2026-10-28): the player opens in place, never in the viewer
 
@@ -89,14 +90,14 @@ The sections "The opened player (the viewer)" and "The morph: one object" above 
 
 - **One number is the state.** A single tween `p` (0 shut, 1 open; 460ms, quart-out, reading its start from wherever it is so a second press turns it around; instant under reduced motion) drives every position, size, radius and type size: height 78 → 189; the sleeve 40 → 64 at radius 6 → 12, at `PAD` in both; the words beside it at 13/11 → 15.5/12; the track from the bar's foot to 22px under the sleeve; the times and the transport (Restart, the 46px Play, Open file) ride `late = clamp((p − 0.6) / 0.4)`, so they arrive into a shape that has stopped growing. The width never changes (it is the column's). On close only, the whole object dips to 0.965 and back (the reference's swell), subtractive, working with the shrink.
 - **The sleeve stays the play control on the bar.** Once open, the transport's Play is the control and the sleeve's mark fades with `late`; the sleeve shows the icon or the thumbnail.
-- **What opens it.** A press on the bar outside its controls (the whole bar when shut; the sleeve-and-words row when open), as a button named "Expand <title>" / "Collapse <title>" with `aria-expanded`. Esc collapses. A pointer press outside the card (`pointerdown`, trusted events only, armed a tick after opening) collapses it. One pearl is open at a time, in a small module store (`audioExpansion`). Opening never changes playback; playback never changes the open state.
+- **What opens it.** A press on the bar outside its controls (the whole bar when shut; the sleeve-and-words row when open), as a button named "Expand <title>" / "Collapse <title>" with `aria-expanded`. Esc collapses. A pointer press outside the card (trusted events only, armed a tick after opening) collapses it: with a mouse or pen on `pointerdown`; with a finger only on a tap's lift (its `pointerup` with no `pointercancel` before it), so a scroll that starts outside the card keeps the player open (final review, 2026-10-28; not a click, which iOS Safari doesn't send for a tap on a plain area). One pearl is open at a time, in a small module store (`audioExpansion`). Opening never changes playback; playback never changes the open state.
 - **The grid follows.** The masonry re-places cards on every resize (`ResizeObserver`), so the cards below move down with the growth, frame by frame, and back.
 - **Where.** The owner's grid card and the shared folder's grid card expand in place. **List rows keep the row layout** (amended 2026-10-28, second pass): an audio row is a normal 48/56px row with the icon slot, the title and "Audio · 2:36", the checkbox on the icon on hover or while selecting, and the `⋯` floating over the row's end; a click on the row (its main element, a button named "Play <title>" / "Pause <title>") toggles playback, and while the pearl is loaded in the store (playing or paused) the **icon slot draws the play/pause mark** in place of the music icon (fourth pass: the `⋯` keeps its place and behaviour on every row; the checkbox still takes the slot on hover with a pointer, while selecting, or after a long-press on touch), and the second line reads the elapsed over the length ("0:22 / 2:36"). Rows don't expand. The hover preview shows the bar and doesn't expand.
 - **The hover preview is a player card** (third pass, 2026-10-28): a row's hover preview for an audio pearl is not the bar but a card in the preview's width (256px, the hover card's width): a **hero** the preview's full width and 180px tall showing the pearl's sleeve art (the thumbnail, `object-cover`; an upload without one shows the music icon at 48px centred on the muted tint), fading into the hover card's surface so the text sits on a near-solid foot (the fade spans the hero's lower 120px and is ≥ 90% surface under the text); over the fade's foot, the **title** (16px/22px, medium, two lines at most) and the second line (`linkSecondLine`, 13px, muted); under them the **track** (the 3px rail with the run in the foreground colour, the same `AudioTrack` as the bar, a scrubber) with the elapsed at the left and the length at the right (11px tabular, `text-foreground/70`); then the **transport** centred (Restart 34, Play 46 with the drawn mark, Open file 34, `gap-3.5`), 16px of padding around the lower part and 16px under the transport. It is a view of the store like the bar (playback shared with the row and the card); it does not expand. The reference's green run and its skip buttons are not adopted: the run is the foreground colour, the side buttons are Restart and Open file.
 - **The card's menu floats** (same pass): the owner's bar reserves no slot for the `⋯`; it floats over the bar's top-right corner on hover with a pointer and always on touch, on a backing of the bar's surface, exactly as the other cards' menus do, so the words take the full width at rest. The landing demo's audio card plays and expands like the owner's (both are client-only; the demo makes no requests).
 - **The viewer.** Images and video only. Audio pearls aren't registered with it, its Previous/Next skip them, and `?pearl=<audio id>` is stripped like an unknown id. The row menu's "Open file" and the opened player's Open file link remain the way to the file itself.
-- **Removed from the earlier sections.** The viewer's opened player, the shared `layoutId` parts, the late-arrival plumbing inside the viewer, the viewer-side presence and "moved off" logic.
+- **Removed from the earlier sections.** The viewer's opened player, the shared `layoutId` parts, the late-arrival plumbing inside the viewer, the viewer-side presence and "moved off" logic. The Summary, "Where it shows", "Accessibility" (no `aria-pressed`: the names flip), "Tests" and "Deviations from the reference" were brought in line with the passes below at the final review.
 
 ## Deviations from the reference
 
-The box radius is the grid's 10px, not sleeve + margin; the width changes with the morph (the viewer's box is 320px, a card's is the grid's); no heart, no skip; the track is a scrubber (the reference's isn't); the open state is the media viewer, not an in-place growth.
+The box keeps the grid's 10px corner, not sleeve + margin; the width is the host's (the grid's column), unchanged by the morph; the sleeve is the play control on the shut bar (the reference's play sits at the row's end); the track is a scrubber (the reference's isn't); no like, no skip.
