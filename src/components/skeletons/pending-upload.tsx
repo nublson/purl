@@ -212,8 +212,8 @@ export function PendingUploadCard({ item, onRetry, onDismiss }: Props) {
 
 /**
  * An audio file uploading, in the grid: the shape of the bar it becomes
- * (`AudioBar`): the icon sleeve, its title over "Uploading…", the
- * progress ring where play sits on a wide bar, and the empty rail. Failed: a scrim with the reason,
+ * (`AudioBar`): the sleeve with the progress ring where the play mark
+ * will be, its title over "Uploading…", and the empty rail. Failed: a scrim with the reason,
  * Retry and Dismiss.
  */
 function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
@@ -228,11 +228,17 @@ function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
       className="relative overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 animate-in fade-in-0 duration-300"
     >
       <div aria-hidden className="flex h-[78px] items-center gap-2.5 p-[10px] pb-7">
+        {/* The ring where the mark will be: the sleeve is the bar's play. */}
         <AudioSleeve
           link={{ thumbnail: null }}
           size={AUDIO_BAR.sleeve}
           radius={AUDIO_BAR.sleeveRadius}
-        />
+          contentClassName="[&>svg]:hidden"
+        >
+          <span className="absolute inset-0 grid place-items-center">
+            <ProgressRing progress={item.progress} />
+          </span>
+        </AudioSleeve>
         <div className="flex min-w-0 flex-1 flex-col">
           <span
             title={item.name}
@@ -244,9 +250,6 @@ function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
             Uploading…
           </span>
         </div>
-        <span className="grid size-[30px] shrink-0 place-items-center">
-          <ProgressRing progress={item.progress} />
-        </span>
       </div>
       {/* The bar's empty rail along the foot. */}
       <span

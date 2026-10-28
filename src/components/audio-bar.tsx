@@ -1,8 +1,9 @@
 "use client";
 
 /* Adapted from Bencho's "Now playing" (bencho.dev), MIT licence: the bar's
-   arrangement (a sleeve, the words beside it, play at the end, a thin track
-   along the foot) and its one margin all round. */
+   arrangement (a sleeve, the words beside it, a thin track along the foot)
+   and its one margin all round. Here the sleeve is the play control; the
+   separate play button is the opened player's. */
 
 import { useAudioPlayer } from "@/hooks/use-audio-player";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
@@ -28,11 +29,10 @@ export const AUDIO_BAR = {
   height: 78,
   sleeve: 40,
   sleeveRadius: 6,
-  play: 30,
   rail: 3,
 } as const;
 
-/** The owner's card: its checkbox in the sleeve's place, its menu after play. */
+/** The owner's card: its checkbox on the sleeve, its menu after the words. */
 export type AudioBarOwner = {
   selected: boolean;
   /** The checkbox's click (mouse, keyboard): toggles, no haptic. */
@@ -58,29 +58,23 @@ function keepClick(event: MouseEvent<HTMLElement>) {
 }
 
 /**
- * The sleeve gives way to the owner's checkbox while selecting, and on a
- * wide bar on hover with a pointer or the checkbox's keyboard focus: it
- * shrinks as it fades while the checkbox settles from larger, the row's
- * favicon swap. A narrow bar's sleeve is its play control, so on hover it
- * stays, with the checkbox in its corner. Never at rest on touch. Reduced
- * motion keeps the fade only.
+ * While selecting, the sleeve gives way to the owner's checkbox: it shrinks
+ * as it fades while the checkbox settles from larger, the row's favicon
+ * swap. Reduced motion keeps the fade only.
  */
 function sleeveSwapOut(selecting: boolean) {
-  return selecting
-    ? "opacity-0 motion-safe:scale-80"
-    : "[@media(hover:hover)]:@min-[240px]:group-hover/card:opacity-0 motion-safe:[@media(hover:hover)]:@min-[240px]:group-hover/card:scale-80 group-has-[[data-slot=checkbox]:focus-visible]/sleeve:opacity-0 motion-safe:group-has-[[data-slot=checkbox]:focus-visible]/sleeve:scale-80";
+  return selecting ? "opacity-0 motion-safe:scale-80" : undefined;
 }
 
 /**
  * An audio pearl's card: a now-playing bar. The sleeve (its page's image,
- * else the music icon), the title over its second line, play at the end
- * and a thin track along the foot, which is the seek control. Narrow (under
- * 240px of the bar's own width, `@max-[240px]:`, a container query, so the
- * server's HTML is right: every grid card; the hover preview is wide), the
- * sleeve itself is the play button, the second line is just the length
- * and the gaps are 8px. It's a view of the page's one player (`useAudioPlayer`),
- * like the hover preview's bar and the viewer's player, so they all show
- * one playback.
+ * else the tint) is the play control, with the drawn play/pause mark on
+ * it; beside it the title over its second line; the owner's menu after
+ * them; and a thin track along the foot, which is the seek control. Under
+ * 200px of the bar's own width (`@max-[200px]:`, a container query, so the
+ * server's HTML is right) an upload's second line is just its length. It's
+ * a view of the page's one player (`useAudioPlayer`), like the hover
+ * preview's bar and the viewer's player, so they all show one playback.
  *
  * The controls take pointer events inside the owner's card (whose content
  * doesn't), except while selecting, when they step aside (`inert`) and a
@@ -88,9 +82,9 @@ function sleeveSwapOut(selecting: boolean) {
  * media viewer morphs out of and back into.
  *
  * The root is a size container, so it's a stacking context: its layers
- * (track 1, menu 2, play 3, checkbox 10) stack among themselves, and
- * whoever hosts it lays its own button under it (clicks reach the button
- * where the bar takes no pointer events).
+ * (track 1, menu 2, play 3, badge 4, checkbox 10) stack among themselves,
+ * and whoever hosts it lays its own button under it (clicks reach the
+ * button where the bar takes no pointer events).
  */
 export function AudioBar({
   link,
@@ -102,7 +96,7 @@ export function AudioBar({
   link: Link;
   /** The bar is the viewer's `MediaAnchor` (the owner's card, the shared card). */
   anchored?: boolean;
-  /** The owner's card only: the checkbox in the sleeve slot, the menu after play. */
+  /** The owner's card only: the checkbox in the sleeve's corner, the menu slot. */
   owner?: AudioBarOwner;
   /** The folder badge, on the sleeve's bottom-end corner. */
   badge?: ReactNode;
@@ -113,11 +107,12 @@ export function AudioBar({
   const selecting = useIsSelectionActive();
   const src = safeRemoteImgSrc(link.url);
   const swapOut = owner ? sleeveSwapOut(selecting) : undefined;
-  const label = `${playing ? "Pause" : "Play"} ${link.title}`;
   const image = Boolean(link.thumbnail && safeRemoteImgSrc(link.thumbnail));
 
   const secondLine = linkSecondLine(link);
-  const length = link.duration != null ? formatDuration(link.duration) : null;
+  // An upload's facts shrink to the length; a link's domain just truncates.
+  const length =
+    link.upload && link.duration != null ? formatDuration(link.duration) : null;
 
   return (
     <AnchorIf link={link} anchored={anchored} corners="all">
@@ -125,16 +120,18 @@ export function AudioBar({
         <div
           // pb: the track's lane under the sleeve (15px, the 3px rail, the
           // margin), so the sleeve sits at the margin like the player's.
-          className="flex h-full items-center gap-2.5 p-[10px] pb-7 @max-[240px]:gap-2"
+          className="flex h-full items-center gap-2.5 p-[10px] pb-7"
         >
           <AudioSleeve
             link={link}
             size={AUDIO_BAR.sleeve}
             radius={AUDIO_BAR.sleeveRadius}
-            contentClassName={cn(swapOut, "@max-[240px]:[&>svg]:hidden")}
+            // The mark takes the music note's place on the tint.
+            contentClassName={cn(swapOut, "[&>svg]:hidden")}
           >
-            {/* Narrow: the sleeve is the play button, the mark drawn on its
-                tint (or on a scrim over its image), 44px to the touch. A
+            {/* The sleeve is the play button: the mark on its tint, or on a
+                scrim over its image; 44px to the touch. Above the menu and
+                the track, so it wins where their touch areas meet. A
                 long-press here still selects the card. */}
             <button
               type="button"
@@ -142,10 +139,10 @@ export function AudioBar({
               disabled={!src}
               inert={selecting}
               aria-pressed={playing}
-              aria-label={label}
+              aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
               aria-describedby={describedBy}
               className={cn(
-                "absolute inset-0 z-[3] hidden cursor-pointer items-center justify-center text-foreground outline-none transition-[opacity,scale] duration-150 ease-out-strong focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100 @max-[240px]:flex [-webkit-touch-callout:none] pointer-coarse:after:absolute pointer-coarse:after:-inset-[2px]",
+                "absolute inset-0 z-[3] flex cursor-pointer items-center justify-center text-foreground outline-none transition-[opacity,scale] duration-150 ease-out-strong focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100 [-webkit-touch-callout:none] pointer-coarse:after:absolute pointer-coarse:after:-inset-[2px]",
                 image && "bg-background/60",
                 selecting ? "pointer-events-none" : "pointer-events-auto",
                 swapOut,
@@ -177,15 +174,14 @@ export function AudioBar({
                   checked={owner.selected}
                   aria-label={`Select ${link.title}`}
                   className={cn(
-                    "absolute top-3 left-3 z-10 cursor-pointer bg-background after:-inset-3 transition-[opacity,scale,box-shadow] duration-150 ease-out-strong",
+                    "absolute z-10 cursor-pointer bg-background transition-[opacity,scale,box-shadow] duration-150 ease-out-strong",
                     selecting
-                      ? "pointer-events-auto opacity-100"
-                      : // At rest it takes no taps (on touch the sleeve plays
-                        // or opens); a pointer's hover shows it: in the
-                        // sleeve's place on a wide bar, in the sleeve's
-                        // corner on a narrow one (the sleeve is play), like
-                        // an image card's.
-                        "pointer-events-none opacity-0 motion-safe:scale-125 focus-visible:opacity-100 motion-safe:focus-visible:scale-100 [@media(hover:hover)]:group-hover/card:pointer-events-auto [@media(hover:hover)]:group-hover/card:opacity-100 motion-safe:[@media(hover:hover)]:group-hover/card:scale-100 @max-[240px]:-top-0.5 @max-[240px]:-left-0.5 @max-[240px]:shadow-sm @max-[240px]:after:-inset-1",
+                      ? // In the sleeve's place, its 40px box the hit area.
+                        "pointer-events-auto top-3 left-3 opacity-100 after:-inset-3"
+                      : // In the sleeve's corner, like an image card's: shown
+                        // on hover with a pointer (the sleeve stays play) or
+                        // keyboard focus; at rest it takes no taps.
+                        "pointer-events-none -top-0.5 -left-0.5 opacity-0 shadow-sm after:-inset-1 motion-safe:scale-125 focus-visible:opacity-100 motion-safe:focus-visible:scale-100 [@media(hover:hover)]:group-hover/card:pointer-events-auto [@media(hover:hover)]:group-hover/card:opacity-100 motion-safe:[@media(hover:hover)]:group-hover/card:scale-100",
                   )}
                   onClick={(event) => {
                     event.preventDefault();
@@ -208,45 +204,17 @@ export function AudioBar({
               {link.title}
             </span>
             {/* `text-foreground/70`, like Kbd: `text-muted-foreground` on the
-                card's tint is under 4.5:1 for small text in light mode.
-                Narrow: just the length, when there's one. */}
+                card's tint is under 4.5:1 for small text in light mode. */}
             <span className="truncate text-[11px] leading-[14px] text-foreground/70">
               {length && length !== secondLine ? (
                 <>
-                  <span className="@max-[240px]:hidden">{secondLine}</span>
-                  <span className="hidden @max-[240px]:inline">{length}</span>
+                  <span className="@max-[200px]:hidden">{secondLine}</span>
+                  <span className="hidden @max-[200px]:inline">{length}</span>
                 </>
               ) : (
                 secondLine
               )}
             </span>
-          </div>
-          {/* `data-card-menu`: a press here isn't the card's long-press.
-              Above the menu and the track: play wins where their touch
-              areas meet. Narrow: gone (the sleeve plays). */}
-          <div
-            data-card-menu=""
-            inert={selecting}
-            className={cn(
-              "relative z-[3] flex shrink-0 @max-[240px]:hidden",
-              selecting ? "pointer-events-none" : "pointer-events-auto",
-            )}
-            onClick={keepClick}
-          >
-            <button
-              type="button"
-              data-play=""
-              disabled={!src}
-              aria-pressed={playing}
-              aria-label={label}
-              aria-describedby={describedBy}
-              className="relative flex size-[30px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100 pointer-coarse:after:absolute pointer-coarse:after:-inset-[7px]"
-              onClick={() => {
-                if (src) toggle(src);
-              }}
-            >
-              <PlayMark playing={playing} size={12} reducedMotion={reducedMotion} />
-            </button>
           </div>
           {owner ? (
             // Its own 32px slot, always there, so nothing reflows when the
@@ -261,6 +229,7 @@ export function AudioBar({
             </div>
           ) : null}
         </div>
+        {/* `data-card-menu`: a press on the track isn't the card's long-press. */}
         <div
           data-card-menu=""
           inert={selecting}
@@ -366,7 +335,7 @@ export function AudioSleeve({
   return (
     <div
       data-sleeve={image ? "image" : "icon"}
-      className="group/sleeve relative shrink-0"
+      className="relative shrink-0"
       style={{ width: size, height: size }}
     >
       <div

@@ -79,7 +79,7 @@ async function clickAt(page: Page, target: Locator) {
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
 }
 
-/** The bar's second line as shown (the narrow bar shows just the length). */
+/** The bar's second line as shown (under 200px an upload's is just its length). */
 function secondLine(scope: Locator) {
   return scope
     .locator("[data-words] > :nth-child(2)")
@@ -203,8 +203,8 @@ test.describe("Media pearls", () => {
     await clickAt(page, song.locator("[data-words]"));
     await expect(checkbox).toBeChecked();
 
-    // The controls step aside: out of reach of focus and clicks. A grid
-    // card's bar is narrow (under 240px): the sleeve is its play button.
+    // The controls step aside: out of reach of focus and clicks. The
+    // sleeve is the bar's play button.
     const play = song.locator('[data-sleeve] button[data-play][aria-label="Play Song"]');
     await expect(play).toHaveAttribute("inert", "");
     expect(
@@ -368,16 +368,15 @@ test.describe("Audio pearls: the now-playing bar", () => {
     await expect(song.locator("a")).toHaveCount(0);
     const bar = song.locator('[data-face="audio"]');
     await expect(bar.locator("[data-words]")).toContainText("Song");
-    // A grid card is under 240px wide (every one is, at most 210px): the
-    // narrow bar. Its second line is the length, its sleeve is play.
-    expect((await bar.boundingBox())!.width).toBeLessThan(240);
-    expect(await secondLine(bar)).toBe("2:36");
+    // At 210px the second line is the upload's facts in full; the sleeve
+    // is the play control.
+    expect(await secondLine(bar)).toBe("Audio · 2:36");
     const songPlay = song.getByRole("button", { name: "Play Song" });
     await expect(songPlay).toHaveAttribute("aria-pressed", "false");
     expect(await songPlay.evaluate((el) => el.closest("[data-sleeve]") !== null)).toBe(true);
     await expect(song.getByRole("slider", { name: "Seek Song" })).toHaveCount(1);
     // No preview image: the icon sleeve; Birds' page image is its sleeve.
-    // (Narrow: the mark is drawn on the icon's tint, the music note hidden.)
+    // (The mark is drawn on the icon's tint, the music note hidden.)
     await expect(song.locator('[data-sleeve="icon"] [data-play] svg')).toBeVisible();
     await expect(song.locator('[data-sleeve="icon"] svg.reicon')).toBeHidden();
     await expect(birds.locator('[data-sleeve="image"] img')).toBeVisible();
@@ -419,13 +418,15 @@ test.describe("Audio pearls: the now-playing bar", () => {
     await row(page, "Song").hover();
     const preview = page.locator('[data-face="audio"]');
     await expect(preview).toBeVisible();
-    // The preview's bar is wide: the full second line, play at the end.
-    expect((await preview.boundingBox())!.width).toBeGreaterThanOrEqual(240);
+    // The same bar: the full second line, the sleeve is the play control.
     expect(await secondLine(preview)).toBe("Audio · 2:36");
-    await expect(preview.locator('[data-sleeve="icon"] svg.reicon')).toBeVisible();
     const previewPlay = preview.getByRole("button", { name: "Play Song" });
-    expect(await previewPlay.evaluate((el) => el.closest("[data-sleeve]") === null)).toBe(true);
-    expect(await previewPlay.evaluate((el) => el.getBoundingClientRect().width)).toBe(30);
+    expect(
+      await previewPlay.evaluate(
+        (el) => el.hasAttribute("data-play") && el.closest("[data-sleeve]") !== null,
+      ),
+    ).toBe(true);
+    expect(await previewPlay.evaluate((el) => el.getBoundingClientRect().width)).toBe(40);
     await previewPlay.click();
     await expect(preview.getByRole("button", { name: "Pause Song" })).toBeVisible();
 
@@ -473,7 +474,8 @@ test.describe("Audio pearls: the now-playing bar", () => {
 
     const item = page.locator('[data-cy="pending-upload"]');
     await expect(item).toHaveAttribute("data-status", "uploading");
-    await expect(item.locator('[data-sleeve="icon"] svg')).toBeVisible();
+    // The ring where the play mark will be: on the sleeve.
+    await expect(item.locator('[data-sleeve="icon"] > span svg')).toBeVisible();
     await expect(item).toContainText("tune");
     await expect(item).toContainText("Uploading…");
     const height = (await item.boundingBox())!.height;
@@ -496,14 +498,22 @@ test.describe("Audio pearls on a phone", () => {
     await page.context().route("https://sounds.example/**", (route) =>
       route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
     );
+    await seed.link({
+      url: "https://birds.example/birds.mp3",
+      title: "Birds",
+      contentType: "AUDIO",
+      duration: 30,
+    });
     await seedSong(seed, "Song for a long drive home");
     // The grid, saved on the account before the page loads.
     const saved = await page.request.patch("/api/user/layout", { data: { view: "grid" } });
     expect(saved.ok()).toBe(true);
     await openHome(page);
 
-    const song = cards(page).filter({ has: page.locator('[data-face="audio"]') });
+    const song = cards(page).filter({ hasText: "Song for a long drive home" });
     expect((await song.boundingBox())!.width).toBeLessThanOrEqual(175);
+    // Under 200px a link's second line stays its domain.
+    expect(await secondLine(cards(page).filter({ hasText: "Birds" }))).toBe("birds.example");
     const title = song.locator("[data-words] > :first-child");
     expect(await title.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
     expect(await secondLine(song)).toBe("2:36");
