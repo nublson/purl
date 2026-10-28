@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test, waitForHydration } from "./fixtures";
 import type { seedLink } from "./support/db";
 import { silentWav } from "./support/media";
@@ -253,10 +253,32 @@ async function seedAudioBetween(
   });
 }
 
+/** An uploaded audio pearl, "Song", 2:36 long (its second line "Audio · 2:36"). */
+function seedUploadedSong(seed: {
+  link: (link: Parameters<typeof seedLink>[1]) => Promise<string>;
+}) {
+  return seed.link({
+    url: "https://sounds.example/song.wav",
+    title: "Song",
+    contentType: "AUDIO",
+    mimeType: "audio/wav",
+    duration: 156,
+    fileKey: "users/e2e/song/song.wav",
+    fileSize: 1000,
+  });
+}
+
+/** Opens an audio card: a click on its bar's words (the card's button, beside its controls). */
+async function openAudioCard(page: Page, card: Locator) {
+  const words = (await card.locator("[data-words]").boundingBox())!;
+  await page.mouse.click(words.x + words.width / 2, words.y + words.height / 2);
+}
+
 /**
  * On an audio pearl with neighbours, Previous / Next (with their invisible
- * hit area) stay clear of Play and the scrubber. Boxes may be mid-morph,
- * but a scale along the axes keeps boxes that don't overlap apart.
+ * hit area) stay clear of the track, its times and the transport. Boxes
+ * may be mid-morph, but a scale along the axes keeps boxes that don't
+ * overlap apart.
  */
 async function expectArrowsClearOfPlayer(page: Page) {
   const dialog = page.getByRole("dialog", { name: "Song" });
@@ -273,8 +295,11 @@ async function expectArrowsClearOfPlayer(page: Page) {
     return {
       arrows: [hit("Previous pearl"), hit("Next pearl")],
       controls: [
+        rect(root.querySelector('button[aria-label="Restart Song"]')),
         rect(root.querySelector('button[aria-label="Play Song"]')),
+        rect(root.querySelector('a[aria-label="Open file"]')),
         rect(root.querySelector('input[aria-label="Seek Song"]')),
+        rect(root.querySelector("[data-times]")),
       ],
     };
   });
@@ -554,19 +579,14 @@ test.describe("Media viewer", () => {
     await expect(player).toHaveAttribute("poster", icon);
   });
 
-  test("an audio card opens the player at viewer size; playback continues in the viewer", async ({
+  test("an audio card opens the player: the bar, opened; playback carries on", async ({
     page,
     seed,
   }) => {
     await page.context().route("https://sounds.example/**", (route) =>
-      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(156) }),
     );
-    await seed.link({
-      url: "https://sounds.example/song.wav",
-      title: "Song",
-      contentType: "AUDIO",
-      duration: 10,
-    });
+    await seedUploadedSong(seed);
     await openHome(page);
     await chooseGrid(page);
     await expect(cards(page)).toHaveCount(1);
@@ -575,25 +595,48 @@ test.describe("Media viewer", () => {
     await card.getByRole("button", { name: "Play Song" }).click();
     await expect(card.getByRole("button", { name: "Pause Song" })).toBeVisible();
 
-    // The card's button, under the bar's words (beside its controls).
-    const words = (await card.locator("[data-words]").boundingBox())!;
-    await page.mouse.click(words.x + words.width / 2, words.y + words.height / 2);
+    await openAudioCard(page, card);
     const dialog = page.getByRole("dialog", { name: "Song" });
     await expect(dialog).toBeVisible();
-    // The title, shown above the player (not only as the dialog's name).
-    await expect(
-      dialog.locator('[data-viewer-media="audio"]').getByText("Song", { exact: true }),
-    ).toBeVisible();
-    // The same playback, carried on: the viewer's player reads Pause.
+    const player = dialog.locator('[data-viewer-media="audio"]');
+    // Layout sizes (the box may still be scaling in the morph): 320 wide,
+    // the stack's sum tall.
+    const size = await player.evaluate((el: HTMLElement) => ({
+      w: el.offsetWidth,
+      h: el.offsetHeight,
+    }));
+    expect(Math.abs(size.w - 320)).toBeLessThanOrEqual(1);
+    expect(Math.abs(size.h - 189)).toBeLessThanOrEqual(2);
+    // The words beside a 64px sleeve.
+    await expect(player.locator("[data-words]").getByText("Song", { exact: true })).toBeVisible();
+    await expect(player.locator("[data-words]").getByText("Audio · 2:36")).toBeVisible();
+    expect(await player.locator("[data-sleeve]").evaluate((el: HTMLElement) => el.offsetWidth)).toBe(
+      64,
+    );
+    await expect(dialog.getByRole("slider", { name: "Seek Song" })).toHaveCount(1);
+    // The same playback, carried on: elapsed at the left, remaining at the right.
+    await expect(player.locator("[data-elapsed]")).toHaveText(/^0:0\d$/);
+    await expect(player.locator("[data-remaining]")).toHaveText(/^\u22122:[23]\d$/);
+    await expect(dialog.getByRole("button", { name: "Restart Song" })).toBeVisible();
     const pause = dialog.getByRole("button", { name: "Pause Song" });
     await expect(pause).toBeVisible();
-    // 56px (its layout size: the box may still be scaling in the morph).
-    expect(await pause.evaluate((el: HTMLElement) => el.offsetWidth)).toBe(56);
+    // The name says what a press does; no `aria-pressed` on top of it.
+    await expect(pause).not.toHaveAttribute("aria-pressed");
+    expect(await pause.evaluate((el: HTMLElement) => el.offsetWidth)).toBe(46);
+    const file = dialog.getByRole("link", { name: "Open file" });
+    await expect(file).toHaveAttribute("href", "https://sounds.example/song.wav");
+    await expect(file).toHaveAttribute("target", "_blank");
     // One element for the page, still playing.
     expect(await page.evaluate(() => document.querySelectorAll("audio").length)).toBe(1);
     await expect
       .poll(() => page.evaluate(() => document.querySelector("audio")?.paused))
       .toBe(false);
+
+    // Restart: back to 0:00, still playing.
+    await expect(player.locator("[data-elapsed]")).not.toHaveText("0:00");
+    await dialog.getByRole("button", { name: "Restart Song" }).click();
+    await expect(player.locator("[data-elapsed]")).toHaveText("0:00");
+    await expect(pause).toBeVisible();
 
     // Closing leaves it playing on the card.
     await page.keyboard.press("Escape");
@@ -603,6 +646,48 @@ test.describe("Media viewer", () => {
     await expect
       .poll(() => page.evaluate(() => document.querySelector("audio")?.paused))
       .toBe(false);
+  });
+
+  test("with reduced motion the audio player opens, and its mark swaps at once", async ({
+    page,
+    seed,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(156) }),
+    );
+    await seedUploadedSong(seed);
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(1);
+
+    await openAudioCard(page, cards(page).first());
+    const dialog = page.getByRole("dialog", { name: "Song" });
+    await expect(dialog).toBeVisible();
+    const player = dialog.locator('[data-viewer-media="audio"]');
+    // Not played yet: the stored length, before the file's metadata.
+    await expect(player.locator("[data-elapsed]")).toHaveText("0:00");
+    await expect(player.locator("[data-remaining]")).toHaveText("\u22122:36");
+
+    // Every frame from the press on draws the mark level and unscaled.
+    const transforms = await dialog
+      .getByRole("button", { name: "Play Song" })
+      .evaluate(
+        (button: HTMLElement) =>
+          new Promise<string[]>((resolve) => {
+            const seen = new Set<string>();
+            const t0 = performance.now();
+            button.click();
+            const tick = () => {
+              seen.add(button.querySelector("svg")!.style.transform);
+              if (performance.now() - t0 < 400) requestAnimationFrame(tick);
+              else resolve([...seen]);
+            };
+            requestAnimationFrame(tick);
+          }),
+      );
+    expect(transforms).toEqual(["rotate(0deg) scale(1, 1)"]);
+    await expect(dialog.getByRole("button", { name: "Pause Song" })).toBeVisible();
   });
 
   test("an image row opens the viewer; Esc gives focus back to the row", async ({

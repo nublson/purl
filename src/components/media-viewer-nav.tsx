@@ -112,8 +112,8 @@ export function ViewerStatus({ text }: { text: string }) {
   );
 }
 
-/** Where a drag can't start: the player's own controls. */
-const NOT_A_HANDLE = "video, input[type=range], button";
+/** Where a drag can't start: the player's own controls (Open file is a link). */
+const NOT_A_HANDLE = "video, input[type=range], button, a[href]";
 
 /** How far a drag goes before the media has shrunk all the way (px). */
 const PULL_FOR_FULL_SCALE = 160;

@@ -48,8 +48,9 @@ const OPENER_CLASS =
  * selecting, when a click anywhere toggles the card); a long-press does
  * the same on touch. The row menu (`⋯`) sits in the other corner, on hover
  * or always on touch. An audio pearl's bar holds both itself (the checkbox
- * in the sleeve's place, the menu after play). Deleted or moved-away cards
- * fade out, and Undo brings them back.
+ * in the sleeve's corner on hover, in its place while selecting; the menu
+ * after the words). Deleted or moved-away cards fade out, and Undo brings
+ * them back.
  */
 export function LinkCard({
   link,
@@ -222,8 +223,8 @@ export function LinkCard({
       <div className="pointer-events-none flex flex-col">
         {kind === "audio" ? (
           // The bar holds the owner's controls itself: the checkbox in the
-          // sleeve's place, the menu after play (no thumbnail corners to
-          // put them in).
+          // sleeve's corner on hover, in its place while selecting; the
+          // menu after the words (no thumbnail corners to put them in).
           <AudioBar
             link={link}
             anchored={anchoredFace}

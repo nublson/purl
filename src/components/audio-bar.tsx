@@ -32,6 +32,24 @@ export const AUDIO_BAR = {
   rail: 3,
 } as const;
 
+/**
+ * The opened player's measures (the media viewer's `ViewerAudio`), in px:
+ * the bar grown downward. Stacked from the sleeve, each gap from the thing
+ * above it: pad, sleeve, 22, rail, 8, times (10), 16, play, pad, so the
+ * height is their sum (189). With Previous / Next on its sides the content
+ * takes `padWithArrows` instead of `pad` on the left and right.
+ */
+export const AUDIO_PLAYER = {
+  width: 320,
+  pad: AUDIO_BAR.pad,
+  padWithArrows: 48,
+  sleeve: 64,
+  sleeveRadius: 12,
+  play: 46,
+  side: 34,
+  height: 189,
+} as const;
+
 /** The owner's card: its checkbox on the sleeve, its menu after the words. */
 export type AudioBarOwner = {
   selected: boolean;
@@ -115,7 +133,7 @@ export function AudioBar({
     link.upload && link.duration != null ? formatDuration(link.duration) : null;
 
   return (
-    <AnchorIf link={link} anchored={anchored} corners="all">
+    <AnchorIf link={link} anchored={anchored}>
       <div data-face="audio" className="@container relative h-[78px] bg-card">
         <div
           // pb: the track's lane under the sleeve (15px, the 3px rail, the
@@ -138,7 +156,6 @@ export function AudioBar({
               data-play=""
               disabled={!src}
               inert={selecting}
-              aria-pressed={playing}
               aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
               aria-describedby={describedBy}
               className={cn(

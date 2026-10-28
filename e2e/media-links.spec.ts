@@ -372,7 +372,8 @@ test.describe("Audio pearls: the now-playing bar", () => {
     // is the play control.
     expect(await secondLine(bar)).toBe("Audio · 2:36");
     const songPlay = song.getByRole("button", { name: "Play Song" });
-    await expect(songPlay).toHaveAttribute("aria-pressed", "false");
+    // The name says what a press does; no `aria-pressed` on top of it.
+    await expect(songPlay).not.toHaveAttribute("aria-pressed");
     expect(await songPlay.evaluate((el) => el.closest("[data-sleeve]") !== null)).toBe(true);
     await expect(song.getByRole("slider", { name: "Seek Song" })).toHaveCount(1);
     // No preview image: the icon sleeve; Birds' page image is its sleeve.
@@ -383,10 +384,10 @@ test.describe("Audio pearls: the now-playing bar", () => {
     const height = (await song.boundingBox())!.height;
     expect(Math.abs(height - 78)).toBeLessThanOrEqual(1);
 
-    // Play: pressed, Pause, and the run moves along the track.
+    // Play: Pause, and the run moves along the track.
     await song.getByRole("button", { name: "Play Song" }).click();
     const pause = song.getByRole("button", { name: "Pause Song" });
-    await expect(pause).toHaveAttribute("aria-pressed", "true");
+    await expect(pause).toBeVisible();
     await page.waitForTimeout(1500);
     expect(await runWidth(song)).toBeGreaterThan(0);
 
@@ -541,7 +542,7 @@ test.describe("Audio pearls on a phone", () => {
     await play.tap();
     await expect(
       song.getByRole("button", { name: "Pause Song for a long drive home" }),
-    ).toHaveAttribute("aria-pressed", "true");
+    ).toBeVisible();
     await expect(page.getByText("1 selected")).toHaveCount(0);
     await expect(song).not.toHaveAttribute("data-selected", "true");
   });

@@ -1,6 +1,5 @@
 "use client";
 
-import { useAudioPlayer } from "@/hooks/use-audio-player";
 import { useLiveCards } from "@/hooks/use-live-cards";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { usePlayVideos } from "@/contexts/link-view-context";
@@ -11,7 +10,6 @@ import { cn } from "@/lib/utils";
 import { formatDuration } from "@/utils/format-duration";
 import { MediaAnchor } from "./media-face-anchor";
 import type { Link } from "@/utils/links";
-import { PlayMark } from "./play-mark";
 import { Image as ImageIcon, Video } from "reicon-react";
 import {
   useEffect,
@@ -86,18 +84,14 @@ export function ImageFace({
 export function AnchorIf({
   link,
   anchored,
-  corners,
   children,
 }: {
   link: Link;
   anchored: boolean;
-  corners?: "all" | "top";
   children: ReactNode;
 }) {
   return anchored ? (
-    <MediaAnchor link={link} corners={corners}>
-      {children}
-    </MediaAnchor>
+    <MediaAnchor link={link}>{children}</MediaAnchor>
   ) : (
     children
   );
@@ -298,58 +292,6 @@ export function VideoFace({
         <FaceBadge badge={badge} />
       </div>
     </AnchorIf>
-  );
-}
-
-/**
- * The media viewer's audio player, until the viewer opens the bar itself:
- * play/pause (56px, the drawn mark), a scrubber, and elapsed over the
- * length. It owns no element: it's a view of the page's one player
- * (`useAudioPlayer`), so a pearl playing on its card plays on here.
- */
-export function AudioControls({ link }: { link: Link }) {
-  const { playing, elapsed, length, toggle, seek } = useAudioPlayer(link.id, link.duration);
-  const reducedMotion = usePrefersReducedMotion();
-  const src = safeRemoteImgSrc(link.url);
-
-  const time = length
-    ? `${formatDuration(elapsed)} / ${formatDuration(length)}`
-    : formatDuration(elapsed);
-
-  return (
-    <div className="relative z-[1] flex items-center gap-4">
-      <button
-        type="button"
-        disabled={!src}
-        aria-pressed={playing}
-        aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
-        className="flex size-14 shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100"
-        onClick={() => {
-          if (src) toggle(src);
-        }}
-      >
-        <PlayMark playing={playing} size={24} reducedMotion={reducedMotion} />
-      </button>
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <input
-          type="range"
-          min={0}
-          max={length ?? 0}
-          step="any"
-          value={Math.min(elapsed, length ?? 0)}
-          disabled={!src || !length}
-          aria-label={`Seek ${link.title}`}
-          aria-valuetext={time}
-          className="h-4 w-full cursor-pointer accent-foreground disabled:cursor-default"
-          onChange={(event) => {
-            if (src) seek(src, Number(event.currentTarget.value));
-          }}
-        />
-        {/* `text-foreground/70`, like Kbd: `text-muted-foreground` on
-            `bg-muted` is 4.3:1 in light mode, under 4.5:1 for 12px text. */}
-        <span className="text-sm leading-5 text-foreground/70 tabular-nums">{time}</span>
-      </div>
-    </div>
   );
 }
 

@@ -1,14 +1,18 @@
 "use client";
 
+import { useAudioPlayer } from "@/hooks/use-audio-player";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { linkKind } from "@/lib/link-kind";
 import { useIsMediaOpen } from "@/lib/media-viewer";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
+import { linkSecondLine } from "@/lib/upload-meta";
 import { cn } from "@/lib/utils";
+import { formatDuration } from "@/utils/format-duration";
 import type { Link } from "@/utils/links";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
-import { Image as ImageIcon, Video } from "reicon-react";
-import { AudioControls } from "./media-card-face";
+import { Export5, Image as ImageIcon, Restart, Video } from "reicon-react";
+import { AUDIO_PLAYER, AudioSleeve, AudioTrack } from "./audio-bar";
+import { PlayMark } from "./play-mark";
 
 // What the media viewer (`media-viewer.tsx`) shows of a pearl: an image,
 // a video's player or an audio player, sized for the viewer.
@@ -285,29 +289,100 @@ function ViewerVideo({ link, ready }: { link: Link; ready: boolean }) {
   );
 }
 
+/** The opened player's side buttons (Restart, Open file): 34px, outlined, 44px to the touch. */
+const SIDE_BUTTON =
+  "relative flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-border text-foreground/70 outline-none transition-[background-color,color,scale] duration-150 ease-out hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100 pointer-coarse:after:absolute pointer-coarse:after:-inset-[5px]";
+
 /**
- * An audio pearl: the title, then the card's player at the viewer's size
- * (a 56px play button, the scrubber and the time), on the card's surface.
- * It's a view of the page's one player, like the card's strip, so a pearl
+ * An audio pearl: the card's now-playing bar, opened. The sleeve (64px)
+ * with the words beside it, clear of the Close button; under them the
+ * track with elapsed and remaining; then the transport, centred: Restart,
+ * Play (the drawn mark) and Open file (the row menu's item, a link). 320px
+ * wide and as tall as its stack (`AUDIO_PLAYER`). It's a view of the
+ * page's one player (`useAudioPlayer`), like the card's bar, so a pearl
  * playing on its card plays on here, and on the card after closing. With
- * Previous / Next on its sides (8px in, up to 40px wide on touch), 56px
- * gutters on both sides keep the player between them, the title lined up
- * with it.
+ * Previous / Next on its sides (8px in, 32px wide; 40px on touch, where
+ * the content keeps the same 8px from them) the content narrows so they
+ * never cover the track's ends or the transport.
  */
 function ViewerAudio({ link, roomForArrows }: { link: Link; roomForArrows: boolean }) {
+  const { playing, elapsed, length, toggle, restart } = useAudioPlayer(link.id, link.duration);
+  const reducedMotion = usePrefersReducedMotion();
+  const src = safeRemoteImgSrc(link.url);
+
   return (
     <div
       data-viewer-media="audio"
       className={cn(
-        "flex w-[min(480px,100vw-32px)] flex-col gap-4 bg-card p-5 md:p-6",
-        roomForArrows && "px-14 md:px-14",
+        "flex w-[min(320px,100vw-32px)] flex-col bg-card p-[10px]",
+        roomForArrows && "px-12 pointer-coarse:px-14",
       )}
     >
-      {/* Clear of the close button in the top-right corner. */}
-      <p className="line-clamp-2 pr-10 text-base leading-6 font-medium wrap-anywhere text-foreground">
-        {link.title}
-      </p>
-      <AudioControls link={link} />
+      <div className="flex items-center gap-2.5">
+        <AudioSleeve link={link} size={AUDIO_PLAYER.sleeve} radius={AUDIO_PLAYER.sleeveRadius} />
+        {/* Clear of the Close button in the top-right corner (the arrows'
+            padding already is). */}
+        <div data-words className={cn("flex min-w-0 flex-1 flex-col", !roomForArrows && "pr-9")}>
+          <span className="truncate text-[15.5px] leading-[19px] font-medium text-foreground">
+            {link.title}
+          </span>
+          {/* `text-foreground/70`, like the bar's: `text-muted-foreground`
+              on the card's tint is under 4.5:1 for small text in light mode. */}
+          <span className="truncate text-xs leading-[15px] text-foreground/70">
+            {linkSecondLine(link)}
+          </span>
+        </div>
+      </div>
+      <AudioTrack
+        link={link}
+        className="mt-[22px]"
+        // 44px to the touch, centred on the rail: clear of the sleeve above
+        // and the transport below.
+        rangeClassName="pointer-coarse:h-11"
+      />
+      {/* Plain text, not a live region: the range's value says the same. */}
+      <div
+        data-times=""
+        className="mt-2 flex h-2.5 items-center justify-between text-[11px] leading-none text-foreground/70 tabular-nums"
+      >
+        <span data-elapsed="">{formatDuration(elapsed)}</span>
+        <span data-remaining="">
+          {length ? `−${formatDuration(Math.max(0, length - elapsed))}` : null}
+        </span>
+      </div>
+      <div className="mt-4 flex items-center justify-center gap-3.5">
+        <button
+          type="button"
+          disabled={!src}
+          aria-label={`Restart ${link.title}`}
+          className={SIDE_BUTTON}
+          onClick={restart}
+        >
+          <Restart className="size-4" aria-hidden />
+        </button>
+        <button
+          type="button"
+          disabled={!src}
+          aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
+          className="flex size-[46px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100"
+          onClick={() => {
+            if (src) toggle(src);
+          }}
+        >
+          <PlayMark playing={playing} size={18} reducedMotion={reducedMotion} />
+        </button>
+        {/* A real link, like the row menu's item: Cmd/Ctrl-click and the
+            browser's own link handling work as on any link. */}
+        <a
+          href={link.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open file"
+          className={SIDE_BUTTON}
+        >
+          <Export5 className="size-4" aria-hidden />
+        </a>
+      </div>
     </div>
   );
 }
