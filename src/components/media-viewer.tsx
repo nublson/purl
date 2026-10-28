@@ -42,6 +42,7 @@ import {
   preloadOriginal,
   preloadSrc,
 } from "./media-viewer-media";
+import { useBoxResize } from "./media-viewer-resize";
 
 /** The box is centred in the room between the safe areas. */
 const CENTER_TOP = "calc(50% + (env(safe-area-inset-top) - var(--bottom-inset)) / 2)";
@@ -83,7 +84,16 @@ export function MediaViewer() {
   if (anchorId !== null && anchorId !== lastAnchor) setLastAnchor(anchorId);
   const layoutId = pearlLayoutId(lastAnchor ?? "");
 
+  // Declared before `requestClose`, which cancels a running resize.
+  const popupRef = useRef<HTMLDivElement>(null);
+  const { capture: captureBoxSize, cancel: cancelBoxResize } = useBoxResize(
+    popupRef,
+    currentId,
+    reducedMotion,
+  );
+
   const requestClose = useCallback(() => {
+    cancelBoxResize();
     const state = mediaViewer.getSnapshot();
     if (state.currentId !== null && state.currentId !== state.openedId) {
       const to = state.currentId;
@@ -91,7 +101,7 @@ export function MediaViewer() {
     } else {
       mediaViewer.close();
     }
-  }, []);
+  }, [cancelBoxResize]);
 
   // Back closes through here too (`ViewerUrl.onPopState`), so it morphs
   // into the pearl shown, like Esc.
@@ -158,7 +168,6 @@ export function MediaViewer() {
   // (`hidden={false}` below) but is gone for assistive tech and focus:
   // `inert`, plus `aria-hidden` for tools that don't read `inert` yet.
   // Set on the elements, since the exiting Popup's props are frozen.
-  const popupRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     // Each open and each close starts without a morph seen: an open with no
@@ -186,6 +195,7 @@ export function MediaViewer() {
       media.focus({ preventScroll: true });
     }
     setMoved(true);
+    captureBoxSize();
     mediaViewer[to]();
   };
   const onDragOutcome = (outcome: DragOutcome) => {
@@ -270,12 +280,13 @@ export function MediaViewer() {
           hidden={false}
           initialFocus={mediaRef}
           finalFocus={finalFocus}
-          // Moving between pearls never morphs the box (it takes the new
-          // pearl's size at once while the media slides).
+          // Moving between pearls never morphs the box through Motion's
+          // layout animation (that would stretch the sliding media); the
+          // box resizes with the slide instead (`useBoxResize`).
           layoutDependency={
             closing && closing.step !== "ready" ? FACE_LAYOUT_DEPENDENCY : VIEWER_LAYOUT_DEPENDENCY
           }
-          className="group/viewer z-50 w-max overflow-hidden bg-card outline-none data-closed:pointer-events-none"
+          className="group/viewer z-50 flex w-max items-center justify-center overflow-hidden bg-card outline-none data-closed:pointer-events-none"
           style={{
             top: CENTER_TOP,
             left: CENTER_LEFT,

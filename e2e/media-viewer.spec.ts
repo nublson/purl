@@ -118,6 +118,79 @@ async function seedThreeShots(
   return { shotA: ids.A, shotB: ids.B, shotC: ids.C };
 }
 
+/** Two images, newest first: Wide (800×500), then Tall (500×800). */
+async function seedWideThenTall(
+  seed: { link: (link: Parameters<typeof seedLink>[1]) => Promise<string> },
+  baseURL: string,
+) {
+  const icon = `${baseURL}/icon.png`;
+  await seed.link({
+    url: `${icon}?t=1`,
+    title: "Tall",
+    contentType: "IMAGE",
+    thumbnail: icon,
+    width: 500,
+    height: 800,
+  });
+  await new Promise((resolve) => setTimeout(resolve, 15));
+  await seed.link({
+    url: `${icon}?w=1`,
+    title: "Wide",
+    contentType: "IMAGE",
+    thumbnail: icon,
+    width: 800,
+    height: 500,
+  });
+}
+
+/**
+ * The viewer box's height as each of the next `count` frames draws it
+ * (a ResizeObserver reports after the frame's animations have written and
+ * layout has run, and only when the size changed). Start it before the key
+ * press: the first entry is the box before the move.
+ */
+function sampleDrawnHeights(page: Page, count: number) {
+  return page.evaluate(
+    (count) =>
+      new Promise<number[]>((resolve) => {
+        const popup = document.querySelector<HTMLElement>("[data-media-viewer]")!;
+        const seen: number[] = [];
+        const observer = new ResizeObserver(() => {
+          seen.push(popup.getBoundingClientRect().height);
+        });
+        observer.observe(popup);
+        let frames = 0;
+        const tick = () => {
+          if (++frames < count) requestAnimationFrame(tick);
+          else {
+            observer.disconnect();
+            resolve(seen);
+          }
+        };
+        requestAnimationFrame(tick);
+      }),
+    count,
+  );
+}
+
+/** The viewer box's inline size (`style.width` + `style.height`) on each of the next `count` frames. */
+function sampleInlineSizes(page: Page, count: number) {
+  return page.evaluate(
+    (count) =>
+      new Promise<string[]>((resolve) => {
+        const seen: string[] = [];
+        const tick = () => {
+          const popup = document.querySelector<HTMLElement>("[data-media-viewer]")!;
+          seen.push(popup.style.width + popup.style.height);
+          if (seen.length < count) requestAnimationFrame(tick);
+          else resolve(seen);
+        };
+        requestAnimationFrame(tick);
+      }),
+    count,
+  );
+}
+
 /** The viewer's live region (the dialog's own; announced on each move). */
 const viewerStatus = (page: Page) =>
   page.locator("[data-media-viewer] [data-viewer-status]");
@@ -718,6 +791,59 @@ test.describe("Media viewer", () => {
     await expect(openButton(page, "Shot C")).toBeFocused();
     // Shot A's card (opened from, never morphed back into) isn't left raised.
     await expect(page.locator("[data-pearl-morphing]")).toHaveCount(0, { timeout: 500 });
+  });
+
+  test("moving to a pearl of another size resizes the box with the slide", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await seedWideThenTall(seed, baseURL!);
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(2);
+
+    await openButton(page, "Wide").click();
+    const popup = page.locator("[data-media-viewer]");
+    // The original shows once the open morph has played.
+    await expect(popup.locator('img[src$="?w=1"]')).toHaveAttribute("alt", "Wide");
+
+    const heights = sampleDrawnHeights(page, 8);
+    await page.keyboard.press("End");
+    const seen = await heights;
+    // Growing towards the tall pearl's height, never back, and never
+    // drawn at the new size before the resize starts.
+    expect(seen.length, JSON.stringify(seen)).toBeGreaterThan(2);
+    for (let i = 1; i < seen.length; i++) {
+      expect(seen[i], JSON.stringify(seen)).toBeGreaterThanOrEqual(seen[i - 1] - 0.5);
+    }
+    expect(seen[0], JSON.stringify(seen)).toBeLessThan(seen[seen.length - 1]);
+    await expect(page.getByRole("dialog", { name: "Tall" })).toBeVisible();
+    // Once it's done, the box follows its content again.
+    await expect
+      .poll(() => popup.evaluate((el) => el.style.width + el.style.height), { timeout: 500 })
+      .toBe("");
+  });
+
+  test("with reduced motion, moving to a pearl of another size doesn't animate the box", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await seedWideThenTall(seed, baseURL!);
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(2);
+
+    await openButton(page, "Wide").click();
+    const popup = page.locator("[data-media-viewer]");
+    await expect(popup.locator('img[src$="?w=1"]')).toHaveAttribute("alt", "Wide");
+
+    const sizes = sampleInlineSizes(page, 8);
+    await page.keyboard.press("End");
+    expect(await sizes).toEqual(Array(8).fill(""));
+    await expect(page.getByRole("dialog", { name: "Tall" })).toBeVisible();
   });
 
   test("with reduced motion the viewer still opens and moves, and video doesn't autoplay", async ({

@@ -119,5 +119,4 @@ One branch, in order:
 ## Deviations (as built, 2026-10-27)
 
 - **Pinch-zoom is blocked on touch** while the slide is draggable: the slide is `touch-none` so the browser's pan and pinch can't cancel the swipe (Motion would write the same `touch-action: none` for `drag` if it listened itself; the slide starts the drag from its own `onPointerDown`, `dragListener={false}`, so the class is ours). `drag="x"` with `touch-action: pan-y` would forbid pinch too. A zoom of the viewer's own is a follow-up.
-- **The box snaps** rather than animates between pearls of different sizes (the Popup's `layoutDependency` stays fixed while open).
 - **A vertical drag scales the media** (toward 0.95) but doesn't fade the backdrop.
