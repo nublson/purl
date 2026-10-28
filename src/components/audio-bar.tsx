@@ -24,7 +24,6 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type FocusEvent,
   type MouseEvent,
   type ReactNode,
 } from "react";
@@ -71,8 +70,7 @@ const OPEN = Math.round(OPS_Y + LEAD / 2 + PAD);
 
 /* How long the shape takes to change, either way. */
 const MORPH_MS = 460;
-/* The menu slot's side (the owner's `⋯`), and the gap before it. */
-const MENU = 32;
+/* The gap between the sleeve and the words. */
 const WORDS_GAP = 10;
 /* The card's corner (`rounded-lg`, `MEDIA_RADIUS`). */
 const CARD_RADIUS = 10;
@@ -91,8 +89,9 @@ export const AUDIO_BAR = {
 } as const;
 
 /**
- * The owner's card or row: its checkbox on the sleeve, its menu after the
- * words. The checkbox shows on its host's hover (`group/card`, `group/item`).
+ * The owner's card: its checkbox on the sleeve, shown on the card's hover
+ * (`group/card`). The card floats its own `⋯` over the bar's top-right
+ * corner, as on every card; the bar keeps no slot for it.
  */
 export type AudioBarOwner = {
   selected: boolean;
@@ -102,9 +101,19 @@ export type AudioBarOwner = {
   onTapSelect: (opts: { shiftKey: boolean }) => void;
   /** True once when this click ends a long-press (which already selected). */
   consumeLongPress: () => boolean;
-  /** The card's `<LinkMenu …>`, wrapped as the card does (`data-card-menu`). */
-  menu: ReactNode;
 };
+
+/** Presses a pearl's card saw in React's tree (its portals included), by pearl. */
+const hostPresses = new WeakMap<Event, string>();
+
+/**
+ * The owner's card marks each press inside it (React's tree: the open menu,
+ * a portal, included), so an open bar doesn't take a press in the card's
+ * menu for one outside its card.
+ */
+export function markAudioHostPress(event: Event, id: string) {
+  hostPresses.set(event, id);
+}
 
 /**
  * A click inside the bar's controls never reaches the card (a click on the
@@ -136,11 +145,11 @@ const LATE_REDUCED =
   "motion-reduce:transition-[opacity,visibility] motion-reduce:duration-150 motion-reduce:ease-out";
 
 /**
- * The bar's host: its card frame (the owner's, the shared folder's) or its
- * row. What a press outside the open bar is measured against, and what the
- * close's swell scales (`--audio-swell`, read by `LINK_CARD_FRAME`).
+ * The bar's host: its card frame (the owner's, the shared folder's). What a
+ * press outside the open bar is measured against, and what the close's
+ * swell scales (`--audio-swell`, read by `LINK_CARD_FRAME`).
  */
-const HOST = '[data-cy="link-card"], [data-cy="link-item"]';
+const HOST = '[data-cy="link-card"]';
 
 /** The opened player's side buttons (Restart, Open file): 34px, outlined, 44px to the touch. */
 const SIDE_BUTTON =
@@ -150,8 +159,9 @@ const SIDE_BUTTON =
  * An audio pearl's card: a now-playing bar that expands in place into its
  * player. Shut (78px): the sleeve (its page's image, else the tint) is the
  * play control, with the drawn play/pause mark on it; beside it the title
- * over its second line; the owner's menu after them; and a thin track along
- * the foot, which is the seek control. Under 200px of the bar's own width
+ * over its second line, to the bar's margin (the owner's card floats its
+ * `⋯` over the top-right corner); and a thin track along the foot, which is
+ * the seek control. Under 200px of the bar's own width
  * (`@max-[200px]:`, a container query, so the server's HTML is right) an
  * upload's second line is just its length.
  *
@@ -165,20 +175,20 @@ const SIDE_BUTTON =
  * over. Esc, or a press outside its card, closes it; one bar is open at a
  * time (`audioExpansion`). Its height is its card's, so the masonry grid
  * follows it (`data-masonry-grow`: the cards below move down, none changes
- * column); in a list it is the row, and the rows below flow down with it.
- * Reduced motion: it jumps, and the late parts fade (150ms).
+ * column). Reduced motion: it jumps, and the late parts fade (150ms).
  * `expandable={false}` (the hover preview) keeps it a bar.
  *
  * It's a view of the page's one player (`useAudioPlayer`), like the hover
- * preview's bar and the list's row, so they all show one playback; opening
- * never changes playback. An audio pearl never opens the media viewer.
+ * preview's bar and the list's audio row, so they all show one playback;
+ * opening never changes playback. An audio pearl never opens the media
+ * viewer.
  *
- * The controls take pointer events inside the owner's card or row (whose
- * content doesn't), except while selecting, when they step aside (`inert`)
- * and a click anywhere selects the card or row.
+ * The controls take pointer events inside the owner's card (whose content
+ * doesn't), except while selecting, when they step aside (`inert`) and a
+ * click anywhere selects the card.
  *
  * The root is a size container, so it's a stacking context: its layers
- * (the opener 0, track 1, menu 2, play 3, badge 4, checkbox 10) stack
+ * (the opener 0, track 1, play 3, badge 4, checkbox 10) stack
  * among themselves, and whoever hosts it lays its own surface under it
  * (clicks reach it where the bar takes no pointer events).
  */
@@ -189,23 +199,17 @@ export function AudioBar({
   describedBy,
   expandable = true,
   expandRef,
-  onExpandFocus,
-  onExpandBlur,
 }: {
   link: Link;
-  /** The owner's card only: the checkbox in the sleeve's corner, the menu slot. */
+  /** The owner's card only: the checkbox in the sleeve's corner. */
   owner?: AudioBarOwner;
   /** The folder badge, on the sleeve's bottom-end corner. */
   badge?: ReactNode;
   describedBy?: string;
   /** False: a bar only (the hover preview): no opener, no tween. */
   expandable?: boolean;
-  /** The opener (`data-expand`): the card's or row's focus anchor. */
+  /** The opener (`data-expand`): the card's focus anchor. */
   expandRef?: (el: HTMLButtonElement | null) => void;
-  /** Focus on the opener (a row opens its preview for keyboard users). */
-  onExpandFocus?: (event: FocusEvent<HTMLButtonElement>) => void;
-  /** Focus leaves the opener (a row closes that preview). */
-  onExpandBlur?: (event: FocusEvent<HTMLButtonElement>) => void;
 }) {
   const { playing, elapsed, length: playLength, toggle, restart } = useAudioPlayer(
     link.id,
@@ -221,7 +225,7 @@ export function AudioBar({
   const image = Boolean(link.thumbnail && safeRemoteImgSrc(link.thumbnail));
   const rootRef = useRef<HTMLDivElement>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);
-  // The last press that started inside the bar, portals included (its menu).
+  // The last press that started inside the bar, portals included.
   const insidePress = useRef<Event | null>(null);
 
   const setOpener = useCallback(
@@ -291,7 +295,7 @@ export function AudioBar({
   const late = clamp((p - 0.6) / 0.4, 0, 1);
   const railTop = mix(SHUT - PAD - RAIL_H, RAIL_Y, p);
   const wordsLeft = mix(PAD + ART.s[0] + WORDS_GAP, PAD + ART.s[1] + WORDS_GAP, p);
-  const wordsRight = PAD + (owner ? MENU + WORDS_GAP : 0);
+  const wordsRight = PAD;
 
   const secondLine = linkSecondLine(link);
   // An upload's facts shrink to the length; a link's domain just truncates.
@@ -309,15 +313,16 @@ export function AudioBar({
      outside its card. `pointerdown` rather than click: a press
      that begins outside and drifts in is still somebody
      reaching past this player, and waiting for the click lets
-     it land on whatever is underneath first. A press in the
-     bar's own menu (a portal, outside its box in the DOM, but
-     inside it in React's tree) is inside. */
+     it land on whatever is underneath first. A press its card
+     saw in React's tree is inside: the card's menu is a portal,
+     outside the card in the DOM (`markAudioHostPress`). */
   useEffect(() => {
     if (!open) return;
     const away = (event: PointerEvent) => {
       /* isTrusted: only a real hand dismisses this, never a
          scripted pointer bubbling to the document. */
       if (!event.isTrusted || event === insidePress.current) return;
+      if (hostPresses.get(event) === link.id) return;
       const root = rootRef.current;
       const host = root?.closest(HOST) ?? root;
       if (host && !host.contains(event.target as Node)) closeExpansion();
@@ -331,12 +336,13 @@ export function AudioBar({
       window.clearTimeout(id);
       document.removeEventListener("pointerdown", away);
     };
-  }, [open, closeExpansion]);
+  }, [open, closeExpansion, link.id]);
 
   // Esc closes it: from inside it (focus back on its opener, since the
-  // transport goes inert; marked as a return, so a row doesn't take it for
-  // keyboard navigation and open its preview), or from the page, unless a
-  // field or an overlay (a menu, a dialog) has the key.
+  // transport goes inert; marked as a return, which the opener uses up, so
+  // nothing takes it for keyboard navigation), or from the page, unless a
+  // field or an overlay (a menu, a dialog) has the key; never when the
+  // event was already handled.
   // Not while selecting: Esc clears the selection then (the bar is inert).
   useEffect(() => {
     if (!open || selecting) return;
@@ -405,12 +411,8 @@ export function AudioBar({
             height: mix(SHUT, ART.s[1], p),
             borderRadius: mix(CARD_RADIUS, ART.r[1], p),
           }}
-          onFocus={(event) => {
-            onExpandFocus?.(event);
-            // A host that doesn't read the return mark (a card) still uses it up.
-            consumeReturningFocus();
-          }}
-          onBlur={onExpandBlur}
+          // The card doesn't read the return mark: the opener uses it up.
+          onFocus={() => consumeReturningFocus()}
           onClick={(event) => {
             keepClick(event);
             if (owner?.consumeLongPress()) return;
@@ -489,10 +491,9 @@ export function AudioBar({
                     ? // In the sleeve's place (centred), a 40px hit area.
                       "pointer-events-auto inset-0 m-auto opacity-100 after:-inset-3"
                     : // In the sleeve's corner, like an image card's: shown
-                      // on its card's or row's hover with a pointer (the
-                      // sleeve stays play) or keyboard focus; at rest it
-                      // takes no taps.
-                      "pointer-events-none -top-0.5 -left-0.5 opacity-0 shadow-sm after:-inset-1 motion-safe:scale-125 focus-visible:opacity-100 motion-safe:focus-visible:scale-100 [@media(hover:hover)]:group-hover/card:pointer-events-auto [@media(hover:hover)]:group-hover/card:opacity-100 motion-safe:[@media(hover:hover)]:group-hover/card:scale-100 [@media(hover:hover)]:group-hover/item:pointer-events-auto [@media(hover:hover)]:group-hover/item:opacity-100 motion-safe:[@media(hover:hover)]:group-hover/item:scale-100",
+                      // on its card's hover with a pointer (the sleeve stays
+                      // play) or keyboard focus; at rest it takes no taps.
+                      "pointer-events-none -top-0.5 -left-0.5 opacity-0 shadow-sm after:-inset-1 motion-safe:scale-125 focus-visible:opacity-100 motion-safe:focus-visible:scale-100 [@media(hover:hover)]:group-hover/card:pointer-events-auto [@media(hover:hover)]:group-hover/card:opacity-100 motion-safe:[@media(hover:hover)]:group-hover/card:scale-100",
                 )}
                 onClick={(event) => {
                   event.preventDefault();
@@ -546,20 +547,6 @@ export function AudioBar({
           )}
         </span>
       </div>
-      {owner ? (
-        // Its own 32px slot, always there, so nothing reflows when the
-        // menu shows (the card reveals it: on hover, always on touch);
-        // level with the sleeve's middle, like the words.
-        <div
-          className={cn(
-            "absolute z-[2] flex size-8",
-            selecting ? "pointer-events-none" : "pointer-events-auto",
-          )}
-          style={{ right: PAD, top: PAD + sleeve / 2 - MENU / 2 }}
-        >
-          {owner.menu}
-        </div>
-      ) : null}
       {/* ── the track ───────────────────────────────────────
           Inset by the same margin as everything else, at the foot
           shut and 22px under the sleeve opened: one margin, so its
@@ -583,8 +570,7 @@ export function AudioBar({
                 // sleeve above and the transport below.
                 "pointer-coarse:h-11"
               : // To the touch, the range runs from the bar's bottom edge
-                // 40px up (under play's and the menu's areas, which lie
-                // above it).
+                // 40px up (under play's area, which lies above it).
                 "pointer-coarse:top-auto pointer-coarse:-bottom-[10px] pointer-coarse:h-10 pointer-coarse:translate-y-0"
           }
         />
@@ -624,7 +610,7 @@ export function AudioBar({
             inert={!open || selecting}
             aria-hidden={!open || undefined}
             className={cn(
-              // The gap gives way on the narrowest cards (a 116px row).
+              // The gap gives way on the narrowest cards (116px of room).
               "absolute inset-x-[10px] flex items-center justify-center gap-[clamp(4px,(100cqw-134px)/2,14px)]",
               open && LATE_REDUCED,
               late > 0.9 && !selecting ? "pointer-events-auto" : "pointer-events-none",

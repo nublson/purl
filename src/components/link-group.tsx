@@ -98,17 +98,15 @@ export const LinkGroup = ({
         ) : null}
         {visibleLinks.map((link, index) => (
           // content-visibility skips layout/paint for off-screen rows; the
-          // intrinsic size (one row; an audio row's 86px slot) keeps the
-          // scrollbar stable. Adjacent selected rows join into one shape:
-          // square the corners they share, but not beside an audio row (its
-          // own rounded card, apart from its neighbours).
+          // intrinsic size (one row) keeps the scrollbar stable. Adjacent
+          // selected rows join into one shape: square the corners they share.
           // While a media pearl's icon morphs to or from the viewer, the
           // containment lifts so the morph isn't clipped to the row.
           <div
             key={link.id}
             role="listitem"
             data-flip={`link:${link.id}`}
-            className="[content-visibility:auto] has-[[data-pearl-morphing]]:[content-visibility:visible] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px] has-[[data-face=audio]]:[contain-intrinsic-size:auto_86px] [&:not(:has([data-face=audio])):has(+div_[data-selected]):not(:has(+div_[data-face=audio]))_[data-selected]]:rounded-b-none [&:not(:has([data-face=audio])):has([data-selected])+div:not(:has([data-face=audio]))_[data-selected]]:rounded-t-none"
+            className="[content-visibility:auto] has-[[data-pearl-morphing]]:[content-visibility:visible] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px] [&:has(+div_[data-selected])_[data-selected]]:rounded-b-none [&:has([data-selected])+div_[data-selected]]:rounded-t-none"
           >
             <LinkItem
               link={link}

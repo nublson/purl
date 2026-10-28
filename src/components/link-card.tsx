@@ -26,7 +26,7 @@ import {
   useFolderTag,
   useLinkFolder,
 } from "./folder-tag";
-import { AudioBar } from "./audio-bar";
+import { AudioBar, markAudioHostPress } from "./audio-bar";
 import { HapticTarget } from "./haptic-target";
 import { MediaOpenButton } from "./media-open-button";
 import { LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
@@ -47,10 +47,11 @@ const OPENER_CLASS =
  * corner selects it (shown on hover or focus, and on every card while
  * selecting, when a click anywhere toggles the card); a long-press does
  * the same on touch. The row menu (`⋯`) sits in the other corner, on hover
- * or always on touch. An audio pearl's bar holds both itself (the checkbox
- * in the sleeve's corner on hover, in its place while selecting; the menu
- * after the words). Deleted or moved-away cards fade out, and Undo brings
- * them back.
+ * or always on touch. An audio pearl's bar holds the checkbox itself (in
+ * the sleeve's corner on hover, in its place while selecting); its menu
+ * floats over the bar's top-right corner like every card's, on a backing
+ * of the bar's surface. Deleted or moved-away cards fade out, and Undo
+ * brings them back.
  */
 export function LinkCard({
   link,
@@ -168,6 +169,11 @@ export function LinkCard({
           "animate-in fade-in-0 zoom-in-95 duration-200 ease-out-strong",
       )}
       {...longPress}
+      // An open audio bar takes a press in this card's menu (a portal) for
+      // one inside its card.
+      onPointerDownCapture={
+        audio ? (event) => markAudioHostPress(event.nativeEvent, link.id) : undefined
+      }
       onPointerDown={(event) => {
         // A press on the menu button, or inside a portal (the open menu,
         // whose React events bubble through here), isn't a long-press on
@@ -236,10 +242,9 @@ export function LinkCard({
       {/* The content is a picture of the link: clicks go to the link. */}
       <div className="pointer-events-none flex flex-col">
         {audio ? (
-          // The bar holds the owner's controls itself: the checkbox in the
-          // sleeve's corner on hover, in its place while selecting; the
-          // menu after the words (no thumbnail corners to put them in). A
-          // press on the rest of it expands it in place into the player.
+          // The bar holds the owner's checkbox itself: in the sleeve's
+          // corner on hover, in its place while selecting. A press on the
+          // rest of it expands it in place into the player.
           <AudioBar
             link={link}
             badge={badge}
@@ -253,15 +258,6 @@ export function LinkCard({
                     onToggleSelect: clickToSelect,
                     onTapSelect: tapToSelect,
                     consumeLongPress,
-                    menu: (
-                      <div
-                        inert={selecting}
-                        className={cn("flex", menuReveal)}
-                        data-card-menu
-                      >
-                        {menu}
-                      </div>
-                    ),
                   }
             }
           />
@@ -275,7 +271,23 @@ export function LinkCard({
         )}
       </div>
       {folderTag ? <FolderTagLabel id={folderLabelId} folder={folderTag} /> : null}
-      {demo || audio ? null : (
+      {demo ? null : audio ? (
+        // Over the bar's top-right corner, as on every card: on the bar's
+        // surface, fading in over 24px, so it covers the words' end (which
+        // run to the bar's margin) cleanly. It keeps the corner opened. The
+        // backing takes no presses (they open the bar); its buttons do.
+        <div
+          inert={selecting}
+          className={cn(
+            "pointer-events-none absolute top-1.5 right-1.5 z-10 flex rounded-e-md bg-card ps-6 [mask-image:linear-gradient(to_right,transparent,black_24px)] *:pointer-events-auto",
+            menuReveal,
+          )}
+          data-card-menu
+        >
+          {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}
+          {menu}
+        </div>
+      ) : (
         <>
           <Checkbox
             checked={selected}

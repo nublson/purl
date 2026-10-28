@@ -13,7 +13,6 @@ import {
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
 import { haptic } from "@/lib/haptics";
 import { useAudioView } from "@/hooks/use-audio-player";
-import { audioExpansion, useAudioExpanded } from "@/lib/audio-expansion";
 import { isViewerKind, linkKind } from "@/lib/link-kind";
 import {
   consumeReturningFocus,
@@ -26,7 +25,7 @@ import { linkSecondLine } from "@/lib/upload-meta";
 import { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
-import { AudioBar } from "./audio-bar";
+import { AudioRowPlay, AudioRowSecondLine, AudioRowToggle } from "./audio-row";
 import {
   FolderBadge,
   FolderLinkButton,
@@ -65,6 +64,13 @@ const LONG_PRESS_SLOP = 10;
  */
 const OPENER_CLASS =
   "absolute inset-0 z-0 w-full rounded-md outline-none [-webkit-touch-callout:none] focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset";
+
+/**
+ * The row's actions show on touch, and with a pointer that hovers only on
+ * the row's hover, keyboard focus inside it or with its menu open.
+ */
+const ROW_ACTIONS_REVEAL =
+  "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100";
 
 const LinkMenu = dynamic(() => import("./link-menu").then((m) => m.LinkMenu), {
   loading: () => <div className="size-8" aria-hidden />,
@@ -108,17 +114,13 @@ export const LinkItem = React.forwardRef<
   // An image or video pearl opens the media viewer (its row's icon is what
   // the viewer morphs out of); a page opens in a new tab. The landing demo
   // has no viewer: its rows are links. An audio pearl never opens the
-  // viewer: its row is its now-playing bar, which expands in place into
-  // the player (the demo's too, without the owner's checkbox and menu).
+  // viewer: a click on its row plays and pauses it (the demo's too).
   const kind = linkKind(link);
   const audio = kind === "audio";
   const media = !demo && isViewerKind(kind);
   // An audio pearl's row is a view of its playback: what its hover preview
   // starts plays on once the preview closes, until the row leaves.
   useAudioView(audio ? link.id : null);
-  // Expanded in place, the bar is the player: no preview beside it.
-  const barOpen = useAudioExpanded(link.id).open;
-  const [menuOpen, setMenuOpen] = React.useState(false);
   const viewerOpen = useIsMediaOpen(link.id);
   const longPressRef = React.useRef<{
     timer: ReturnType<typeof setTimeout>;
@@ -174,12 +176,10 @@ export const LinkItem = React.forwardRef<
       if (linkSelection.selectedIds().length > 0) return;
       // Nor over the media viewer this row (or another) just opened.
       if (mediaViewer.getSnapshot().currentId !== null) return;
-      // Nor beside this row's bar expanded into the player.
-      if (audioExpansion.getSnapshot() === link.id) return;
       openedByPointerRef.current = true;
       setPreviewOpen(true);
     }, previewOpenDelay());
-  }, [clearCloseTimer, clearOpenTimer, link.id]);
+  }, [clearCloseTimer, clearOpenTimer]);
 
   const scheduleClose = React.useCallback(() => {
     clearOpenTimer();
@@ -197,11 +197,11 @@ export const LinkItem = React.forwardRef<
     };
   }, [clearCloseTimer, clearOpenTimer]);
 
-  // Entering selection mode, opening this pearl in the media viewer, or
-  // expanding its bar into the player closes an open preview.
+  // Entering selection mode, or opening this pearl in the media viewer,
+  // closes an open preview.
   React.useEffect(() => {
-    if (selecting || viewerOpen || barOpen) setPreviewOpen(false);
-  }, [selecting, viewerOpen, barOpen]);
+    if (selecting || viewerOpen) setPreviewOpen(false);
+  }, [selecting, viewerOpen]);
 
   const cancelLongPress = React.useCallback(() => {
     if (longPressRef.current) clearTimeout(longPressRef.current.timer);
@@ -221,9 +221,9 @@ export const LinkItem = React.forwardRef<
     deleteLinkKeepingFocus({
       linkId: link.id,
       anchor: anchorRef.current,
-      // An audio row's is its bar's opener (`data-expand`).
+      // An audio row's is its play button (`data-audio-toggle`).
       siblingsSelector:
-        '[data-cy="link-item"] > a[href], [data-cy="link-item"] > [data-pearl-button], [data-cy="link-item"] [data-expand]',
+        '[data-cy="link-item"] > a[href], [data-cy="link-item"] > [data-pearl-button], [data-cy="link-item"] > [data-audio-toggle]',
       byKeyboard,
       onDeleted: notifyLinksChanged,
     });
@@ -239,7 +239,6 @@ export const LinkItem = React.forwardRef<
   const openPreviewOnFocus = (event: React.FocusEvent<HTMLElement>) => {
     if (consumeReturningFocus()) return;
     if (!event.currentTarget.matches(":focus-visible")) return;
-    if (audioExpansion.getSnapshot() === link.id) return;
     clearCloseTimer();
     openedByPointerRef.current = false;
     setPreviewOpen(true);
@@ -256,20 +255,19 @@ export const LinkItem = React.forwardRef<
     <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
   );
 
-  // The row's own handlers (an audio row's bar takes them too): a
-  // long-press selects on touch; a mouse or pen previews.
+  // The row's own handlers: a long-press selects on touch; a mouse or pen
+  // previews.
   const hostHandlers = {
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
       if (demo || event.pointerType !== "touch") return;
       // A press on the row's actions, or inside a portal (the open menu,
       // whose React events bubble through here), isn't a long-press on
       // the row: opening the menu takes the lift away from the row, so
-      // the press would select it behind the menu. Nor is a press on an
-      // audio row's menu or track (`data-card-menu`).
+      // the press would select it behind the menu.
       const target = event.target as Element;
       if (
         !event.currentTarget.contains(target) ||
-        target.closest("[data-row-actions], [data-card-menu]")
+        target.closest("[data-row-actions]")
       ) {
         return;
       }
@@ -327,134 +325,7 @@ export const LinkItem = React.forwardRef<
     return true;
   };
 
-  // An audio row is its now-playing bar at the list's width (78px), which
-  // expands in place into the player; the rows below flow down with it.
-  // The row's conventions ride on the bar: the checkbox in the sleeve's
-  // corner on hover and in its place while selecting, the `⋯` in the bar's
-  // menu slot, the folder badge on the sleeve, a long-press to select, and
-  // the hover preview (by pointer, or keyboard focus on the bar's opener).
-  const audioContent = audio ? (
-    <Item
-      ref={ref}
-      data-cy="link-item"
-      data-selected={selected || undefined}
-      className={cn(
-        // The bar's own surface, a card's: rounded (important: the list
-        // squares the corners neighbouring selected rows share), and its
-        // hairline drawn over it, inset, since the list clips each row to
-        // its box. `--audio-swell`: the close's dip takes the whole row.
-        "relative my-1 block w-full overflow-hidden rounded-lg! border-0 bg-card p-0 transition-none [transform:var(--audio-swell)]",
-        "after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:ring-1 after:ring-foreground/10 after:ring-inset after:transition-[box-shadow] after:duration-150 after:ease-out [@media(hover:hover)]:hover:after:ring-foreground/25",
-        // Touch: a long-press selects the row, so no text selection.
-        "[@media(pointer:coarse)]:select-none",
-        selected &&
-          "after:ring-2 after:ring-primary [@media(hover:hover)]:hover:after:ring-primary",
-        arriving && ARRIVE,
-        (deletePhase === "fading" || leaving) &&
-          "pointer-events-none animate-out fade-out-0 slide-out-to-left-2 duration-200",
-        deletePhase === "restoring" &&
-          "animate-in fade-in-0 slide-in-from-left-2 duration-200 ease-out-strong motion-reduce:[--tw-enter-translate-x:0]",
-        className,
-      )}
-      {...hostHandlers}
-      {...rest}
-    >
-      {/* A plain surface under the bar: while selecting, a click on it
-          toggles the row (the bar's controls, its opener included, step
-          aside then). The row's focus anchor is the bar's opener. */}
-      <div
-        aria-hidden
-        className={cn(
-          "absolute inset-0 z-0 rounded-[inherit]",
-          selecting && "cursor-pointer",
-        )}
-        onClick={(event) => {
-          if (consumeLongPress()) return;
-          if (selecting) linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-        }}
-      />
-      {link.description ? (
-        <span id={descriptionId} className="sr-only">
-          {link.description}
-        </span>
-      ) : null}
-      {/* The bar is a picture of the row, but for its own controls. */}
-      <div className="pointer-events-none">
-        <AudioBar
-          link={link}
-          badge={
-            folderTag ? (
-              <FolderBadge
-                key={folderTag.id}
-                folder={folderTag}
-                inCard
-                arrive={badgeArrives || arriving}
-              />
-            ) : null
-          }
-          describedBy={describedBy}
-          expandRef={setAnchor}
-          onExpandFocus={openPreviewOnFocus}
-          onExpandBlur={closePreviewOnBlur}
-          owner={
-            demo
-              ? undefined
-              : {
-                  selected,
-                  onToggleSelect: ({ shiftKey }) => {
-                    if (consumeLongPress()) return;
-                    linkSelection.toggle(link.id, { shiftKey });
-                  },
-                  onTapSelect: tapToSelect,
-                  consumeLongPress,
-                  menu: (
-                    // Shown like a row's: on hover or keyboard focus with a
-                    // pointer, always on touch, and while open; hidden (and
-                    // inert) while selecting. No preview over it.
-                    <div
-                      inert={selecting}
-                      data-card-menu
-                      className={cn(
-                        "flex transition-opacity duration-150 ease-out-strong",
-                        selecting
-                          ? "invisible opacity-0"
-                          : menuOpen
-                            ? "opacity-100"
-                            : "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100",
-                      )}
-                      onPointerEnter={(event) => {
-                        if (event.pointerType === "touch") return;
-                        hoveringActionsRef.current = true;
-                        clearOpenTimer();
-                        clearCloseTimer();
-                      }}
-                      onPointerLeave={(event) => {
-                        if (event.pointerType === "touch") return;
-                        hoveringActionsRef.current = false;
-                        scheduleOpen();
-                      }}
-                    >
-                      <LinkMenu
-                        link={link}
-                        onDelete={deleteRow}
-                        onOpenChange={setMenuOpen}
-                      />
-                    </div>
-                  ),
-                }
-          }
-        />
-      </div>
-      {folderTag ? <FolderTagLabel id={folderLabelId} folder={folderTag} /> : null}
-      {/* While selecting, a tap anywhere on the row toggles it, with a
-          tick (touch); also where a long-press's lift lands. */}
-      {selecting ? (
-        <HapticTarget className="z-[5]" onTap={tapToSelect} />
-      ) : null}
-    </Item>
-  ) : null;
-
-  const content = audioContent ?? (
+  const content = (
     <Item
       ref={ref}
       data-cy="link-item"
@@ -482,17 +353,32 @@ export const LinkItem = React.forwardRef<
       {...hostHandlers}
       {...rest}
     >
-      {media ? (
+      {audio ? (
+        // An audio pearl's row plays and pauses it (it never opens the
+        // viewer); while selecting, a click toggles the row instead.
+        <AudioRowToggle
+          ref={setAnchor}
+          link={link}
+          aria-describedby={describedBy}
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={cn(OPENER_CLASS, "cursor-pointer")}
+          onClick={(event) => {
+            if (consumeLongPress()) return true;
+            if (!selecting) return false;
+            linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+            return true;
+          }}
+          onFocus={openPreviewOnFocus}
+          onBlur={closePreviewOnBlur}
+        />
+      ) : media ? (
         <MediaOpenButton
           ref={setAnchor}
           link={link}
           preset="snappy"
           selecting={selecting}
-          consumeLongPress={() => {
-            if (!longPressedRef.current) return false;
-            longPressedRef.current = false;
-            return true;
-          }}
+          consumeLongPress={consumeLongPress}
           aria-describedby={describedBy}
           // While selecting, the row's checkbox is the keyboard and screen
           // reader control; a click anywhere on the row toggles it.
@@ -658,7 +544,7 @@ export const LinkItem = React.forwardRef<
               arriving && ARRIVE_LATE,
             )}
           >
-            {linkSecondLine(link)}
+            {audio ? <AudioRowSecondLine link={link} /> : linkSecondLine(link)}
           </Typography>
           {/* The favicon's folder badge, named for screen readers (and the
               link's description). */}
@@ -672,14 +558,19 @@ export const LinkItem = React.forwardRef<
           title's end); with a pointer that hovers, only on hover, keyboard
           focus or with the menu open. Its backing is the row's color,
           fading in over 24px, so it covers the text's end cleanly. Hidden
-          (and inert) while selecting. */}
+          (and inert) while selecting. An audio pearl that's loaded (playing
+          or paused) adds its play/pause mark before the `⋯`, shown always
+          (the demo's too), while the `⋯` keeps its own reveal. */}
       <ItemActions
         data-row-actions
         inert={selecting}
         className={cn(
-          (selecting || demo) && "invisible",
+          selecting
+            ? "invisible"
+            : demo && "invisible has-[[data-row-play]]:visible",
           "absolute inset-y-0 end-0 rounded-e-md bg-(--row-bg) ps-6 pe-2 [mask-image:linear-gradient(to_right,transparent,black_24px)]",
-          "z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100",
+          "z-10 has-[[data-row-play]]:opacity-100",
+          ROW_ACTIONS_REVEAL,
         )}
         onPointerEnter={(event) => {
           if (event.pointerType === "touch") return;
@@ -693,14 +584,23 @@ export const LinkItem = React.forwardRef<
           scheduleOpen();
         }}
       >
-        {demo ? (
-          <div className="size-8" aria-hidden />
-        ) : (
-          <>
-            {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}
-            <LinkMenu link={link} onDelete={deleteRow} />
-          </>
-        )}
+        {audio ? <AudioRowPlay link={link} /> : null}
+        <div
+          className={cn(
+            "flex items-center gap-2",
+            demo && "invisible",
+            ROW_ACTIONS_REVEAL,
+          )}
+        >
+          {demo ? (
+            <div className="size-8" aria-hidden />
+          ) : (
+            <>
+              {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}
+              <LinkMenu link={link} onDelete={deleteRow} />
+            </>
+          )}
+        </div>
       </ItemActions>
       {/* While selecting, a tap anywhere on the row toggles it, with a
           tick (touch). Also where a long-press's lift lands, once it has

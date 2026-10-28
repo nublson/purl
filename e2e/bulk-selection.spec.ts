@@ -304,6 +304,41 @@ test.describe("Link selection, row size", () => {
   });
 });
 
+test.describe("Link selection, an audio row", () => {
+  test("is a 48px row: a click while selecting toggles it, and doesn't play it", async ({ page, seed }) => {
+    await page.context().route("https://sounds.example/**", (route) => route.abort());
+    await seedLinks(seed, ["Alpha"]);
+    await seed.link({
+      url: "https://sounds.example/song.wav",
+      title: "Song",
+      contentType: "AUDIO",
+      duration: 10,
+    });
+    await openHome(page);
+
+    const song = rows(page).filter({ hasText: "Song" });
+    const heights = () =>
+      rows(page).evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
+    expect(await heights()).toEqual([48, 48]);
+
+    await rows(page).filter({ hasText: "Alpha" }).hover();
+    await checkbox(page, "Alpha").click();
+    await expect(bar(page)).toBeVisible();
+    expect(await heights()).toEqual([48, 48]);
+    // Every row shows its checkbox; a click on the audio row toggles it.
+    await expect(checkbox(page, "Song")).toBeVisible();
+    // (Where the title is: the row's button lies over it.)
+    await song.locator('[data-slot="item-title"]').click({ force: true });
+    await expect(checkbox(page, "Song")).toBeChecked();
+    await expect(page.getByText("2 selected")).toBeVisible();
+    await song.locator('[data-slot="item-title"]').click({ force: true });
+    await expect(checkbox(page, "Song")).not.toBeChecked();
+    // It never played.
+    await expect(song.locator("[data-audio-toggle]")).toHaveAttribute("aria-label", "Play Song");
+    expect(await page.evaluate(() => document.querySelectorAll("audio").length)).toBe(0);
+  });
+});
+
 test.describe("Selection bar on touch screens", () => {
   test.use({ viewport: { width: 820, height: 1180 }, hasTouch: true, isMobile: true });
 

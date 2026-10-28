@@ -95,7 +95,7 @@ test.describe("Link rows on phones", () => {
     await expect(page.getByRole("checkbox", { name: "Select all" })).toHaveCount(0);
   });
 
-  test("an audio row: a tap on its words expands it; its menu is shown", async ({ page, seed }) => {
+  test("an audio row: a tap plays it; its menu is shown", async ({ page, seed }) => {
     await page.context().route("https://sounds.example/**", (route) =>
       route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
     );
@@ -109,10 +109,12 @@ test.describe("Link rows on phones", () => {
     await openHome(page);
 
     const song = row(page, "Song");
-    const bar = song.locator('[data-face="audio"]');
-    const opener = song.locator("[data-expand]");
-    expect(Math.abs((await song.boundingBox())!.height - 78)).toBeLessThanOrEqual(1);
-    // On touch the menu is always shown, in the bar's menu slot.
+    const toggle = song.locator("[data-audio-toggle]");
+    // A row like the others: 56px on phones, its icon, no bar.
+    expect(Math.abs((await song.boundingBox())!.height - 56)).toBeLessThanOrEqual(1);
+    await expect(song.locator('[data-face="audio"]')).toHaveCount(0);
+    await expect(song.locator('[data-cy="row-favicon"]')).toBeVisible();
+    // On touch the menu is always shown, over the row's end.
     await expect(song.getByRole("button", { name: "Open link menu" })).toBeVisible();
     // No text selection from a press on it.
     expect(
@@ -121,26 +123,26 @@ test.describe("Link rows on phones", () => {
       ),
     ).toBe("none");
 
-    const words = (await song.locator("[data-words]").boundingBox())!;
-    await page.touchscreen.tap(words.x + words.width / 2, words.y + 4);
-    await expect(opener).toHaveAttribute("aria-expanded", "true");
-    await expect.poll(() => bar.evaluate((el: HTMLElement) => el.offsetHeight)).toBe(189);
+    const title = (await song.locator('[data-slot="item-title"]').boundingBox())!;
+    await page.touchscreen.tap(title.x + 20, title.y + title.height / 2);
+    await expect(toggle).toHaveAttribute("aria-label", "Pause Song");
     await expect(page.getByText("1 selected")).toHaveCount(0);
     await expect(song).not.toHaveAttribute("data-selected");
-    // The transport fits the phone's row.
-    const play = (await song.getByRole("button", { name: "Play Song", exact: true }).boundingBox())!;
+    // The mark at the row's end, beside the menu, inside the row.
+    const play = song.locator("[data-row-play]");
+    await expect(play).toBeVisible();
+    const playBox = (await play.boundingBox())!;
     const rowBox = (await song.boundingBox())!;
-    expect(play.x).toBeGreaterThanOrEqual(rowBox.x);
-    expect(play.x + play.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
+    expect(playBox.x + playBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
+    expect(Math.abs(rowBox.height - 56)).toBeLessThanOrEqual(1);
 
-    // A tap on the opened words collapses it.
-    const openWords = (await song.locator("[data-words]").boundingBox())!;
-    await page.touchscreen.tap(openWords.x + openWords.width / 2, openWords.y + 4);
-    await expect(opener).toHaveAttribute("aria-expanded", "false");
-    await expect.poll(() => bar.evaluate((el: HTMLElement) => el.offsetHeight)).toBe(78);
+    // A second tap pauses it.
+    await page.touchscreen.tap(title.x + 20, title.y + title.height / 2);
+    await expect(toggle).toHaveAttribute("aria-label", "Play Song");
+    await expect(play).toBeVisible();
   });
 
-  test("an audio row: a long-press selects it, and doesn't expand it", async ({
+  test("an audio row: a long-press selects it, and doesn't play it", async ({
     page,
     seed,
     browserName,
@@ -154,12 +156,13 @@ test.describe("Link rows on phones", () => {
     });
     await openHome(page);
     const song = row(page, "Song");
-    await longPress(page, song.locator("[data-words]"));
+    await longPress(page, song.locator('[data-slot="item-title"]'));
     await expect(song).toHaveAttribute("data-selected", "true");
     await expect(song.getByRole("checkbox", { name: "Select Song" })).toBeChecked();
-    // The lift after the long-press neither unselects nor opens it.
+    // The lift after the long-press neither unselects nor plays it.
     await page.waitForTimeout(300);
     await expect(song).toHaveAttribute("data-selected", "true");
-    await expect(song.locator("[data-expand]")).toHaveAttribute("aria-expanded", "false");
+    await expect(song.locator("[data-audio-toggle]")).toHaveAttribute("aria-label", "Play Song");
+    await expect(song.locator("[data-row-play]")).toHaveCount(0);
   });
 });

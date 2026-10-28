@@ -1,5 +1,6 @@
 import { expect, test, waitForHydration } from "./fixtures";
 import { pool, setFolderPublic } from "./support/db";
+import { silentWav } from "./support/media";
 
 // Public folders at /@username/slug: readable by anyone (no session),
 // never indexed, 404 when private, and old URLs redirect after a rename.
@@ -102,13 +103,15 @@ test.describe("Shared folders, visited signed out", () => {
     await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
   });
 
-  test("the list view's audio row is the bar: a Tab stop that expands in place, read-only", async ({
+  test("the list view's audio row is a row that plays: a Tab stop, read-only", async ({
     page,
     seed,
     testUser,
     browserName,
   }) => {
-    await page.context().route("https://sounds.example/**", (route) => route.abort());
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
     const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
     await seed.link({
       url: "https://sounds.example/song.mp3",
@@ -126,32 +129,41 @@ test.describe("Shared folders, visited signed out", () => {
     );
 
     const song = page.locator('[data-cy="link-item"]').filter({ hasText: "Song" });
-    await expect(song.locator('[data-face="audio"]')).toBeVisible();
-    expect(Math.abs((await song.boundingBox())!.height - 78)).toBeLessThanOrEqual(1);
+    const alpha = page.locator('[data-cy="link-item"]').filter({ hasText: "Alpha article" });
+    // A row like the others: no bar, the same height.
+    await expect(song.locator('[data-face="audio"]')).toHaveCount(0);
+    expect(Math.abs((await song.boundingBox())!.height - 48)).toBeLessThanOrEqual(1);
+    expect((await song.boundingBox())!.height).toBe((await alpha.boundingBox())!.height);
     // Read-only: no checkbox, no menu.
     await expect(song.getByRole("checkbox")).toHaveCount(0);
     await expect(song.getByRole("button", { name: "Open link menu" })).toHaveCount(0);
+    await expect(song.getByRole("link")).toHaveCount(0);
 
-    // Tab from the row above reaches its opener.
-    const opener = song.getByRole("button", { name: "Expand Song" });
+    // Tab from the row above reaches its button.
+    const button = song.locator("[data-audio-toggle]");
+    await expect(button).toHaveAttribute("aria-label", "Play Song");
     await page.getByRole("link", { name: "Alpha article (opens in new tab)" }).focus();
     // WebKit's Tab skips buttons; Option-Tab doesn't.
     await page.keyboard.press(browserName === "webkit" ? "Alt+Tab" : "Tab");
-    await expect(opener).toBeFocused();
+    await expect(button).toBeFocused();
     await page.keyboard.press("Enter");
-    await expect(song.locator("[data-expand]")).toHaveAttribute("aria-expanded", "true");
+    await expect(button).toHaveAttribute("aria-label", "Pause Song");
+    // The mark at the row's end, and the second line counts.
+    await expect(song.locator("[data-row-play]")).toBeVisible();
+    await expect(song.locator("[data-row-play]")).toHaveAttribute("aria-label", "Pause Song");
     await expect
-      .poll(() => song.locator('[data-face="audio"]').evaluate((el: HTMLElement) => el.offsetHeight))
-      .toBe(189);
-    await expect(song.getByRole("link", { name: "Open file" })).toHaveAttribute(
-      "href",
-      "https://sounds.example/song.mp3",
-    );
+      .poll(() =>
+        song
+          .locator('[data-slot="item-title"] > :nth-child(2)')
+          .evaluate((el) => (el as HTMLElement).innerText.trim()),
+      )
+      .toMatch(/^0:0\d \/ (1:05|0:10)$/);
     await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(page.url()).not.toContain("pearl");
-    await page.keyboard.press("Escape");
-    await expect(song.locator("[data-expand]")).toHaveAttribute("aria-expanded", "false");
-    await expect(song.getByRole("button", { name: "Expand Song" })).toBeFocused();
+    // A click on the mark pauses it; the mark stays.
+    await song.locator("[data-row-play]").click();
+    await expect(button).toHaveAttribute("aria-label", "Play Song");
+    await expect(song.locator("[data-row-play]")).toBeVisible();
   });
 
   test("the grid has 2 columns on phones and 3 on small tablets, every card on screen", async ({

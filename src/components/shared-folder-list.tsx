@@ -282,7 +282,7 @@ export function SharedFolderList({
                 role="listitem"
                 // Containment lifts while the row's icon morphs to or from
                 // the media viewer, so the morph isn't clipped to the row.
-                className="[content-visibility:auto] has-[[data-pearl-morphing]]:[content-visibility:visible] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px] has-[[data-face=audio]]:[contain-intrinsic-size:auto_86px]"
+                className="[content-visibility:auto] has-[[data-pearl-morphing]]:[content-visibility:visible] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px]"
               >
                 <SharedLinkItem link={link} eagerFavicon={index < EAGER_ROWS} />
               </div>

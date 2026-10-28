@@ -14,8 +14,7 @@ import { Typography } from "./typography";
 /**
  * A link card's frame (the shared folder's and the owner's grid): rounded,
  * a hairline edge that firms up on hover, pressed to 0.98. An audio card's
- * close swell scales it (`--audio-swell`, see `AudioBar`); a row hosting
- * the bar takes the same `[transform:var(--audio-swell)]`.
+ * close swell scales it (`--audio-swell`, see `AudioBar`).
  */
 export const LINK_CARD_FRAME =
   // `--audio-swell`: an audio card's close dips the whole card (set by its

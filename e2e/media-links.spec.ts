@@ -439,6 +439,56 @@ test.describe("Audio pearls: the now-playing bar", () => {
     await expect(slider).not.toHaveAttribute("aria-valuetext", before ?? "");
   });
 
+  test("the card's ⋯ floats over the bar's corner on hover; the words keep the full width", async ({
+    page,
+    seed,
+  }) => {
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
+    await seedSong(seed);
+    await openHome(page);
+    await chooseView(page, "Grid");
+    await page.mouse.move(0, 0);
+
+    const song = card(page, "Song");
+    const bar = song.locator('[data-face="audio"]');
+    const words = song.locator("[data-words]");
+    const barBox = (await bar.boundingBox())!;
+    const wordsBox = (await words.boundingBox())!;
+    // At rest the words run to the bar's margin: no slot kept for the menu.
+    expect(Math.abs(barBox.x + barBox.width - 10 - (wordsBox.x + wordsBox.width))).toBeLessThanOrEqual(1);
+    // The menu is hidden until the card is hovered (a pointer that hovers).
+    const menu = song.locator("[data-card-menu]").filter({
+      has: page.getByRole("button", { name: "Open link menu" }),
+    });
+    await expect(menu).toHaveCSS("opacity", "0");
+
+    await song.hover();
+    await expect(menu).toHaveCSS("opacity", "1");
+    const button = song.getByRole("button", { name: "Open link menu" });
+    const buttonBox = (await button.boundingBox())!;
+    // Over the bar's top-right corner, inside it.
+    expect(await insideBox(button, bar)).toBe(true);
+    expect(barBox.x + barBox.width - (buttonBox.x + buttonBox.width)).toBeLessThanOrEqual(10);
+    expect(buttonBox.y - barBox.y).toBeLessThanOrEqual(10);
+    // The words don't move.
+    const hovered = (await words.boundingBox())!;
+    expect(hovered.x).toBeCloseTo(wordsBox.x, 0);
+    expect(hovered.width).toBeCloseTo(wordsBox.width, 0);
+
+    // Opened, it keeps the corner.
+    await clickAt(page, words);
+    await expect(song.locator("[data-expand]")).toHaveAttribute("aria-expanded", "true");
+    await expect.poll(() => bar.evaluate((el: HTMLElement) => el.offsetHeight)).toBe(189);
+    await song.hover();
+    const openBox = (await button.boundingBox())!;
+    expect(openBox.y).toBeCloseTo(buttonBox.y, 0);
+    expect(openBox.x).toBeCloseTo(buttonBox.x, 0);
+    await button.click();
+    await expect(page.getByRole("menuitem", { name: "Open file" })).toBeVisible();
+  });
+
   test("the hover preview's bar and the card's are one playback", async ({ page, seed }) => {
     await page.context().route("https://sounds.example/**", (route) =>
       route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
@@ -625,6 +675,8 @@ async function seedExpandGrid(seed: Seed, baseURL: string | undefined) {
     height: 600,
   });
   for (const title of ["Tide", "Sun"]) {
+    // Distinct creation times, so the order (and the columns) never swap.
+    await new Promise((resolve) => setTimeout(resolve, 15));
     await seed.link({
       url: `https://sounds.example/${title.toLowerCase()}.wav`,
       title,
@@ -903,120 +955,164 @@ test.describe("Audio pearls: the bar expands in place", () => {
   });
 });
 
-test.describe("Audio pearls in the list: the row is the bar", () => {
+/** A row's second line (under its title), as shown. */
+function rowSecondLine(scope: Locator) {
+  return scope
+    .locator('[data-slot="item-title"] > :nth-child(2)')
+    .evaluate((el) => (el as HTMLElement).innerText.trim());
+}
+
+/** The audio row's main element: the button that plays and pauses it. */
+const rowToggle = (scope: Locator) => scope.locator("[data-audio-toggle]");
+const rowPlay = (scope: Locator) => scope.locator("[data-row-play]");
+
+test.describe("Audio pearls in the list: a row that plays", () => {
   test.beforeEach(async ({ page, seed }) => {
     await page.context().route("https://sounds.example/**", (route) =>
       route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
     );
-    // Newest first: Alpha, Sun, then Bravo under it.
+    // Newest first: Alpha, Song, then Bravo under it.
     await seed.link({ url: "https://bravo.example", title: "Bravo" });
-    await seed.link({
-      url: "https://sounds.example/sun.wav",
-      title: "Sun",
-      contentType: "AUDIO",
-      duration: 10,
-    });
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    await seedSong(seed);
+    await new Promise((resolve) => setTimeout(resolve, 15));
     await seed.link({ url: "https://alpha.example", title: "Alpha" });
   });
 
-  test("an audio row is the bar at the list's width; it expands in place and the rows below follow", async ({
+  test("an audio row is a row: a click plays and pauses it, the mark shows at its end, Esc does nothing", async ({
     page,
   }) => {
     await openHome(page);
-    const sun = row(page, "Sun");
+    const song = row(page, "Song");
     const alpha = row(page, "Alpha");
-    const bravo = row(page, "Bravo");
-    await expect(bar(sun)).toBeVisible();
-    // The bar is the row: 78px, the row's width.
-    const sunBox = (await sun.boundingBox())!;
-    expect(Math.abs(sunBox.height - 78)).toBeLessThanOrEqual(1);
-    const barBox = (await bar(sun).boundingBox())!;
-    expect(Math.abs(barBox.width - sunBox.width)).toBeLessThanOrEqual(1);
-    expect(Math.abs(barBox.width - (await alpha.boundingBox())!.width)).toBeLessThanOrEqual(1);
-    await expectShut(sun, "Sun");
-    // No favicon column: its sleeve is the picture.
-    await expect(sun.locator('[data-cy="row-favicon"]')).toHaveCount(0);
+    // A normal row: 48px, its icon, its title and "Audio · 2:36"; no bar.
+    expect(Math.abs((await song.boundingBox())!.height - 48)).toBeLessThanOrEqual(1);
+    expect((await song.boundingBox())!.height).toBe((await alpha.boundingBox())!.height);
+    await expect(song.locator('[data-face="audio"]')).toHaveCount(0);
+    await expect(song.locator('[data-cy="row-favicon"]')).toBeVisible();
+    expect(await rowSecondLine(song)).toBe("Audio · 2:36");
+    // Its main element is a button that plays it: never a link.
+    await expect(song.getByRole("link")).toHaveCount(0);
+    await expect(rowToggle(song)).toHaveAttribute("aria-label", "Play Song");
+    await expect(rowToggle(song)).toHaveJSProperty("tagName", "BUTTON");
+    await expect(rowPlay(song)).toHaveCount(0);
 
-    const bravoTop = (await bravo.boundingBox())!.y;
-    await clickAt(page, sun.locator("[data-words]"));
-    await expectOpen(sun, "Sun");
-    expect(Math.abs((await sun.boundingBox())!.height - 189)).toBeLessThanOrEqual(2);
-    // The row below moved down by the growth.
-    expect(Math.abs((await bravo.boundingBox())!.y - bravoTop - 111)).toBeLessThanOrEqual(3);
-    // An expanded bar has no hover preview beside it.
-    await expect(page.locator('[data-slot="hover-card-content"]')).toHaveCount(0);
-
-    // It plays inline from the transport; nothing opens.
-    await sun.getByRole("button", { name: "Play Sun", exact: true }).click();
-    await expect(sun.getByRole("button", { name: "Pause Sun", exact: true })).toBeVisible();
-    await expect(sun.getByRole("link", { name: "Open file" })).toBeVisible();
+    // A click on the row plays it: the row's end shows the mark (always,
+    // not just on hover) and the second line counts.
+    await clickAt(page, song.locator('[data-slot="item-title"]'));
+    await expect(rowToggle(song)).toHaveAttribute("aria-label", "Pause Song");
+    await expect(rowPlay(song)).toHaveAttribute("aria-label", "Pause Song");
+    await page.mouse.move(0, 0);
+    await expect(rowPlay(song)).toBeVisible();
+    await expect.poll(() => rowSecondLine(song)).toMatch(/^0:0\d \/ (2:36|0:10)$/);
+    // The `⋯` beside it stays a hover thing; the row keeps its height.
+    await expect(song.getByRole("button", { name: "Open link menu" })).toHaveCSS("opacity", "1");
+    expect(
+      await song
+        .getByRole("button", { name: "Open link menu" })
+        .evaluate((el) => {
+          let node: Element | null = el;
+          let opacity = 1;
+          while (node) {
+            opacity *= Number(getComputedStyle(node).opacity);
+            node = node.parentElement;
+          }
+          return opacity;
+        }),
+    ).toBe(0);
+    const playBox = (await rowPlay(song).boundingBox())!;
+    const songBox = (await song.boundingBox())!;
+    expect(playBox.x + playBox.width).toBeLessThanOrEqual(songBox.x + songBox.width);
+    expect(Math.abs(songBox.height - 48)).toBeLessThanOrEqual(1);
+    // Nothing opens.
     await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(page.url()).not.toContain("pearl");
 
+    // Esc does nothing: it plays on.
     await page.keyboard.press("Escape");
-    await expectShut(sun, "Sun");
-    await expect.poll(async () => (await bravo.boundingBox())!.y).toBeCloseTo(bravoTop, 0);
+    await expect(rowToggle(song)).toHaveAttribute("aria-label", "Pause Song");
+    await expect
+      .poll(() => page.evaluate(() => document.querySelector("audio")?.paused))
+      .toBe(false);
+
+    // A second click pauses it; the mark stays while it's paused.
+    await clickAt(page, song.locator('[data-slot="item-title"]'));
+    await expect(rowToggle(song)).toHaveAttribute("aria-label", "Play Song");
+    await expect(rowPlay(song)).toHaveAttribute("aria-label", "Play Song");
+    await expect(rowPlay(song)).toBeVisible();
+    // The mark plays it again.
+    await rowPlay(song).click();
+    await expect(rowToggle(song)).toHaveAttribute("aria-label", "Pause Song");
   });
 
-  test("the row's checkbox and menu work as on other rows", async ({ page }) => {
+  test("the checkbox swaps in on hover and the ⋯ floats, as on other rows", async ({ page }) => {
     await openHome(page);
-    const sun = row(page, "Sun");
-    const checkbox = sun.getByRole("checkbox", { name: "Select Sun" });
-    // On hover, in the sleeve's corner; at rest, hidden.
+    const song = row(page, "Song");
+    const checkbox = song.getByRole("checkbox", { name: "Select Song" });
+    // On hover, in the icon's place; at rest, hidden.
     await expect(checkbox).toHaveCSS("opacity", "0");
-    await sun.hover();
+    await song.hover();
     await expect(checkbox).toHaveCSS("opacity", "1");
-    await checkbox.click();
-    await expect(checkbox).toBeChecked();
-    await expect(sun).toHaveAttribute("data-selected", "true");
-    // While selecting, a click on the bar toggles the row; it doesn't open.
-    await clickAt(page, sun.locator("[data-words]"));
-    await expect(checkbox).not.toBeChecked();
-    await expect(expandButton(sun)).toHaveAttribute("aria-expanded", "false");
-
-    // The menu, in the bar's menu slot: on hover.
-    await sun.hover();
-    const menuButton = sun.getByRole("button", { name: "Open link menu" });
+    await expect(song.locator('[data-cy="row-favicon"]')).toHaveCSS("opacity", "0");
+    // The menu floats over the row's end, on hover.
+    const menuButton = song.getByRole("button", { name: "Open link menu" });
     await expect(menuButton).toBeVisible();
-    expect(await insideBox(menuButton, bar(sun))).toBe(true);
+    const menuBox = (await menuButton.boundingBox())!;
+    const songBox = (await song.boundingBox())!;
+    expect(songBox.x + songBox.width - (menuBox.x + menuBox.width)).toBeLessThanOrEqual(12);
     await menuButton.click();
     await expect(page.getByRole("menuitem", { name: "Open file" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("menu")).toHaveCount(0);
-    await expect(expandButton(sun)).toHaveAttribute("aria-expanded", "false");
+
+    await song.hover();
+    await checkbox.click();
+    await expect(checkbox).toBeChecked();
+    await expect(song).toHaveAttribute("data-selected", "true");
+    // While selecting, a click on the row toggles it; it doesn't play.
+    await clickAt(page, song.locator('[data-slot="item-title"]'));
+    await expect(checkbox).not.toBeChecked();
+    await expect(rowToggle(song)).toHaveAttribute("aria-label", "Play Song");
+    await expect(rowPlay(song)).toHaveCount(0);
   });
 
-  test("by keyboard: Tab reaches its opener, which previews; Enter expands; Esc back to it", async ({
+  test("by keyboard: Tab reaches its button, which previews; Enter plays; a delete moves focus to it", async ({
     page,
     browserName,
   }) => {
     // WebKit's Tab skips buttons; Option-Tab doesn't.
     const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
     await openHome(page);
-    const sun = row(page, "Sun");
-    const opener = sun.getByRole("button", { name: "Expand Sun" });
+    const song = row(page, "Song");
+    const button = rowToggle(song);
     await page.getByRole("link", { name: "Alpha (opens in new tab)" }).focus();
     for (let i = 0; i < 6; i++) {
-      if (await opener.evaluate((el) => el === document.activeElement)) break;
+      if (await button.evaluate((el) => el === document.activeElement)) break;
       await page.keyboard.press(tab);
     }
-    await expect(opener).toBeFocused();
-    // Keyboard focus opens the hover preview, as on other rows; its bar
+    await expect(button).toBeFocused();
+    // Keyboard focus opens the hover preview, as on other rows: its bar
     // doesn't expand.
     const preview = page.locator('[data-slot="hover-card-content"]');
     await expect(preview.locator('[data-face="audio"]')).toBeVisible();
     await expect(preview.locator("[data-expand]")).toHaveCount(0);
-
     await page.keyboard.press("Enter");
-    await expectOpen(sun, "Sun");
-    await expect(preview).toHaveCount(0);
-    await sun.getByRole("button", { name: "Play Sun", exact: true }).focus();
-    await page.keyboard.press("Escape");
-    await expectShut(sun, "Sun");
-    await expect(sun.getByRole("button", { name: "Expand Sun" })).toBeFocused();
-    // Focus handed back isn't keyboard navigation: no preview reopens.
-    await page.waitForTimeout(300);
-    await expect(preview).toHaveCount(0);
+    await expect(button).toHaveAttribute("aria-label", "Pause Song");
+    await expect(preview.getByRole("button", { name: "Pause Song" })).toBeVisible();
+    await page.keyboard.press("Enter");
+    await expect(button).toHaveAttribute("aria-label", "Play Song");
+
+    // Alpha, deleted from its menu by keyboard: focus lands on Song's button.
+    const alpha = row(page, "Alpha");
+    await alpha.hover();
+    await alpha.getByRole("button", { name: "Open link menu" }).focus();
+    await page.keyboard.press("Enter");
+    await page.getByRole("menuitem", { name: "Delete" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(alpha).toHaveCount(0);
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.hasAttribute("data-audio-toggle")))
+      .toBe(true);
   });
 });
 

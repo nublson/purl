@@ -1,7 +1,6 @@
 "use client";
 
 import { useAudioView } from "@/hooks/use-audio-player";
-import { audioExpansion, useAudioExpanded } from "@/lib/audio-expansion";
 import { isViewerKind, linkKind } from "@/lib/link-kind";
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
 import {
@@ -13,7 +12,7 @@ import { linkSecondLine } from "@/lib/upload-meta";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
 import * as React from "react";
-import { AudioBar } from "./audio-bar";
+import { AudioRowPlay, AudioRowSecondLine, AudioRowToggle } from "./audio-row";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
 import { MediaAnchor, ROW_ICON_RADIUS } from "./media-face-anchor";
@@ -26,9 +25,9 @@ import { Item, ItemContent, ItemMedia, ItemTitle } from "./ui/item";
  * checkbox, no menu). Same box, type and hover preview, so a shared folder
  * looks exactly like the owner's. PDFs get no preview: their thumbnail
  * goes through the signed-in PDF proxy. An image or video pearl opens the
- * media viewer, morphing out of its icon; a page opens a tab; an audio
- * pearl's row is its now-playing bar (read-only), which expands in place
- * into the player.
+ * media viewer, morphing out of its icon; a page opens a tab; a click on
+ * an audio pearl's row plays and pauses it, and while it's loaded (playing
+ * or paused) its play/pause mark shows at the row's end.
  */
 export function SharedLinkItem({
   link,
@@ -52,8 +51,6 @@ export function SharedLinkItem({
   // An audio pearl's row is a view of its playback: what its hover preview
   // starts plays on once the preview closes, until the row leaves.
   useAudioView(audio ? link.id : null);
-  // Expanded in place, the bar is the player: no preview beside it.
-  const barOpen = useAudioExpanded(link.id).open;
   const viewerOpen = useIsMediaOpen(link.id);
 
   const clearTimers = React.useCallback(() => {
@@ -69,8 +66,6 @@ export function SharedLinkItem({
     openTimerRef.current = setTimeout(() => {
       // Not over the media viewer this row (or another) just opened.
       if (mediaViewer.getSnapshot().currentId !== null) return;
-      // Nor beside this row's bar expanded into the player.
-      if (audioExpansion.getSnapshot() === link.id) return;
       openedByPointerRef.current = true;
       setPreviewOpen(true);
     }, previewOpenDelay());
@@ -82,18 +77,16 @@ export function SharedLinkItem({
     }, 100);
   };
 
-  // Opening this pearl in the media viewer, or expanding its bar into the
-  // player, closes its preview.
+  // Opening this pearl in the media viewer closes its preview.
   React.useEffect(() => {
-    if (viewerOpen || barOpen) setPreviewOpen(false);
-  }, [viewerOpen, barOpen]);
+    if (viewerOpen) setPreviewOpen(false);
+  }, [viewerOpen]);
 
   // Keyboard users get the same preview mouse users get on hover; not when
   // the media viewer hands focus back on close (its icon is morphing back).
   const openPreviewOnFocus = (event: React.FocusEvent<HTMLElement>) => {
     if (consumeReturningFocus()) return;
     if (!hasPreview || !event.currentTarget.matches(":focus-visible")) return;
-    if (audioExpansion.getSnapshot() === link.id) return;
     clearTimers();
     openedByPointerRef.current = false;
     setPreviewOpen(true);
@@ -125,35 +118,28 @@ export function SharedLinkItem({
     },
   };
 
-  // An audio row is its bar at the list's width (78px), read-only, which
-  // expands in place (the owner's row's look, without its checkbox and
-  // menu); its opener is the row's Tab stop and opens the preview on focus.
-  const row = audio ? (
-    <Item
-      data-cy="link-item"
-      className="relative my-1 block w-full overflow-hidden rounded-lg border-0 bg-card p-0 transition-none [transform:var(--audio-swell)] [@media(pointer:coarse)]:select-none after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:ring-1 after:ring-foreground/10 after:ring-inset after:transition-[box-shadow] after:duration-150 after:ease-out [@media(hover:hover)]:hover:after:ring-foreground/25"
-      {...hoverHandlers}
-    >
-      {link.description ? (
-        <span id={descriptionId} className="sr-only">
-          {link.description}
-        </span>
-      ) : null}
-      <AudioBar
-        link={link}
-        describedBy={describedBy}
-        onExpandFocus={openPreviewOnFocus}
-        onExpandBlur={closePreviewOnBlur}
-      />
-    </Item>
-  ) : (
+  const row = (
     <Item
       data-cy="link-item"
       // min-h-12: the owner's row gets its 48px from the menu button.
-      className="relative grid min-h-12 w-full grid-cols-[20px_1fr] gap-4 border-0 p-2 transition-none hover:bg-accent/40 max-md:min-h-14 max-md:grid-cols-[24px_1fr] max-md:py-3"
+      className={cn(
+        "relative grid min-h-12 w-full grid-cols-[20px_1fr] gap-4 border-0 p-2 transition-none hover:bg-accent/40 max-md:min-h-14 max-md:grid-cols-[24px_1fr] max-md:py-3",
+        // The row's color, opaque, for the audio row's mark at its end.
+        "[--row-bg:var(--color-background)] hover:[--row-bg:color-mix(in_oklab,var(--color-accent)_40%,var(--color-background))]",
+        // Touch: no text selection from a press on it (like the owner's).
+        audio && "[@media(pointer:coarse)]:select-none",
+      )}
       {...hoverHandlers}
     >
-      {media ? (
+      {audio ? (
+        <AudioRowToggle
+          link={link}
+          aria-describedby={describedBy}
+          className={cn(openerClass, "cursor-pointer")}
+          onFocus={openPreviewOnFocus}
+          onBlur={closePreviewOnBlur}
+        />
+      ) : media ? (
         <MediaOpenButton
           link={link}
           preset="snappy"
@@ -214,10 +200,17 @@ export function SharedLinkItem({
             size="small"
             className="hidden font-normal text-muted-foreground md:block"
           >
-            {linkSecondLine(link)}
+            {audio ? <AudioRowSecondLine link={link} /> : linkSecondLine(link)}
           </Typography>
         </ItemTitle>
       </ItemContent>
+      {audio ? (
+        // Loaded (playing or paused): the mark at the row's end, on the
+        // row's color, like the owner's row's actions.
+        <div className="absolute inset-y-0 end-0 z-10 flex items-center rounded-e-md bg-(--row-bg) ps-6 pe-2 [mask-image:linear-gradient(to_right,transparent,black_24px)] empty:hidden">
+          <AudioRowPlay link={link} />
+        </div>
+      ) : null}
     </Item>
   );
 
