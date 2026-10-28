@@ -259,6 +259,59 @@ async function readMorphFrames(page: Page, ms: number): Promise<MorphFrame[]> {
   );
 }
 
+type SleeveFrame = { x: number; y: number; w: number; h: number; transform: string };
+
+/** Tags a card, so `startSleeveFrames` finds its sleeve even while the page is hidden behind the viewer. */
+function tagCard(card: Locator, name: string) {
+  return card.evaluate((el, name) => el.setAttribute("data-probe", name), name);
+}
+
+/**
+ * Starts recording, on every frame for the next `ms`, where each named
+ * sleeve is drawn and its inline transform: a tagged card's (`tagCard`; a
+ * remounted sleeve is still found) or the player's of the pearl titled
+ * `player` (a slide's words name it). Read them with `readSleeveFrames`.
+ */
+async function startSleeveFrames(
+  page: Page,
+  ms: number,
+  queries: Record<string, { card: string } | { player: string }>,
+) {
+  await page.evaluate(
+    ({ ms, queries }) => {
+      const w = window as unknown as { __sleeves: Record<string, unknown[]> };
+      w.__sleeves = Object.fromEntries(Object.keys(queries).map((name) => [name, []]));
+      const find = (q: { card: string } | { player: string }) => {
+        if ("card" in q) return document.querySelector<HTMLElement>(`[data-probe="${q.card}"] [data-sleeve]`);
+        const players = document.querySelectorAll<HTMLElement>('[data-media-viewer] [data-viewer-media="audio"]');
+        const player = [...players].find(
+          (el) => el.querySelector("[data-words] span")?.textContent === q.player,
+        );
+        return player?.querySelector<HTMLElement>("[data-sleeve]") ?? null;
+      };
+      const t0 = performance.now();
+      const tick = () => {
+        for (const [name, q] of Object.entries(queries)) {
+          const el = find(q);
+          if (!el) continue;
+          const r = el.getBoundingClientRect();
+          w.__sleeves[name].push({ x: r.x, y: r.y, w: r.width, h: r.height, transform: el.style.transform });
+        }
+        if (performance.now() - t0 < ms) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    },
+    { ms, queries },
+  );
+}
+
+async function readSleeveFrames(page: Page, ms: number): Promise<Record<string, SleeveFrame[]>> {
+  await page.waitForTimeout(ms + 100);
+  return page.evaluate(
+    () => (window as unknown as { __sleeves: Record<string, SleeveFrame[]> }).__sleeves,
+  );
+}
+
 /** A transform Motion leaves when it's done (or never wrote). */
 const restingTransform = (transform: string) =>
   transform === "" || transform === "none";
@@ -838,6 +891,7 @@ test.describe("Media viewer", () => {
     await chooseGrid(page);
     await expect(cards(page)).toHaveCount(1);
     const card = cards(page).first();
+    await tagCard(card, "card");
 
     await startMorphFrames(page, 400);
     await openAudioCard(page, card);
@@ -848,9 +902,70 @@ test.describe("Media viewer", () => {
     );
     await expectPlayerSettled(page);
 
+    // Closing: the card's sleeve doesn't travel back either.
+    await startSleeveFrames(page, 600, { card: { card: "card" } });
     await page.keyboard.press("Escape");
+    const back = (await readSleeveFrames(page, 600)).card;
+    expect(back.length).toBeGreaterThan(3);
+    expect(back.every((f) => restingTransform(f.transform)), JSON.stringify(back)).toBe(true);
     await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
     await expectCardSleeveBack(card);
+  });
+
+  test("moving from one audio pearl to the next doesn't fly from its card; closing lands in it", async ({
+    page,
+    seed,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    // Newest first: Song, then Tune.
+    await seed.link({
+      url: "https://sounds.example/tune.wav",
+      title: "Tune",
+      contentType: "AUDIO",
+      duration: 30,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    await seedUploadedSong(seed);
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(2);
+    const song = cards(page).filter({ has: openButton(page, "Song") });
+    const tune = cards(page).filter({ has: openButton(page, "Tune") });
+    await tagCard(song, "song");
+    await tagCard(tune, "tune");
+
+    await openAudioCard(page, song);
+    await expectPlayerSettled(page);
+    // Onto Tune: its player slides in at its own 64px, never out of its card.
+    await startSleeveFrames(page, 500, { tune: { player: "Tune" } });
+    await page.getByRole("button", { name: "Next pearl" }).click();
+    const arriving = (await readSleeveFrames(page, 500)).tune;
+    expect(arriving.length).toBeGreaterThan(3);
+    for (const f of arriving) {
+      expect(Math.abs(f.w - 64), JSON.stringify(arriving)).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(f.h - 64), JSON.stringify(arriving)).toBeLessThanOrEqual(0.5);
+      expect(restingTransform(f.transform), JSON.stringify(arriving)).toBe(true);
+    }
+    await expect(page.getByRole("dialog", { name: "Tune" })).toBeVisible();
+    await expectSlideSettled(page);
+
+    // Closed onto Tune: it lands in Tune's card; Song's sleeve never moves.
+    await startSleeveFrames(page, 800, { song: { card: "song" } });
+    await page.keyboard.press("Escape");
+    const still = (await readSleeveFrames(page, 800)).song;
+    expect(still.length).toBeGreaterThan(3);
+    const rest = still[still.length - 1];
+    expect(Math.round(rest.w)).toBe(40);
+    for (const f of still) {
+      expect(
+        Math.abs(f.x - rest.x) + Math.abs(f.y - rest.y) + Math.abs(f.w - rest.w) + Math.abs(f.h - rest.h),
+        JSON.stringify(still),
+      ).toBeLessThanOrEqual(0.5);
+      expect(restingTransform(f.transform), JSON.stringify(still)).toBe(true);
+    }
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expectCardSleeveBack(page.locator('[data-probe="tune"]'));
+    await expectCardSleeveBack(page.locator('[data-probe="song"]'));
   });
 
   test("after moving off an audio pearl, its card's sleeve stays in place, wherever the viewer closes", async ({

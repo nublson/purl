@@ -14,8 +14,8 @@ import { linkSecondLine } from "@/lib/upload-meta";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/utils/format-duration";
 import type { Link } from "@/utils/links";
-import { animate, m, useMotionValue, type Transition } from "motion/react";
-import { useState, type MouseEvent, type ReactNode } from "react";
+import { m, type Transition } from "motion/react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { MusicNote } from "reicon-react";
 import { HapticTarget } from "./haptic-target";
 import { AnchorIf } from "./media-card-face";
@@ -70,6 +70,20 @@ export type AudioPart = {
   /** The player's: the Popup's preset. The card's: `CARD_MORPH`. */
   transition: Transition;
 };
+
+/**
+ * A Motion transition's timing for the Web Animations API (the words' scale
+ * keeps the travel's pace without Motion's animation engine, which stays
+ * out of the page's first load).
+ */
+function waapiTiming(transition: Transition): { duration: number; easing: string } {
+  const { duration, ease } = transition as { duration?: number; ease?: unknown };
+  return {
+    duration: (duration ?? 0.3) * 1000,
+    easing:
+      Array.isArray(ease) && ease.length === 4 ? `cubic-bezier(${ease.join(", ")})` : "ease-out",
+  };
+}
 
 /** The part's Motion props: a shared layout element, or nothing at all. */
 function partProps(part: AudioPart | undefined, layout: true | "position") {
@@ -168,10 +182,11 @@ export function AudioBar({
   if (anchored && movedOff && !steppedOut) setSteppedOut(true);
   if (!open && steppedOut) setSteppedOut(false);
   // The parts travel only out of the card the viewer opens from (a hover
-  // preview's bar is another view of the pearl, never a morph's end).
+  // preview's bar is another view of the pearl, never a morph's end), and
+  // never under reduced motion.
   const partKey = steppedOut ? "out" : "in";
   const part = (name: "sleeve" | "words"): AudioPart | undefined =>
-    anchored && !steppedOut
+    anchored && !steppedOut && !reducedMotion
       ? {
           layoutId: pearlPartLayoutId(link.id, name),
           layoutDependency: FACE_LAYOUT_DEPENDENCY,
@@ -412,23 +427,29 @@ export function AudioWords({
   className?: string;
   children: ReactNode;
 }) {
-  const scale = useMotionValue(1);
+  const textRef = useRef<HTMLDivElement>(null);
+  const scaling = useRef<Animation | null>(null);
+  useEffect(() => () => scaling.current?.cancel(), []);
   return (
     <m.div
       data-words=""
       {...partProps(part, "position")}
       onLayoutAnimationStart={() => {
-        if (!part) return;
-        scale.set(from);
-        animate(scale, 1, part.transition);
+        const text = textRef.current;
+        if (!part || !text || from === 1) return;
+        scaling.current?.cancel();
+        scaling.current = text.animate(
+          [{ transform: `scale(${from})` }, { transform: "none" }],
+          waapiTiming(part.transition),
+        );
       }}
       className={cn("flex min-w-0 flex-1 flex-col", className)}
     >
       {/* The scale is its own element's: on the travelling one, Motion
           would fold it into its projection. */}
-      <m.div className="flex min-w-0 flex-col" style={{ scale, originX: 0, originY: 0 }}>
+      <div ref={textRef} className="flex min-w-0 origin-top-left flex-col">
         {children}
-      </m.div>
+      </div>
     </m.div>
   );
 }
