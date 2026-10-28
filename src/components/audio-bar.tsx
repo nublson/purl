@@ -20,6 +20,7 @@ import type { Link } from "@/utils/links";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type FocusEvent,
@@ -123,13 +124,18 @@ function sleeveSwapOut(selecting: boolean) {
 }
 
 /**
- * The late parts under reduced motion: the shape jumps, so they fade
- * (150ms) instead of riding the tween (hidden at the end of a fade out).
+ * The late parts under reduced motion, on the way in: the shape jumps, so
+ * they fade (150ms) instead of riding the tween. Not on the way out: the
+ * box is already 78px, and they'd fade over the title.
  */
 const LATE_REDUCED =
   "motion-reduce:transition-[opacity,visibility] motion-reduce:duration-150 motion-reduce:ease-out";
 
-/** What a press outside the open bar is measured against: its card or row. */
+/**
+ * The bar's host: its card frame (the owner's, the shared folder's) or its
+ * row. What a press outside the open bar is measured against, and what the
+ * close's swell scales (`--audio-swell`, read by `LINK_CARD_FRAME`).
+ */
 const HOST = '[data-cy="link-card"], [data-cy="link-item"]';
 
 /** The opened player's side buttons (Restart, Open file): 34px, outlined, 44px to the touch. */
@@ -249,6 +255,22 @@ export function AudioBar({
   const swell = Math.sin(Math.PI * clamp(u, 0, 1) ** 1.5);
   const zoom = open || reducedMotion ? 1 : 1 - 0.035 * swell;
 
+  /* The object is the card, so the dip is the card's: its frame, ring and
+     ground with it, not just what's inside. A variable can't climb from
+     here to the host, so it's written there (`transform`, which composes
+     with the frame's own press `scale` and its transition); unset, the
+     frame's `transform` is none, so no other card gains a stacking
+     context. The masonry measures the box, not the scale. */
+  useLayoutEffect(() => {
+    if (zoom === 1) return;
+    const host = rootRef.current?.closest<HTMLElement>(HOST);
+    if (!host) return;
+    host.style.setProperty("--audio-swell", `scale(${zoom})`);
+    return () => {
+      host.style.removeProperty("--audio-swell");
+    };
+  }, [zoom]);
+
   /* Everything below is derived, never stored. A second piece
      of state describing the same transformation is a second
      thing that can be out of step with the first. */
@@ -306,8 +328,9 @@ export function AudioBar({
   // Esc closes it: from inside it (focus back on its opener, since the
   // transport goes inert), or from the page, unless a field or an overlay
   // (a menu, a dialog) has the key.
+  // Not while selecting: Esc clears the selection then (the bar is inert).
   useEffect(() => {
-    if (!open) return;
+    if (!open || selecting) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       const root = rootRef.current;
@@ -322,7 +345,7 @@ export function AudioBar({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, closeExpansion]);
+  }, [open, selecting, closeExpansion]);
 
   return (
     <div
@@ -333,7 +356,7 @@ export function AudioBar({
       // every card in its column while it grows.
       data-masonry-grow={expandable ? h - SHUT : undefined}
       className="@container relative overflow-hidden bg-card"
-      style={{ height: h, scale: zoom === 1 ? undefined : zoom }}
+      style={{ height: h }}
       onPointerDownCapture={(event) => {
         insidePress.current = event.nativeEvent;
       }}
@@ -480,8 +503,13 @@ export function AudioBar({
         className="pointer-events-none absolute flex min-w-0 flex-col justify-center"
         style={{ left: wordsLeft, right: wordsRight, top: PAD, height: sleeve }}
       >
+        {/* One line on the bar; two beside the opened sleeve (from
+            halfway, when there's room for them). */}
         <span
-          className="truncate font-medium text-foreground"
+          className={cn(
+            "font-medium text-foreground",
+            p < 0.5 ? "truncate" : "line-clamp-2 break-words",
+          )}
           style={{ fontSize: mix(13, 15.5, p), lineHeight: `${mix(16, 19, p)}px` }}
         >
           {link.title}
@@ -555,7 +583,7 @@ export function AudioBar({
             aria-hidden={!open || undefined}
             className={cn(
               "pointer-events-none absolute inset-x-[10px] flex items-center justify-between text-[11px] leading-none text-foreground/70 tabular-nums",
-              LATE_REDUCED,
+              open && LATE_REDUCED,
             )}
             style={{
               top: railTop + RAIL_H + CLOCK_GAP,
@@ -582,7 +610,7 @@ export function AudioBar({
             className={cn(
               // The gap gives way on the narrowest cards (a 116px row).
               "absolute inset-x-[10px] flex items-center justify-center gap-[clamp(4px,(100cqw-134px)/2,14px)]",
-              LATE_REDUCED,
+              open && LATE_REDUCED,
               late > 0.9 && !selecting ? "pointer-events-auto" : "pointer-events-none",
             )}
             style={{

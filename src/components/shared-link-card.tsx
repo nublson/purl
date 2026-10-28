@@ -13,10 +13,14 @@ import { Typography } from "./typography";
 
 /**
  * A link card's frame (the shared folder's and the owner's grid): rounded,
- * a hairline edge that firms up on hover, pressed to 0.98.
+ * a hairline edge that firms up on hover, pressed to 0.98. An audio card's
+ * close swell scales it (`--audio-swell`, see `AudioBar`); a row hosting
+ * the bar takes the same `[transform:var(--audio-swell)]`.
  */
 export const LINK_CARD_FRAME =
-  "flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 outline-none transition-[box-shadow,scale] duration-150 ease-out focus-visible:ring-3 active:scale-[0.98] motion-reduce:active:scale-100 focus-visible:ring-ring [@media(hover:hover)]:hover:ring-foreground/25";
+  // `--audio-swell`: an audio card's close dips the whole card (set by its
+  // bar while it closes; unset, the transform is none).
+  "[transform:var(--audio-swell)] flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 outline-none transition-[box-shadow,scale] duration-150 ease-out focus-visible:ring-3 active:scale-[0.98] motion-reduce:active:scale-100 focus-visible:ring-ring [@media(hover:hover)]:hover:ring-foreground/25";
 
 /**
  * A link in the shared folder's grid: the page's thumbnail full-bleed on
@@ -100,7 +104,9 @@ export function LinkCardContent({
     case "video":
       return <VideoFace link={link} badge={badge} anchored={mediaAnchor} />;
     case "audio":
-      return <AudioBar link={link} badge={badge} />;
+      // Not reached by either grid (both draw their own audio card), but
+      // if it were, a bar inside a link mustn't expand.
+      return <AudioBar link={link} badge={badge} expandable={false} />;
     default: {
       const thumbnailSrc = link.thumbnail
         ? safeRemoteImgSrc(link.thumbnail)

@@ -616,7 +616,7 @@ async function seedExpandGrid(seed: Seed, baseURL: string | undefined) {
   }
 }
 
-type GrowthSample = { height: number; drawn: number; below: number };
+type GrowthSample = { height: number; drawn: number; below: number; swell: string };
 
 /**
  * Records the bar's layout height (`offsetHeight`; `drawn` includes the
@@ -626,33 +626,37 @@ type GrowthSample = { height: number; drawn: number; below: number };
  * cards). The first entry is the bar before the move.
  */
 async function startGrowthSampling(bar: Locator) {
-  await bar.evaluate((el: HTMLElement) => {
+  // Resolves once the first entry (the bar before the move) is in.
+  await bar.evaluate((el: HTMLElement) => new Promise<void>((ready) => {
     const below = document.querySelector("[data-e2e-below]");
+    const card = el.closest('[data-cy="link-card"]')!;
     const seen: GrowthSample[] = [];
     const observer = new ResizeObserver(() => {
       seen.push({
         height: el.offsetHeight,
         drawn: el.getBoundingClientRect().height,
         below: below ? below.getBoundingClientRect().top : NaN,
+        swell: getComputedStyle(card).transform,
       });
+      if (seen.length === 1) ready();
     });
     observer.observe(el);
     Object.assign(window, {
       e2eGrowth: seen,
       e2eStopGrowth: () => observer.disconnect(),
     });
-  });
+  }));
 }
 
 async function stopGrowthSampling(page: Page, settledHeight: number) {
   await expect
     .poll(() =>
-      page.evaluate(() => {
+      page.evaluate((settled) => {
         const seen = (window as unknown as { e2eGrowth: GrowthSample[] }).e2eGrowth;
-        return seen.at(-1)?.height ?? 0;
-      }),
+        return seen.length > 1 && Math.abs(seen.at(-1)!.height - settled) <= 2;
+      }, settledHeight),
     )
-    .toBeGreaterThanOrEqual(settledHeight - 2);
+    .toBe(true);
   // A frame or two for anything still settling (the last sample is the end).
   await page.waitForTimeout(100);
   return page.evaluate(() => {
@@ -780,6 +784,88 @@ test.describe("Audio pearls: the bar expands in place", () => {
     await expectOpen(sun, "Sun");
     await clickAt(page, sun.locator("[data-words]"));
     await expectShut(sun, "Sun");
+  });
+
+  test("Esc closes it: the bar shrinks back to 78, the card dips on the way, the grid follows", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await seedExpandGrid(seed, baseURL);
+    await openHome(page);
+    await chooseView(page, "Grid");
+    const sun = card(page, "Sun");
+    const shot = card(page, "Shot");
+    await expect(shot).toBeVisible();
+    const shotTop = (await shot.boundingBox())!.y;
+    await shot.evaluate((el) => el.setAttribute("data-e2e-below", ""));
+    await clickAt(page, sun.locator("[data-words]"));
+    await expectOpen(sun, "Sun");
+    // At rest, open: no transform on the card.
+    expect(await sun.evaluate((el) => getComputedStyle(el).transform)).toBe("none");
+
+    await startGrowthSampling(bar(sun));
+    await page.keyboard.press("Escape");
+    const shrink = await stopGrowthSampling(page, 78);
+    await expectShut(sun, "Sun");
+    expect(Math.abs(shrink[0].height - 189)).toBeLessThanOrEqual(1);
+    expect(shrink.length).toBeGreaterThan(4);
+    for (let i = 1; i < shrink.length; i++) {
+      expect(shrink[i].height).toBeLessThanOrEqual(shrink[i - 1].height);
+    }
+    expect(Math.abs(shrink.at(-1)!.height - 78)).toBeLessThanOrEqual(1);
+    // The image under it comes back up with it, frame by frame.
+    for (const sample of shrink) {
+      expect(
+        Math.abs(sample.below - shrink[0].below - (sample.height - shrink[0].height)),
+      ).toBeLessThanOrEqual(2);
+    }
+    expect(Math.abs((await shot.boundingBox())!.y - shotTop)).toBeLessThanOrEqual(1);
+    // The swell is the card's: a scale under 1 on some frame mid-close,
+    // and none once it has landed.
+    const scales = shrink
+      .map((sample) => sample.swell)
+      .filter((swell) => swell !== "none")
+      .map((swell) => Number(/matrix\(([^,]+),/.exec(swell)?.[1]));
+    expect(scales.length).toBeGreaterThan(0);
+    expect(Math.min(...scales)).toBeLessThan(0.99);
+    expect(Math.min(...scales)).toBeGreaterThanOrEqual(0.964);
+    await expect.poll(() => sun.evaluate((el) => getComputedStyle(el).transform)).toBe("none");
+  });
+
+  test("opened, a long title takes two lines beside the sleeve; shut, one", async ({
+    page,
+    seed,
+  }) => {
+    await seed.link({
+      url: "https://sounds.example/long.wav",
+      title: "A very long title for a recording of the tide coming in at dawn",
+      contentType: "AUDIO",
+      duration: 10,
+    });
+    await openHome(page);
+    await chooseView(page, "Grid");
+    const long = cards(page).filter({ has: page.locator('[data-face="audio"]') });
+    const title = long.locator("[data-words] > :first-child");
+    const lines = () =>
+      title.evaluate((el) => {
+        const lineHeight = parseFloat(getComputedStyle(el).lineHeight);
+        return Math.round(el.clientHeight / lineHeight);
+      });
+    expect(await lines()).toBe(1);
+    await clickAt(page, long.locator("[data-words]"));
+    await expect
+      .poll(() => bar(long).evaluate((el: HTMLElement) => el.offsetHeight))
+      .toBe(189);
+    expect(await lines()).toBe(2);
+    expect(await title.evaluate((el) => el.clientHeight)).toBeCloseTo(38, 0);
+    // The words still fit beside the sleeve.
+    expect(await insideBox(title, long.locator("[data-words]"))).toBe(true);
+    await page.keyboard.press("Escape");
+    await expect
+      .poll(() => bar(long).evaluate((el: HTMLElement) => el.offsetHeight))
+      .toBe(78);
+    expect(await lines()).toBe(1);
   });
 
   test("by keyboard: the bar's opener, Esc back to it", async ({ page, seed, baseURL }) => {

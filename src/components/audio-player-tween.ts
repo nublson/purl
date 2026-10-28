@@ -45,7 +45,10 @@ export function useTween(to: number, ms: number, instant = false, ease = QUART) 
     if (from === to) return;
     const t0 = performance.now();
     const step = (now: number) => {
-      const t = Math.min(1, (now - t0) / ms);
+      /* Clamped at 0 too: a frame's timestamp is when the frame
+         began, which can be before `t0` was read, and quart-out
+         below 0 runs backwards (the bar dipped under 78). */
+      const t = clamp((now - t0) / ms, 0, 1);
       cur.current = from + (to - from) * ease(t);
       setAt(cur.current);
       raf.current = t < 1 ? requestAnimationFrame(step) : 0;
