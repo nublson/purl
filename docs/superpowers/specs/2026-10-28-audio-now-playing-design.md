@@ -83,6 +83,18 @@ Waveforms, likes, queues or skipping between files, a mini player that persists 
 - Unit: the store's snapshot transitions (toggle, stop, seek, ended, error, switching pearls), `PlayMark`'s path interpolation at t = 0, 0.5 and 1.
 - e2e (`e2e/media-links.spec.ts`, `e2e/media-viewer.spec.ts`, `e2e/owner-grid.spec.ts`): the bar's parts and names; play on the card then open the viewer → the player shows the same elapsed and "Pause"; close → the card still plays; one element at a time across two cards; seek by keyboard; selecting clicks on the bar select; the shared card's play works inline; reduced motion; the pending audio card's shape.
 
+## Amendment (2026-10-28): the player opens in place, never in the viewer
+
+The sections "The opened player (the viewer)" and "The morph: one object" above are superseded. The audio pearl keeps the reference's exact behaviour: the bar **expands in place**, inside the grid, into the opened player, and collapses back. Audio pearls never open the media viewer.
+
+- **One number is the state.** A single tween `p` (0 shut, 1 open; 460ms, quart-out, reading its start from wherever it is so a second press turns it around; instant under reduced motion) drives every position, size, radius and type size: height 78 → 189; the sleeve 40 → 64 at radius 6 → 12, at `PAD` in both; the words beside it at 13/11 → 15.5/12; the track from the bar's foot to 22px under the sleeve; the times and the transport (Restart, the 46px Play, Open file) ride `late = clamp((p − 0.6) / 0.4)`, so they arrive into a shape that has stopped growing. The width never changes (it is the column's). On close only, the whole object dips to 0.965 and back (the reference's swell), subtractive, working with the shrink.
+- **The sleeve stays the play control on the bar.** Once open, the transport's Play is the control and the sleeve's mark fades with `late`; the sleeve shows the icon or the thumbnail.
+- **What opens it.** A press on the bar outside its controls (the whole bar when shut; the sleeve-and-words row when open), as a button named "Expand <title>" / "Collapse <title>" with `aria-expanded`. Esc collapses. A pointer press outside the card (`pointerdown`, trusted events only, armed a tick after opening) collapses it. One pearl is open at a time, in a small module store (`audioExpansion`). Opening never changes playback; playback never changes the open state.
+- **The grid follows.** The masonry re-places cards on every resize (`ResizeObserver`), so the cards below move down with the growth, frame by frame, and back.
+- **Where.** The owner's grid card and the shared folder's grid card expand in place. In list view an audio row is the bar at the list's width (78px, with the row's checkbox and menu conventions) and expands in place the same way; the hover preview shows the bar and doesn't expand. The landing demo's audio card plays and expands like the owner's (both are client-only; the demo makes no requests).
+- **The viewer.** Images and video only. Audio pearls aren't registered with it, its Previous/Next skip them, and `?pearl=<audio id>` is stripped like an unknown id. The row menu's "Open file" and the opened player's Open file link remain the way to the file itself.
+- **Removed from the earlier sections.** The viewer's opened player, the shared `layoutId` parts, the late-arrival plumbing inside the viewer, the viewer-side presence and "moved off" logic.
+
 ## Deviations from the reference
 
 The box radius is the grid's 10px, not sleeve + margin; the width changes with the morph (the viewer's box is 320px, a card's is the grid's); no heart, no skip; the track is a scrubber (the reference's isn't); the open state is the media viewer, not an in-place growth.

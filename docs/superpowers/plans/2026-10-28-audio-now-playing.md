@@ -178,6 +178,47 @@
 
 ---
 
+## Revision (2026-10-28): the player opens in place
+
+The spec's amendment supersedes Tasks 4 and 5 (which landed as 0dd76f4, 8a150e1 and 150e6c6 and are taken back by Task 7) and Task 6 (redone as Task 10). Tasks 1–3 stand: the store, `PlayMark`, and the bar with the sleeve as its play control.
+
+### Task 7: Audio leaves the viewer
+
+**Files:**
+- Modify: `src/lib/link-kind.ts` (`isViewerKind`: image and video; `isMediaKind` keeps audio for faces), `src/lib/media-viewer.ts` (`register` ignores audio; `useIsMediaMovedOff` removed), `src/components/home-shell.tsx` and `shared-folder-list.tsx` (register viewer kinds only), `src/components/media-viewer-media.tsx` (`ViewerAudio`, `DialogPresence` and the late parts removed; the `audio` case renders nothing), `src/components/media-viewer-nav.tsx` (`ViewerStage` back on `loadMotionFeatures`; `a[href]` out of `NOT_A_HANDLE`), `src/components/media-face-anchor.tsx` (`pearlPartLayoutId` removed), `src/components/audio-bar.tsx` (the shared-layout parts, the WAAPI words scale and `anchored` removed: the bar is plain markup again; `AnchorIf` no longer wraps it), `src/components/link-card.tsx`, `shared-link-card.tsx`, `link-item.tsx`, `shared-link-item.tsx` (audio no longer opens the viewer: no `MediaOpenButton` for audio; the card's opener for audio is Task 8's expand button), `e2e/media-viewer.spec.ts` (the audio viewer tests removed; a test that an audio pearl between two images is skipped by Previous/Next and that `?pearl=<audio id>` is stripped), `e2e/media-links.spec.ts` (selectors back to the plain bar).
+
+**Interfaces:**
+- Produces: `isViewerKind(kind: LinkKind): boolean` (image | video). `AudioBar`'s props lose `anchored`; everything else stays.
+
+- [ ] **Step 1: e2e**: three pearls image A, audio S, image C: open A, ArrowRight → the dialog names C (S skipped), the status "2 of 2: C"; `/home?pearl=<S's id>` → no dialog, URL stripped. The audio tests in `e2e/media-viewer.spec.ts` that open S in the viewer are deleted. **Step 2:** Run → FAIL. **Step 3:** Implement (prefer deleting over keeping: `git show 0dd76f4 8a150e1 150e6c6` lists what came in). **Step 4:** Run `e2e/media-viewer.spec.ts`, `e2e/media-links.spec.ts` (both engines) → PASS; unit, typecheck, lint clean. **Step 5:** Commit `refactor: audio pearls leave the media viewer`.
+
+### Task 8: The bar expands in place
+
+**Files:**
+- Create: `src/lib/audio-expansion.ts`, `src/lib/audio-expansion.test.ts`, `src/components/audio-player-tween.ts` (the `useTween` moved out of `play-mark.tsx` so both share it; or keep it where it is and export it: say which)
+- Modify: `src/components/audio-bar.tsx` (the expansion), `src/components/play-mark.tsx` (import the shared tween), `e2e/media-links.spec.ts`
+
+**Interfaces:**
+- Produces: `audioExpansion` store: `openId: string | null`, `toggle(id)`, `close()`, `subscribe`, `getSnapshot`; `useAudioExpanded(id): { open: boolean; toggle: () => void; close: () => void }`. In `AudioBar`: `p = useTween(open ? 1 : 0, 460, reducedMotion, QUART)`; every size is `mix(a, b, p)` as the spec's amendment lists (height 78 → 189; sleeve 40 → 64, radius 6 → 12; words 13 → 15.5 and 11 → 12 with the block beside the sleeve at both ends; the track's top from 65 to 96; the times and the transport at opacity `late = clamp((p − 0.6) / 0.4, 0, 1)` with `pointer-events` only when `late > 0.9`; the sleeve's mark at opacity `1 − late`; on close only, `scale = 1 − 0.035 · sin(π · u^1.5)` with `u` a second, linear tween of the same length); the expand button (`data-expand`) is invisible and covers the whole bar when shut and the sleeve-and-words row when open, named "Expand <title>" / "Collapse <title>" with `aria-expanded`, declared before the controls so they win a press that lands on both; Esc on the card collapses; a trusted `pointerdown` outside the bar's root collapses, armed on the next tick after opening; opening one pearl closes another (the store). The opened layout is the one Task 4 built (Restart 34, Play 46 with `PlayMark 18`, Open file 34, the times, `gap-3.5`), now inside the card. The owner's checkbox and menu keep their places on the bar; while selecting the expand button is inert like the controls. Reduced motion: `p` jumps (instant), no swell, the late parts fade 150ms.
+
+- [ ] **Step 1: Unit tests** (`audio-expansion.test.ts`): toggle opens, toggle again closes, toggling another id switches, `close()` clears, subscribers notified once per change.
+- [ ] **Step 2: e2e** (`e2e/media-links.spec.ts`): in grid view with two audio pearls S and T and an image under them: click S's bar away from the controls → `[data-expand]` reads "Collapse S" with `aria-expanded="true"`, the bar's box grows to 189 ± 2 monotonically over the samples (ResizeObserver, as the viewer's resize tests sample), the image card below moves down by ≈ 111px, the transport's buttons are visible and clickable; click T's bar → S collapses to 78 and T opens; Esc → T collapses; open S then click the page background → S collapses; while S is open, play from its transport reads "Pause S" and S's sleeve shows no mark; `reducedMotion: "reduce"` → S opens at 189 at once (two samples apart ≤ 1 frame). Phone profile: a tap on the words opens; the expand button's target is the bar.
+- [ ] **Step 3:** Run → FAIL. **Step 4:** Implement. **Step 5:** Run `e2e/media-links.spec.ts`, `e2e/owner-grid.spec.ts`, `e2e/bulk-selection.spec.ts`, `e2e/upload-entry-points.spec.ts` (both engines) → PASS; unit, typecheck, lint clean. By hand on the dev server: the growth reads as one object; the cards below follow without a jump. **Step 6:** Commit `feat: the audio bar expands in place into the player`.
+
+### Task 9: Rows, the shared page and the preview
+
+**Files:**
+- Modify: `src/components/link-item.tsx`, `shared-link-item.tsx` (an audio row renders `AudioBar` at the list's width, 78px, with the row's checkbox and menu conventions, and expands in place), `src/components/shared-link-card.tsx` (the shared card expands; the frame's open button is gone for audio), `src/components/link-preview.tsx` (the bar, not expandable: `expandable={false}`), `src/components/landing/*` only if the demo needs a prop, `e2e/link-row-phone.spec.ts`, `e2e/shared-folders.spec.ts`, `e2e/media-links.spec.ts`
+
+**Interfaces:**
+- Consumes: `AudioBar` (Task 8) with a new `expandable?: boolean` (default true) prop.
+
+- [ ] **Step 1: e2e**: list view: an audio row shows the bar (78px) and expands to 189 on a click away from its controls; the row's checkbox and menu work as on other rows; shared page (signed-out): the audio card expands and plays inline, nothing opens a dialog, the URL never gains `pearl`; the hover preview's bar has no `[data-expand]`. **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run the listed specs plus `e2e/media-viewer.spec.ts` (both engines) → PASS. **Step 5:** Commit `feat: audio rows and shared cards expand in place`.
+
+### Task 10: Docs and verification
+
+- [ ] As Task 6, written for the amended design: the "Audio player" bullets describe the in-place expansion (`audioExpansion`, the tween, the late parts, the swell, the masonry following, rows), the viewer bullets drop audio, "Media faces" is rewritten; `pnpm lint && pnpm typecheck && pnpm test && NEXT_DIST_DIR=.next-build pnpm build` and the e2e list in both engines. Commit `docs: the audio now-playing bar in CLAUDE.md`.
+
 ## Self-review notes
 
 - Spec coverage: the bar (T3), the opened player (T4), the morph's shared elements and late arrivals (T5), the mark (T2), one element and continuity (T1), the pending audio card and the preview and the shared card and the demo (T3), rows unchanged (nothing), accessibility names and targets (T3, T4), reduced motion (T2, T4, T5), attribution (T2, T3), docs (T6), tests as the spec lists (T1 unit, T3–T5 e2e).
