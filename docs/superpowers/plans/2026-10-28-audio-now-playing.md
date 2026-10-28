@@ -222,6 +222,17 @@ The spec's amendment supersedes Tasks 4 and 5 (which landed as 0dd76f4, 8a150e1 
 
 - [ ] **Step 1: e2e**: grid: the bar's words span to the bar's padding at rest (no 32px gap before the end), the `⋯` is absent until hover with a pointer and present on the phone profile, hovering shows it over the top-right corner and the words stay put (no reflow); list: an audio row is 48px (56 on phones), shows the icon, the title and "Audio · 2:36", a click on the row toggles "Pause <title>", the row's end shows a `[data-row-play]` button while active, the second line reads "0:0x / 2:36", a second click pauses (the button stays while paused), Esc does nothing, the checkbox swap on hover and the `⋯` float as on other rows; shared list row: the same without the checkbox; phone: a tap on the row plays, long-press selects. **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run the listed specs plus `e2e/owner-grid.spec.ts` (both engines) → PASS; unit, typecheck, lint clean. **Step 5:** Commit `feat: the audio card's menu floats; audio rows keep the row layout`.
 
+### Task 12: The hover preview is a player card (user correction, third pass)
+
+**Files:**
+- Create: `src/components/audio-preview.tsx`
+- Modify: `src/components/link-preview.tsx` (the audio case renders `AudioPreview` instead of the bar; the preview's title/description block for audio is inside the card, not under it), `src/components/audio-bar.tsx` (export the transport as `AudioTransport({ link, size? })` so the preview and the opened card share it; `AudioSleeve` gains a `hero` variant or the preview draws its own hero from `link.thumbnail`), `CLAUDE.md` ("Audio player": the preview sentence), `e2e/media-links.spec.ts`
+
+**Interfaces:**
+- Produces: `AudioPreview({ link }: { link: Link })`: `data-face="audio-preview"`; the hero (`[data-hero="image"|"icon"]`, 320×180, `object-cover` or the 48px icon on `bg-muted`, a bottom gradient to `bg-card`), the title (`text-base leading-[22px] font-medium line-clamp-2`), the second line (`text-[13px] text-foreground/70`), `AudioTrack`, the times row, `AudioTransport` (Restart "Restart <title>", Play/Pause "<verb> <title>" with `PlayMark 18`, Open file as a link), padding 16px.
+
+- [ ] **Step 1: e2e** (`e2e/media-links.spec.ts`, list view, hover an audio row with a thumbnail and one without): the preview shows `[data-face="audio-preview"]` 320px wide with `[data-hero="image"]` (an `<img>` 180px tall) for the first and `[data-hero="icon"]` for the second, the title, "Audio · 2:36", the slider "Seek <title>", the times "0:00" and "2:36", and the three transport controls; pressing the preview's Play reads "Pause <title>" and the row's end shows its play/pause mark (one `<audio>`); the preview has no `[data-expand]`. **Step 2:** Run → FAIL. **Step 3:** Implement. **Step 4:** Run `e2e/media-links.spec.ts` (both engines) → PASS; unit, typecheck, lint clean. **Step 5:** Commit `feat: the audio hover preview is a player card`.
+
 ### Task 10: Docs and verification
 
 - [ ] As Task 6, written for the amended design: the "Audio player" bullets describe the in-place expansion (`audioExpansion`, the tween, the late parts, the swell, the masonry following, rows), the viewer bullets drop audio, "Media faces" is rewritten; `pnpm lint && pnpm typecheck && pnpm test && NEXT_DIST_DIR=.next-build pnpm build` and the e2e list in both engines. Commit `docs: the audio now-playing bar in CLAUDE.md`.
