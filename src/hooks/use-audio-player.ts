@@ -211,6 +211,14 @@ export function createAudioPlayerStore(
           pauseElement();
           set({ playing: false, failed: false, failedId: null });
         } else {
+          // A seek made before the length was known stops waiting for it:
+          // the element already holds the time, and a stream whose length
+          // never becomes finite would otherwise keep `timeupdate` ignored
+          // (elapsed frozen) for as long as it plays.
+          if (pendingSeek !== null) {
+            audio.currentTime = pendingSeek;
+            pendingSeek = null;
+          }
           set({ playing: true, failed: false, failedId: null });
           play(id);
         }
@@ -370,4 +378,13 @@ export function useAudioPlayer(
   );
   const restart = useCallback(() => audioPlayerStore.restart(id), [id]);
   return { ...view, toggle, seek, restart };
+}
+
+/**
+ * Holds pearl `id` as a view without reading the player (an audio pearl's
+ * list row, whose hover preview plays it): a playing pearl keeps playing
+ * while its row is on the page, after the preview closes. Null: no view.
+ */
+export function useAudioView(id: string | null): void {
+  useEffect(() => (id === null ? undefined : audioPlayerStore.attach(id)), [id]);
 }

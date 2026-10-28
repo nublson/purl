@@ -575,10 +575,9 @@ test.describe("Media viewer", () => {
     await card.getByRole("button", { name: "Play Song" }).click();
     await expect(card.getByRole("button", { name: "Pause Song" })).toBeVisible();
 
-    // The card's button, below the player's controls (on the title strip).
-    const opener = openButton(page, "Song");
-    const box = (await opener.boundingBox())!;
-    await opener.click({ position: { x: 12, y: box.height - 12 } });
+    // The card's button, under the bar's words (beside its controls).
+    const words = (await card.locator("[data-words]").boundingBox())!;
+    await page.mouse.click(words.x + words.width / 2, words.y + words.height / 2);
     const dialog = page.getByRole("dialog", { name: "Song" });
     await expect(dialog).toBeVisible();
     // The title, shown above the player (not only as the dialog's name).

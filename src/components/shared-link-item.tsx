@@ -1,5 +1,6 @@
 "use client";
 
+import { useAudioView } from "@/hooks/use-audio-player";
 import { isMediaKind, linkKind } from "@/lib/link-kind";
 import { previewOpenDelay, trackPreviewOpen } from "@/lib/link-preview-warmth";
 import {
@@ -42,6 +43,9 @@ export function SharedLinkItem({
   const descriptionId = React.useId();
   const hasPreview = link.contentType !== "PDF";
   const media = isMediaKind(linkKind(link));
+  // An audio pearl's row is a view of its playback: what its hover preview
+  // starts plays on once the preview closes, until the row leaves.
+  useAudioView(linkKind(link) === "audio" ? link.id : null);
   const viewerOpen = useIsMediaOpen(link.id);
 
   const clearTimers = React.useCallback(() => {

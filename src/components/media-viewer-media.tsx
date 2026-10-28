@@ -307,7 +307,7 @@ function ViewerAudio({ link, roomForArrows }: { link: Link; roomForArrows: boole
       <p className="line-clamp-2 pr-10 text-base leading-6 font-medium wrap-anywhere text-foreground">
         {link.title}
       </p>
-      <AudioControls link={link} size="viewer" />
+      <AudioControls link={link} />
     </div>
   );
 }

@@ -296,6 +296,20 @@ describe("createAudioPlayerStore", () => {
     expect(store.getSnapshot()).toMatchObject({ elapsed: 18, length: 60 });
   });
 
+  it("playing a pearl seeked before its length was known follows its time (a stream)", () => {
+    const { store, element } = ctx;
+    store.seek("b", "/b.mp3", 30);
+    // A stream: the length never becomes finite.
+    element().duration = Number.POSITIVE_INFINITY;
+    element().fire("durationchange");
+    store.toggle("b", "/b.mp3");
+    expect(element().currentTime).toBe(30);
+    expect(store.getSnapshot()).toMatchObject({ id: "b", playing: true, elapsed: 30 });
+    element().currentTime = 31.5;
+    element().fire("timeupdate");
+    expect(store.getSnapshot().elapsed).toBe(31.5);
+  });
+
   it("a toggle loads with preload none again", () => {
     const { store, element } = ctx;
     store.seek("b", "/b.mp3", 10);

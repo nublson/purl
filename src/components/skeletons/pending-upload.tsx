@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
+import { AUDIO_BAR, AudioSleeve } from "@/components/audio-bar";
 import { cardAspectRatio } from "@/lib/link-kind";
 import { titleFromFileName } from "@/utils/media-title";
 import type { PendingUpload } from "@/lib/pending-upload";
@@ -152,13 +153,16 @@ function FailedActions({
 }
 
 /**
- * A file uploading, in the grid: its local preview at the pearl's ratio (an
- * audio file is the kind's icon on the card's tint), a progress ring in the
- * top-right corner. Failed: a scrim with Retry and Dismiss.
+ * A file uploading, in the grid: its local preview at the pearl's ratio, a
+ * progress ring in the top-right corner (an audio file: the bar's shape,
+ * `PendingAudioCard`). Failed: a scrim with Retry and Dismiss.
  */
 const FAILED_MESSAGE = "Couldn\u2019t upload";
 
 export function PendingUploadCard({ item, onRetry, onDismiss }: Props) {
+  if (item.kind === "audio") {
+    return <PendingAudioCard item={item} onRetry={onRetry} onDismiss={onDismiss} />;
+  }
   const failed = item.status === "failed";
   const title = titleFromFileName(item.name);
   const message = item.message ?? FAILED_MESSAGE;
@@ -202,6 +206,60 @@ export function PendingUploadCard({ item, onRetry, onDismiss }: Props) {
           <ProgressRing progress={item.progress} />
         </span>
       )}
+    </div>
+  );
+}
+
+/**
+ * An audio file uploading, in the grid: the shape of the bar it becomes
+ * (`AudioBar`): the icon sleeve, its title over "Uploading…", and the
+ * progress ring where play will sit. Failed: a scrim with the reason,
+ * Retry and Dismiss.
+ */
+function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
+  const failed = item.status === "failed";
+  const title = titleFromFileName(item.name);
+  const message = item.message ?? FAILED_MESSAGE;
+  return (
+    <div
+      aria-busy={failed ? undefined : true}
+      data-cy="pending-upload"
+      data-status={item.status}
+      className="relative overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 animate-in fade-in-0 duration-300"
+    >
+      <div aria-hidden className="flex h-[78px] items-center gap-2.5 p-[10px] pb-7">
+        <AudioSleeve
+          link={{ thumbnail: null }}
+          size={AUDIO_BAR.sleeve}
+          radius={AUDIO_BAR.sleeveRadius}
+        />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span
+            title={item.name}
+            className="truncate text-[13px] leading-4 font-medium text-foreground"
+          >
+            {title}
+          </span>
+          <span className="truncate text-[11px] leading-[14px] text-foreground/70">
+            Uploading…
+          </span>
+        </div>
+        <span className="grid size-[30px] shrink-0 place-items-center">
+          <ProgressRing progress={item.progress} />
+        </span>
+      </div>
+      <span className="sr-only">{failed ? `${title}, ${message}` : title}</span>
+      {failed ? (
+        // The bar is short: the reason on one line, the compact actions.
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-background/90 p-2 text-center backdrop-blur-sm">
+          <p aria-hidden title={message} className="max-w-full truncate text-xs text-foreground">
+            {message}
+          </p>
+          <div className="flex items-center justify-center gap-1 pointer-coarse:gap-3">
+            <FailedActions item={item} onRetry={onRetry} onDismiss={onDismiss} compact />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

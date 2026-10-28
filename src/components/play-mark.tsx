@@ -19,9 +19,15 @@ function useTween(to: number, ms: number, instant: boolean) {
   const [at, setAt] = useState(to);
   const cur = useRef(to);
   const raf = useRef(0);
+  /* Instant: the drawn value follows the target as it changes (React's
+     adjust-state-during-render), so nothing is set from an effect. */
+  if (instant && at !== to) setAt(to);
 
   useEffect(() => {
-    if (instant) return;
+    if (instant) {
+      cur.current = to;
+      return;
+    }
     const from = cur.current;
     if (from === to) return;
     const t0 = performance.now();
@@ -38,9 +44,9 @@ function useTween(to: number, ms: number, instant: boolean) {
     };
   }, [to, ms, instant]);
 
-  /* Instant is read at render, not tweened: no state is set from the
-     effect, and if the preference flips back the tween resumes from the
-     last value it drew. */
+  /* Instant is read at render, not tweened. Both the drawn value and the
+     tween's start track the target meanwhile, so if the preference flips
+     back the next tween starts from the shape on screen. */
   return instant ? to : at;
 }
 

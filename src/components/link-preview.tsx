@@ -5,12 +5,14 @@ import {
 } from "@/components/ui/hover-card";
 import type { FolderSummary } from "@/lib/folders";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
+import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
 import type { ReactNode } from "react";
 import { linkKind } from "@/lib/link-kind";
 import { FolderEmoji } from "./folder-emoji";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
-import { AudioFace, ImageFace, VideoFace } from "./media-card-face";
+import { AudioBar } from "./audio-bar";
+import { ImageFace, VideoFace } from "./media-card-face";
 import { PdfThumbnail } from "./pdf-thumbnail";
 
 type LinkPreviewProps = {
@@ -77,8 +79,9 @@ export function LinkPreview({
 const MEDIA_FACE = "max-h-80 rounded-t-lg";
 
 /**
- * What a preview card shows: the thumbnail (or favicon), or for an image,
- * video or audio pearl the media itself, then the title and description,
+ * What a preview card shows: the thumbnail (or favicon), or for an image
+ * or video pearl the media itself, then the title and description (an
+ * audio pearl: its bar, which holds the title, then the description),
  * then the folder when given. `pdfThumbnail: false` skips the PDF render (it needs the
  * signed-in PDF proxy) for the regular thumbnail.
  */
@@ -95,14 +98,30 @@ export function LinkPreviewBody({
 }) {
   const thumbnailSrc = link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
   const kind = linkKind(link);
+  if (kind === "audio") {
+    // The bar already shows the title: then the description and the
+    // folder, if any.
+    const more = Boolean(link.description) || folder !== null;
+    return (
+      <>
+        <div className={cn("overflow-hidden", more ? "rounded-t-lg" : "rounded-lg")}>
+          <AudioBar link={link} />
+        </div>
+        {more ? (
+          <div className="flex flex-col gap-2 p-4 pt-3">
+            {link.description ? <PreviewDescription text={link.description} /> : null}
+            {folder ? <PreviewFolder folder={folder} /> : null}
+          </div>
+        ) : null}
+      </>
+    );
+  }
   return (
     <>
       {kind === "image" ? (
         <ImageFace link={link} eager={eagerThumbnail} className={MEDIA_FACE} />
       ) : kind === "video" ? (
         <VideoFace link={link} className={MEDIA_FACE} />
-      ) : kind === "audio" ? (
-        <AudioFace link={link} className="rounded-t-lg pt-4" />
       ) : link.contentType === "PDF" && pdfThumbnail ? (
         <PdfThumbnail url={link.url} />
       ) : (
@@ -116,18 +135,26 @@ export function LinkPreviewBody({
         <p className="text-accent-foreground text-sm font-medium line-clamp-2 wrap-anywhere">
           {link.title}
         </p>
-        {link.description && (
-          <p className="text-muted-foreground text-xs font-normal line-clamp-3 wrap-anywhere">
-            {link.description}
-          </p>
-        )}
-        {folder ? (
-          <p className="flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs font-normal">
-            <FolderEmoji emoji={folder.emoji} className="size-auto text-xs" />
-            <span className="truncate">{folder.name}</span>
-          </p>
-        ) : null}
+        {link.description && <PreviewDescription text={link.description} />}
+        {folder ? <PreviewFolder folder={folder} /> : null}
       </div>
     </>
+  );
+}
+
+function PreviewDescription({ text }: { text: string }) {
+  return (
+    <p className="text-muted-foreground text-xs font-normal line-clamp-3 wrap-anywhere">
+      {text}
+    </p>
+  );
+}
+
+function PreviewFolder({ folder }: { folder: FolderSummary }) {
+  return (
+    <p className="flex min-w-0 items-center gap-1.5 text-muted-foreground text-xs font-normal">
+      <FolderEmoji emoji={folder.emoji} className="size-auto text-xs" />
+      <span className="truncate">{folder.name}</span>
+    </p>
   );
 }

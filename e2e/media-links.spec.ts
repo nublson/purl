@@ -1,10 +1,12 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page, Route } from "@playwright/test";
 import { expect, test, waitForHydration } from "./fixtures";
+import type { seedLink } from "./support/db";
 import { silentWav } from "./support/media";
 
 // Image, video and audio pearls show the media itself: the grid card is the
-// image or the video (no title strip), audio gets a player strip, and a list
-// row's favicon slot is the image's preview.
+// image or the video (no title strip), audio is a now-playing bar (sleeve,
+// title, second line, play, a track along the foot), and a list row's
+// favicon slot is the image's preview.
 
 const cards = (page: Page) => page.locator('[data-cy="link-card"]');
 // A page's card is a link; a media pearl's card opens the viewer (a button).
@@ -39,8 +41,51 @@ async function chooseView(page: Page, view: "List" | "Grid") {
   expect((await saved).ok()).toBe(true);
 }
 
+type Seed = { link: (link: Parameters<typeof seedLink>[1]) => Promise<string> };
+
+/** An uploaded audio pearl, 2:36 long, with no preview image. */
+function seedSong(seed: Seed, title = "Song") {
+  return seed.link({
+    url: "https://sounds.example/song.wav",
+    title,
+    contentType: "AUDIO",
+    mimeType: "audio/wav",
+    duration: 156,
+    fileKey: "users/e2e/song/song.wav",
+    fileSize: 1000,
+  });
+}
+
+/** Whether `inner`'s box lies within `outer`'s. */
+async function insideBox(inner: Locator, outer: Locator) {
+  const a = await inner.boundingBox();
+  const b = await outer.boundingBox();
+  if (!a || !b) return false;
+  return (
+    a.x >= b.x - 0.5 &&
+    a.y >= b.y - 0.5 &&
+    a.x + a.width <= b.x + b.width + 0.5 &&
+    a.y + a.height <= b.y + b.height + 0.5
+  );
+}
+
+/**
+ * A real click at `target`'s centre, wherever it lands: the bar's words take
+ * no pointer events of their own (the card's button lies under or over them).
+ */
+async function clickAt(page: Page, target: Locator) {
+  const box = await target.boundingBox();
+  if (!box) throw new Error("no box to click");
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+}
+
+/** The played run's width in px. */
+function runWidth(scope: Locator) {
+  return scope.locator("[data-run]").evaluate((el) => el.getBoundingClientRect().width);
+}
+
 test.describe("Media pearls", () => {
-  test("cards show the image, the video and the audio player", async ({
+  test("cards show the image and the video", async ({
     page,
     seed,
     baseURL,
@@ -48,7 +93,6 @@ test.describe("Media pearls", () => {
     // The app's own icon: an image that loads locally in both browsers.
     const icon = `${baseURL}/icon.png`;
     await page.context().route("https://clips.example/**", (route) => route.abort());
-    await page.context().route("https://sounds.example/**", (route) => route.abort());
 
     await seed.link({
       url: "https://shots.example/a.png",
@@ -65,16 +109,10 @@ test.describe("Media pearls", () => {
       contentType: "VIDEO",
       duration: 14,
     });
-    await seed.link({
-      url: "https://sounds.example/song.mp3",
-      title: "Song",
-      contentType: "AUDIO",
-      duration: 65,
-    });
 
     await openHome(page);
     await chooseView(page, "Grid");
-    await expect(cards(page)).toHaveCount(4);
+    await expect(cards(page)).toHaveCount(3);
 
     // Image with its size: the image alone, at 800:600, no title or domain.
     const shotA = card(page, "Shot A");
@@ -107,20 +145,6 @@ test.describe("Media pearls", () => {
     expect(await clip.locator("video").evaluate((v: HTMLVideoElement) => v.muted)).toBe(true);
     await expect(clip.getByText("0:14", { exact: true })).toBeVisible();
     await expect(clip).not.toContainText("Clip");
-
-    // Audio: the player strip, then the title.
-    const song = card(page, "Song");
-    await expect(song.getByRole("button", { name: "Play Song" })).toBeVisible();
-    await expect(song.getByText("0:00 / 1:05")).toBeVisible();
-    await expect(song.getByRole("slider")).toBeVisible();
-    await expect(song.getByText("Song", { exact: true })).toBeVisible();
-
-    // A file that won't load: Play opens nothing and turns back to Play.
-    let popups = 0;
-    page.on("popup", () => popups++);
-    await song.getByRole("button", { name: "Play Song" }).click();
-    await expect(song.getByRole("button", { name: "Play Song" })).toBeVisible();
-    expect(popups).toBe(0);
   });
 
   test("a broken image shows the image icon at its ratio, never a broken image", async ({
@@ -146,15 +170,13 @@ test.describe("Media pearls", () => {
     expect(await face.evaluate((el) => getComputedStyle(el).aspectRatio)).toBe("800 / 600");
   });
 
-  test("while selecting, a click on the audio strip selects the card", async ({ page, seed }) => {
+  test("while selecting, a click on the bar selects the card; its controls step aside", async ({
+    page,
+    seed,
+  }) => {
     await page.context().route("https://sounds.example/**", (route) => route.abort());
-    await seed.link({
-      url: "https://sounds.example/song.mp3",
-      title: "Song",
-      contentType: "AUDIO",
-      duration: 65,
-    });
     await seed.link({ url: "https://alpha.example", title: "Alpha" });
+    await seedSong(seed);
     await openHome(page);
     await chooseView(page, "Grid");
 
@@ -162,13 +184,21 @@ test.describe("Media pearls", () => {
     await alpha.hover();
     await alpha.getByRole("checkbox", { name: "Select Alpha" }).click();
 
-    // While selecting, the card's link leaves the accessibility tree: find
-    // the card by its text.
-    const song = cards(page).filter({ hasText: "sounds.example" });
+    // While selecting, the card's button leaves the accessibility tree: find
+    // the card by its bar.
+    const song = cards(page).filter({ has: page.locator('[data-face="audio"]') });
+    const checkbox = song.getByRole("checkbox", { name: "Select Song" });
+    // The checkbox takes the sleeve's place.
+    await expect(checkbox).toBeVisible();
+    expect(await insideBox(checkbox, song.locator("[data-sleeve]"))).toBe(true);
+
+    // A click on the bar, away from its controls (on the words), selects it.
+    await clickAt(page, song.locator("[data-words]"));
+    await expect(checkbox).toBeChecked();
+
     // The controls step aside: out of reach of focus and clicks.
     const play = song.locator('[inert] button[aria-label="Play Song"]');
     await expect(play).toHaveCount(1);
-    // Inert: it can't take focus.
     expect(
       await play.evaluate((el: HTMLElement) => {
         el.focus();
@@ -179,7 +209,7 @@ test.describe("Media pearls", () => {
     const box = await play.boundingBox();
     if (!box) throw new Error("no Play button box");
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(song.getByRole("checkbox", { name: "Select Song" })).toBeChecked();
+    await expect(checkbox).not.toBeChecked();
     await expect(play).toHaveAttribute("aria-label", "Play Song");
   });
 
@@ -258,8 +288,11 @@ test.describe("Media pearls", () => {
     await expect(songCard.getByRole("button", { name: "Play Song" })).toBeVisible();
     expect(popups).toBe(0);
     expect(page.url()).toBe(url);
-    // The button still covers the rest of the card (a media link: its domain).
-    await expect(sharedCard("Song")).toContainText("sounds.example");
+    // The button covers the rest of the bar: a click on its words opens the
+    // viewer (the bar is what it morphs out of).
+    await expect(songCard.locator('[data-face="audio"]')).toContainText("sounds.example");
+    await clickAt(page, songCard.locator("[data-words]"));
+    await expect(page.getByRole("dialog", { name: "Song" })).toBeVisible();
     await context.close();
   });
 
@@ -284,5 +317,183 @@ test.describe("Media pearls", () => {
       "src",
       `${icon}?b=1`,
     );
+  });
+});
+
+test.describe("Audio pearls: the now-playing bar", () => {
+  test("the bar's parts; one plays at a time; a file that won't load goes back to Play", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    const icon = `${baseURL}/icon.png`;
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
+    // Birds' host never answers until the test lets it fail: then every
+    // request held and every one after it (WebKit tries again) fails.
+    const birdsRequests: Route[] = [];
+    let birdsDown = false;
+    await page.context().route("https://birds.example/**", (route) => {
+      if (birdsDown) return route.abort();
+      birdsRequests.push(route);
+    });
+    const failBirds = async () => {
+      await expect.poll(() => birdsRequests.length).toBeGreaterThan(0);
+      birdsDown = true;
+      for (const route of birdsRequests) await route.abort().catch(() => {});
+    };
+    await seed.link({
+      url: "https://birds.example/birds.mp3",
+      title: "Birds",
+      contentType: "AUDIO",
+      thumbnail: icon,
+    });
+    await seedSong(seed);
+    await openHome(page);
+    await chooseView(page, "Grid");
+
+    const song = card(page, "Song");
+    const birds = card(page, "Birds");
+    // The card is the button that opens the viewer, never a link.
+    await expect(song.locator("a")).toHaveCount(0);
+    const bar = song.locator('[data-face="audio"]');
+    await expect(bar.locator("[data-words]")).toContainText("Song");
+    await expect(bar.locator("[data-words]")).toContainText("Audio · 2:36");
+    await expect(song.locator('button[aria-label="Play Song"][aria-pressed="false"]')).toBeVisible();
+    await expect(song.getByRole("slider", { name: "Seek Song" })).toHaveCount(1);
+    // No preview image: the music icon; Birds' page image is its sleeve.
+    await expect(song.locator('[data-sleeve="icon"] svg')).toBeVisible();
+    await expect(birds.locator('[data-sleeve="image"] img')).toBeVisible();
+    const height = (await song.boundingBox())!.height;
+    expect(Math.abs(height - 78)).toBeLessThanOrEqual(1);
+
+    // Play: pressed, Pause, and the run moves along the track.
+    await song.getByRole("button", { name: "Play Song" }).click();
+    const pause = song.getByRole("button", { name: "Pause Song" });
+    await expect(pause).toHaveAttribute("aria-pressed", "true");
+    await page.waitForTimeout(1500);
+    expect(await runWidth(song)).toBeGreaterThan(0);
+
+    // Birds starts: Song goes back to Play with its run at 0.
+    await birds.getByRole("button", { name: "Play Birds" }).click();
+    await expect(song.getByRole("button", { name: "Play Song" })).toBeVisible();
+    expect(await runWidth(song)).toBe(0);
+    await expect(birds.getByRole("button", { name: "Pause Birds" })).toBeVisible();
+    // Its file fails: back to Play, the track disabled, nothing retried.
+    await failBirds();
+    await expect(birds.getByRole("button", { name: "Play Birds" })).toBeVisible();
+    await expect(birds.getByRole("slider", { name: "Seek Birds" })).toBeDisabled();
+
+    // The track seeks by keyboard.
+    const slider = song.getByRole("slider", { name: "Seek Song" });
+    const before = await slider.getAttribute("aria-valuetext");
+    await slider.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(slider).not.toHaveAttribute("aria-valuetext", before ?? "");
+  });
+
+  test("the hover preview's bar and the card's are one playback", async ({ page, seed }) => {
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
+    await seedSong(seed);
+    await openHome(page);
+
+    await row(page, "Song").hover();
+    const preview = page.locator('[data-face="audio"]');
+    await expect(preview).toBeVisible();
+    await preview.getByRole("button", { name: "Play Song" }).click();
+    await expect(preview.getByRole("button", { name: "Pause Song" })).toBeVisible();
+
+    // Closing the preview (the pointer leaves for the menu) keeps it playing.
+    await chooseView(page, "Grid");
+    await expect(card(page, "Song").getByRole("button", { name: "Pause Song" })).toBeVisible();
+    expect(await page.evaluate(() => document.querySelectorAll("audio").length)).toBe(1);
+    await expect
+      .poll(() => page.evaluate(() => document.querySelector("audio")?.paused))
+      .toBe(false);
+  });
+
+  test("an audio file uploading is the bar's shape, with the ring where play sits", async ({
+    page,
+    seed,
+  }) => {
+    await seed.link({ url: "https://alpha.example", title: "Alpha" });
+    await openHome(page);
+    await chooseView(page, "Grid");
+    // The token request waits until the test answers it with the limit.
+    const tokenRequests: Route[] = [];
+    await page.route("**/api/uploads/token", (route) => {
+      tokenRequests.push(route);
+    });
+    const refuse = async () => {
+      await expect.poll(() => tokenRequests.length).toBeGreaterThan(0);
+      for (const route of tokenRequests) {
+        await route
+          .fulfill({
+            status: 403,
+            contentType: "application/json",
+            body: JSON.stringify({
+              error: "Your 250 MB of storage is full.",
+              code: "LIMIT_REACHED",
+              feature: "STORAGE_LIMIT",
+            }),
+          })
+          .catch(() => {});
+      }
+    };
+    // The page's file input (what the + menu and `U` open).
+    await page
+      .locator('[data-cy="upload-input"]')
+      .setInputFiles({ name: "tune.wav", mimeType: "audio/wav", buffer: silentWav(1) });
+
+    const item = page.locator('[data-cy="pending-upload"]');
+    await expect(item).toHaveAttribute("data-status", "uploading");
+    await expect(item.locator('[data-sleeve="icon"] svg')).toBeVisible();
+    await expect(item).toContainText("tune");
+    await expect(item).toContainText("Uploading…");
+    const height = (await item.boundingBox())!.height;
+    expect(Math.abs(height - 78)).toBeLessThanOrEqual(1);
+
+    await refuse();
+    await expect(item).toHaveAttribute("data-status", "failed");
+    await expect(item.getByRole("button", { name: "Retry uploading tune.wav" })).toBeVisible();
+    await expect(item.getByRole("button", { name: "Dismiss tune.wav" })).toBeVisible();
+  });
+});
+
+test.describe("Audio pearls on a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("the phone grid's bar: truncated title, the length, 44px play, the menu", async ({
+    page,
+    seed,
+  }) => {
+    await page.context().route("https://sounds.example/**", (route) => route.abort());
+    await seedSong(seed, "Song for a long drive home");
+    // The grid, saved on the account before the page loads.
+    const saved = await page.request.patch("/api/user/layout", { data: { view: "grid" } });
+    expect(saved.ok()).toBe(true);
+    await openHome(page);
+
+    const song = cards(page).filter({ has: page.locator('[data-face="audio"]') });
+    expect((await song.boundingBox())!.width).toBeLessThanOrEqual(175);
+    const title = song.locator("[data-words] > :first-child");
+    expect(await title.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+    expect(
+      await song
+        .locator("[data-words] > :nth-child(2)")
+        .evaluate((el) => (el as HTMLElement).innerText.trim()),
+    ).toBe("2:36");
+    const play = song.getByRole("button", { name: "Play Song for a long drive home" });
+    const target = await play.evaluate((b) => {
+      const box = b.getBoundingClientRect();
+      const hit = getComputedStyle(b, "::after");
+      return { w: box.width, h: box.height, top: parseFloat(hit.top), left: parseFloat(hit.left) };
+    });
+    expect(target.w - 2 * target.left).toBeGreaterThanOrEqual(44);
+    expect(target.h - 2 * target.top).toBeGreaterThanOrEqual(44);
+    await expect(song.getByRole("button", { name: "Open link menu" })).toBeVisible();
   });
 });

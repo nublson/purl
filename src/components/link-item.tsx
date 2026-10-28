@@ -12,6 +12,7 @@ import {
 } from "@/lib/link-selection";
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
 import { haptic } from "@/lib/haptics";
+import { useAudioView } from "@/hooks/use-audio-player";
 import { isMediaKind, linkKind } from "@/lib/link-kind";
 import {
   consumeReturningFocus,
@@ -106,6 +107,9 @@ export const LinkItem = React.forwardRef<
   // is what the viewer morphs out of); a page opens in a new tab. The
   // landing demo has no viewer: its rows are links.
   const media = !demo && isMediaKind(linkKind(link));
+  // An audio pearl's row is a view of its playback: what its hover preview
+  // starts plays on once the preview closes, until the row leaves.
+  useAudioView(linkKind(link) === "audio" ? link.id : null);
   const viewerOpen = useIsMediaOpen(link.id);
   const longPressRef = React.useRef<{
     timer: ReturnType<typeof setTimeout>;

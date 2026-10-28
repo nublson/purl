@@ -5,7 +5,8 @@ import type { Link as LinkType } from "@/utils/links";
 import { isMediaKind, linkKind } from "@/lib/link-kind";
 import { linkSecondLine } from "@/lib/upload-meta";
 import { LinkIcon } from "./link-icon";
-import { AudioFace, ImageFace, VideoFace } from "./media-card-face";
+import { AudioBar } from "./audio-bar";
+import { ImageFace, VideoFace } from "./media-card-face";
 import { MediaOpenButton } from "./media-open-button";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
 import { Typography } from "./typography";
@@ -34,10 +35,11 @@ export function SharedLinkCard({
 }) {
   const kind = linkKind(link);
   if (kind === "audio") {
-    // The player's controls can't sit inside the card's button: the card
-    // is a frame holding the strip and a button over everything else
-    // (`after:`), so clicks beside the controls still open the viewer. The
-    // frame draws the button's focus ring, as the owner's card does.
+    // The bar's controls can't sit inside the card's button: the card is a
+    // frame holding the bar and a button over the rest of it, under the
+    // controls (which lie above it), so clicks beside them still open the
+    // viewer. The frame draws the button's focus ring, as the owner's card
+    // does.
     return (
       <div
         data-cy="link-card"
@@ -46,14 +48,12 @@ export function SharedLinkCard({
           "relative overflow-visible has-[[data-pearl-button]:focus-visible]:ring-3 has-[[data-pearl-button]:focus-visible]:ring-ring",
         )}
       >
-        <AudioFace link={link} anchored />
+        <AudioBar link={link} anchored compact />
         <MediaOpenButton
           link={link}
           selecting={false}
-          className="flex w-full cursor-pointer flex-col text-start outline-none after:absolute after:inset-0 after:rounded-lg after:content-['']"
-        >
-          <LinkCardStrip link={link} />
-        </MediaOpenButton>
+          className="absolute inset-0 cursor-pointer rounded-lg outline-none"
+        />
       </div>
     );
   }
@@ -88,7 +88,7 @@ export function SharedLinkCard({
 /**
  * What a link card shows, shared by both grids, by the link's kind: an image
  * or a video is the media alone, full-bleed at its ratio (the card's label
- * is the title); audio is the player strip, then the title strip; a page is
+ * is the title); audio is the now-playing bar (`AudioBar`); a page is
  * the thumbnail (16:10, full-bleed), then the favicon, the title (two lines)
  * and the domain.
  */
@@ -96,15 +96,12 @@ export function LinkCardContent({
   link,
   eagerThumbnail = false,
   badge,
-  ownerControls = false,
   mediaAnchor = false,
 }: {
   link: LinkType;
   eagerThumbnail?: boolean;
   /** On the favicon's corner (the owner's grid: the link's folder badge). */
   badge?: ReactNode;
-  /** The owner's card: its checkbox and menu sit over the top edge. */
-  ownerControls?: boolean;
   /** The media viewer opens from this card: the face is its morph anchor. */
   mediaAnchor?: boolean;
 }) {
@@ -116,12 +113,7 @@ export function LinkCardContent({
     case "video":
       return <VideoFace link={link} badge={badge} anchored={mediaAnchor} />;
     case "audio":
-      return (
-        <>
-          <AudioFace link={link} controls={ownerControls} anchored={mediaAnchor} />
-          <LinkCardStrip link={link} badge={badge} />
-        </>
-      );
+      return <AudioBar link={link} anchored={mediaAnchor} badge={badge} compact />;
     default: {
       const thumbnailSrc = link.thumbnail
         ? safeRemoteImgSrc(link.thumbnail)

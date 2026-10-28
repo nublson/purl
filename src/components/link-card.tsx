@@ -26,6 +26,7 @@ import {
   useFolderTag,
   useLinkFolder,
 } from "./folder-tag";
+import { AudioBar } from "./audio-bar";
 import { HapticTarget } from "./haptic-target";
 import { MediaOpenButton } from "./media-open-button";
 import { LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
@@ -46,8 +47,9 @@ const OPENER_CLASS =
  * corner selects it (shown on hover or focus, and on every card while
  * selecting, when a click anywhere toggles the card); a long-press does
  * the same on touch. The row menu (`⋯`) sits in the other corner, on hover
- * or always on touch. Deleted or moved-away cards fade out, and Undo
- * brings them back.
+ * or always on touch. An audio pearl's bar holds both itself (the checkbox
+ * in the sleeve's place, the menu after play). Deleted or moved-away cards
+ * fade out, and Undo brings them back.
  */
 export function LinkCard({
   link,
@@ -82,7 +84,7 @@ export function LinkCard({
   // its cards are links).
   const kind = linkKind(link);
   const media = !demo && isMediaKind(kind);
-  // A media face (the image, the video, the audio strip) is the viewer's
+  // A media face (the image, the video, the audio bar) is the viewer's
   // morph anchor: it rounds and clips itself, so the card doesn't crop the
   // morph back.
   const anchoredFace = media;
@@ -105,6 +107,38 @@ export function LinkCard({
     haptic("selection");
     linkSelection.toggle(link.id, { shiftKey });
   };
+
+  const badge = folderTag ? (
+    <FolderBadge key={folderTag.id} folder={folderTag} inCard arrive={badgeArrives} />
+  ) : null;
+  const menu = (
+    <LinkMenu
+      link={link}
+      onOpenChange={setMenuOpen}
+      onDelete={({ byKeyboard }) =>
+        // Keyboard users land on the next card, not the page.
+        deleteLinkKeepingFocus({
+          linkId: link.id,
+          anchor: anchorRef.current,
+          siblingsSelector:
+            '[data-cy="link-card"] > a[href], [data-cy="link-card"] > [data-pearl-button]',
+          byKeyboard,
+          onDeleted: notifyLinksChanged,
+        })
+      }
+    />
+  );
+  // The menu shows on hover or focus with a pointer, always on touch, and
+  // while it's open; hidden (and inert) while selecting: every action goes
+  // through the selection bar then.
+  const menuReveal = cn(
+    "transition-opacity duration-150 ease-out-strong",
+    selecting
+      ? "invisible opacity-0"
+      : menuOpen
+        ? "opacity-100"
+        : "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/card:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/card:opacity-100",
+  );
 
   return (
     <div
@@ -179,25 +213,45 @@ export function LinkCard({
       )}
       {/* The content is a picture of the link: clicks go to the link. */}
       <div className="pointer-events-none flex flex-col">
-        <LinkCardContent
-          link={link}
-          eagerThumbnail={eagerThumbnail}
-          ownerControls
-          mediaAnchor={anchoredFace}
-          badge={
-            folderTag ? (
-              <FolderBadge
-                key={folderTag.id}
-                folder={folderTag}
-                inCard
-                arrive={badgeArrives}
-              />
-            ) : null
-          }
-        />
+        {kind === "audio" ? (
+          // The bar holds the owner's controls itself: the checkbox in the
+          // sleeve's place, the menu after play (no thumbnail corners to
+          // put them in).
+          <AudioBar
+            link={link}
+            anchored={anchoredFace}
+            badge={badge}
+            compact
+            describedBy={describedBy}
+            owner={
+              demo
+                ? undefined
+                : {
+                    selected,
+                    onToggleSelect: tapToSelect,
+                    menu: (
+                      <div
+                        inert={selecting}
+                        className={cn("flex", menuReveal)}
+                        data-card-menu
+                      >
+                        {menu}
+                      </div>
+                    ),
+                  }
+            }
+          />
+        ) : (
+          <LinkCardContent
+            link={link}
+            eagerThumbnail={eagerThumbnail}
+            mediaAnchor={anchoredFace}
+            badge={badge}
+          />
+        )}
       </div>
       {folderTag ? <FolderTagLabel id={folderLabelId} folder={folderTag} /> : null}
-      {demo ? null : (
+      {demo || kind === "audio" ? null : (
         <>
           <Checkbox
             checked={selected}
@@ -220,36 +274,16 @@ export function LinkCard({
             className="inset-auto top-0 -left-1 z-[11] h-8 w-10"
             onTap={tapToSelect}
           />
-          {/* Hidden (and inert) while selecting: every action goes through the
-          selection bar then. */}
           <div
             inert={selecting}
             className={cn(
-              "absolute top-1.5 right-1.5 z-10 flex rounded-md bg-background/80 backdrop-blur-sm transition-opacity duration-150 ease-out-strong",
-              selecting
-                ? "invisible opacity-0"
-                : menuOpen
-                  ? "opacity-100"
-                  : "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/card:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/card:opacity-100",
+              "absolute top-1.5 right-1.5 z-10 flex rounded-md bg-background/80 backdrop-blur-sm",
+              menuReveal,
             )}
             data-card-menu
           >
             {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}
-            <LinkMenu
-              link={link}
-              onOpenChange={setMenuOpen}
-              onDelete={({ byKeyboard }) =>
-                // Keyboard users land on the next card, not the page.
-                deleteLinkKeepingFocus({
-                  linkId: link.id,
-                  anchor: anchorRef.current,
-                  siblingsSelector:
-                    '[data-cy="link-card"] > a[href], [data-cy="link-card"] > [data-pearl-button]',
-                  byKeyboard,
-                  onDeleted: notifyLinksChanged,
-                })
-              }
-            />
+            {menu}
           </div>
         </>
       )}

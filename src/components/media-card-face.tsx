@@ -5,14 +5,14 @@ import { useLiveCards } from "@/hooks/use-live-cards";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { usePlayVideos } from "@/contexts/link-view-context";
 import { cardAspectRatio } from "@/lib/link-kind";
-import { useIsSelectionActive } from "@/lib/link-selection";
 import { useIsMediaOpen } from "@/lib/media-viewer";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/utils/format-duration";
 import { MediaAnchor } from "./media-face-anchor";
 import type { Link } from "@/utils/links";
-import { Image as ImageIcon, Pause, Play, Video } from "reicon-react";
+import { PlayMark } from "./play-mark";
+import { Image as ImageIcon, Video } from "reicon-react";
 import {
   useEffect,
   useRef,
@@ -83,7 +83,7 @@ export function ImageFace({
 }
 
 /** Wraps a face's box in `MediaAnchor` when the viewer opens from it. */
-function AnchorIf({
+export function AnchorIf({
   link,
   anchored,
   corners,
@@ -302,115 +302,33 @@ export function VideoFace({
 }
 
 /**
- * An audio pearl's player strip, on the card's tint: play/pause, elapsed
- * over the length, and a scrubber (`AudioControls`). With `controls`, the
- * top keeps room for the owner's checkbox and menu (the shared card and the
- * hover preview have none). With `anchored`, the strip is what the media
- * viewer's player morphs out of and back into.
- */
-export function AudioFace({
-  link,
-  className,
-  controls = false,
-  anchored = false,
-}: Omit<FaceProps, "badge"> & { controls?: boolean; anchored?: boolean }) {
-  return (
-    <AnchorIf link={link} anchored={anchored} corners="top">
-      <div
-        data-face="audio"
-        className={cn(
-          "flex flex-col bg-muted px-3 pb-3 md:px-4",
-          controls ? "pt-10" : "pt-4",
-          className,
-        )}
-      >
-        <AudioControls link={link} size="card" />
-      </div>
-    </AnchorIf>
-  );
-}
-
-/** The two sizes of the audio player: a card's strip, or the media viewer. */
-const AUDIO_SIZES = {
-  card: {
-    button: "size-9",
-    icon: "size-4",
-    gap: "gap-3",
-    time: "text-xs leading-4",
-  },
-  viewer: {
-    button: "size-14",
-    icon: "size-6",
-    gap: "gap-4",
-    time: "text-sm leading-5",
-  },
-} as const;
-
-/**
- * An audio pearl's player: play/pause, a scrubber, and elapsed over the
+ * The media viewer's audio player, until the viewer opens the bar itself:
+ * play/pause (56px, the drawn mark), a scrubber, and elapsed over the
  * length. It owns no element: it's a view of the page's one player
- * (`useAudioPlayer`), so starting one pearl stops the other, and a card's
- * strip and the viewer's player (`viewer`, a 56px button) show the same
- * playback, which carries on from one into the other. A card's steps aside
- * while links are selected and never lets a click reach the card.
+ * (`useAudioPlayer`), so a pearl playing on its card plays on here.
  */
-export function AudioControls({
-  link,
-  size,
-}: {
-  link: Link;
-  size: "card" | "viewer";
-}) {
+export function AudioControls({ link }: { link: Link }) {
   const { playing, elapsed, length, toggle, seek } = useAudioPlayer(link.id, link.duration);
-  // While links are selected, a click on the card toggles it: the card's
-  // controls step aside (the shared card never selects).
-  const selecting = useIsSelectionActive() && size === "card";
+  const reducedMotion = usePrefersReducedMotion();
   const src = safeRemoteImgSrc(link.url);
-  const look = AUDIO_SIZES[size];
 
   const time = length
     ? `${formatDuration(elapsed)} / ${formatDuration(length)}`
     : formatDuration(elapsed);
 
-  // The controls take pointer events inside the owner's card (whose
-  // content doesn't), except while selecting, and never open the link they
-  // sit in (the shared card is one link). `data-card-menu`: a press here
-  // isn't the card's long-press.
   return (
-    <div
-      data-card-menu={size === "card" ? "" : undefined}
-      inert={selecting}
-      className={cn(
-        "relative z-[1] flex items-center",
-        look.gap,
-        selecting ? "pointer-events-none" : "pointer-events-auto",
-      )}
-      onClick={
-        size === "card"
-          ? (event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }
-          : undefined
-      }
-    >
+    <div className="relative z-[1] flex items-center gap-4">
       <button
         type="button"
         disabled={!src}
+        aria-pressed={playing}
         aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
-        className={cn(
-          "flex shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100",
-          look.button,
-        )}
+        className="flex size-14 shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100"
         onClick={() => {
           if (src) toggle(src);
         }}
       >
-        {playing ? (
-          <Pause className={look.icon} aria-hidden />
-        ) : (
-          <Play className={cn(look.icon, "translate-x-px")} aria-hidden />
-        )}
+        <PlayMark playing={playing} size={24} reducedMotion={reducedMotion} />
       </button>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <input
@@ -429,7 +347,7 @@ export function AudioControls({
         />
         {/* `text-foreground/70`, like Kbd: `text-muted-foreground` on
             `bg-muted` is 4.3:1 in light mode, under 4.5:1 for 12px text. */}
-        <span className={cn("text-foreground/70 tabular-nums", look.time)}>{time}</span>
+        <span className="text-sm leading-5 text-foreground/70 tabular-nums">{time}</span>
       </div>
     </div>
   );
