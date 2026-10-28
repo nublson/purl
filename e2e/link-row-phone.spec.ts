@@ -128,18 +128,19 @@ test.describe("Link rows on phones", () => {
     await expect(toggle).toHaveAttribute("aria-label", "Pause Song");
     await expect(page.getByText("1 selected")).toHaveCount(0);
     await expect(song).not.toHaveAttribute("data-selected");
-    // The mark at the row's end, beside the menu, inside the row.
-    const play = song.locator("[data-row-play]");
-    await expect(play).toBeVisible();
-    const playBox = (await play.boundingBox())!;
+    // The mark in the icon's place (24px on phones); the menu as before.
+    const mark = song.locator('[data-cy="row-favicon"] [data-row-mark]');
+    await expect(mark).toHaveAttribute("data-row-mark", "pause");
+    await expect(mark).toBeVisible();
+    expect(await mark.evaluate((el: HTMLElement) => el.offsetWidth)).toBe(24);
+    await expect(song.getByRole("button", { name: "Open link menu" })).toBeVisible();
     const rowBox = (await song.boundingBox())!;
-    expect(playBox.x + playBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
     expect(Math.abs(rowBox.height - 56)).toBeLessThanOrEqual(1);
 
     // A second tap pauses it.
     await page.touchscreen.tap(title.x + 20, title.y + title.height / 2);
     await expect(toggle).toHaveAttribute("aria-label", "Play Song");
-    await expect(play).toBeVisible();
+    await expect(mark).toHaveAttribute("data-row-mark", "play");
   });
 
   test("an audio row: a long-press selects it, and doesn't play it", async ({
@@ -163,6 +164,6 @@ test.describe("Link rows on phones", () => {
     await page.waitForTimeout(300);
     await expect(song).toHaveAttribute("data-selected", "true");
     await expect(song.locator("[data-audio-toggle]")).toHaveAttribute("aria-label", "Play Song");
-    await expect(song.locator("[data-row-play]")).toHaveCount(0);
+    await expect(song.locator("[data-row-mark]")).toHaveCount(0);
   });
 });

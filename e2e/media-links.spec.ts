@@ -485,8 +485,19 @@ test.describe("Audio pearls: the now-playing bar", () => {
     const openBox = (await button.boundingBox())!;
     expect(openBox.y).toBeCloseTo(buttonBox.y, 0);
     expect(openBox.x).toBeCloseTo(buttonBox.x, 0);
+    // Opened, the words (up to two lines) wrap short of it.
+    const openWords = (await words.boundingBox())!;
+    expect(openWords.x + openWords.width).toBeLessThanOrEqual(openBox.x + 0.5);
     await button.click();
     await expect(page.getByRole("menuitem", { name: "Open file" })).toBeVisible();
+    // A press in its menu (a portal, outside the card) isn't outside it.
+    await page.getByRole("menuitem", { name: "Copy link" }).click();
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect(song.locator("[data-expand]")).toHaveAttribute("aria-expanded", "true");
+    // A press outside the card closes it.
+    const cardBox = (await song.boundingBox())!;
+    await page.mouse.click(cardBox.x + cardBox.width + 200, cardBox.y + 40);
+    await expect(song.locator("[data-expand]")).toHaveAttribute("aria-expanded", "false");
   });
 
   test("the hover preview's bar and the card's are one playback", async ({ page, seed }) => {
@@ -964,7 +975,8 @@ function rowSecondLine(scope: Locator) {
 
 /** The audio row's main element: the button that plays and pauses it. */
 const rowToggle = (scope: Locator) => scope.locator("[data-audio-toggle]");
-const rowPlay = (scope: Locator) => scope.locator("[data-row-play]");
+/** The play/pause mark drawn in the icon slot while the pearl is loaded. */
+const rowMark = (scope: Locator) => scope.locator('[data-cy="row-favicon"] [data-row-mark]');
 
 test.describe("Audio pearls in the list: a row that plays", () => {
   test.beforeEach(async ({ page, seed }) => {
@@ -995,34 +1007,44 @@ test.describe("Audio pearls in the list: a row that plays", () => {
     await expect(song.getByRole("link")).toHaveCount(0);
     await expect(rowToggle(song)).toHaveAttribute("aria-label", "Play Song");
     await expect(rowToggle(song)).toHaveJSProperty("tagName", "BUTTON");
-    await expect(rowPlay(song)).toHaveCount(0);
+    await expect(rowMark(song)).toHaveCount(0);
 
-    // A click on the row plays it: the row's end shows the mark (always,
-    // not just on hover) and the second line counts.
+    // A click on the row plays it: the icon slot draws the mark (the pause
+    // shape while playing), and the second line counts.
     await clickAt(page, song.locator('[data-slot="item-title"]'));
     await expect(rowToggle(song)).toHaveAttribute("aria-label", "Pause Song");
-    await expect(rowPlay(song)).toHaveAttribute("aria-label", "Pause Song");
+    await expect(rowMark(song)).toHaveAttribute("data-row-mark", "pause");
     await page.mouse.move(0, 0);
-    await expect(rowPlay(song)).toBeVisible();
+    await expect(rowMark(song)).toBeVisible();
+    // In the icon's place, at its size; one button per row.
+    // (Its layout size: the slot's own scale may still be easing back.)
+    expect(await rowMark(song).evaluate((el: HTMLElement) => el.offsetWidth)).toBe(20);
+    expect(await insideBox(rowMark(song), song.locator('[data-cy="row-favicon"]'))).toBe(true);
+    await expect(song.locator('[data-cy="row-favicon"] svg.reicon')).toHaveCount(0);
+    await expect(song.getByRole("button", { name: "Pause Song" })).toHaveCount(1);
     await expect.poll(() => rowSecondLine(song)).toMatch(/^0:0\d \/ (2:36|0:10)$/);
-    // The `⋯` beside it stays a hover thing; the row keeps its height.
-    await expect(song.getByRole("button", { name: "Open link menu" })).toHaveCSS("opacity", "1");
+    // The `⋯` stays exactly as on other rows: hidden at rest with a pointer,
+    // over the row's end on hover; the checkbox takes the icon slot on hover.
+    const menuButton = song.getByRole("button", { name: "Open link menu" });
     expect(
-      await song
-        .getByRole("button", { name: "Open link menu" })
-        .evaluate((el) => {
-          let node: Element | null = el;
-          let opacity = 1;
-          while (node) {
-            opacity *= Number(getComputedStyle(node).opacity);
-            node = node.parentElement;
-          }
-          return opacity;
-        }),
+      await menuButton.evaluate((el) => {
+        let node: Element | null = el;
+        let opacity = 1;
+        while (node) {
+          opacity *= Number(getComputedStyle(node).opacity);
+          node = node.parentElement;
+        }
+        return opacity;
+      }),
     ).toBe(0);
-    const playBox = (await rowPlay(song).boundingBox())!;
+    await song.hover();
+    await expect(menuButton).toBeVisible();
     const songBox = (await song.boundingBox())!;
-    expect(playBox.x + playBox.width).toBeLessThanOrEqual(songBox.x + songBox.width);
+    const menuBox = (await menuButton.boundingBox())!;
+    expect(songBox.x + songBox.width - (menuBox.x + menuBox.width)).toBeLessThanOrEqual(12);
+    await expect(song.getByRole("checkbox", { name: "Select Song" })).toHaveCSS("opacity", "1");
+    await expect(song.locator('[data-cy="row-favicon"]')).toHaveCSS("opacity", "0");
+    await page.mouse.move(0, 0);
     expect(Math.abs(songBox.height - 48)).toBeLessThanOrEqual(1);
     // Nothing opens.
     await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -1035,14 +1057,13 @@ test.describe("Audio pearls in the list: a row that plays", () => {
       .poll(() => page.evaluate(() => document.querySelector("audio")?.paused))
       .toBe(false);
 
-    // A second click pauses it; the mark stays while it's paused.
+    // A second click pauses it; the mark stays (the play shape) while it's
+    // paused.
     await clickAt(page, song.locator('[data-slot="item-title"]'));
     await expect(rowToggle(song)).toHaveAttribute("aria-label", "Play Song");
-    await expect(rowPlay(song)).toHaveAttribute("aria-label", "Play Song");
-    await expect(rowPlay(song)).toBeVisible();
-    // The mark plays it again.
-    await rowPlay(song).click();
-    await expect(rowToggle(song)).toHaveAttribute("aria-label", "Pause Song");
+    await expect(rowMark(song)).toHaveAttribute("data-row-mark", "play");
+    await page.mouse.move(0, 0);
+    await expect(rowMark(song)).toBeVisible();
   });
 
   test("the checkbox swaps in on hover and the ⋯ floats, as on other rows", async ({ page }) => {
@@ -1073,7 +1094,7 @@ test.describe("Audio pearls in the list: a row that plays", () => {
     await clickAt(page, song.locator('[data-slot="item-title"]'));
     await expect(checkbox).not.toBeChecked();
     await expect(rowToggle(song)).toHaveAttribute("aria-label", "Play Song");
-    await expect(rowPlay(song)).toHaveCount(0);
+    await expect(rowMark(song)).toHaveCount(0);
   });
 
   test("by keyboard: Tab reaches its button, which previews; Enter plays; a delete moves focus to it", async ({

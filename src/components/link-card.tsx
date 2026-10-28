@@ -12,6 +12,7 @@ import {
 import { ARRIVE } from "@/lib/motion";
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
 import { haptic } from "@/lib/haptics";
+import { useAudioExpanded } from "@/lib/audio-expansion";
 import { isViewerKind, linkKind } from "@/lib/link-kind";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
@@ -26,7 +27,7 @@ import {
   useFolderTag,
   useLinkFolder,
 } from "./folder-tag";
-import { AudioBar, markAudioHostPress } from "./audio-bar";
+import { AUDIO_BAR, AudioBar, markAudioHostPress } from "./audio-bar";
 import { HapticTarget } from "./haptic-target";
 import { MediaOpenButton } from "./media-open-button";
 import { LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
@@ -87,6 +88,8 @@ export function LinkCard({
   // opener: its bar plays and expands in place, and never opens the viewer.
   const kind = linkKind(link);
   const audio = kind === "audio";
+  // Opened, the bar's words wrap short of the menu: no backing over them.
+  const barOpen = useAudioExpanded(link.id).open;
   const media = !demo && isViewerKind(kind);
   // An image or video face is the viewer's morph anchor: it rounds and
   // clips itself, so the card doesn't crop the morph back.
@@ -258,6 +261,7 @@ export function LinkCard({
                     onToggleSelect: clickToSelect,
                     onTapSelect: tapToSelect,
                     consumeLongPress,
+                    folderButton: Boolean(linkFolder),
                   }
             }
           />
@@ -272,16 +276,20 @@ export function LinkCard({
       </div>
       {folderTag ? <FolderTagLabel id={folderLabelId} folder={folderTag} /> : null}
       {demo ? null : audio ? (
-        // Over the bar's top-right corner, as on every card: on the bar's
-        // surface, fading in over 24px, so it covers the words' end (which
-        // run to the bar's margin) cleanly. It keeps the corner opened. The
-        // backing takes no presses (they open the bar); its buttons do.
+        // Over the bar's top-right corner, as on every card, the buttons
+        // 6px in. Shut, on a backing of the bar's surface from the top
+        // down through the words' band, fading in over 24px, so it covers
+        // the words' end (which run to the bar's margin) cleanly, never
+        // through a line. Opened, the words wrap short of it: no backing.
+        // The backing takes no presses (they open the bar); its buttons do.
         <div
           inert={selecting}
           className={cn(
-            "pointer-events-none absolute top-1.5 right-1.5 z-10 flex rounded-e-md bg-card ps-6 [mask-image:linear-gradient(to_right,transparent,black_24px)] *:pointer-events-auto",
+            "pointer-events-none absolute top-0 right-0 z-10 flex items-start bg-card pt-1.5 pe-1.5 *:pointer-events-auto",
+            !barOpen && "ps-6 [mask-image:linear-gradient(to_right,transparent,black_24px)]",
             menuReveal,
           )}
+          style={barOpen ? undefined : { height: AUDIO_BAR.pad + AUDIO_BAR.sleeve }}
           data-card-menu
         >
           {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}

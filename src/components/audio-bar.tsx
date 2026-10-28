@@ -91,7 +91,8 @@ export const AUDIO_BAR = {
 /**
  * The owner's card: its checkbox on the sleeve, shown on the card's hover
  * (`group/card`). The card floats its own `⋯` over the bar's top-right
- * corner, as on every card; the bar keeps no slot for it.
+ * corner, as on every card; the bar keeps no slot for it at rest, and
+ * opened, its words (two lines) wrap short of it.
  */
 export type AudioBarOwner = {
   selected: boolean;
@@ -101,6 +102,8 @@ export type AudioBarOwner = {
   onTapSelect: (opts: { shiftKey: boolean }) => void;
   /** True once when this click ends a long-press (which already selected). */
   consumeLongPress: () => boolean;
+  /** The card's folder button floats beside its `⋯` (a pointer that hovers). */
+  folderButton?: boolean;
 };
 
 /** Presses a pearl's card saw in React's tree (its portals included), by pearl. */
@@ -295,7 +298,12 @@ export function AudioBar({
   const late = clamp((p - 0.6) / 0.4, 0, 1);
   const railTop = mix(SHUT - PAD - RAIL_H, RAIL_Y, p);
   const wordsLeft = mix(PAD + ART.s[0] + WORDS_GAP, PAD + ART.s[1] + WORDS_GAP, p);
-  const wordsRight = PAD;
+  /* Opened, the words wrap short of the card's floating `⋯` (and its folder
+     button, where one shows: `--audio-corner`), growing in with `p`; shut,
+     they run to the margin, the `⋯` covering their end where it shows. */
+  const wordsRight = owner
+    ? `calc(${PAD}px + var(--audio-corner) * ${p})`
+    : PAD;
 
   const secondLine = linkSecondLine(link);
   // An upload's facts shrink to the length; a link's domain just truncates.
@@ -371,7 +379,13 @@ export function AudioBar({
       // The part of its height that's a growth in place: the masonry keeps
       // every card in its column while it grows.
       data-masonry-grow={expandable ? h - SHUT : undefined}
-      className="@container relative overflow-hidden bg-card"
+      className={cn(
+        "@container relative overflow-hidden bg-card",
+        owner &&
+          (owner.folderButton
+            ? "[--audio-corner:32px] [@media(hover:hover)]:[--audio-corner:64px]"
+            : "[--audio-corner:32px]"),
+      )}
       style={{ height: h }}
       onPointerDownCapture={(event) => {
         insidePress.current = event.nativeEvent;

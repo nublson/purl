@@ -12,7 +12,7 @@ import { linkSecondLine } from "@/lib/upload-meta";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
 import * as React from "react";
-import { AudioRowPlay, AudioRowSecondLine, AudioRowToggle } from "./audio-row";
+import { AudioRowIcon, AudioRowSecondLine, AudioRowToggle } from "./audio-row";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
 import { MediaAnchor, ROW_ICON_RADIUS } from "./media-face-anchor";
@@ -27,7 +27,7 @@ import { Item, ItemContent, ItemMedia, ItemTitle } from "./ui/item";
  * goes through the signed-in PDF proxy. An image or video pearl opens the
  * media viewer, morphing out of its icon; a page opens a tab; a click on
  * an audio pearl's row plays and pauses it, and while it's loaded (playing
- * or paused) its play/pause mark shows at the row's end.
+ * or paused) its play/pause mark takes the icon's place.
  */
 export function SharedLinkItem({
   link,
@@ -97,7 +97,10 @@ export function SharedLinkItem({
   const describedBy = link.description ? descriptionId : undefined;
   const openerClass =
     "absolute inset-0 z-0 w-full rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset";
-  const icon = <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />;
+  const linkIcon = <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />;
+  // An audio pearl that's loaded (playing or paused) draws its play/pause
+  // mark in the icon's place.
+  const icon = audio ? <AudioRowIcon link={link}>{linkIcon}</AudioRowIcon> : linkIcon;
 
   // While this preview is open, other rows open theirs without the delay.
   React.useEffect(() => {
@@ -124,8 +127,6 @@ export function SharedLinkItem({
       // min-h-12: the owner's row gets its 48px from the menu button.
       className={cn(
         "relative grid min-h-12 w-full grid-cols-[20px_1fr] gap-4 border-0 p-2 transition-none hover:bg-accent/40 max-md:min-h-14 max-md:grid-cols-[24px_1fr] max-md:py-3",
-        // The row's color, opaque, for the audio row's mark at its end.
-        "[--row-bg:var(--color-background)] hover:[--row-bg:color-mix(in_oklab,var(--color-accent)_40%,var(--color-background))]",
         // Touch: no text selection from a press on it (like the owner's).
         audio && "[@media(pointer:coarse)]:select-none",
       )}
@@ -204,13 +205,6 @@ export function SharedLinkItem({
           </Typography>
         </ItemTitle>
       </ItemContent>
-      {audio ? (
-        // Loaded (playing or paused): the mark at the row's end, on the
-        // row's color, like the owner's row's actions.
-        <div className="absolute inset-y-0 end-0 z-10 flex items-center rounded-e-md bg-(--row-bg) ps-6 pe-2 [mask-image:linear-gradient(to_right,transparent,black_24px)] empty:hidden">
-          <AudioRowPlay link={link} />
-        </div>
-      ) : null}
     </Item>
   );
 

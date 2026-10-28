@@ -148,9 +148,11 @@ test.describe("Shared folders, visited signed out", () => {
     await expect(button).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(button).toHaveAttribute("aria-label", "Pause Song");
-    // The mark at the row's end, and the second line counts.
-    await expect(song.locator("[data-row-play]")).toBeVisible();
-    await expect(song.locator("[data-row-play]")).toHaveAttribute("aria-label", "Pause Song");
+    // The mark in the icon's place, and the second line counts.
+    const mark = song.locator("[data-row-mark]");
+    await expect(mark).toBeVisible();
+    await expect(mark).toHaveAttribute("data-row-mark", "pause");
+    await expect(song.getByRole("button", { name: "Pause Song" })).toHaveCount(1);
     await expect
       .poll(() =>
         song
@@ -160,10 +162,10 @@ test.describe("Shared folders, visited signed out", () => {
       .toMatch(/^0:0\d \/ (1:05|0:10)$/);
     await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(page.url()).not.toContain("pearl");
-    // A click on the mark pauses it; the mark stays.
-    await song.locator("[data-row-play]").click();
+    // A click on the row pauses it; the mark stays (the play shape).
+    await button.click();
     await expect(button).toHaveAttribute("aria-label", "Play Song");
-    await expect(song.locator("[data-row-play]")).toBeVisible();
+    await expect(mark).toHaveAttribute("data-row-mark", "play");
   });
 
   test("the grid has 2 columns on phones and 3 on small tablets, every card on screen", async ({

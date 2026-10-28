@@ -4,7 +4,6 @@ import { useAudioPlayer } from "@/hooks/use-audio-player";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { linkSecondLine } from "@/lib/upload-meta";
-import { cn } from "@/lib/utils";
 import { formatDuration } from "@/utils/format-duration";
 import type { Link } from "@/utils/links";
 import * as React from "react";
@@ -62,33 +61,28 @@ export function AudioRowSecondLine({ link }: { link: Link }) {
 }
 
 /**
- * The play/pause mark at an audio row's end, while the pearl is loaded
- * (playing or paused); nothing otherwise. Its row shows it always, not on
- * hover (`data-row-play`); 32px, 44px to the touch.
+ * An audio row's icon slot: the icon (`children`) at rest; while the pearl
+ * is loaded (playing or paused), the drawn play/pause mark in its place, at
+ * the slot's size (20px, 24px on phones) in the icon's color (playing: the
+ * pause shape). Decorative (`data-row-mark`): the row's button says it.
  */
-export function AudioRowPlay({
+export function AudioRowIcon({
   link,
-  className,
+  children,
 }: {
   link: Link;
-  className?: string;
+  children: React.ReactNode;
 }) {
-  const { active, playing, toggle } = useAudioPlayer(link.id, link.duration);
+  const { active, playing } = useAudioPlayer(link.id, link.duration);
   const reducedMotion = usePrefersReducedMotion();
-  const src = safeRemoteImgSrc(link.url);
-  if (!active || !src) return null;
+  if (!active) return <>{children}</>;
   return (
-    <button
-      type="button"
-      data-row-play=""
-      aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
-      className={cn(
-        "relative flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-foreground outline-none transition-[background-color,scale] duration-150 ease-out hover:bg-accent focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] motion-reduce:active:scale-100 after:absolute after:-inset-1.5",
-        className,
-      )}
-      onClick={() => toggle(src)}
+    <span
+      data-row-mark={playing ? "pause" : "play"}
+      aria-hidden
+      className="flex size-5 shrink-0 items-center justify-center max-md:size-6 [&>svg]:size-full"
     >
-      <PlayMark playing={playing} size={16} reducedMotion={reducedMotion} />
-    </button>
+      <PlayMark playing={playing} size={24} reducedMotion={reducedMotion} />
+    </span>
   );
 }

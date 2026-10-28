@@ -25,7 +25,7 @@ import { linkSecondLine } from "@/lib/upload-meta";
 import { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
-import { AudioRowPlay, AudioRowSecondLine, AudioRowToggle } from "./audio-row";
+import { AudioRowIcon, AudioRowSecondLine, AudioRowToggle } from "./audio-row";
 import {
   FolderBadge,
   FolderLinkButton,
@@ -64,13 +64,6 @@ const LONG_PRESS_SLOP = 10;
  */
 const OPENER_CLASS =
   "absolute inset-0 z-0 w-full rounded-md outline-none [-webkit-touch-callout:none] focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset";
-
-/**
- * The row's actions show on touch, and with a pointer that hovers only on
- * the row's hover, keyboard focus inside it or with its menu open.
- */
-const ROW_ACTIONS_REVEAL =
-  "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100";
 
 const LinkMenu = dynamic(() => import("./link-menu").then((m) => m.LinkMenu), {
   loading: () => <div className="size-8" aria-hidden />,
@@ -247,12 +240,21 @@ export const LinkItem = React.forwardRef<
     if (!hoveringPreviewRef.current) setPreviewOpen(false);
   };
 
-  const icon = arriving ? (
-    <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
+  // An audio pearl that's loaded (playing or paused) draws its play/pause
+  // mark in the icon's place.
+  const glyph = audio ? (
+    <AudioRowIcon link={link}>
       <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
-    </Typography>
+    </AudioRowIcon>
   ) : (
     <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
+  );
+  const icon = arriving ? (
+    <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
+      {glyph}
+    </Typography>
+  ) : (
+    glyph
   );
 
   // The row's own handlers: a long-press selects on touch; a mouse or pen
@@ -558,19 +560,14 @@ export const LinkItem = React.forwardRef<
           title's end); with a pointer that hovers, only on hover, keyboard
           focus or with the menu open. Its backing is the row's color,
           fading in over 24px, so it covers the text's end cleanly. Hidden
-          (and inert) while selecting. An audio pearl that's loaded (playing
-          or paused) adds its play/pause mark before the `⋯`, shown always
-          (the demo's too), while the `⋯` keeps its own reveal. */}
+          (and inert) while selecting. */}
       <ItemActions
         data-row-actions
         inert={selecting}
         className={cn(
-          selecting
-            ? "invisible"
-            : demo && "invisible has-[[data-row-play]]:visible",
+          (selecting || demo) && "invisible",
           "absolute inset-y-0 end-0 rounded-e-md bg-(--row-bg) ps-6 pe-2 [mask-image:linear-gradient(to_right,transparent,black_24px)]",
-          "z-10 has-[[data-row-play]]:opacity-100",
-          ROW_ACTIONS_REVEAL,
+          "z-10 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/item:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/item:opacity-100 group-data-[state=open]/item:opacity-100 has-data-[state=open]:opacity-100",
         )}
         onPointerEnter={(event) => {
           if (event.pointerType === "touch") return;
@@ -584,23 +581,14 @@ export const LinkItem = React.forwardRef<
           scheduleOpen();
         }}
       >
-        {audio ? <AudioRowPlay link={link} /> : null}
-        <div
-          className={cn(
-            "flex items-center gap-2",
-            demo && "invisible",
-            ROW_ACTIONS_REVEAL,
-          )}
-        >
-          {demo ? (
-            <div className="size-8" aria-hidden />
-          ) : (
-            <>
-              {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}
-              <LinkMenu link={link} onDelete={deleteRow} />
-            </>
-          )}
-        </div>
+        {demo ? (
+          <div className="size-8" aria-hidden />
+        ) : (
+          <>
+            {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}
+            <LinkMenu link={link} onDelete={deleteRow} />
+          </>
+        )}
       </ItemActions>
       {/* While selecting, a tap anywhere on the row toggles it, with a
           tick (touch). Also where a long-press's lift lands, once it has
