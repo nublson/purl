@@ -131,7 +131,7 @@ export function SharedLinkItem({
   const row = audio ? (
     <Item
       data-cy="link-item"
-      className="relative my-1 block w-full overflow-hidden rounded-lg border-0 bg-card p-0 transition-none [transform:var(--audio-swell)] after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:ring-1 after:ring-foreground/10 after:ring-inset after:transition-[box-shadow] after:duration-150 after:ease-out [@media(hover:hover)]:hover:after:ring-foreground/25"
+      className="relative my-1 block w-full overflow-hidden rounded-lg border-0 bg-card p-0 transition-none [transform:var(--audio-swell)] [@media(pointer:coarse)]:select-none after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:ring-1 after:ring-foreground/10 after:ring-inset after:transition-[box-shadow] after:duration-150 after:ease-out [@media(hover:hover)]:hover:after:ring-foreground/25"
       {...hoverHandlers}
     >
       {link.description ? (

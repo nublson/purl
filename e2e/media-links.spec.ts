@@ -1014,6 +1014,9 @@ test.describe("Audio pearls in the list: the row is the bar", () => {
     await page.keyboard.press("Escape");
     await expectShut(sun, "Sun");
     await expect(sun.getByRole("button", { name: "Expand Sun" })).toBeFocused();
+    // Focus handed back isn't keyboard navigation: no preview reopens.
+    await page.waitForTimeout(300);
+    await expect(preview).toHaveCount(0);
   });
 });
 

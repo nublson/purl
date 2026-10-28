@@ -10,6 +10,7 @@
 import { useAudioPlayer } from "@/hooks/use-audio-player";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { useAudioExpanded } from "@/lib/audio-expansion";
+import { consumeReturningFocus, markReturningFocus } from "@/lib/media-viewer";
 import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { useIsSelectionActive } from "@/lib/link-selection";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
@@ -333,8 +334,9 @@ export function AudioBar({
   }, [open, closeExpansion]);
 
   // Esc closes it: from inside it (focus back on its opener, since the
-  // transport goes inert), or from the page, unless a field or an overlay
-  // (a menu, a dialog) has the key.
+  // transport goes inert; marked as a return, so a row doesn't take it for
+  // keyboard navigation and open its preview), or from the page, unless a
+  // field or an overlay (a menu, a dialog) has the key.
   // Not while selecting: Esc clears the selection then (the bar is inert).
   useEffect(() => {
     if (!open || selecting) return;
@@ -347,6 +349,7 @@ export function AudioBar({
       if (inside) {
         event.preventDefault();
         event.stopPropagation();
+        markReturningFocus();
         openerRef.current?.focus();
       }
     };
@@ -402,7 +405,11 @@ export function AudioBar({
             height: mix(SHUT, ART.s[1], p),
             borderRadius: mix(CARD_RADIUS, ART.r[1], p),
           }}
-          onFocus={onExpandFocus}
+          onFocus={(event) => {
+            onExpandFocus?.(event);
+            // A host that doesn't read the return mark (a card) still uses it up.
+            consumeReturningFocus();
+          }}
           onBlur={onExpandBlur}
           onClick={(event) => {
             keepClick(event);
