@@ -11,8 +11,13 @@ export type AudioSnapshot = {
   elapsed: number;
   /** Seconds, once the element knows the file's metadata. */
   length: number | null;
-  /** The last load errored; cleared by the next toggle. */
+  /** The last load errored; cleared by the next toggle or seek. */
   failed: boolean;
+  /**
+   * The pearl whose last load errored (the snapshot is idle by then, so
+   * `id` no longer names it); cleared by the next toggle or seek.
+   */
+  failedId: string | null;
 };
 
 /** The parts of `<audio>` the store uses (tests pass a fake). */
@@ -23,6 +28,7 @@ export type AudioElementLike = Pick<
   | "src"
   | "currentTime"
   | "duration"
+  | "paused"
   | "preload"
   | "addEventListener"
   | "removeEventListener"
@@ -39,10 +45,15 @@ export interface AudioPlayerStore {
   toggle(id: string, src: string): void;
   /** If `id` is loaded: pause and go idle (elapsed 0). */
   stop(id: string): void;
-  /** Moves the loaded pearl to `seconds`; nothing while idle. */
-  seek(seconds: number): void;
-  /** Back to 0, still playing or paused as it was. */
-  restart(): void;
+  /**
+   * Moves pearl `id` to `seconds`. The loaded pearl moves as it plays (or
+   * stays paused). Another pearl is loaded from `src`, paused, and starts
+   * from there when toggled; with one element, that unloads (stops) the
+   * pearl that was loaded.
+   */
+  seek(id: string, src: string, seconds: number): void;
+  /** Pearl `id` back to 0, still playing or paused, if it's the loaded one. */
+  restart(id: string): void;
   /**
    * A view of pearl `id` mounted; returns its detach. When the last view
    * of the loaded pearl detaches (deleted, moved out, the page left), it
@@ -57,6 +68,7 @@ const IDLE: AudioSnapshot = {
   elapsed: 0,
   length: null,
   failed: false,
+  failedId: null,
 };
 
 function readLength(duration: number): number | null {
@@ -67,7 +79,7 @@ function readLength(duration: number): number | null {
  * The page's audio player: one element for every audio pearl, so one plays
  * at a time by construction, and a pearl's card and its opened player are
  * two views of the same playback (opening a playing pearl doesn't restart
- * it). The element is made by `createElement` on the first `toggle`.
+ * it). The element is made by `createElement` on the first toggle or seek.
  */
 export function createAudioPlayerStore(
   createElement: () => AudioElementLike,
@@ -82,10 +94,17 @@ export function createAudioPlayerStore(
   // a pause from outside. A new load drops the element's queued events, so
   // it resets the count.
   let ownPauses = 0;
+  // A seek on a pearl that wasn't loaded: the time to move to once the
+  // element knows the file's length (clamped to it).
+  let pendingSeek: number | null = null;
+
+  function notify() {
+    for (const listener of [...listeners]) listener();
+  }
 
   function set(next: Partial<AudioSnapshot>) {
     state = { ...state, ...next };
-    for (const listener of [...listeners]) listener();
+    notify();
   }
 
   function pauseElement() {
@@ -94,12 +113,21 @@ export function createAudioPlayerStore(
     element.pause();
   }
 
-  function goIdle(failed: boolean) {
+  function goIdle(failedId: string | null) {
     if (!element) return;
     pauseElement();
+    pendingSeek = null;
     element.currentTime = 0;
-    state = { ...IDLE, failed };
-    for (const listener of [...listeners]) listener();
+    state = { ...IDLE, failed: failedId !== null, failedId };
+    notify();
+  }
+
+  /** The element errored on the loaded pearl: idle, remembering which. */
+  function fail() {
+    const failedId = state.id;
+    // The element isn't playing, so no pause event of ours is coming.
+    state = { ...state, playing: false };
+    goIdle(failedId);
   }
 
   function play(id: string) {
@@ -109,10 +137,17 @@ export function createAudioPlayerStore(
       // A pause() or a new load that cut the play short isn't a failure.
       if ((error as { name?: string } | null)?.name === "AbortError") return;
       if (token !== load || state.id !== id) return;
-      // The element never started, so no pause event of ours is coming.
-      state = { ...state, playing: false };
-      goIdle(true);
+      fail();
     });
+  }
+
+  /** Loads `src` as pearl `id`; the element pauses and drops queued events. */
+  function loadSource(audio: AudioElementLike, src: string, preload: "none" | "metadata") {
+    load += 1;
+    ownPauses = 0;
+    pendingSeek = null;
+    audio.preload = preload;
+    audio.src = src;
   }
 
   function ensureElement(): AudioElementLike {
@@ -120,32 +155,40 @@ export function createAudioPlayerStore(
     const audio = createElement();
     audio.preload = "none";
     audio.addEventListener("timeupdate", () => {
-      if (state.id === null || state.elapsed === audio.currentTime) return;
+      if (state.id === null || pendingSeek !== null) return;
+      if (state.elapsed === audio.currentTime) return;
       set({ elapsed: audio.currentTime });
     });
     const onLength = () => {
+      if (state.id === null) return;
       const length = readLength(audio.duration);
-      if (state.id === null || length === null || length === state.length) return;
-      set({ length });
+      const next: Partial<AudioSnapshot> = {};
+      if (length !== null && length !== state.length) next.length = length;
+      if (pendingSeek !== null && length !== null) {
+        const time = Math.min(pendingSeek, length);
+        pendingSeek = null;
+        audio.currentTime = time;
+        next.elapsed = time;
+      }
+      if (Object.keys(next).length > 0) set(next);
     };
     audio.addEventListener("loadedmetadata", onLength);
     audio.addEventListener("durationchange", onLength);
     audio.addEventListener("pause", () => {
-      if (ownPauses > 0) {
-        ownPauses -= 1;
-        return;
-      }
+      const ours = ownPauses > 0;
+      if (ours) ownPauses -= 1;
+      // An event from a pause that's over (the pearl resumed, or another
+      // file loaded since) or one of our own: nothing to follow.
+      if (!audio.paused || ours) return;
       // Paused from outside (media keys, the OS taking audio focus): the
       // pearl stays loaded where it was.
       if (state.id !== null && state.playing) set({ playing: false });
     });
     audio.addEventListener("ended", () => {
-      if (state.id !== null) goIdle(false);
+      if (state.id !== null) goIdle(null);
     });
     audio.addEventListener("error", () => {
-      if (state.id === null) return;
-      state = { ...state, playing: false };
-      goIdle(true);
+      if (state.id !== null) fail();
     });
     element = audio;
     return audio;
@@ -166,33 +209,45 @@ export function createAudioPlayerStore(
       if (state.id === id) {
         if (state.playing) {
           pauseElement();
-          set({ playing: false });
+          set({ playing: false, failed: false, failedId: null });
         } else {
-          set({ playing: true, failed: false });
+          set({ playing: true, failed: false, failedId: null });
           play(id);
         }
         return;
       }
-      // Loading a new file pauses the element and drops its queued events.
-      load += 1;
-      ownPauses = 0;
-      audio.src = src;
+      loadSource(audio, src, "none");
       audio.currentTime = 0;
-      state = { id, playing: true, elapsed: 0, length: null, failed: false };
-      for (const listener of [...listeners]) listener();
+      state = { ...IDLE, id, playing: true };
+      notify();
       play(id);
     },
     stop(id) {
       if (state.id !== id) return;
-      goIdle(false);
+      goIdle(null);
     },
-    seek(seconds) {
-      if (!element || state.id === null) return;
-      element.currentTime = seconds;
-      set({ elapsed: seconds });
+    seek(id, src, seconds) {
+      const audio = ensureElement();
+      if (state.id === id) {
+        // Before the length is known, the time waits for it.
+        if (pendingSeek !== null) pendingSeek = seconds;
+        audio.currentTime = seconds;
+        set({ elapsed: seconds, failed: false, failedId: null });
+        return;
+      }
+      // Another pearl: load it paused, just far enough to know its length,
+      // then move to the time (a later toggle plays from there).
+      loadSource(audio, src, "metadata");
+      pendingSeek = seconds;
+      audio.currentTime = seconds;
+      state = { ...IDLE, id, elapsed: seconds };
+      notify();
     },
-    restart() {
-      store.seek(0);
+    restart(id) {
+      if (state.id !== id || !element) return;
+      if (pendingSeek !== null) pendingSeek = 0;
+      element.currentTime = 0;
+      set({ elapsed: 0 });
     },
     attach(id) {
       views.set(id, (views.get(id) ?? 0) + 1);
@@ -206,7 +261,12 @@ export function createAudioPlayerStore(
           return;
         }
         views.delete(id);
-        store.stop(id);
+        // A view swapped for another in the same commit (the old one's
+        // cleanup runs before the new one attaches) keeps it playing: stop
+        // only if no view of it came back.
+        queueMicrotask(() => {
+          if (!views.has(id)) store.stop(id);
+        });
       };
     },
   };
@@ -248,7 +308,7 @@ export function snapshotFor(
     playing: active && snapshot.playing,
     elapsed: active ? snapshot.elapsed : 0,
     length: active && snapshot.length != null ? snapshot.length : fallbackLength,
-    failed: active && snapshot.failed,
+    failed: snapshot.failedId === id,
   };
 }
 
@@ -290,7 +350,8 @@ export function useAudioPlayer(
   fallbackLength: number | null,
 ): AudioPlayerView & {
   toggle: (src: string) => void;
-  seek: (seconds: number) => void;
+  /** Moves this pearl to `seconds`, loading it (paused) if it isn't. */
+  seek: (src: string, seconds: number) => void;
   restart: () => void;
 } {
   const read = useMemo(() => viewReader(id, fallbackLength), [id, fallbackLength]);
@@ -303,7 +364,10 @@ export function useAudioPlayer(
   useEffect(() => audioPlayerStore.attach(id), [id]);
 
   const toggle = useCallback((src: string) => audioPlayerStore.toggle(id, src), [id]);
-  const seek = useCallback((seconds: number) => audioPlayerStore.seek(seconds), []);
-  const restart = useCallback(() => audioPlayerStore.restart(), []);
+  const seek = useCallback(
+    (src: string, seconds: number) => audioPlayerStore.seek(id, src, seconds),
+    [id],
+  );
+  const restart = useCallback(() => audioPlayerStore.restart(id), [id]);
   return { ...view, toggle, seek, restart };
 }

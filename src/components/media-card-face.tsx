@@ -423,7 +423,9 @@ export function AudioControls({
           aria-label={`Seek ${link.title}`}
           aria-valuetext={time}
           className="h-4 w-full cursor-pointer accent-foreground disabled:cursor-default"
-          onChange={(event) => seek(Number(event.currentTarget.value))}
+          onChange={(event) => {
+            if (src) seek(src, Number(event.currentTarget.value));
+          }}
         />
         {/* `text-foreground/70`, like Kbd: `text-muted-foreground` on
             `bg-muted` is 4.3:1 in light mode, under 4.5:1 for 12px text. */}
