@@ -98,6 +98,39 @@ export function chooseMasonryColumn(bottoms: number[], previous: number): number
   return toTheRight !== -1 ? toTheRight : bottoms.findIndex(level);
 }
 
+/**
+ * Where each card goes: its column (0-based), its first 1px row (1-based)
+ * and how many rows it spans. `height` is the card's box; `grow` is how
+ * much of it is a growth in place (an audio bar opening into its player),
+ * which still pushes the cards under it down but doesn't count when
+ * choosing columns, so nothing changes column while a card grows: the
+ * cards below follow it, frame by frame, instead of jumping across.
+ */
+export function placeMasonry(
+  cards: readonly { height: number; grow: number }[],
+  columns: number,
+): { column: number; row: number; span: number }[] {
+  // Where each column ends: as placed, and as read for choosing columns.
+  const bottoms = new Array<number>(columns).fill(0);
+  const resting = new Array<number>(columns).fill(0);
+  let previous = -1;
+  return cards.map(({ height, grow }) => {
+    const column = chooseMasonryColumn(resting, previous);
+    previous = column;
+    const row = bottoms[column] + 1;
+    bottoms[column] += height;
+    resting[column] += Math.max(0, height - grow);
+    return { column, row, span: Math.max(height, 1) };
+  });
+}
+
+/** A growth in place inside a card's box (`data-masonry-grow`, in px). */
+function growthOf(box: HTMLElement): number {
+  const grower = box.querySelector<HTMLElement>("[data-masonry-grow]");
+  const grow = Number(grower?.dataset.masonryGrow);
+  return Number.isFinite(grow) && grow > 0 ? grow : 0;
+}
+
 function placeCards(list: HTMLElement) {
   const items = Array.from(list.children) as HTMLElement[];
   // Count the template's columns with no card placed: a card left in
@@ -109,21 +142,22 @@ function placeCards(list: HTMLElement) {
     .gridTemplateColumns.split(" ")
     .filter(Boolean).length;
   if (columns === 0) return;
-  const bottoms = new Array<number>(columns).fill(0);
-  let previous = -1;
+  const placed: HTMLElement[] = [];
+  const cards: { height: number; grow: number }[] = [];
   for (const item of items) {
     const box = item.firstElementChild;
     if (!(box instanceof HTMLElement)) continue;
+    placed.push(item);
     // Layout height, whole pixels (fractional 16:10 thumbnails round to
     // within half a pixel of the gutter), ignoring transforms: a card
     // mid-arrival (scaled) still takes its full height.
-    const height = box.offsetHeight;
-    const column = chooseMasonryColumn(bottoms, previous);
-    previous = column;
-    item.style.gridColumn = String(column + 1);
-    item.style.gridRow = `${bottoms[column] + 1} / span ${Math.max(height, 1)}`;
-    bottoms[column] += height;
+    cards.push({ height: box.offsetHeight, grow: growthOf(box) });
   }
+  placeMasonry(cards, columns).forEach(({ column, row, span }, index) => {
+    const item = placed[index];
+    item.style.gridColumn = String(column + 1);
+    item.style.gridRow = `${row} / span ${span}`;
+  });
 }
 
 function clearPlacement(item: HTMLElement) {

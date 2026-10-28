@@ -105,7 +105,8 @@ export function LinkPreviewBody({
     return (
       <>
         <div className={cn("overflow-hidden", more ? "rounded-t-lg" : "rounded-lg")}>
-          <AudioBar link={link} />
+          {/* The bar, not the player: the preview doesn't expand. */}
+          <AudioBar link={link} expandable={false} />
         </div>
         {more ? (
           <div className="flex flex-col gap-2 p-4 pt-3">

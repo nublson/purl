@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseMasonryColumn } from "./masonry";
+import { chooseMasonryColumn, placeMasonry } from "./masonry";
 
 describe("chooseMasonryColumn", () => {
   it("fills the first row left to right", () => {
@@ -28,5 +28,48 @@ describe("chooseMasonryColumn", () => {
   it("takes the shortest column when the others are clearly taller", () => {
     expect(chooseMasonryColumn([400, 300], 0)).toBe(1);
     expect(chooseMasonryColumn([300, 400], 1)).toBe(0);
+  });
+});
+
+describe("placeMasonry", () => {
+  it("stacks cards in their columns, each spanning its height", () => {
+    expect(
+      placeMasonry(
+        [
+          { height: 100, grow: 0 },
+          { height: 100, grow: 0 },
+          { height: 50, grow: 0 },
+        ],
+        2,
+      ),
+    ).toEqual([
+      { column: 0, row: 1, span: 100 },
+      { column: 1, row: 1, span: 100 },
+      { column: 0, row: 101, span: 50 },
+    ]);
+  });
+
+  it("keeps every card in its column while one grows in place, moving those below it down", () => {
+    // An audio bar opening: 94 → 205 tall (78 → 189, and the gutter). Read
+    // by its whole height, the card under it would jump to the other column.
+    const shut = placeMasonry(
+      [
+        { height: 94, grow: 0 },
+        { height: 94, grow: 0 },
+        { height: 120, grow: 0 },
+      ],
+      2,
+    );
+    const open = placeMasonry(
+      [
+        { height: 205, grow: 111 },
+        { height: 94, grow: 0 },
+        { height: 120, grow: 0 },
+      ],
+      2,
+    );
+    expect(open.map((cell) => cell.column)).toEqual(shut.map((cell) => cell.column));
+    expect(open[2]).toEqual({ column: 0, row: 206, span: 120 });
+    expect(open[0].span).toBe(205);
   });
 });

@@ -214,8 +214,9 @@ export const LinkItem = React.forwardRef<
     deleteLinkKeepingFocus({
       linkId: link.id,
       anchor: anchorRef.current,
+      // An audio row's is its bar's opener (`data-expand`).
       siblingsSelector:
-        '[data-cy="link-item"] > a[href], [data-cy="link-item"] > [data-pearl-button]',
+        '[data-cy="link-item"] > a[href], [data-cy="link-item"] > [data-pearl-button], [data-cy="link-item"] [data-expand]',
       byKeyboard,
       onDeleted: notifyLinksChanged,
     });

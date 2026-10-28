@@ -222,6 +222,11 @@ test.describe("Media pearls", () => {
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
     await expect(checkbox).not.toBeChecked();
     await expect(play).toHaveAttribute("aria-label", "Play Song");
+    // The bar's opener steps aside too: the click selected, it didn't open.
+    const expand = song.locator("[data-expand]");
+    await expect(expand).toHaveAttribute("inert", "");
+    await expect(expand).toHaveAttribute("aria-expanded", "false");
+    expect((await song.boundingBox())!.height).toBeLessThan(80);
   });
 
   test("one audio pearl plays at a time, and stops at its end", async ({ page, seed }) => {
@@ -292,7 +297,8 @@ test.describe("Media pearls", () => {
     // are the bar's).
     const songCard = cards(page).filter({ has: page.locator('[data-face="audio"]') });
     await expect(sharedCard("Song")).toHaveCount(0);
-    await expect(songCard.locator("a")).toHaveCount(0);
+    // (Its Open file link is the opened player's, hidden while it's shut.)
+    await expect(songCard.getByRole("link")).toHaveCount(0);
     let popups = 0;
     page.on("popup", () => popups++);
     const url = page.url();
@@ -371,7 +377,8 @@ test.describe("Audio pearls: the now-playing bar", () => {
     const song = card(page, "Song");
     const birds = card(page, "Birds");
     // The card is its bar: never a link, and no button opens the viewer.
-    await expect(song.locator("a")).toHaveCount(0);
+    // (Its Open file link is the opened player's, hidden while it's shut.)
+    await expect(song.getByRole("link")).toHaveCount(0);
     await expect(song.getByRole("button", { name: "Song", exact: true })).toHaveCount(0);
     const bar = song.locator('[data-face="audio"]');
     await expect(bar.locator("[data-words]")).toContainText("Song");
@@ -552,5 +559,281 @@ test.describe("Audio pearls on a phone", () => {
     ).toBeVisible();
     await expect(page.getByText("1 selected")).toHaveCount(0);
     await expect(song).not.toHaveAttribute("data-selected", "true");
+  });
+
+  test("a tap on the bar's words opens it; shut, the whole bar is its opener", async ({
+    page,
+    seed,
+  }) => {
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
+    await seedSong(seed);
+    const saved = await page.request.patch("/api/user/layout", { data: { view: "grid" } });
+    expect(saved.ok()).toBe(true);
+    await openHome(page);
+
+    const song = card(page, "Song");
+    const opener = song.locator("[data-expand]");
+    const barBox = (await song.locator('[data-face="audio"]').boundingBox())!;
+    const openerBox = (await opener.boundingBox())!;
+    for (const key of ["x", "y", "width", "height"] as const) {
+      expect(Math.abs(openerBox[key] - barBox[key])).toBeLessThanOrEqual(0.5);
+    }
+    const words = (await song.locator("[data-words]").boundingBox())!;
+    await page.touchscreen.tap(words.x + words.width / 2, words.y + 4);
+    await expect(opener).toHaveAttribute("aria-expanded", "true");
+    await expect
+      .poll(() => song.locator('[data-face="audio"]').evaluate((el: HTMLElement) => el.offsetHeight))
+      .toBe(189);
+    await expect(page.getByText("1 selected")).toHaveCount(0);
+    // The transport fits the phone's card.
+    const play = (await song.getByRole("button", { name: "Play Song", exact: true }).boundingBox())!;
+    const cardBox = (await song.boundingBox())!;
+    expect(play.x).toBeGreaterThanOrEqual(cardBox.x);
+    expect(play.x + play.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+  });
+});
+
+/** Two audio pearls side by side (Sun, Tide) and an image card under Sun. */
+async function seedExpandGrid(seed: Seed, baseURL: string | undefined) {
+  // Oldest first: the grid shows the newest first (Sun, Tide, then Shot).
+  await seed.link({
+    url: "https://shots.example/shot.png",
+    title: "Shot",
+    contentType: "IMAGE",
+    thumbnail: `${baseURL}/icon.png`,
+    width: 800,
+    height: 600,
+  });
+  for (const title of ["Tide", "Sun"]) {
+    await seed.link({
+      url: `https://sounds.example/${title.toLowerCase()}.wav`,
+      title,
+      contentType: "AUDIO",
+      duration: 10,
+    });
+  }
+}
+
+type GrowthSample = { height: number; drawn: number; below: number };
+
+/**
+ * Records the bar's layout height (`offsetHeight`; `drawn` includes the
+ * close's swell) and the top of the card marked `data-e2e-below`, each time
+ * the bar's box changes (a ResizeObserver: after layout, before paint, so
+ * once per drawn frame, after the masonry's own observer has placed the
+ * cards). The first entry is the bar before the move.
+ */
+async function startGrowthSampling(bar: Locator) {
+  await bar.evaluate((el: HTMLElement) => {
+    const below = document.querySelector("[data-e2e-below]");
+    const seen: GrowthSample[] = [];
+    const observer = new ResizeObserver(() => {
+      seen.push({
+        height: el.offsetHeight,
+        drawn: el.getBoundingClientRect().height,
+        below: below ? below.getBoundingClientRect().top : NaN,
+      });
+    });
+    observer.observe(el);
+    Object.assign(window, {
+      e2eGrowth: seen,
+      e2eStopGrowth: () => observer.disconnect(),
+    });
+  });
+}
+
+async function stopGrowthSampling(page: Page, settledHeight: number) {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const seen = (window as unknown as { e2eGrowth: GrowthSample[] }).e2eGrowth;
+        return seen.at(-1)?.height ?? 0;
+      }),
+    )
+    .toBeGreaterThanOrEqual(settledHeight - 2);
+  // A frame or two for anything still settling (the last sample is the end).
+  await page.waitForTimeout(100);
+  return page.evaluate(() => {
+    const w = window as unknown as { e2eGrowth: GrowthSample[]; e2eStopGrowth: () => void };
+    w.e2eStopGrowth();
+    return w.e2eGrowth;
+  });
+}
+
+const bar = (scope: Locator) => scope.locator('[data-face="audio"]');
+const expandButton = (scope: Locator) => scope.locator("[data-expand]");
+
+async function expectShut(scope: Locator, title: string) {
+  await expect(expandButton(scope)).toHaveAttribute("aria-expanded", "false");
+  await expect(expandButton(scope)).toHaveAttribute("aria-label", `Expand ${title}`);
+  await expect.poll(() => bar(scope).evaluate((el: HTMLElement) => el.offsetHeight)).toBe(78);
+}
+
+async function expectOpen(scope: Locator, title: string) {
+  await expect(expandButton(scope)).toHaveAttribute("aria-expanded", "true");
+  await expect(expandButton(scope)).toHaveAttribute("aria-label", `Collapse ${title}`);
+  await expect.poll(() => bar(scope).evaluate((el: HTMLElement) => el.offsetHeight)).toBe(189);
+}
+
+test.describe("Audio pearls: the bar expands in place", () => {
+  // Two columns of cards (under 640px), so the image sits under Sun.
+  test.use({ viewport: { width: 600, height: 900 } });
+
+  test.beforeEach(async ({ page }) => {
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
+  });
+
+  test("a press on the bar grows it into the player, and the grid follows it", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await seedExpandGrid(seed, baseURL);
+    await openHome(page);
+    await chooseView(page, "Grid");
+    const sun = card(page, "Sun");
+    const tide = card(page, "Tide");
+    const shot = card(page, "Shot");
+    await expect(shot).toBeVisible();
+    // The image sits under Sun.
+    const sunBox = (await sun.boundingBox())!;
+    const shotBox = (await shot.boundingBox())!;
+    expect(Math.abs(shotBox.x - sunBox.x)).toBeLessThanOrEqual(1);
+    expect(shotBox.y).toBeGreaterThan(sunBox.y + sunBox.height);
+    await shot.evaluate((el) => el.setAttribute("data-e2e-below", ""));
+    await expectShut(sun, "Sun");
+    // Shut, the transport isn't there for focus or clicks.
+    await expect(sun.getByRole("button", { name: "Restart Sun" })).toHaveCount(0);
+
+    // A press on the words (away from the controls) opens it.
+    await startGrowthSampling(bar(sun));
+    await clickAt(page, sun.locator("[data-words]"));
+    const growth = await stopGrowthSampling(page, 189);
+    await expectOpen(sun, "Sun");
+    expect(Math.abs(growth[0].height - 78)).toBeLessThanOrEqual(1);
+    expect(Math.abs(growth.at(-1)!.height - 189)).toBeLessThanOrEqual(2);
+    // It grew over several frames, never back.
+    expect(growth.length).toBeGreaterThan(4);
+    for (let i = 1; i < growth.length; i++) {
+      expect(growth[i].height).toBeGreaterThanOrEqual(growth[i - 1].height);
+    }
+    // The image under it moved down with it, frame by frame (no jump), by
+    // the growth: 111px.
+    for (const sample of growth) {
+      expect(
+        Math.abs(sample.below - growth[0].below - (sample.height - growth[0].height)),
+      ).toBeLessThanOrEqual(2);
+    }
+    expect(Math.abs(growth.at(-1)!.below - growth[0].below - 111)).toBeLessThanOrEqual(3);
+
+    // The transport: Restart, Play, Open file. Play takes over from the
+    // sleeve, whose mark is gone.
+    const play = sun.getByRole("button", { name: "Play Sun", exact: true });
+    await expect(play).toHaveCount(1);
+    await expect(play).toBeVisible();
+    expect(await play.evaluate((el) => el.closest("[data-sleeve]") === null)).toBe(true);
+    await expect(sun.getByRole("link", { name: "Open file" })).toBeVisible();
+    const restart = sun.getByRole("button", { name: "Restart Sun" });
+    await expect(restart).toBeVisible();
+    await expect(restart).toBeDisabled();
+    await expect(sun.locator("[data-times]")).toContainText("0:00");
+    await expect(sun.locator("[data-times]")).toContainText("−0:10");
+    expect(
+      await sun
+        .locator("[data-sleeve] [data-play] [data-mark]")
+        .evaluate((el) => getComputedStyle(el).opacity),
+    ).toBe("0");
+    await play.click();
+    await expect(sun.getByRole("button", { name: "Pause Sun", exact: true })).toBeVisible();
+    await expect(restart).toBeEnabled();
+    await restart.click();
+    await expect(sun.getByRole("button", { name: "Pause Sun", exact: true })).toBeVisible();
+    // Still open: the controls don't collapse it.
+    await expectOpen(sun, "Sun");
+
+    // Another pearl opens: this one closes (one at a time), still playing.
+    await clickAt(page, tide.locator("[data-words]"));
+    await expectOpen(tide, "Tide");
+    await expectShut(sun, "Sun");
+    await expect(sun.getByRole("button", { name: "Pause Sun", exact: true })).toBeVisible();
+    await expect
+      .poll(async () => (await shot.boundingBox())!.y)
+      .toBeCloseTo(shotBox.y, 0);
+
+    // Esc collapses it.
+    await page.keyboard.press("Escape");
+    await expectShut(tide, "Tide");
+
+    // A press outside the card collapses it; the press that opened it didn't.
+    await clickAt(page, sun.locator("[data-words]"));
+    await expectOpen(sun, "Sun");
+    const grid = (await page.getByRole("list", { name: "Links" }).boundingBox())!;
+    await page.mouse.click(grid.x - 8 > 0 ? grid.x - 8 : 4, sunBox.y + 30);
+    await expectShut(sun, "Sun");
+
+    // A press on the opened sleeve-and-words row collapses it too.
+    await clickAt(page, sun.locator("[data-words]"));
+    await expectOpen(sun, "Sun");
+    await clickAt(page, sun.locator("[data-words]"));
+    await expectShut(sun, "Sun");
+  });
+
+  test("by keyboard: the bar's opener, Esc back to it", async ({ page, seed, baseURL }) => {
+    await seedExpandGrid(seed, baseURL);
+    await openHome(page);
+    await chooseView(page, "Grid");
+    const sun = card(page, "Sun");
+    const opener = sun.getByRole("button", { name: "Expand Sun" });
+    await opener.focus();
+    await page.keyboard.press("Enter");
+    await expectOpen(sun, "Sun");
+    // Into the transport, then Esc: shut, focus back on the opener.
+    await sun.getByRole("button", { name: "Play Sun", exact: true }).focus();
+    await page.keyboard.press("Escape");
+    await expectShut(sun, "Sun");
+    await expect(sun.getByRole("button", { name: "Expand Sun" })).toBeFocused();
+  });
+});
+
+test.describe("Audio pearls: the bar expands at once with reduced motion", () => {
+  test.use({ viewport: { width: 600, height: 900 }, reducedMotion: "reduce" });
+
+  test("no frames between the bar and the player", async ({ page, seed, baseURL }) => {
+    await seedExpandGrid(seed, baseURL);
+    await openHome(page);
+    await chooseView(page, "Grid");
+    const sun = card(page, "Sun");
+    await card(page, "Shot").evaluate((el) => el.setAttribute("data-e2e-below", ""));
+    await startGrowthSampling(bar(sun));
+    await clickAt(page, sun.locator("[data-words]"));
+    const growth = await stopGrowthSampling(page, 189);
+    await expectOpen(sun, "Sun");
+    // 78, then 189: nothing in between.
+    for (const sample of growth) {
+      expect(
+        Math.abs(sample.height - 78) <= 1 || Math.abs(sample.height - 189) <= 1,
+      ).toBe(true);
+    }
+    // The transport fades in (150ms) and is there.
+    await expect(sun.getByRole("button", { name: "Restart Sun" })).toBeVisible();
+    await expect
+      .poll(() =>
+        sun
+          .getByRole("button", { name: "Play Sun", exact: true })
+          .evaluate((el) => {
+            let node: Element | null = el;
+            let opacity = 1;
+            while (node) {
+              opacity *= Number(getComputedStyle(node).opacity);
+              node = node.parentElement;
+            }
+            return opacity;
+          }),
+      )
+      .toBe(1);
   });
 });

@@ -1,54 +1,10 @@
 "use client";
 
 /* Adapted from Bencho's "Now playing" (bencho.dev), MIT licence: the drawn
-   play/pause mark, its tween and its goo. */
+   play/pause mark and its goo (its tween is `audio-player-tween.ts`). */
 
-import { useEffect, useRef, useState } from "react";
-import { clamp, markPaths, SWING } from "@/lib/play-mark-path";
-
-/* ── eased, NOT sprung ─────────────────────────────────────
-   A spring past its target takes every value derived from it
-   along, and the mark's corners would wobble rather than
-   bounce. So: a curve that never passes the number it is
-   going to.
-
-   It reads its start from wherever it currently IS, so
-   pressing again mid-flight turns the object around rather
-   than snapping it to an end it never reached. */
-function useTween(to: number, ms: number, instant: boolean) {
-  const [at, setAt] = useState(to);
-  const cur = useRef(to);
-  const raf = useRef(0);
-  /* Instant: the drawn value follows the target as it changes (React's
-     adjust-state-during-render), so nothing is set from an effect. */
-  if (instant && at !== to) setAt(to);
-
-  useEffect(() => {
-    if (instant) {
-      cur.current = to;
-      return;
-    }
-    const from = cur.current;
-    if (from === to) return;
-    const t0 = performance.now();
-    const step = (now: number) => {
-      const t = Math.min(1, (now - t0) / ms);
-      cur.current = from + (to - from) * SWING(t);
-      setAt(cur.current);
-      raf.current = t < 1 ? requestAnimationFrame(step) : 0;
-    };
-    raf.current = requestAnimationFrame(step);
-    return () => {
-      cancelAnimationFrame(raf.current);
-      raf.current = 0;
-    };
-  }, [to, ms, instant]);
-
-  /* Instant is read at render, not tweened. Both the drawn value and the
-     tween's start track the target meanwhile, so if the preference flips
-     back the next tween starts from the shape on screen. */
-  return instant ? to : at;
-}
+import { markPaths } from "@/lib/play-mark-path";
+import { clamp, SWING, useTween } from "./audio-player-tween";
 
 /* The mark shows what pressing does not: while playing it is the pause. */
 export function PlayMark({
@@ -64,7 +20,7 @@ export function PlayMark({
      the box's own move: this one leaves a shape as well as
      arriving at one, and a curve that only softens the
      landing snaps out of the shape it was. */
-  const t = useTween(playing ? 0 : 1, 300, reducedMotion);
+  const t = useTween(playing ? 0 : 1, 300, reducedMotion, SWING);
   const { left, right } = markPaths(t);
 
   /* ── the goo ─────────────────────────────────────────────

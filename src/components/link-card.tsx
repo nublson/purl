@@ -129,8 +129,9 @@ export function LinkCard({
         deleteLinkKeepingFocus({
           linkId: link.id,
           anchor: anchorRef.current,
+          // An audio card's is its bar's opener (`data-expand`).
           siblingsSelector:
-            '[data-cy="link-card"] > a[href], [data-cy="link-card"] > [data-pearl-button]',
+            '[data-cy="link-card"] > a[href], [data-cy="link-card"] > [data-pearl-button], [data-cy="link-card"] [data-expand]',
           byKeyboard,
           onDeleted: notifyLinksChanged,
         })
@@ -185,9 +186,9 @@ export function LinkCard({
     >
       {audio && !demo ? (
         // A plain surface under the bar: while selecting, a click on it
-        // toggles the card (the bar's controls step aside then).
+        // toggles the card (the bar's controls, its opener included, step
+        // aside then). The card's focus anchor is the bar's opener.
         <div
-          ref={setAnchor}
           aria-hidden
           className={cn("absolute inset-0 z-0 rounded-lg", selecting && "cursor-pointer")}
           onClick={(event) => {
@@ -237,11 +238,13 @@ export function LinkCard({
         {audio ? (
           // The bar holds the owner's controls itself: the checkbox in the
           // sleeve's corner on hover, in its place while selecting; the
-          // menu after the words (no thumbnail corners to put them in).
+          // menu after the words (no thumbnail corners to put them in). A
+          // press on the rest of it expands it in place into the player.
           <AudioBar
             link={link}
             badge={badge}
             describedBy={describedBy}
+            expandRef={demo ? undefined : setAnchor}
             owner={
               demo
                 ? undefined

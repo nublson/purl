@@ -3,7 +3,7 @@
 
 export const clamp = (v: number, lo: number, hi: number) =>
   Math.min(hi, Math.max(lo, v));
-const mix = (a: number, b: number, t: number) => a + (b - a) * t;
+export const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /* in AND out, for the one thing here that is a round trip between two
    shapes rather than an arrival at one */
