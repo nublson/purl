@@ -8,15 +8,18 @@
 import { useAudioPlayer } from "@/hooks/use-audio-player";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { useIsSelectionActive } from "@/lib/link-selection";
+import { useIsMediaMovedOff, useIsMediaOpen } from "@/lib/media-viewer";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { linkSecondLine } from "@/lib/upload-meta";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/utils/format-duration";
 import type { Link } from "@/utils/links";
+import { animate, m, useMotionValue, type Transition } from "motion/react";
 import { useState, type MouseEvent, type ReactNode } from "react";
 import { MusicNote } from "reicon-react";
 import { HapticTarget } from "./haptic-target";
 import { AnchorIf } from "./media-card-face";
+import { FACE_LAYOUT_DEPENDENCY, pearlPartLayoutId } from "./media-face-anchor";
 import { PlayMark } from "./play-mark";
 import { Checkbox } from "./ui/checkbox";
 
@@ -32,23 +35,54 @@ export const AUDIO_BAR = {
   rail: 3,
 } as const;
 
-/**
- * The opened player's measures (the media viewer's `ViewerAudio`), in px:
- * the bar grown downward. Stacked from the sleeve, each gap from the thing
- * above it: pad, sleeve, 22, rail, 8, times (10), 16, play, pad, so the
- * height is their sum (189). With Previous / Next on its sides the content
- * takes `padWithArrows` instead of `pad` on the left and right.
- */
+/** The opened player's sleeve (the media viewer's `ViewerAudio`), in px. */
 export const AUDIO_PLAYER = {
-  width: 320,
-  pad: AUDIO_BAR.pad,
-  padWithArrows: 48,
   sleeve: 64,
   sleeveRadius: 12,
-  play: 46,
-  side: 34,
-  height: 189,
 } as const;
+
+/**
+ * The words' heights (the title's line over the second line's), in px: the
+ * bar's 16 + 14, the player's 19 + 15. While the words travel between them
+ * they're drawn at the size they left (scaled by this ratio) and grow or
+ * shrink to the size they land at: Motion moves their box, never stretches it.
+ */
+export const WORDS_SCALE = (16 + 14) / (19 + 15);
+
+/**
+ * How the card's parts travel back from the player: Motion's own default
+ * for a layout animation, which is what the card's box (`MediaAnchor`, no
+ * `transition` of its own) morphs back with, so they keep its pace.
+ */
+const CARD_MORPH: Transition = { duration: 0.45, ease: [0.4, 0, 0.1, 1] };
+
+/**
+ * A shared part of a pearl's audio face: the sleeve or the words, the same
+ * element to Motion in the card's bar and the viewer's player
+ * (`pearlPartLayoutId`), so it travels from one place to the other while the
+ * box morphs around it. `layoutDependency` follows the box's: a card's
+ * never changes (its re-renders never animate); the player's follows the
+ * viewer's Popup.
+ */
+export type AudioPart = {
+  layoutId: string;
+  layoutDependency: string;
+  /** The player's: the Popup's preset. The card's: `CARD_MORPH`. */
+  transition: Transition;
+};
+
+/** The part's Motion props: a shared layout element, or nothing at all. */
+function partProps(part: AudioPart | undefined, layout: true | "position") {
+  return part
+    ? {
+        layoutId: part.layoutId,
+        layoutDependency: part.layoutDependency,
+        layout,
+        layoutCrossfade: false,
+        transition: part.transition,
+      }
+    : {};
+}
 
 /** The owner's card: its checkbox on the sleeve, its menu after the words. */
 export type AudioBarOwner = {
@@ -122,6 +156,28 @@ export function AudioBar({
 }) {
   const { playing, toggle } = useAudioPlayer(link.id, link.duration);
   const reducedMotion = usePrefersReducedMotion();
+  // Once the viewer moves off this pearl, its parts step out of the morph
+  // until the viewer closes (remounted without their ids, `key`): Motion
+  // would otherwise hand them the lead when the player's parts slide away,
+  // inside a box it's hiding, and leave them drawn out of place. Back in
+  // (remounted with their ids) as the viewer closes: if it closes onto this
+  // pearl, they travel back from the player's like the first time.
+  const open = useIsMediaOpen(link.id);
+  const movedOff = useIsMediaMovedOff(link.id);
+  const [steppedOut, setSteppedOut] = useState(false);
+  if (anchored && movedOff && !steppedOut) setSteppedOut(true);
+  if (!open && steppedOut) setSteppedOut(false);
+  // The parts travel only out of the card the viewer opens from (a hover
+  // preview's bar is another view of the pearl, never a morph's end).
+  const partKey = steppedOut ? "out" : "in";
+  const part = (name: "sleeve" | "words"): AudioPart | undefined =>
+    anchored && !steppedOut
+      ? {
+          layoutId: pearlPartLayoutId(link.id, name),
+          layoutDependency: FACE_LAYOUT_DEPENDENCY,
+          transition: CARD_MORPH,
+        }
+      : undefined;
   const selecting = useIsSelectionActive();
   const src = safeRemoteImgSrc(link.url);
   const swapOut = owner ? sleeveSwapOut(selecting) : undefined;
@@ -141,11 +197,17 @@ export function AudioBar({
           className="flex h-full items-center gap-2.5 p-[10px] pb-7"
         >
           <AudioSleeve
+            key={`sleeve-${partKey}`}
             link={link}
             size={AUDIO_BAR.sleeve}
             radius={AUDIO_BAR.sleeveRadius}
-            // The mark takes the music note's place on the tint.
-            contentClassName={cn(swapOut, "[&>svg]:hidden")}
+            part={part("sleeve")}
+            contentClassName={swapOut}
+            // The mark takes the music note's place on the tint, except
+            // while the card morphs (the player's sleeve shows the note):
+            // the note, then the mark fading back once it has landed.
+            // (`invisible` too, at rest: it's not there, just under the mark.)
+            iconClassName="invisible opacity-0 transition-[opacity,visibility] duration-150 ease-out-strong [[data-pearl-morphing]_&]:visible [[data-pearl-morphing]_&]:opacity-100"
           >
             {/* The sleeve is the play button: the mark on its tint, or on a
                 scrim over its image; 44px to the touch. Above the menu and
@@ -159,12 +221,14 @@ export function AudioBar({
               aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
               aria-describedby={describedBy}
               className={cn(
-                "absolute inset-0 z-[3] flex cursor-pointer items-center justify-center text-foreground outline-none transition-[opacity,scale] duration-150 ease-out-strong focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100 [-webkit-touch-callout:none] pointer-coarse:after:absolute pointer-coarse:after:-inset-[2px]",
+                "absolute inset-0 z-[3] flex cursor-pointer items-center justify-center rounded-[inherit] text-foreground outline-none transition-[opacity,scale] duration-150 ease-out-strong focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100 [-webkit-touch-callout:none] pointer-coarse:after:absolute pointer-coarse:after:-inset-[2px]",
                 image && "bg-background/60",
                 selecting ? "pointer-events-none" : "pointer-events-auto",
+                // The mark and its scrim are the card's: they're gone while
+                // it morphs, and fade back once it has landed.
+                "[[data-pearl-morphing]_&]:opacity-0",
                 swapOut,
               )}
-              style={{ borderRadius: AUDIO_BAR.sleeveRadius }}
               onClick={(event) => {
                 keepClick(event);
                 if (owner?.consumeLongPress()) return;
@@ -216,7 +280,7 @@ export function AudioBar({
               </>
             ) : null}
           </AudioSleeve>
-          <div data-words className="flex min-w-0 flex-1 flex-col">
+          <AudioWords key={`words-${partKey}`} part={part("words")} from={1 / WORDS_SCALE}>
             <span className="truncate text-[13px] leading-4 font-medium text-foreground">
               {link.title}
             </span>
@@ -232,7 +296,7 @@ export function AudioBar({
                 secondLine
               )}
             </span>
-          </div>
+          </AudioWords>
           {owner ? (
             // Its own 32px slot, always there, so nothing reflows when the
             // menu shows (the card reveals it: on hover, always on touch).
@@ -246,12 +310,15 @@ export function AudioBar({
             </div>
           ) : null}
         </div>
-        {/* `data-card-menu`: a press on the track isn't the card's long-press. */}
+        {/* `data-card-menu`: a press on the track isn't the card's
+            long-press. The track stays at the foot here and lands under the
+            words in the player, so it doesn't travel: it's gone while the
+            card morphs. */}
         <div
           data-card-menu=""
           inert={selecting}
           className={cn(
-            "absolute inset-x-[10px] bottom-[10px] z-[1]",
+            "absolute inset-x-[10px] bottom-[10px] z-[1] transition-opacity duration-150 ease-out-strong [[data-pearl-morphing]_&]:opacity-0",
             selecting ? "pointer-events-none" : "pointer-events-auto",
           )}
           onClick={keepClick}
@@ -327,42 +394,92 @@ export function AudioTrack({
 }
 
 /**
+ * The words: the title over its second line, beside the sleeve. As a shared
+ * part they travel by position only (`layout="position"`: a box that changes
+ * width would stretch the text) and their text scales from the size it left
+ * (`from`, uniform) to its own as they go, so 13px grows to 15.5px rather
+ * than jumping.
+ */
+export function AudioWords({
+  part,
+  from,
+  className,
+  children,
+}: {
+  part?: AudioPart;
+  /** The text's scale when the travel starts (the size it leaves at, over its own). */
+  from: number;
+  className?: string;
+  children: ReactNode;
+}) {
+  const scale = useMotionValue(1);
+  return (
+    <m.div
+      data-words=""
+      {...partProps(part, "position")}
+      onLayoutAnimationStart={() => {
+        if (!part) return;
+        scale.set(from);
+        animate(scale, 1, part.transition);
+      }}
+      className={cn("flex min-w-0 flex-1 flex-col", className)}
+    >
+      {/* The scale is its own element's: on the travelling one, Motion
+          would fold it into its projection. */}
+      <m.div className="flex min-w-0 flex-col" style={{ scale, originX: 0, originY: 0 }}>
+        {children}
+      </m.div>
+    </m.div>
+  );
+}
+
+/**
  * The pearl's sleeve: its page's image (`thumbnail`) when it has one, else
  * the Reicon music icon on `bg-muted` (never generated art). `children`
- * lie over it (the owner's checkbox, the folder badge); the content swaps
- * out under `contentClassName`.
+ * lie over it (the owner's checkbox, the folder badge, the play mark); the
+ * content swaps out under `contentClassName`. As a shared part (`part`) it
+ * travels between the card's bar and the viewer's player, 40 to 64, its
+ * corners (set inline, so Motion corrects them; the content inherits them)
+ * 6 to 12; `onTravel` is told when it starts.
  */
 export function AudioSleeve({
   link,
   size,
   radius,
+  part,
+  onTravel,
   children,
   contentClassName,
+  iconClassName,
 }: {
   link: Pick<Link, "thumbnail">;
   size: 40 | 64;
   radius: 6 | 12;
+  part?: AudioPart;
+  onTravel?: () => void;
   children?: ReactNode;
   contentClassName?: string;
+  /** The music note's (shown when there's no image). */
+  iconClassName?: string;
 }) {
   const src = link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const image = src !== null && failedSrc !== src;
 
   return (
-    <div
+    <m.div
       data-sleeve={image ? "image" : "icon"}
+      {...partProps(part, true)}
+      onLayoutAnimationStart={part ? onTravel : undefined}
       className="relative shrink-0"
-      style={{ width: size, height: size }}
+      style={{ width: size, height: size, borderRadius: radius }}
     >
       <div
         data-sleeve-content=""
         className={cn(
-          "absolute inset-0 flex items-center justify-center overflow-hidden bg-muted text-muted-foreground transition-[opacity,scale] duration-150 ease-out-strong",
+          "absolute inset-0 flex items-center justify-center overflow-hidden rounded-[inherit] bg-muted text-muted-foreground transition-[opacity,scale] duration-150 ease-out-strong",
           contentClassName,
         )}
-        // Inline, so Motion can keep the corners round while it scales.
-        style={{ borderRadius: radius }}
       >
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element -- user-controlled media URLs; avoid next/image optimizer SSRF
@@ -380,10 +497,13 @@ export function AudioSleeve({
             onError={() => setFailedSrc(src)}
           />
         ) : (
-          <MusicNote aria-hidden className={size === 64 ? "size-7" : "size-5"} />
+          <MusicNote
+            aria-hidden
+            className={cn(size === 64 ? "size-7" : "size-5", iconClassName)}
+          />
         )}
       </div>
       {children}
-    </div>
+    </m.div>
   );
 }

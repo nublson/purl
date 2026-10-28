@@ -216,6 +216,109 @@ function sampleInlineSizes(page: Page, count: number) {
   );
 }
 
+/** One frame of the audio morph: the dialog's sleeve and words as drawn. */
+type MorphFrame = {
+  t: number;
+  sleeve: { x: number; y: number; w: number; h: number; transform: string } | null;
+  words: { x: number; y: number; w: number; h: number } | null;
+};
+
+/**
+ * Starts recording, on every frame for the next `ms`, where the dialog's
+ * sleeve and words are drawn (and the sleeve's inline transform: Motion's
+ * projection). Read the frames with `readMorphFrames` once it's done.
+ */
+async function startMorphFrames(page: Page, ms: number) {
+  await page.evaluate((ms) => {
+    const w = window as unknown as { __morph: unknown[] };
+    w.__morph = [];
+    const t0 = performance.now();
+    const tick = () => {
+      const popup = document.querySelector<HTMLElement>("[data-media-viewer]");
+      const sleeve = popup?.querySelector<HTMLElement>("[data-sleeve]") ?? null;
+      const words = popup?.querySelector<HTMLElement>("[data-words]") ?? null;
+      const box = (el: HTMLElement) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.x, y: r.y, w: r.width, h: r.height };
+      };
+      w.__morph.push({
+        t: performance.now() - t0,
+        sleeve: sleeve ? { ...box(sleeve), transform: sleeve.style.transform } : null,
+        words: words ? box(words) : null,
+      });
+      if (performance.now() - t0 < ms) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, ms);
+}
+
+async function readMorphFrames(page: Page, ms: number): Promise<MorphFrame[]> {
+  await page.waitForTimeout(ms + 100);
+  return page.evaluate(
+    () => (window as unknown as { __morph: MorphFrame[] }).__morph,
+  );
+}
+
+/** A transform Motion leaves when it's done (or never wrote). */
+const restingTransform = (transform: string) =>
+  transform === "" || transform === "none";
+
+/**
+ * After the morph: the dialog's sleeve is 64 square, untransformed, the
+ * words beside it, and what only the player has (the track, the times, the
+ * transport) fully shown.
+ */
+async function expectPlayerSettled(page: Page) {
+  const dialog = page.getByRole("dialog", { name: "Song" });
+  const player = dialog.locator('[data-viewer-media="audio"]');
+  await expect
+    .poll(() =>
+      player.evaluate((root) => {
+        const sleeve = root.querySelector<HTMLElement>("[data-sleeve]")!;
+        const s = sleeve.getBoundingClientRect();
+        const words = root.querySelector<HTMLElement>("[data-words]")!.getBoundingClientRect();
+        const late = [...root.querySelectorAll<HTMLElement>("[data-late]")].map((el) =>
+          Number(getComputedStyle(el).opacity),
+        );
+        return {
+          w: Math.round(s.width),
+          h: Math.round(s.height),
+          transform: sleeve.style.transform || "none",
+          beside: words.left >= s.right && words.top < s.bottom && words.bottom > s.top,
+          late: late.length >= 3 && late.every((o) => o === 1),
+        };
+      }),
+    )
+    .toEqual({ w: 64, h: 64, transform: "none", beside: true, late: true });
+  await expect(dialog.getByRole("button", { name: "Play Song" })).toBeVisible();
+}
+
+/**
+ * After closing: the card's sleeve is back in its place (the bar's 10px
+ * margin), 40 square, untransformed, its mark shown.
+ */
+async function expectCardSleeveBack(card: Locator) {
+  await expect
+    .poll(() =>
+      card.evaluate((root) => {
+        const bar = root.querySelector<HTMLElement>('[data-face="audio"]')!.getBoundingClientRect();
+        const sleeve = root.querySelector<HTMLElement>("[data-sleeve]")!;
+        const s = sleeve.getBoundingClientRect();
+        const play = root.querySelector<HTMLElement>("[data-play]")!;
+        return {
+          x: Math.round(s.left - bar.left),
+          y: Math.round(s.top - bar.top),
+          w: Math.round(s.width),
+          h: Math.round(s.height),
+          transform: sleeve.style.transform || "none",
+          visible: getComputedStyle(sleeve).visibility === "visible",
+          mark: getComputedStyle(play).opacity === "1",
+        };
+      }),
+    )
+    .toEqual({ x: 10, y: 10, w: 40, h: 40, transform: "none", visible: true, mark: true });
+}
+
 /** The viewer's live region (the dialog's own; announced on each move). */
 const viewerStatus = (page: Page) =>
   page.locator("[data-media-viewer] [data-viewer-status]");
@@ -688,6 +791,105 @@ test.describe("Media viewer", () => {
       );
     expect(transforms).toEqual(["rotate(0deg) scale(1, 1)"]);
     await expect(dialog.getByRole("button", { name: "Pause Song" })).toBeVisible();
+  });
+
+  test("an audio card's sleeve and words travel into the player, and back on Esc", async ({
+    page,
+    seed,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await seedUploadedSong(seed);
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(1);
+    const card = cards(page).first();
+
+    await startMorphFrames(page, 600);
+    await openAudioCard(page, card);
+    const frames = (await readMorphFrames(page, 600)).filter((f) => f.sleeve);
+    expect(frames.length).toBeGreaterThan(3);
+    // The first ~150ms: Motion carries the sleeve (an inline transform), and
+    // it grows from the card's 40 toward the player's 64, never back.
+    const early = frames.filter((f) => f.t - frames[0].t <= 150);
+    expect(early.length, JSON.stringify(frames)).toBeGreaterThan(1);
+    expect(early.some((f) => !restingTransform(f.sleeve!.transform)), JSON.stringify(early)).toBe(
+      true,
+    );
+    expect(Math.abs(early[0].sleeve!.w - 40), JSON.stringify(early)).toBeLessThanOrEqual(4);
+    for (let i = 1; i < frames.length; i++) {
+      expect(frames[i].sleeve!.w, JSON.stringify(frames)).toBeGreaterThanOrEqual(
+        frames[i - 1].sleeve!.w - 0.5,
+      );
+    }
+    await expectPlayerSettled(page);
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expectCardSleeveBack(card);
+  });
+
+  test("with reduced motion the sleeve never travels, and both ends are the same", async ({
+    page,
+    seed,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await seedUploadedSong(seed);
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(1);
+    const card = cards(page).first();
+
+    await startMorphFrames(page, 400);
+    await openAudioCard(page, card);
+    const frames = (await readMorphFrames(page, 400)).filter((f) => f.sleeve);
+    expect(frames.length).toBeGreaterThan(3);
+    expect(frames.every((f) => restingTransform(f.sleeve!.transform)), JSON.stringify(frames)).toBe(
+      true,
+    );
+    await expectPlayerSettled(page);
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expectCardSleeveBack(card);
+  });
+
+  test("after moving off an audio pearl, its card's sleeve stays in place, wherever the viewer closes", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await seedAudioBetween(seed, baseURL!);
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(3);
+    const song = cards(page).filter({ has: page.locator('[data-face="audio"]') });
+
+    // Onto the image after it, and closed there: the audio card wasn't
+    // the morph's end, and its sleeve is where it was.
+    await openAudioCard(page, song);
+    await expectPlayerSettled(page);
+    // The buttons, not the keys: focus may still be on its way back from
+    // the account menu.
+    const next = page.getByRole("button", { name: "Next pearl" });
+    const previous = page.getByRole("button", { name: "Previous pearl" });
+    await next.click();
+    await expect(page.getByRole("dialog", { name: "Shot C" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expectCardSleeveBack(song);
+
+    // Off and back, then closed: the sleeve travels back into its card.
+    await openAudioCard(page, song);
+    await expectPlayerSettled(page);
+    await previous.click();
+    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
+    await next.click();
+    await expect(page.getByRole("dialog", { name: "Song" })).toBeVisible();
+    await expectSlideSettled(page);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+    await expectCardSleeveBack(song);
   });
 
   test("an image row opens the viewer; Esc gives focus back to the row", async ({

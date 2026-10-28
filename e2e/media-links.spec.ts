@@ -82,7 +82,7 @@ async function clickAt(page: Page, target: Locator) {
 /** The bar's second line as shown (under 200px an upload's is just its length). */
 function secondLine(scope: Locator) {
   return scope
-    .locator("[data-words] > :nth-child(2)")
+    .locator("[data-words] > * > :nth-child(2)")
     .evaluate((el) => (el as HTMLElement).innerText.trim());
 }
 
@@ -515,7 +515,7 @@ test.describe("Audio pearls on a phone", () => {
     expect((await song.boundingBox())!.width).toBeLessThanOrEqual(175);
     // Under 200px a link's second line stays its domain.
     expect(await secondLine(cards(page).filter({ hasText: "Birds" }))).toBe("birds.example");
-    const title = song.locator("[data-words] > :first-child");
+    const title = song.locator("[data-words] > * > :first-child");
     expect(await title.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
     expect(await secondLine(song)).toBe("2:36");
     await expect(song.getByRole("button", { name: "Open link menu" })).toBeVisible();

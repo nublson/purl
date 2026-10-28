@@ -289,6 +289,18 @@ export function useMediaViewer(): MediaViewerView {
 }
 
 /**
+ * Whether the viewer opened from `id` and has moved on to another pearl
+ * (it's still open); a card re-renders only when its own answer flips.
+ */
+export function useIsMediaMovedOff(id: string): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => state.openedId === id && state.currentId !== null && state.currentId !== id,
+    () => false,
+  );
+}
+
+/**
  * Whether `id` is the pearl the viewer opened from or is showing; a card
  * re-renders only when its own answer flips.
  */

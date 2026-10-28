@@ -35,6 +35,7 @@ import {
   type ViewerMove,
 } from "./media-viewer-nav";
 import {
+  DialogPresence,
   MAX_HEIGHT,
   MAX_WIDTH,
   ViewerMedia,
@@ -181,6 +182,12 @@ export function MediaViewer() {
     }
   }, [closed]);
 
+  // Moving between pearls never morphs the box through Motion's layout
+  // animation (that would stretch the sliding media); the box resizes with
+  // the slide instead (`useBoxResize`).
+  const popupDependency =
+    closing && closing.step !== "ready" ? FACE_LAYOUT_DEPENDENCY : VIEWER_LAYOUT_DEPENDENCY;
+
   // Moving between pearls (keys, buttons, swipes). The status says where
   // it went from the first move on (opening reads the dialog itself).
   const [moved, setMoved] = useState(false);
@@ -270,12 +277,7 @@ export function MediaViewer() {
           hidden={false}
           initialFocus={mediaRef}
           finalFocus={finalFocus}
-          // Moving between pearls never morphs the box through Motion's
-          // layout animation (that would stretch the sliding media); the
-          // box resizes with the slide instead (`useBoxResize`).
-          layoutDependency={
-            closing && closing.step !== "ready" ? FACE_LAYOUT_DEPENDENCY : VIEWER_LAYOUT_DEPENDENCY
-          }
+          layoutDependency={popupDependency}
           className="group/viewer z-50 flex w-max items-center justify-center overflow-hidden bg-card outline-none data-closed:pointer-events-none"
           style={{
             top: CENTER_TOP,
@@ -286,7 +288,7 @@ export function MediaViewer() {
           }}
         >
           {current ? (
-            <>
+            <DialogPresence>
               <Cambio.Title className="sr-only">{current.title}</Cambio.Title>
               <Cambio.Description className="sr-only">
                 {linkSecondLine(current)}
@@ -308,6 +310,18 @@ export function MediaViewer() {
                     link={current}
                     ready={ready}
                     roomForArrows={hasPrev || hasNext}
+                    // An audio pearl's sleeve and words travel with the
+                    // box: only the pearl the Popup morphs for, and only
+                    // with its dependency (`ViewerAudio`).
+                    morph={
+                      current.id === lastAnchor
+                        ? {
+                            dependency: popupDependency,
+                            opening: !moved && !closing,
+                            preset: openedPreset,
+                          }
+                        : null
+                    }
                   />
                 </ViewerStage>
               </div>
@@ -315,7 +329,7 @@ export function MediaViewer() {
               <Cambio.Close aria-label="Close" className={cn(VIEWER_BUTTON, "top-2 right-2")}>
                 <X className="size-4" aria-hidden />
               </Cambio.Close>
-            </>
+            </DialogPresence>
           ) : null}
         </Cambio.Popup>
       </Cambio.Portal>

@@ -1,7 +1,7 @@
 "use client";
 
 import { EASE_OUT_STRONG } from "@/lib/motion";
-import { loadMotionFeatures } from "@/lib/motion-features-loader";
+import motionFeatures from "@/lib/motion-features";
 import { cn } from "@/lib/utils";
 import { decideDrag, type DragOutcome } from "@/lib/viewer-drag";
 import {
@@ -162,8 +162,12 @@ export function ViewerStage({
     setShown({ id, index, direction: index >= shown.index ? 1 : -1 });
   }
 
+  // Its features synchronously (the viewer is its own chunk, loaded after
+  // the page's, so they're there already): with `loadMotionFeatures` the
+  // slide's contents would get Motion a render after the Popup mounts, too
+  // late for an audio player's sleeve and words to join the open's morph.
   return (
-    <LazyMotion features={loadMotionFeatures} strict>
+    <LazyMotion features={motionFeatures} strict>
       <AnimatePresence initial={false} mode="popLayout" custom={shown.direction}>
         <ViewerSlide
           key={id}
