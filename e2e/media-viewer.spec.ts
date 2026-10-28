@@ -173,6 +173,31 @@ function sampleDrawnHeights(page: Page, count: number) {
   );
 }
 
+/**
+ * The viewer box's size as each frame over the next `ms` draws it (a
+ * ResizeObserver, as in `sampleDrawnHeights`). The first entry is the box
+ * before the move.
+ */
+function sampleDrawnSizes(page: Page, ms: number) {
+  return page.evaluate(
+    (ms) =>
+      new Promise<{ width: number; height: number }[]>((resolve) => {
+        const popup = document.querySelector<HTMLElement>("[data-media-viewer]")!;
+        const seen: { width: number; height: number }[] = [];
+        const observer = new ResizeObserver(() => {
+          const rect = popup.getBoundingClientRect();
+          seen.push({ width: rect.width, height: rect.height });
+        });
+        observer.observe(popup);
+        setTimeout(() => {
+          observer.disconnect();
+          resolve(seen);
+        }, ms);
+      }),
+    ms,
+  );
+}
+
 /** The viewer box's inline size (`style.width` + `style.height`) on each of the next `count` frames. */
 function sampleInlineSizes(page: Page, count: number) {
   return page.evaluate(
@@ -823,6 +848,70 @@ test.describe("Media viewer", () => {
     await expect
       .poll(() => popup.evaluate((el) => el.style.width + el.style.height), { timeout: 500 })
       .toBe("");
+  });
+
+  test("moving to an image with no stored size holds the box until it has one, then resizes", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    // The unsized image (1024×1024, drawn at 688×688) is held back until
+    // after the move, so the viewer's image has no size when the move
+    // commits; the card asks for the same file and waits too.
+    const loose = `${baseURL}/apple-icon.png?u=1`;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/apple-icon.png?u=1", async (route) => {
+      const response = await route.fetch();
+      const body = await response.body();
+      await held;
+      await route.fulfill({ status: 200, body, headers: { "content-type": "image/png" } });
+    });
+    await seed.link({ url: loose, title: "Loose", contentType: "IMAGE" });
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    await seed.link({
+      url: `${baseURL}/icon.png?t=1`,
+      title: "Tall",
+      contentType: "IMAGE",
+      thumbnail: `${baseURL}/icon.png`,
+      width: 500,
+      height: 800,
+    });
+    // Not `openHome`: the held image keeps the network busy.
+    await page.goto("/home", { waitUntil: "domcontentloaded" });
+    await waitForHydration(page, '[data-cy="link-item"], [data-cy="link-card"]');
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(2);
+
+    await openButton(page, "Tall").click();
+    const popup = page.locator("[data-media-viewer]");
+    await expect(popup.locator('img[src$="?t=1"]')).toHaveAttribute("alt", "Tall");
+
+    const sizes = sampleDrawnSizes(page, 900);
+    await page.keyboard.press("End");
+    await expect(page.getByRole("dialog", { name: "Loose" })).toBeVisible();
+    await page.waitForTimeout(300);
+    release();
+    const seen = await sizes;
+    await expect
+      .poll(() => popup.evaluate((el) => el.style.width + el.style.height), { timeout: 1500 })
+      .toBe("");
+    const end = await popup.evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    });
+    const start = seen[0];
+    const log = JSON.stringify({ seen, end });
+    // Never collapsing towards nothing while the image is on its way.
+    for (const size of seen) {
+      expect(size.width, log).toBeGreaterThanOrEqual(Math.min(start.width, end.width) - 1);
+      expect(size.height, log).toBeGreaterThanOrEqual(Math.min(start.height, end.height) - 1);
+    }
+    // It grows into the loaded image's size, and that's where it ends.
+    expect(end.width, log).toBeGreaterThan(start.width + 1);
+    const last = seen[seen.length - 1];
+    expect(Math.abs(last.width - end.width), log).toBeLessThan(1);
+    expect(Math.abs(last.height - end.height), log).toBeLessThan(1);
   });
 
   test("with reduced motion, moving to a pearl of another size doesn't animate the box", async ({
