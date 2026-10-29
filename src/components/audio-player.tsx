@@ -1,6 +1,6 @@
 "use client";
 
-import { useAudioPlayer, useAudioView } from "@/hooks/use-audio-player";
+import { useAudioPlayer } from "@/hooks/use-audio-player";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { linkSecondLine } from "@/lib/upload-meta";
@@ -15,6 +15,7 @@ import {
   type Ref,
 } from "react";
 import { Export5, MusicNote, Restart } from "reicon-react";
+import { EqualizerBars } from "./equalizer-bars";
 import { PlayMark } from "./play-mark";
 
 /**
@@ -53,8 +54,12 @@ const FADE = {
  * `object-cover`; without one, or if it fails, the music icon at 48px on
  * the muted tint), fading into the surface under it so the words sit on a
  * near-solid foot; over it, the title (two lines at most, the whole of it
- * on hover) and the second line (`linkSecondLine`: the times row below is
- * the clock). Under it, 16px in: the track (a scrubber), the elapsed and
+ * on hover) and, for a link, its domain (an upload has no second line: the
+ * hero and the times row already say it's audio and how long). While it
+ * plays, the playing bars sit in the hero's top-left corner, where the
+ * owner's checkbox shows on hover (`indicatorClassName` hides them then).
+ * A press on the hero plays and pauses, as on a list row (a pointer
+ * shortcut for the transport's Play, which keyboards reach). Under it, 16px in: the track (a scrubber), the elapsed and
  * the length, and the transport centred (Restart, Play/Pause, Open file),
  * 16px under it. A size container: on a narrow card the transport's gaps
  * close up, and under 122px Restart goes (the track seeks back to 0).
@@ -62,7 +67,8 @@ const FADE = {
  * A view of the page's one player: every view of a pearl (its card, its
  * row, its preview) shows and drives the same `<audio>`. The controls are
  * `data-card-menu`, so a press on them isn't the owner's card's
- * long-press; `inert` (while selecting) steps them aside.
+ * long-press; `inert` (while selecting) steps them and the hero's press
+ * aside.
  */
 export function AudioPlayer({
   link,
@@ -70,6 +76,8 @@ export function AudioPlayer({
   badge,
   inert = false,
   playRef,
+  consumePress,
+  indicatorClassName,
 }: {
   link: Link;
   /** What it sits on: the hero fades into it. */
@@ -80,11 +88,27 @@ export function AudioPlayer({
   inert?: boolean;
   /** The Play button (the owner's card's focus anchor). */
   playRef?: Ref<HTMLButtonElement>;
+  /** True once when this press ends a long-press (which already selected). */
+  consumePress?: () => boolean;
+  /** The playing bars' extra classes (the owner's card hides them on hover). */
+  indicatorClassName?: string;
 }) {
-  useAudioView(link.id);
+  const { playing, toggle } = useAudioPlayer(link.id, link.duration);
+  const src = safeRemoteImgSrc(link.url);
   return (
     <div data-face="audio" className="flex flex-col">
-      <div className="relative h-[180px] w-full shrink-0 overflow-hidden rounded-t-lg">
+      <div
+        data-hero-press={src && !inert ? "" : undefined}
+        className={cn(
+          "relative h-[180px] w-full shrink-0 overflow-hidden rounded-t-lg",
+          src && !inert ? "pointer-events-auto cursor-pointer" : "pointer-events-none",
+        )}
+        onClick={(event) => {
+          if (consumePress?.()) return;
+          keepAudioClick(event);
+          if (src) toggle(src);
+        }}
+      >
         <AudioHero link={link} />
         {/* The fade: over the hero's lower 120px, already 90% surface by
             the top of a two-line title (35%, 102px down) and solid at the
@@ -100,6 +124,19 @@ export function AudioPlayer({
           // The badge hangs 4px off its box's bottom-end corner.
           <span className="pointer-events-none absolute top-3 left-3 size-1">{badge}</span>
         ) : null}
+        {playing ? (
+          // On the menu button's backing, centred where the checkbox is
+          // (16px in), so the swap on hover doesn't move the corner.
+          <span
+            data-playing=""
+            className={cn(
+              "pointer-events-none absolute top-1 left-1 flex size-6 items-center justify-center rounded-md bg-background/80 text-foreground backdrop-blur-sm transition-opacity duration-150 ease-out-strong",
+              indicatorClassName,
+            )}
+          >
+            <EqualizerBars className="size-4" />
+          </span>
+        ) : null}
         <div className="absolute inset-x-0 bottom-0 flex min-w-0 flex-col p-4">
           <p
             title={link.title}
@@ -109,9 +146,11 @@ export function AudioPlayer({
           </p>
           {/* `text-foreground/70`: the muted pair is under 4.5:1 for small
               text. */}
-          <p className="truncate text-[13px] leading-[1.385] text-foreground/70">
-            {linkSecondLine(link)}
-          </p>
+          {link.upload ? null : (
+            <p className="truncate text-[13px] leading-[1.385] text-foreground/70">
+              {linkSecondLine(link)}
+            </p>
+          )}
         </div>
       </div>
       <div

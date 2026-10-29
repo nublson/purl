@@ -7,6 +7,7 @@ import { linkSecondLine } from "@/lib/upload-meta";
 import { formatDuration } from "@/utils/format-duration";
 import type { Link } from "@/utils/links";
 import * as React from "react";
+import { EqualizerBars } from "./equalizer-bars";
 import { PlayMark } from "./play-mark";
 
 /**
@@ -62,9 +63,9 @@ export function AudioRowSecondLine({ link }: { link: Link }) {
 
 /**
  * An audio row's icon slot: the icon (`children`) at rest; while the pearl
- * is loaded (playing or paused), the drawn play/pause mark in its place, at
- * the slot's size (20px, 24px on phones) in the icon's color (playing: the
- * pause shape). Decorative (`data-row-mark`): the row's button says it.
+ * plays, the playing bars in its place, and while it's loaded but paused,
+ * the drawn play mark, both at the slot's size (20px, 24px on phones) in
+ * the icon's color. Decorative (`data-row-mark`): the row's button says it.
  */
 export function AudioRowIcon({
   link,
@@ -78,11 +79,15 @@ export function AudioRowIcon({
   if (!active) return <>{children}</>;
   return (
     <span
-      data-row-mark={playing ? "pause" : "play"}
+      data-row-mark={playing ? "playing" : "play"}
       aria-hidden
       className="flex size-5 shrink-0 items-center justify-center max-md:size-6 [&>svg]:size-full"
     >
-      <PlayMark playing={playing} size={24} reducedMotion={reducedMotion} />
+      {playing ? (
+        <EqualizerBars className="size-full" />
+      ) : (
+        <PlayMark playing={false} size={24} reducedMotion={reducedMotion} />
+      )}
     </span>
   );
 }

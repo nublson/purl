@@ -29,7 +29,7 @@ import {
 import { AudioPlayer } from "./audio-player";
 import { HapticTarget } from "./haptic-target";
 import { MediaOpenButton } from "./media-open-button";
-import { CARD_FRAME, LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
+import { AUDIO_CARD_FRAME, LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
 import { Checkbox } from "./ui/checkbox";
 
 // Loaded on demand, like the rows' menu.
@@ -147,7 +147,7 @@ export function LinkCard({
       data-cy="link-card"
       data-selected={selected || undefined}
       className={cn(
-        audio ? CARD_FRAME : LINK_CARD_FRAME,
+        audio ? AUDIO_CARD_FRAME : LINK_CARD_FRAME,
         // The opener (below, a direct child) is the focus target: its ring
         // is the card's. Not any link inside: the audio transport's Open
         // file and the folder button ring themselves.
@@ -237,6 +237,17 @@ export function LinkCard({
             badge={badge}
             inert={selecting}
             playRef={demo ? undefined : setAnchor}
+            consumePress={consumeLongPress}
+            // The checkbox takes the corner on hover, on its keyboard focus
+            // and while selecting (the demo has none).
+            indicatorClassName={
+              demo
+                ? undefined
+                : cn(
+                    selecting && "opacity-0",
+                    "[@media(hover:hover)]:group-hover/card:opacity-0 group-has-[[role=checkbox]:focus-visible]/card:opacity-0",
+                  )
+            }
           />
         ) : (
           <LinkCardContent

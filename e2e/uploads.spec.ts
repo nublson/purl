@@ -32,14 +32,11 @@ async function noisePng(): Promise<Buffer> {
 }
 
 async function chooseGrid(page: Page) {
-  await page.getByRole("button", { name: "Account menu" }).click();
-  await page.getByRole("menuitem", { name: "View mode" }).click();
   const saved = page.waitForResponse(
     (res) => res.url().endsWith("/api/user/layout") && res.request().method() === "PATCH",
   );
-  await page.getByRole("menuitemradio", { name: "Grid" }).click();
+  await page.getByRole("button", { name: "Grid view" }).click();
   expect((await saved).ok()).toBe(true);
-  await page.keyboard.press("Escape");
 }
 
 async function openHomeInGrid(page: Page) {

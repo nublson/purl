@@ -250,8 +250,8 @@ test.describe("Landing demo", () => {
           "true",
         );
       }
-      await menu.getByRole("menuitem", { name: "View mode" }).click();
-      await page.getByRole("menuitemradio", { name: "Grid" }).click();
+      await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: "Grid view" }).click();
 
       await expect(page.locator('[data-cy="link-card"]')).toHaveCount(4);
       expect(apiRequests.filter((url) => url.includes("/api/user/layout"))).toEqual([]);

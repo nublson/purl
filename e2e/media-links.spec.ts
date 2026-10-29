@@ -28,19 +28,12 @@ async function openHome(page: Page) {
   await page.waitForLoadState("networkidle");
 }
 
-/** The user menu's "View mode", opened to its List / Grid choices. */
-async function openViewMode(page: Page) {
-  await page.getByRole("button", { name: "Account menu" }).click();
-  await page.getByRole("menuitem", { name: "View mode" }).click();
-}
-
+/** The header's List / Grid switch, waiting for the choice to be saved. */
 async function chooseView(page: Page, view: "List" | "Grid") {
-  await openViewMode(page);
-  const item = page.getByRole("menuitemradio", { name: view });
   const saved = page.waitForResponse(
     (res) => res.url().endsWith("/api/user/layout") && res.request().method() === "PATCH",
   );
-  await item.click();
+  await page.getByRole("button", { name: `${view} view` }).click();
   expect((await saved).ok()).toBe(true);
 }
 
@@ -371,7 +364,10 @@ test.describe("Audio pearls: the grid card is the player card", () => {
     await expect(iconHero).toBeVisible();
     expect(Math.abs((await iconHero.boundingBox())!.height - 180)).toBeLessThanOrEqual(0.5);
     await expect(birds.locator('img[data-hero="image"]')).toBeVisible();
-    await expect(song).toContainText("Audio · 2:36");
+    // An upload has no second line (the times row says how long); a
+    // link's is its domain.
+    await expect(song).not.toContainText("Audio ·");
+    await expect(birds).toContainText("birds.example");
     await expect(song.locator("[data-times] [data-elapsed]")).toHaveText("0:00");
     await expect(song.locator("[data-times] [data-length]")).toHaveText("2:36");
     await expect(song.getByRole("button", { name: "Restart Song" })).toBeDisabled();
@@ -430,6 +426,36 @@ test.describe("Audio pearls: the grid card is the player card", () => {
     expect(await insideBox(checkbox, hero)).toBe(true);
     await song.getByRole("button", { name: "Open link menu" }).click();
     await expect(page.getByRole("menuitem", { name: "Open file" })).toBeVisible();
+  });
+
+  test("a press on the hero plays and pauses; while it plays the bars hold the checkbox's corner", async ({
+    page,
+    seed,
+  }) => {
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
+    await seedSong(seed);
+    await openHome(page);
+    await chooseView(page, "Grid");
+
+    const song = card(page, "Song");
+    const bars = song.locator("[data-playing]");
+    await expect(bars).toHaveCount(0);
+    await clickAt(page, song.locator("[data-hero]"));
+    await expect(song.getByRole("button", { name: "Pause Song" })).toBeVisible();
+    await expect(bars).toBeVisible();
+    // Bars have no action: on hover the checkbox takes the corner.
+    await page.mouse.move(0, 0);
+    await expect(bars).toHaveCSS("opacity", "1");
+    const hero = (await song.locator("[data-hero]").boundingBox())!;
+    await page.mouse.move(hero.x + hero.width / 2, hero.y + hero.height / 2);
+    await expect(bars).toHaveCSS("opacity", "0");
+    await expect(song.getByRole("checkbox", { name: "Select Song" })).toHaveCSS("opacity", "1");
+
+    await clickAt(page, song.locator("[data-hero]"));
+    await expect(song.getByRole("button", { name: "Play Song" })).toBeVisible();
+    await expect(bars).toHaveCount(0);
   });
 
   test("the hover preview and the card are one playback", async ({ page, seed }) => {
@@ -539,7 +565,7 @@ function rowSecondLine(scope: Locator) {
 
 /** The audio row's main element: the button that plays and pauses it. */
 const rowToggle = (scope: Locator) => scope.locator("[data-audio-toggle]");
-/** The play/pause mark drawn in the icon slot while the pearl is loaded. */
+/** The icon slot while the pearl is loaded: the playing bars, or the play mark while paused. */
 const rowMark = (scope: Locator) => scope.locator('[data-cy="row-favicon"] [data-row-mark]');
 
 test.describe("Audio pearls in the list: a row that plays", () => {
@@ -577,7 +603,7 @@ test.describe("Audio pearls in the list: a row that plays", () => {
     // shape while playing), and the second line counts.
     await clickAt(page, song.locator('[data-slot="item-title"]'));
     await expect(rowToggle(song)).toHaveAttribute("aria-label", "Pause Song");
-    await expect(rowMark(song)).toHaveAttribute("data-row-mark", "pause");
+    await expect(rowMark(song)).toHaveAttribute("data-row-mark", "playing");
     await page.mouse.move(0, 0);
     await expect(rowMark(song)).toBeVisible();
     // In the icon's place, at its size; one button per row.
@@ -752,7 +778,7 @@ test.describe("Audio pearls: the hover preview is a player card", () => {
       "https://sounds.example/birds.wav",
     );
 
-    // Song: no image, the icon hero; the upload's facts as its second line.
+    // Song: no image, the icon hero; an upload has no second line.
     await page.mouse.move(0, 0);
     await expect(audioPreview(page)).toHaveCount(0);
     await row(page, "Song").hover();
@@ -763,7 +789,7 @@ test.describe("Audio pearls: the hover preview is a player card", () => {
     await expect(song.locator('[data-hero="image"]')).toHaveCount(0);
     expect(Math.abs((await iconHero.boundingBox())!.height - 180)).toBeLessThanOrEqual(0.5);
     await expect(song).toContainText("Song");
-    await expect(song).toContainText("Audio · 2:36");
+    await expect(song).not.toContainText("Audio ·");
     await expect(song.getByRole("slider", { name: "Seek Song" })).toBeVisible();
     await expect(song.locator("[data-times] [data-elapsed]")).toHaveText("0:00");
     await expect(song.locator("[data-times] [data-length]")).toHaveText("2:36");
@@ -773,7 +799,7 @@ test.describe("Audio pearls: the hover preview is a player card", () => {
     // Its Play plays the row's pearl: one element, the row's mark shows.
     await song.getByRole("button", { name: "Play Song" }).click();
     await expect(song.getByRole("button", { name: "Pause Song" })).toBeVisible();
-    await expect(rowMark(row(page, "Song"))).toHaveAttribute("data-row-mark", "pause");
+    await expect(rowMark(row(page, "Song"))).toHaveAttribute("data-row-mark", "playing");
     expect(await page.evaluate(() => document.querySelectorAll("audio").length)).toBe(1);
     await expect(song.getByRole("button", { name: "Restart Song" })).toBeEnabled();
   });

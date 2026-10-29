@@ -13,14 +13,21 @@ import { Typography } from "./typography";
 
 /**
  * A link card's frame (the shared folder's and the owner's grid): rounded,
- * a hairline edge that firms up on hover. An audio card's frame as is: it
- * isn't pressed as a whole, its controls are.
+ * a hairline edge that firms up on hover.
  */
-export const CARD_FRAME =
+const CARD_FRAME =
   "flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 outline-none transition-[box-shadow,scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring [@media(hover:hover)]:hover:ring-foreground/25";
 
 /** A link card's frame, pressed to 0.98 (the whole card is its opener). */
 export const LINK_CARD_FRAME = `${CARD_FRAME} active:scale-[0.98] motion-reduce:active:scale-100`;
+
+/**
+ * An audio card's frame: pressed to 0.98 through its hero (which plays and
+ * pauses, `data-hero-press`) or, on the owner's card while selecting, its
+ * surface (`data-select-surface`), never through the transport or the
+ * track, which have their own press.
+ */
+export const AUDIO_CARD_FRAME = `${CARD_FRAME} has-[[data-hero-press]:active]:scale-[0.98] has-[[data-select-surface]:active]:scale-[0.98] motion-reduce:has-[[data-hero-press]:active]:scale-100 motion-reduce:has-[[data-select-surface]:active]:scale-100`;
 
 /**
  * A link in the shared folder's grid: the page's thumbnail full-bleed on
@@ -43,7 +50,7 @@ export function SharedLinkCard({
     // A frame around the player, whose controls are its own: an audio
     // pearl never opens the media viewer.
     return (
-      <div data-cy="link-card" className={CARD_FRAME}>
+      <div data-cy="link-card" className={AUDIO_CARD_FRAME}>
         <AudioPlayer link={link} surface="card" />
       </div>
     );

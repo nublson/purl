@@ -151,7 +151,7 @@ test.describe("Shared folders, visited signed out", () => {
     // The mark in the icon's place, and the second line counts.
     const mark = song.locator("[data-row-mark]");
     await expect(mark).toBeVisible();
-    await expect(mark).toHaveAttribute("data-row-mark", "pause");
+    await expect(mark).toHaveAttribute("data-row-mark", "playing");
     await expect(song.getByRole("button", { name: "Pause Song" })).toHaveCount(1);
     await expect
       .poll(() =>

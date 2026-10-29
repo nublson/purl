@@ -130,7 +130,7 @@ test.describe("Link rows on phones", () => {
     await expect(song).not.toHaveAttribute("data-selected");
     // The mark in the icon's place (24px on phones); the menu as before.
     const mark = song.locator('[data-cy="row-favicon"] [data-row-mark]');
-    await expect(mark).toHaveAttribute("data-row-mark", "pause");
+    await expect(mark).toHaveAttribute("data-row-mark", "playing");
     await expect(mark).toBeVisible();
     expect(await mark.evaluate((el: HTMLElement) => el.offsetWidth)).toBe(24);
     await expect(song.getByRole("button", { name: "Open link menu" })).toBeVisible();
