@@ -16,11 +16,14 @@ import { Typography } from "./typography";
 
 /**
  * The viewer's box: 16px from every edge, inside the safe areas (the
- * notch, the home indicator: `--bottom-inset`), 1200px at most.
+ * notch, the home indicator: `--bottom-inset`), 1200px wide at most. Never
+ * the screen's full height: 80% of it, 800px at most, so the page shows
+ * around it (and there's backdrop to press on, to close it).
  */
 export const MAX_WIDTH =
   "min(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right), 1200px)";
-export const MAX_HEIGHT = "calc(100dvh - 32px - env(safe-area-inset-top) - var(--bottom-inset))";
+export const MAX_HEIGHT =
+  "min(100dvh - 32px - env(safe-area-inset-top) - var(--bottom-inset), 80dvh, 800px)";
 
 /** The file to load ahead for a pearl (an image's original, a video's poster). */
 export function preloadSrc(link: Link | null | undefined): string | null {
