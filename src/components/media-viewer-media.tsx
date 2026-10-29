@@ -361,6 +361,8 @@ function ViewerEmbed({ link, ready }: { link: Link; ready: boolean }) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const framed = ready && !failed;
+  // A frame that unmounts starts over: the next one fades in on its own load.
+  if (!framed && loaded) setLoaded(false);
   useEmbedLoadTimeout(framed && !loaded, () => setFailed(true));
   const thumbnailSrc = link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
   const room = failed

@@ -128,14 +128,16 @@ export function PlayVideosMenuItem() {
  * The switch's look (ui/switch) without its button: the menu item is the
  * control, and a button can't sit inside it.
  */
-export function SwitchIndicator({ on }: { on: boolean }) {
+export function SwitchIndicator({ on, busy = false }: { on: boolean; busy?: boolean }) {
   return (
     <span
       aria-hidden
       data-state={on ? "checked" : "unchecked"}
+      data-busy={busy || undefined}
       className={cn(
-        "ms-auto inline-flex h-[18.4px] w-[32px] shrink-0 items-center rounded-full border border-transparent shadow-xs transition-[background-color] duration-150 ease-out-strong",
+        "ms-auto inline-flex h-[18.4px] w-[32px] shrink-0 items-center rounded-full border border-transparent shadow-xs transition-[background-color,opacity] duration-150 ease-out-strong",
         on ? "bg-primary" : "bg-input dark:bg-input/80",
+        busy && "opacity-50",
       )}
     >
       <span

@@ -93,7 +93,10 @@ export function EmbedFace({
   const inViewer = useIsMediaOpen(link.id);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const live = useLiveCards(boxRef, !coarse && !demo && !failed);
+  // No frame while the pearl is open in the viewer: the viewer frames its
+  // own copy (two would both run, a video's sound included); the anchor
+  // shows the preview through the morph back.
+  const live = useLiveCards(boxRef, !coarse && !demo && !failed && !inViewer);
   const framed = live && !failed;
   if (!framed && loaded) setLoaded(false);
 
@@ -116,9 +119,17 @@ export function EmbedFace({
     const card = box?.closest<HTMLElement>('[data-cy="link-card"]') ?? box;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
+      // Back on the cover, once it's shown again, but only when focus is
+      // still with the card (or nowhere): an Esc elsewhere leaves it be.
+      const focused = document.activeElement;
+      const refocus =
+        !focused ||
+        focused === document.body ||
+        (card !== null && card !== undefined && card.contains(focused));
       activeEmbed.clearIf(link.id);
-      // Back on the cover, once it's shown again.
-      requestAnimationFrame(() => coverRef.current?.focus({ preventScroll: true }));
+      if (refocus) {
+        requestAnimationFrame(() => coverRef.current?.focus({ preventScroll: true }));
+      }
     };
     const onPointerDown = (event: PointerEvent) => {
       if (card && event.target instanceof Node && card.contains(event.target)) return;

@@ -47,6 +47,39 @@ test.describe("Show live", () => {
     await expect(item).toHaveAttribute("aria-checked", "false");
   });
 
+  test("is busy while the check runs and ignores another toggle", async ({ page, seed }) => {
+    await seed.link({ url: "https://example.com", title: "Example" });
+    let patches = 0;
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route("**/api/links/*", async (route) => {
+      if (route.request().method() !== "PATCH") return route.fallback();
+      patches += 1;
+      await held;
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Couldn't reach this site", code: "UNREACHABLE" }),
+      });
+    });
+    await page.goto("/home");
+    await waitForHydration(page, '[aria-label="Open link menu"]');
+    await openMenu(page, "Example");
+    const item = page.getByRole("menuitemcheckbox", { name: "Show live" });
+    await item.click();
+    await expect(item).toHaveAttribute("aria-busy", "true");
+    await expect(item).toHaveAttribute("aria-checked", "true");
+    await item.click();
+    await expect(item).toHaveAttribute("aria-checked", "true");
+    expect(patches).toBe(1);
+
+    release();
+    await expect(page.getByText("Couldn't reach this site")).toBeVisible();
+    await expect(item).toHaveAttribute("aria-checked", "false");
+    await expect(item).not.toHaveAttribute("aria-busy", "true");
+    expect(patches).toBe(1);
+  });
+
   test("an image link has no Show live", async ({ page, seed }) => {
     await seed.link({
       url: "https://example.com/pic.png",
@@ -69,6 +102,12 @@ test.describe("Show live", () => {
 const LIVE_PAGE = `<!doctype html><html><body style="margin:0;height:100vh;display:grid;place-items:center">
 <button onclick="document.body.dataset.clicked = '1'">Inside</button>
 </body></html>`;
+
+/** A 1×1 PNG, for a live page's thumbnail. */
+const PIXEL_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64",
+);
 
 /** Serves https://live.example/* with a small page holding an "Inside" button. */
 async function serveLivePage(page: Page) {
@@ -184,6 +223,27 @@ test.describe("Live grid cards", () => {
     await expect(page).toHaveURL(/[?&]pearl=/);
   });
 
+  test("the card's frame stops while its pearl is open in the viewer", async ({
+    page,
+    seed,
+  }) => {
+    await serveLivePage(page);
+    await seed.link({ url: "https://live.example/", title: "Live demo", embed: true });
+    await openGrid(page);
+
+    const card = liveCard(page, "Live demo");
+    const cardFrame = card.locator('iframe[title="Live demo"]');
+    await expect(cardFrame).toHaveAttribute("data-state", "loaded");
+    await card.hover();
+    await card.getByRole("button", { name: "Open large" }).click();
+    await expect(viewerFrame(page, "Live demo")).toHaveAttribute("data-state", "loaded");
+    await expect(cardFrame).toHaveCount(0);
+
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer][data-open]")).toHaveCount(0);
+    await expect(cardFrame).toHaveAttribute("data-state", "loaded");
+  });
+
   test("a frame that never loads falls back to the preview", async ({ page, seed }) => {
     await page.addInitScript(() => {
       (window as Window & { __purlEmbedTimeoutMs?: number }).__purlEmbedTimeoutMs = 300;
@@ -286,7 +346,16 @@ test.describe("Live list rows", () => {
     seed,
   }) => {
     await serveLivePage(page);
-    await seed.link({ url: "https://live.example/", title: "Live demo", embed: true });
+    // The page's picture, for the hover preview (registered after, so it wins).
+    await page.route("https://live.example/thumb.png", (route) =>
+      route.fulfill({ status: 200, contentType: "image/png", body: PIXEL_PNG }),
+    );
+    await seed.link({
+      url: "https://live.example/",
+      title: "Live demo",
+      embed: true,
+      thumbnail: "https://live.example/thumb.png",
+    });
     await seed.link({ url: "https://plain.example/", title: "Plain page" });
     await page.goto("/home");
     await waitForHydration(page, '[data-cy="link-item"]');
@@ -301,7 +370,9 @@ test.describe("Live list rows", () => {
 
     // Hover preview: the page's picture, never a frame.
     await row.hover();
-    await page.waitForTimeout(900);
+    const preview = page.locator('[data-slot="hover-card-content"]');
+    await expect(preview.locator('img[src*="thumb.png"]')).toBeVisible();
+    await expect(preview.locator("iframe")).toHaveCount(0);
     await expect(page.locator("iframe")).toHaveCount(0);
 
     let popup = false;
