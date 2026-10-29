@@ -34,6 +34,13 @@ function useIsCoarsePointer(): boolean {
   );
 }
 
+/**
+ * The card's opener over a live square must sit above it: Chromium sends the
+ * wheel to the topmost frame, even an inert one, so the grid only scrolls
+ * if the opener is on top. Both cards add this to their opener for this face.
+ */
+export const EMBED_OPENER_CLASS = "z-[1]";
+
 /** The small chips in the square's corners ("Couldn't load", "Live"). */
 const CHIP =
   "pointer-events-none absolute rounded-[3px] bg-background/85 px-1.5 py-0.5 leading-4 font-medium text-foreground shadow-sm backdrop-blur-sm";

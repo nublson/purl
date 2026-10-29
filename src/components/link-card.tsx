@@ -28,6 +28,7 @@ import {
   useLinkFolder,
 } from "./folder-tag";
 import { AudioOpenButton, AudioPlayer } from "./audio-player";
+import { EMBED_OPENER_CLASS } from "./embed-face";
 import { HapticTarget } from "./haptic-target";
 import { MediaOpenButton } from "./media-open-button";
 import {
@@ -241,10 +242,7 @@ export function LinkCard({
           // control; a click anywhere on the card toggles it.
           aria-hidden={selecting || undefined}
           tabIndex={selecting ? -1 : undefined}
-          // A live page's opener lies over its square: Chromium sends the
-          // wheel to the topmost frame, even an inert one, so the grid only
-          // scrolls if the opener is on top.
-          className={cn(OPENER_CLASS, kind === "embed" && "z-[1]")}
+          className={cn(OPENER_CLASS, kind === "embed" && EMBED_OPENER_CLASS)}
           onClick={(event) => linkSelection.toggle(link.id, { shiftKey: event.shiftKey })}
         />
       ) : (

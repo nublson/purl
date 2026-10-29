@@ -7,7 +7,15 @@ import { useIsMediaOpen } from "@/lib/media-viewer";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 import { Image as ImageIcon, Video } from "reicon-react";
 import { EmbedFrame, useEmbedLoadTimeout } from "./embed-frame";
 import { LinkIcon } from "./link-icon";
@@ -285,10 +293,28 @@ function ViewerVideo({ link, ready }: { link: Link; ready: boolean }) {
   );
 }
 
-/** The live page's header line above its box (`h-8`), kept off the box's height. */
+/**
+ * The live page's header line above its box and the failure line under it
+ * are sized from these, and the box subtracts the same values from the
+ * viewer's height, so the three always fit it together.
+ */
 const EMBED_HEADER_HEIGHT = "2rem";
-/** Room for the failure line under the box (`py-3` around a 20px line). */
 const EMBED_FAILED_HEIGHT = "2.75rem";
+
+function subscribeOrientation(onChange: () => void) {
+  const query = window.matchMedia("(orientation: landscape)");
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+/** The live box's shape, following the screen as it turns (`embedBoxRatio`). */
+function useEmbedBoxRatio() {
+  return useSyncExternalStore(
+    subscribeOrientation,
+    () => embedBoxRatio({ width: window.innerWidth, height: window.innerHeight }),
+    () => "16 / 10" as const,
+  );
+}
 /** The way out to the page itself, in the header line and the failure line. */
 const OPEN_IN_NEW_TAB = "Open in new tab";
 
@@ -320,7 +346,8 @@ export function ViewerEmbedHeader({ link }: { link: Link }) {
   return (
     <div
       data-embed-header=""
-      className="flex h-8 w-0 min-w-full shrink-0 items-center gap-2 px-3"
+      style={{ height: EMBED_HEADER_HEIGHT }}
+      className="flex w-0 min-w-full shrink-0 items-center gap-2 px-3"
     >
       <span className="flex shrink-0 items-center" aria-hidden>
         <LinkIcon link={link} size="small" />
@@ -347,17 +374,15 @@ export function ViewerEmbedHeader({ link }: { link: Link }) {
 
 /**
  * A live page: a fixed box (16:10 on screens wider than tall, 3:4
- * otherwise, read once as it mounts), as large as the viewer allows under
- * the header line. The preview travels in the morph; the sandboxed frame
+ * otherwise, following the screen as it turns), as large as the viewer
+ * allows under the header line. The preview travels in the morph; the sandboxed frame
  * (`EmbedFrame`) mounts once it has played (`ready`) and fades in on load
  * (none under reduced motion). It's live at once: keys typed in it stay in
  * the page. One that hasn't loaded after `embedLoadTimeoutMs()` goes: the
  * preview stays, with "Couldn't load this page" and the link under it.
  */
 function ViewerEmbed({ link, ready }: { link: Link; ready: boolean }) {
-  const [ratio] = useState(() =>
-    embedBoxRatio({ width: window.innerWidth, height: window.innerHeight }),
-  );
+  const ratio = useEmbedBoxRatio();
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const framed = ready && !failed;
@@ -399,7 +424,10 @@ function ViewerEmbed({ link, ready }: { link: Link; ready: boolean }) {
       {/* Always there, so the line is announced when it appears. */}
       <div role="status">
         {failed ? (
-          <div className="flex items-center gap-3 px-4 py-3">
+          <div
+            style={{ height: EMBED_FAILED_HEIGHT }}
+            className="flex items-center gap-3 px-4"
+          >
             <Typography component="p" size="small" className="min-w-0 truncate leading-5">
               Couldn&apos;t load this page
             </Typography>

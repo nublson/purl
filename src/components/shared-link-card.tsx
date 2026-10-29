@@ -6,7 +6,7 @@ import { isViewerKind, linkKind } from "@/lib/link-kind";
 import { linkSecondLine } from "@/lib/upload-meta";
 import { LinkIcon } from "./link-icon";
 import { AudioOpenButton, AudioPlayer } from "./audio-player";
-import { EmbedFace } from "./embed-face";
+import { EMBED_OPENER_CLASS, EmbedFace } from "./embed-face";
 import { ImageFace, VideoFace } from "./media-card-face";
 import { MediaOpenButton } from "./media-open-button";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
@@ -71,9 +71,8 @@ export function SharedLinkCard({
     );
   }
   if (kind === "embed") {
-    // The live square is a picture: a click anywhere opens the viewer. The
-    // opener lies over it (Chromium sends the wheel to the topmost frame,
-    // even an inert one, so the grid only scrolls if the opener is on top).
+    // The live square is a picture: a click anywhere opens the viewer (the
+    // opener lies over it: `EMBED_OPENER_CLASS`).
     return (
       <div
         data-cy="link-card"
@@ -85,7 +84,10 @@ export function SharedLinkCard({
         <MediaOpenButton
           link={link}
           selecting={false}
-          className="absolute inset-0 z-[1] cursor-pointer rounded-lg outline-none"
+          className={cn(
+            "absolute inset-0 z-0 cursor-pointer rounded-lg outline-none",
+            EMBED_OPENER_CLASS,
+          )}
         />
         <div className="pointer-events-none flex flex-col">
           <LinkCardContent link={link} eagerThumbnail={eagerThumbnail} mediaAnchor />

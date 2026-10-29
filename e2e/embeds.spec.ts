@@ -11,7 +11,24 @@ async function openMenu(page: Page, title: string) {
   await row.getByRole("button", { name: "Open link menu" }).click();
 }
 
+/** Whether the network answers: the switch tests need the real sites. */
+async function online(): Promise<boolean> {
+  try {
+    const res = await fetch("https://example.com", {
+      method: "HEAD",
+      signal: AbortSignal.timeout(5000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 test.describe("Show live", () => {
+  test.beforeEach(async ({}, testInfo) => {
+    testInfo.skip(!(await online()), "needs network: the switch checks real sites");
+  });
+
   test("switches a frameable page live and keeps it on", async ({ page, seed }) => {
     await seed.link({ url: "https://example.com", title: "Example" });
     await page.goto("/home");
@@ -165,9 +182,13 @@ test.describe("Live grid cards", () => {
 
     // The wheel over the square scrolls the grid, not the frame.
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
-    await page.mouse.wheel(0, 300);
+    // Sent again on each try: a wheel that lands while the frame is still
+    // being laid out can be lost.
     await expect
-      .poll(() => page.locator("main").evaluate((el) => el.scrollTop))
+      .poll(async () => {
+        await page.mouse.wheel(0, 300);
+        return page.locator("main").evaluate((el) => el.scrollTop);
+      })
       .toBeGreaterThan(0);
     await page.locator("main").evaluate((el) => (el.scrollTop = 0));
 
