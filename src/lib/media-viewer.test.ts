@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Link } from "@/utils/links";
-import { markCloseSettled, mediaViewer, onCloseSettled } from "./media-viewer";
+import { isViewerLink, markCloseSettled, mediaViewer, onCloseSettled } from "./media-viewer";
 
 function link(id: string, contentType: Link["contentType"] = "IMAGE"): Link {
   return { id, contentType, embed: null, title: id } as unknown as Link;
@@ -260,5 +260,10 @@ describe("mediaViewer", () => {
     expect(second).toHaveBeenCalledTimes(1);
     expect(first).not.toHaveBeenCalled();
     stopSecond();
+  });
+
+  it("isViewerLink: live pages are viewer pearls, audio is not", () => {
+    expect(isViewerLink({ contentType: "WEB", embed: true })).toBe(true);
+    expect(isViewerLink({ contentType: "AUDIO", embed: false })).toBe(false);
   });
 });
