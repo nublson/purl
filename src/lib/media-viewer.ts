@@ -70,7 +70,7 @@ function getSnapshot(): MediaViewerState {
   return state;
 }
 
-/** What the viewer shows: image and video pearls (never audio). */
+/** What the viewer shows: image, video and live-page pearls (never audio). */
 export function isViewerLink(link: Pick<Link, "contentType" | "embed">): boolean {
   return isViewerKind(linkKind(link));
 }

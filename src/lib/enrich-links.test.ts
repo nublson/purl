@@ -232,6 +232,29 @@ describe("enrichFlaggedLinks", () => {
     expect(transaction).toHaveBeenCalledTimes(1);
   });
 
+  it("switches a live pearl off when its page turns out not to be one", async () => {
+    queryRaw.mockResolvedValue([claimed(1), claimed(2)]);
+    storeRow("link-1");
+    storeRow("link-2");
+    resolve.mockImplementation(async (url: string) => ({
+      ...resolved(url),
+      contentType: url.endsWith("/1") ? ("PDF" as const) : ("WEB" as const),
+    }));
+
+    await enrichFlaggedLinks();
+
+    // A guessed WEB that is a PDF: `embed` is reset (only pages can be live).
+    const pdfWrite = updateMany.mock.calls.find(
+      ([arg]) => arg!.where!.id === "link-1" && "contentType" in arg!.data!,
+    );
+    expect(pdfWrite![0]!.data).toMatchObject({ contentType: "PDF", embed: false });
+    // A page keeps whatever the owner chose.
+    const pageWrite = updateMany.mock.calls.find(
+      ([arg]) => arg!.where!.id === "link-2" && "contentType" in arg!.data!,
+    );
+    expect(pageWrite![0]!.data).not.toHaveProperty("embed");
+  });
+
   it("writes nothing when the user changed the link's URL while it waited", async () => {
     queryRaw.mockResolvedValue([claimed(1)]);
     storeRow("link-1", {

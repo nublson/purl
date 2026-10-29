@@ -17,6 +17,7 @@ import { DropHandler } from "@/components/drop-handler";
 import { PasteHandler } from "@/components/paste-handler";
 import { MediaViewerLazy, loadMediaViewer } from "@/components/media-viewer-lazy";
 import { UploadInput } from "@/components/upload-input";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   LinkResultsSkeleton,
   OmniboxAddSkeleton,
@@ -697,6 +698,8 @@ export function HomeShell({
   // Leaving the page stops its batches: queued files don't start. Made in
   // the effect below (Strict Mode's rehearsal unmount aborts its own).
   const uploadsAbort = useRef<AbortController | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const { uploadsEnabled } = useCurrentUser();
   // Uploads (`uploadFiles`): each file's pending item from its start until
   // its pearl lands in its slot; a failed one stays with Retry and Dismiss.
   const uploadHandlers = useMemo<UploadHandlers | null>(() => {
@@ -978,9 +981,9 @@ export function HomeShell({
       />
       <MediaViewerLazy />
       {/* The other ways in: files dropped on the page (or a dragged link),
-          and the + menu's "Upload files" / `U` picker. */}
+          and the picker (`U`, or the search field's Add files button). */}
       <DropHandler folder={folderId ? currentFolder : null} />
-      <UploadInput />
+      <UploadInput inputRef={uploadInputRef} />
       {savableUrls.length > 0 ? (
         <div className="wrapper-private flex flex-col">
           {savableUrls.map((url, index) => (
@@ -1141,6 +1144,9 @@ export function HomeShell({
         onChange={setQuery}
         onSave={saveFromField}
         canSave={Boolean(saveUrl) || pastedUrls.length > 0}
+        onAddFiles={
+          uploadsEnabled ? () => uploadInputRef.current?.click() : undefined
+        }
         placeholder={
           folderId
             ? `Search ${currentFolder?.name ?? "this folder"} or paste a link`

@@ -81,6 +81,7 @@ const {
   isUrlSavedForUser,
   scrapeLinkMetadata,
   UnauthorizedError,
+  LinkChangedError,
 } = await import("./links");
 
 const MOCK_SESSION = { user: { id: "user-123", username: "user-123" }, session: {} };
@@ -1727,6 +1728,61 @@ describe("updateLinkForUser", () => {
       where: { id: "link-1" },
       data: { title: "New" },
     });
+  });
+
+  it("writes embed:false when the url changes, so a live pearl is re-checked", async () => {
+    const row = { ...makeRow({ url: "https://example.com/a" }), embed: true };
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue(row as never);
+
+    await updateLinkForUser("user-123", "link-1", { url: "https://example.com/b" });
+
+    const data = vi.mocked(prisma.link.update).mock.calls[0][0].data;
+    expect(data.embed).toBe(false);
+  });
+
+  it("writes embed only while the url is still the one checked (expectedUrl)", async () => {
+    const row = makeRow({ url: "https://example.com/a" });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue({ ...row, embed: true } as never);
+
+    await updateLinkForUser("user-123", "link-1", {
+      embed: true,
+      expectedUrl: "https://example.com/a",
+    });
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: "link-1", url: "https://example.com/a" },
+      data: { embed: true },
+    });
+  });
+
+  it("throws LinkChangedError when the url changed since the check", async () => {
+    const row = makeRow({ url: "https://example.com/b" });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+
+    const err = await updateLinkForUser("user-123", "link-1", {
+      embed: true,
+      expectedUrl: "https://example.com/a",
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(LinkChangedError);
+    expect(vi.mocked(prisma.link.update)).not.toHaveBeenCalled();
+  });
+
+  it("throws LinkChangedError when the url changes between the read and the write (P2025)", async () => {
+    const row = makeRow({ url: "https://example.com/a" });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockRejectedValue(
+      Object.assign(new Error("not found"), { code: "P2025" }),
+    );
+
+    const err = await updateLinkForUser("user-123", "link-1", {
+      embed: true,
+      expectedUrl: "https://example.com/a",
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(LinkChangedError);
   });
 
   it("scopes the lookup to the given user and returns null for a link it doesn't own", async () => {

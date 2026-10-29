@@ -25,7 +25,8 @@ import { ChevronLeft, ChevronRight } from "reicon-react";
 export type ViewerMove = "prev" | "next" | "first" | "last";
 
 /**
- * The viewer's round buttons (Close, Previous, Next): 32px with a mouse;
+ * The viewer's round buttons (Previous, Next, and Close, shown only on
+ * keyboard focus): 32px with a mouse;
  * on touch screens 40px plus 2px of invisible hit area all round (`after:`),
  * so each target is 44px, as in the selection bar.
  */
@@ -112,8 +113,8 @@ export function ViewerStatus({ text }: { text: string }) {
   );
 }
 
-/** Where a drag can't start: the player's own controls. */
-const NOT_A_HANDLE = "video, input[type=range], button";
+/** Where a drag can't start: the player's own controls, and links (a live page's way out). */
+const NOT_A_HANDLE = "video, input[type=range], button, a";
 
 /** How far a drag goes before the media has shrunk all the way (px). */
 const PULL_FOR_FULL_SCALE = 160;

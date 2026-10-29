@@ -3,10 +3,67 @@
 import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useLinkView } from "@/contexts/link-view-context";
 import { haptic } from "@/lib/haptics";
+import type { LinkView } from "@/lib/link-view";
 import { cn } from "@/lib/utils";
-import { Tag5, Video } from "reicon-react";
+import { Grid, List3, Tag5, Video } from "reicon-react";
 import { HapticTarget } from "./haptic-target";
-import { DropdownMenuCheckboxItem } from "./ui/dropdown-menu";
+import {
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "./ui/dropdown-menu";
+
+const VIEW_OPTIONS = [
+  { value: "list", label: "List", Icon: List3 },
+  { value: "grid", label: "Grid", Icon: Grid },
+] as const;
+
+/**
+ * The view (list or grid) in the user menu, under its "View" title: two
+ * radio items side by side, each its icon and name, drawn as the menu's
+ * own rows (same padding, so List's icon lines up with the icons below);
+ * the current one keeps the highlight's fill, the other is muted and
+ * fills half as much on hover. How Home and folders show links, saved on
+ * the account (`useLinkView`; the landing demo's is local state). The menu
+ * stays open, so the list can be seen changing.
+ */
+export function ViewMenuItems() {
+  const { view, setView } = useLinkView();
+  return (
+    <DropdownMenuRadioGroup
+      value={view}
+      aria-label="View"
+      onValueChange={(value) => {
+        haptic("selection");
+        setView(value as LinkView);
+      }}
+      className="grid grid-cols-2 gap-1"
+    >
+      {VIEW_OPTIONS.map(({ value, label, Icon }) => (
+        <DropdownMenuRadioItem
+          key={value}
+          value={value}
+          data-cy={`link-view-${value}`}
+          onSelect={(event) => event.preventDefault()}
+          // The fill is the indicator: no check mark, no room kept for one.
+          // A ring on keyboard focus, like every menu item (ui/dropdown-menu).
+          className={cn(
+            "relative pr-2 in-data-[input=keyboard]:focus:ring-2 in-data-[input=keyboard]:focus:ring-ring in-data-[input=keyboard]:focus:ring-inset [&>[data-slot=dropdown-menu-radio-item-indicator]]:hidden",
+            view === value
+              ? // An inset ring as well as the fill: the fill alone is ~1.2:1
+                // against the menu, the ring ~3.4:1 (a state needs 3:1).
+                "bg-accent text-accent-foreground ring-1 ring-foreground/40 ring-inset"
+              : "text-muted-foreground focus:bg-accent/50 [&_svg]:text-muted-foreground",
+          )}
+        >
+          <Icon />
+          {label}
+          <HapticTarget />
+        </DropdownMenuRadioItem>
+      ))}
+    </DropdownMenuRadioGroup>
+  );
+}
 
 /**
  * "Folder tags" in the user menu's Layout group: whether Home tags each
@@ -71,14 +128,16 @@ export function PlayVideosMenuItem() {
  * The switch's look (ui/switch) without its button: the menu item is the
  * control, and a button can't sit inside it.
  */
-function SwitchIndicator({ on }: { on: boolean }) {
+export function SwitchIndicator({ on, busy = false }: { on: boolean; busy?: boolean }) {
   return (
     <span
       aria-hidden
       data-state={on ? "checked" : "unchecked"}
+      data-busy={busy || undefined}
       className={cn(
-        "ms-auto inline-flex h-[18.4px] w-[32px] shrink-0 items-center rounded-full border border-transparent shadow-xs transition-[background-color] duration-150 ease-out-strong",
+        "ms-auto inline-flex h-[18.4px] w-[32px] shrink-0 items-center rounded-full border border-transparent shadow-xs transition-[background-color,opacity] duration-150 ease-out-strong",
         on ? "bg-primary" : "bg-input dark:bg-input/80",
+        busy && "opacity-50",
       )}
     >
       <span

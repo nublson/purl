@@ -287,7 +287,10 @@ test.describe("Reorder folders on a touch screen", () => {
 async function sampleTransforms(page: Page, slug: string, frames: number) {
   return page.evaluate(
     async ({ slug, frames }) => {
-      const wrapper = document.querySelector(`a[href="/folders/${slug}"]`)!.parentElement!;
+      // The Reorder item: the link sits in its swipe row (content, then frame).
+      const wrapper = document
+        .querySelector(`a[href="/folders/${slug}"]`)!
+        .closest("[data-swipe-row]")!.parentElement!.parentElement!;
       const samples: string[] = [];
       for (let i = 0; i < frames; i++) {
         samples.push(getComputedStyle(wrapper).transform);

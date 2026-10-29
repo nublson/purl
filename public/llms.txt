@@ -1,11 +1,11 @@
 # Purl
 
-> A calm place to save and share the links you find. Free, no ads, no AI.
+> A calm place to save and share your links and files. Free, no ads, no AI.
 
 ## What it does
 - Save web pages, PDFs, YouTube videos and audio. Purl fetches the title, favicon, description and thumbnail.
 - Organize links into folders (up to 100) and share any folder at a public link, purl.live/@username/folder.
-- Upload images, videos and audio files as pearls: up to 25 MB a file and 250 MB per account.
+- Upload images, video and audio as pearls: up to 25 MB a file and 250 MB per account.
 - Free for everyone: up to 1,000 saved links per account.
 - Save from a Chrome extension, a REST API or an MCP server.
 

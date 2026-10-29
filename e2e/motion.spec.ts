@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { expect, test, waitForHydration } from "./fixtures";
 
 // The motion pass: rows animate back on Undo and out when moved out of a
-// folder; the search field shows focus and cross-fades ✕ / ⌘K.
+// folder; the search field shows focus and cross-fades ✕ / Add files.
 
 const rows = (page: Page) => page.locator('[data-cy="link-item"]');
 const field = (page: Page) =>
@@ -80,7 +80,7 @@ test.describe("Motion", () => {
     ).toBe(true);
   });
 
-  test("the search field shows focus and cross-fades ✕ with the ⌘K hint", async ({ page, seed }) => {
+  test("the search field shows focus and cross-fades ✕ with Add files", async ({ page, seed }) => {
     await seed.link({ url: "https://a.example", title: "Alpha" });
     await page.goto("/home");
     await waitForHydration(page, 'form[role="search"] input');

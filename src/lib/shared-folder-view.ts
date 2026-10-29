@@ -1,6 +1,10 @@
 import { LINK_GRID_COLUMNS } from "@/lib/link-view";
 
-/** A shared folder page's layout: rows (the default) or a grid of cards. */
+/**
+ * A shared folder page's layout: a grid of cards (the default, for
+ * visitors; the owner's own folder page follows their account's view) or
+ * rows.
+ */
 export type SharedFolderView = "list" | "grid";
 
 /**
@@ -13,7 +17,7 @@ export const SHARED_FOLDER_VIEW_COOKIE = "purl-shared-view";
 export function parseSharedFolderView(
   value: string | undefined | null,
 ): SharedFolderView {
-  return value === "grid" ? "grid" : "list";
+  return value === "list" ? "list" : "grid";
 }
 
 /** The shared folder grid: the same columns as the owner's (`link-view.ts`). */

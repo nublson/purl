@@ -58,12 +58,18 @@ export function pearlLayoutId(id: string): string {
 export function MediaAnchor({
   link,
   radius = MEDIA_RADIUS,
+  topOnly = false,
   className,
   children,
 }: {
   link: Pick<Link, "id">;
   /** The corners' radius in px: a card's by default; a list row's icon is smaller. */
   radius?: number;
+  /**
+   * Only the top corners round: a face with the card's strip under it (a
+   * live page's square).
+   */
+  topOnly?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -113,7 +119,16 @@ export function MediaAnchor({
         data-pearl-morphing={morphing || undefined}
         className={cn("w-full overflow-hidden", morphing && "relative z-10", className)}
         // Inline, so Motion can keep the corners round while it scales.
-        style={{ borderRadius: radius }}
+        style={
+          topOnly
+            ? {
+                borderTopLeftRadius: radius,
+                borderTopRightRadius: radius,
+                borderBottomLeftRadius: 0,
+                borderBottomRightRadius: 0,
+              }
+            : { borderRadius: radius }
+        }
       >
         {children}
       </m.div>

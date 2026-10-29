@@ -25,7 +25,8 @@ describe("isMediaKind / isViewerKind", () => {
     expect(isViewerKind("video")).toBe(true);
     expect(isViewerKind("audio")).toBe(false);
     expect(isViewerKind("page")).toBe(false);
-    expect(isViewerKind("embed")).toBe(false);
+    // Live pages are viewer pearls: the viewer shows the page large.
+    expect(isViewerKind("embed")).toBe(true);
   });
 });
 

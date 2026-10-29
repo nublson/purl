@@ -28,9 +28,14 @@ import {
   useLinkFolder,
 } from "./folder-tag";
 import { AudioOpenButton, AudioPlayer } from "./audio-player";
+import { EMBED_OPENER_CLASS } from "./embed-face";
 import { HapticTarget } from "./haptic-target";
 import { MediaOpenButton } from "./media-open-button";
-import { AUDIO_CARD_FRAME, LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
+import {
+  AUDIO_CARD_FRAME,
+  LINK_CARD_FRAME,
+  LinkCardContent,
+} from "./shared-link-card";
 import { Checkbox } from "./ui/checkbox";
 
 // Loaded on demand, like the rows' menu.
@@ -237,7 +242,7 @@ export function LinkCard({
           // control; a click anywhere on the card toggles it.
           aria-hidden={selecting || undefined}
           tabIndex={selecting ? -1 : undefined}
-          className={OPENER_CLASS}
+          className={cn(OPENER_CLASS, kind === "embed" && EMBED_OPENER_CLASS)}
           onClick={(event) => linkSelection.toggle(link.id, { shiftKey: event.shiftKey })}
         />
       ) : (

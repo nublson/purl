@@ -3,7 +3,8 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, test, waitForHydration } from "./fixtures";
 
-// The three ways files get in (the + menu and `U`, a drop, a paste) and the
+// The three ways files get in (the picker: `U` or the search field's Add
+// files button; a drop; a paste) and the
 // drop overlay. No Blob store runs locally, so the token route is answered
 // in the browser with the storage limit: every upload starts (its pending
 // item shows), then fails with the server's message and Retry, and nothing
@@ -111,6 +112,19 @@ test.describe("Upload entry points", () => {
     await expect(page.locator('[data-cy="upload-input"]')).toHaveValue("");
   });
 
+  test("the search field's Add files opens the picker, and gives way to ✕ while typing", async ({ page }) => {
+    await openHome(page);
+    const addFiles = page.getByRole("button", { name: "Add files", includeHidden: true });
+    const chooser = page.waitForEvent("filechooser");
+    await addFiles.click();
+    await (await chooser).setFiles(PIXEL);
+    await expectFailedUpload(page);
+
+    await page.getByLabel("Search your links or paste a link to save").fill("al");
+    await expect(addFiles).toHaveAttribute("inert", "");
+    await expect(page.getByRole("button", { name: "Clear search" })).toBeVisible();
+  });
+
   test("U does nothing while typing in the search field", async ({ page }) => {
     await openHome(page);
     let opened = false;
@@ -123,18 +137,6 @@ test.describe("Upload entry points", () => {
     await expect(field).toHaveValue("u");
     await page.waitForTimeout(300);
     expect(opened).toBe(false);
-  });
-
-  test("the + menu's Upload files opens the same picker", async ({ page }) => {
-    await openHome(page);
-    await waitForHydration(page, 'button[aria-label="Add"]');
-    await page.getByRole("button", { name: "Add", exact: true }).click();
-    const item = page.getByRole("menuitem", { name: "Upload files" });
-    await expect(item.locator('[data-slot="kbd"]')).toHaveText("U");
-    const chooser = page.waitForEvent("filechooser");
-    await item.click();
-    await (await chooser).setFiles(PIXEL);
-    await expectFailedUpload(page);
   });
 
   test("dropping a file uploads it", async ({ page }) => {
@@ -263,16 +265,14 @@ test.describe("Upload entry points on a phone", () => {
     isMobile: true,
   });
 
-  test("the + button shows on touch, and Upload files opens the picker", async ({ page }) => {
-    await refuseTokens(page);
+  test("the + menu is for pointers that hover; phones add files from the search field", async ({ page }) => {
     await page.goto("/home");
-    await waitForHydration(page, 'button[aria-label="Add"]');
-    const add = page.getByRole("button", { name: "Add", exact: true });
-    await expect(add).toBeVisible();
-    await add.tap();
+    await waitForHydration(page, 'button[aria-label^="Folder:"]');
+    await expect(page.getByRole("button", { name: "Add", exact: true })).toBeHidden();
+    const addFiles = page.getByRole("button", { name: "Add files" });
+    await expect(addFiles).toBeVisible();
     const chooser = page.waitForEvent("filechooser");
-    await page.getByRole("menuitem", { name: "Upload files" }).tap();
-    await (await chooser).setFiles(PIXEL);
-    await expectFailedUpload(page);
+    await addFiles.tap();
+    await chooser;
   });
 });

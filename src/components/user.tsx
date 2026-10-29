@@ -21,7 +21,11 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import { UserItem } from "./user-item";
-import { FolderTagsMenuItem, PlayVideosMenuItem } from "./layout-menu-items";
+import {
+  FolderTagsMenuItem,
+  PlayVideosMenuItem,
+  ViewMenuItems,
+} from "./layout-menu-items";
 
 export function User() {
   const { user } = useCurrentUser();
@@ -111,8 +115,15 @@ export function User() {
           />
           <DropdownMenuSeparator />
         </DropdownMenuGroup>
-        {/* Layout: how the lists look (its own group, apart from the
-            account's actions below). */}
+        {/* View, then Layout: how the lists look (their own groups, apart
+            from the account's actions below). */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+            View
+          </DropdownMenuLabel>
+          <ViewMenuItems />
+        </DropdownMenuGroup>
+        <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
             Layout

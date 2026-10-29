@@ -1,22 +1,11 @@
 /** The `U` shortcut that opens the file picker (Home and folder pages). */
 export const UPLOAD_SHORTCUT = "U";
 
-/** Window event the + menu's "Upload files" sends to the page's `UploadInput`. */
-export const UPLOAD_PICK_EVENT = "purl:upload-pick";
-
 /** Toasted when files (or the picker) found no page to take them. */
 export const NO_UPLOAD_PAGE_MESSAGE = "Open Home or a folder to upload";
 
 /** Toasted when files are dropped or pasted without a Blob store. */
 export const UPLOADS_UNAVAILABLE_MESSAGE = "Uploads aren't available here";
-
-/**
- * Opens the page's file picker (`UploadInput`, rendered by `HomeShell`).
- * Returns false when no page took it (the picker isn't mounted).
- */
-export function openUploadPicker(): boolean {
-  return !window.dispatchEvent(new Event(UPLOAD_PICK_EVENT, { cancelable: true }));
-}
 
 /**
  * A plain `U` keypress: not already handled, not held down, no modifiers.

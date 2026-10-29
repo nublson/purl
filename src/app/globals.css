@@ -225,7 +225,7 @@ body {
    in the page sets data-landing-seen on <html> before first paint on later
    visits, which switches all of this off. `both` fill keeps content visible
    whatever happens (no JS, interrupted). Nothing here touches pointer-events.
-   Timeline (ms): words 0-740, sub 340-840, actions 420-920, panel 500-1000,
+   Timeline (ms): badge 40-540, words 0-740, sub 340-840, actions 420-920, panel 500-1000,
    rows 600-1270. */
 @keyframes landing-arrive {
   from {
@@ -260,6 +260,10 @@ body {
     /* The pearl mark arrives first; everything else follows 80ms later. */
     [data-landing-block="mark"] {
       animation: landing-arrive 500ms var(--ease-out-strong) both;
+    }
+    /* The badge, just after the mark, before the headline's words. */
+    [data-landing-block="badge"] {
+      animation: landing-arrive 500ms var(--ease-out-strong) 40ms both;
     }
     [data-landing-word] {
       display: inline-block;

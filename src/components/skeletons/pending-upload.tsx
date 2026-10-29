@@ -81,7 +81,13 @@ function LocalPreview({
 }
 
 /** The upload's progress as a ring; steady and quiet (HomeShell announces). */
-function ProgressRing({ progress }: { progress: number }) {
+function ProgressRing({
+  progress,
+  className,
+}: {
+  progress: number;
+  className?: string;
+}) {
   const radius = 9;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - Math.min(100, Math.max(0, progress)) / 100);
@@ -89,7 +95,7 @@ function ProgressRing({ progress }: { progress: number }) {
     <svg
       aria-hidden
       viewBox="0 0 24 24"
-      className="size-6 -rotate-90"
+      className={cn("size-6 -rotate-90", className)}
     >
       <circle
         cx="12"
@@ -289,7 +295,8 @@ function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
 
 /**
  * A file uploading, in the list: its preview in the favicon's slot, its name,
- * "42%" on the right where a row's ⋯ sits. Failed: Retry and Dismiss there.
+ * the grid card's progress ring on the right where a row's ⋯ sits. Failed:
+ * Retry and Dismiss there.
  */
 export function PendingUploadRow({ item, onRetry, onDismiss }: Props) {
   const failed = item.status === "failed";
@@ -355,12 +362,11 @@ export function PendingUploadRow({ item, onRetry, onDismiss }: Props) {
           />
         </div>
       ) : (
-        // Steady, tabular figures, so the number never jitters.
-        <span
-          aria-hidden
-          className="flex min-w-8 items-center justify-end text-sm text-muted-foreground tabular-nums max-md:text-base"
-        >
-          {item.progress}%
+        // The grid card's ring, where a row's ⋯ sits (a 32px slot): the
+        // same progress read the same way in both views. Decorative: the
+        // page's status line says what's uploading.
+        <span aria-hidden className="flex size-8 items-center justify-center">
+          <ProgressRing progress={item.progress} className="size-5" />
         </span>
       )}
     </Item>

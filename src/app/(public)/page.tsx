@@ -16,7 +16,7 @@ export const dynamic = "force-static";
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: { absolute: "Purl: save and share the links you find" },
+  title: { absolute: "Purl: save and share your links and files" },
   alternates: { canonical: "/" },
 };
 
@@ -40,7 +40,7 @@ export default async function Home() {
     applicationCategory: "BrowserApplication",
     operatingSystem: "Web, Chrome",
     description:
-      "A calm place to save and share the links you find. Keep articles, PDFs, videos and audio in folders, and share any folder with a link.",
+      "A calm place to save and share your links and files. Keep articles, PDFs and videos, upload your images, video and audio, and share any folder with a link.",
     offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     author: {
       "@type": "Person",

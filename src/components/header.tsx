@@ -9,7 +9,6 @@ import { Logo } from "./logo";
 import { HeaderActionsFallback } from "./skeletons/header-actions-fallback";
 import { Separator } from "./ui/separator";
 import { User } from "./user";
-import { LinkViewToggle } from "./view-toggle";
 
 async function HeaderActions() {
   const user = await getSessionUser();
@@ -21,7 +20,6 @@ async function HeaderActions() {
     <UsageProvider usageSummary={usageSummary}>
       <div className="flex items-center justify-end gap-2">
         <FolderSharePopover />
-        <LinkViewToggle />
         <HeaderAddMenu />
         <User />
       </div>

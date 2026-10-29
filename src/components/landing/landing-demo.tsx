@@ -3,7 +3,6 @@
 import { FolderSelectDropdown } from "@/components/folder-select-dropdown";
 import { FolderSharePopover } from "@/components/folder-share-popover";
 import { HeaderAddMenu } from "@/components/header-add-menu";
-import { LinkViewToggle } from "@/components/view-toggle";
 import { LinkGrid } from "@/components/link-group";
 import { LinkItem } from "@/components/link-item";
 import { Logo } from "@/components/logo";
@@ -86,7 +85,6 @@ export function LandingDemo({
           </div>
           <div className="flex shrink-0 items-center justify-end gap-2">
             <FolderSharePopover />
-            <LinkViewToggle />
             <HeaderAddMenu />
             <User />
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
+import { linkKind } from "@/lib/link-kind";
 import {
   markCloseSettled,
   markReturningFocus,
@@ -38,6 +39,7 @@ import {
 import {
   MAX_HEIGHT,
   MAX_WIDTH,
+  ViewerEmbedHeader,
   ViewerMedia,
   preloadOriginal,
   preloadSrc,
@@ -282,7 +284,7 @@ export function MediaViewer() {
           layoutDependency={
             closing && closing.step !== "ready" ? FACE_LAYOUT_DEPENDENCY : VIEWER_LAYOUT_DEPENDENCY
           }
-          className="group/viewer z-50 flex w-max items-center justify-center overflow-hidden bg-card outline-none data-closed:pointer-events-none"
+          className="group/viewer z-50 flex w-max flex-col items-center justify-center overflow-hidden bg-card outline-none data-closed:pointer-events-none"
           style={{
             top: CENTER_TOP,
             left: CENTER_LEFT,
@@ -300,6 +302,9 @@ export function MediaViewer() {
               <ViewerStatus
                 text={moved ? `${index + 1} of ${count}: ${current.title}` : ""}
               />
+              {/* A live page's header line, above its box (which leaves it
+                  room under the viewer's height). */}
+              {linkKind(current) === "embed" ? <ViewerEmbedHeader link={current} /> : null}
               {/* Positioned: the slide leaving is laid out against it. */}
               <div ref={mediaRef} tabIndex={-1} className="relative outline-none">
                 <ViewerStage
@@ -315,7 +320,17 @@ export function MediaViewer() {
                 </ViewerStage>
               </div>
               <ViewerArrows hasPrev={hasPrev} hasNext={hasNext} onMove={move} />
-              <Cambio.Close aria-label="Close" className={cn(VIEWER_BUTTON, "top-2 right-2")}>
+              {/* No visible close button: Esc, a press outside the media, a
+                  vertical swipe and Back close it. This one is for screen
+                  readers (on a phone, swipes move between controls instead)
+                  and shows only on keyboard focus. */}
+              <Cambio.Close
+                aria-label="Close"
+                className={cn(
+                  VIEWER_BUTTON,
+                  "top-2 right-2 not-focus-visible:sr-only",
+                )}
+              >
                 <X className="size-4" aria-hidden />
               </Cambio.Close>
             </>

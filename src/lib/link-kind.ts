@@ -24,11 +24,11 @@ export function isMediaKind(kind: LinkKind): boolean {
 }
 
 /**
- * Image and video pearls: the ones the media viewer shows. An audio pearl
- * plays (and opens) in place, on its own bar, never in the viewer.
+ * Image, video and live-page (embed) pearls: the ones the media viewer shows.
+ * An audio pearl plays (and opens) in place, on its own bar, never in the viewer.
  */
 export function isViewerKind(kind: LinkKind): boolean {
-  return kind === "image" || kind === "video";
+  return kind === "image" || kind === "video" || kind === "embed";
 }
 
 const DEFAULT_RATIO = "16 / 10";

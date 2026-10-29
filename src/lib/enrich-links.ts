@@ -1,5 +1,6 @@
 import "server-only";
 
+import { canEmbed } from "@/lib/embeds";
 import { resolveLinkFromUrl, type ResolvedLinkFields } from "@/lib/links";
 import prisma from "@/lib/prisma";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
@@ -159,6 +160,12 @@ export async function enrichFlaggedLinks(): Promise<EnrichResult> {
             domain: resolved.domain,
             contentType: resolved.contentType,
             mimeType: resolved.mimeType,
+            // A pearl switched live before its lookup (a guessed WEB) that
+            // turns out to be a PDF or an image can't stay live: only pages
+            // can (`canEmbed`, which the switch checks).
+            ...(canEmbed({ contentType: resolved.contentType, upload: false })
+              ? {}
+              : { embed: false }),
           },
         }),
         prisma.link.updateMany({

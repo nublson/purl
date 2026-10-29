@@ -26,6 +26,7 @@ import { DialogDeleteFolder } from "./dialog-delete-folder";
 import { DialogFolderForm } from "./dialog-folder-form";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { FolderEmoji } from "./folder-emoji";
+import { SwipeRow, type SwipeSide } from "./swipe-row";
 import { Typography } from "./typography";
 import { Button } from "./ui/button";
 import { Kbd } from "./ui/kbd";
@@ -79,9 +80,13 @@ export function FolderSelectDropdown() {
   const isDemo = useIsDemo();
   const demoSelectFolder = useDemoFolderSelect();
   const [menuOpen, setMenuOpen] = React.useState(false);
+  // Touch: the one folder row swiped open on its Edit or Delete, if any.
+  const [swiped, setSwiped] = React.useState<{ id: string; side: SwipeSide } | null>(null);
+  if (!menuOpen && swiped) setSwiped(null);
   const { reorderFolders } = useFolderActions();
   const canReorder = !isDemo && folders.length >= 2;
   const reorderHintId = React.useId();
+  const deleteHintId = React.useId();
   const [announcement, setAnnouncement] = React.useState("");
   // Clear, then set on the next frame: a message identical to the last one
   // ("Alpha is already last" twice) is still a change, so it's read again.
@@ -202,6 +207,18 @@ export function FolderSelectDropdown() {
   const [dialog, setDialog] = React.useState<FolderDialog | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
 
+  /** Asks to delete `folder`: its dialog opens once the menu has closed. */
+  const askToDelete = (folder: FolderSummary) => {
+    pendingDialog.current = { kind: "delete", folder };
+    setMenuOpen(false);
+  };
+
+  /** Opens `folder`'s edit dialog once the menu has closed. */
+  const askToEdit = (folder: FolderSummary) => {
+    pendingDialog.current = { kind: "edit", folder };
+    setMenuOpen(false);
+  };
+
   /** A folder's menu row; `grip` once drag has loaded. */
   const folderRow = (
     folder: FolderSummary,
@@ -211,64 +228,125 @@ export function FolderSelectDropdown() {
     const active = currentFolder?.id === folder.id;
     const shortcut = folderShortcutKey(index);
     return (
-      <DropdownMenuItem
+      // Touch: swipe right to edit, left to delete (it asks first).
+      <SwipeRow
         key={folder.id}
-        asChild
-        onKeyDown={(event) => moveWithKeyboard(event, folder)}
+        name={folder.name}
+        open={swiped?.id === folder.id ? swiped.side : null}
+        onOpenChange={(side) =>
+          setSwiped((current) =>
+            side ? { id: folder.id, side } : current?.id === folder.id ? null : current,
+          )
+        }
+        onEdit={() => askToEdit(folder)}
+        onDelete={() => askToDelete(folder)}
       >
-        <Link
-          href={`/folders/${folder.slug}`}
-          data-folder-id={folder.id}
-          aria-current={active ? "page" : undefined}
-          aria-keyshortcuts={shortcut ?? undefined}
-          aria-describedby={canReorder ? reorderHintId : undefined}
-          onFocus={() => {
-            focusedId.current = folder.id;
+        <DropdownMenuItem
+          asChild
+          onKeyDown={(event) => {
+            // Delete or Backspace on the highlighted row: the keyboard's way to
+            // the delete button its pointer twin shows (announced, below).
+            if (
+              (event.key === "Delete" || event.key === "Backspace") &&
+              !event.altKey &&
+              !event.metaKey &&
+              !event.ctrlKey &&
+              !event.shiftKey
+            ) {
+              event.preventDefault();
+              event.stopPropagation();
+              askToDelete(folder);
+              return;
+            }
+            moveWithKeyboard(event, folder);
           }}
-          onBlur={() => {
-            if (focusedId.current === folder.id) focusedId.current = null;
-          }}
-          className="group/row select-none"
         >
-          {/* Mouse and keyboard: the grip takes the emoji's place on the
-              highlighted row (Radix highlights on hover and on arrow keys). */}
-          <span className="relative flex size-4 shrink-0 items-center justify-center">
-            <FolderEmoji
-              emoji={folder.emoji}
-              className={grip ? "pointer-fine:group-data-highlighted/row:invisible" : undefined}
+          <Link
+            href={`/folders/${folder.slug}`}
+            data-folder-id={folder.id}
+            aria-current={active ? "page" : undefined}
+            aria-keyshortcuts={shortcut ?? undefined}
+            aria-describedby={
+              [canReorder && reorderHintId, deleteHintId].filter(Boolean).join(" ")
+            }
+            onFocus={() => {
+              focusedId.current = folder.id;
+            }}
+            onBlur={() => {
+              if (focusedId.current === folder.id) focusedId.current = null;
+            }}
+            className="group/row select-none"
+          >
+            {/* Mouse and keyboard: the grip takes the emoji's place on the
+                highlighted row (Radix highlights on hover and on arrow keys). */}
+            <span className="relative flex size-4 shrink-0 items-center justify-center">
+              <FolderEmoji
+                emoji={folder.emoji}
+                className={grip ? "pointer-fine:group-data-highlighted/row:invisible" : undefined}
+              />
+              {grip ? (
+                <FolderGrip
+                  {...grip}
+                  // 20px icon: its lines then span ~13px, the emoji's ink width
+                  // (at 16px they'd read as an indented, smaller icon).
+                  className="absolute -inset-1 hidden pointer-fine:group-data-highlighted/row:flex [&_svg]:size-5"
+                />
+              ) : null}
+            </span>
+            <RowLabel name={folder.name} count={folder.linkCount} />
+            <CurrentMark
+              active={active}
+              shortcut={shortcut}
+              hideOnTouch={canReorder}
+              // The highlighted row's delete button takes its place.
+              className="pointer-fine:group-data-highlighted/row:hidden"
             />
+            {/* Mouse and keyboard: on the highlighted row (hover or arrow
+                keys), a delete button at the end, so a folder can go without
+                opening it first. Decorative to assistive tech, like the grip:
+                the row is a link (no button inside it), and Delete or
+                Backspace does the same (`deleteHintId`). Opens the delete
+                dialog, which confirms. Not on touch: its grip is there. */}
+            <span
+              aria-hidden="true"
+              data-folder-delete=""
+              title={`Delete ${folder.name}`}
+              // Rows are links: no native link drag, no focus move from here.
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={(event) => {
+                // Not the row's navigation, nor the menu's select.
+                event.preventDefault();
+                event.stopPropagation();
+                askToDelete(folder);
+              }}
+              // 24px, 2px past the end: centred on the 20px slot the check and
+              // the digit keys sit in (`CurrentMark`), so they share one axis.
+              className="-my-1 -me-0.5 ms-auto hidden size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground transition-[color,background-color,scale] duration-150 ease-out-strong hover:bg-destructive/10 hover:text-destructive active:scale-[0.96] motion-reduce:active:scale-100 pointer-fine:group-data-highlighted/row:flex"
+            >
+              <Trash2 className="size-4" />
+            </span>
+            {/* Touch: always there, at the end (no digit keys to show). Until
+                drag loads, an empty slot of its size, so rows don't reflow. */}
+            {canReorder && !grip ? (
+              <span
+                aria-hidden="true"
+                className="-my-1.5 -me-1.5 hidden size-8 shrink-0 pointer-coarse:block"
+              />
+            ) : null}
             {grip ? (
               <FolderGrip
                 {...grip}
-                // 20px icon: its lines then span ~13px, the emoji's ink width
-                // (at 16px they'd read as an indented, smaller icon).
-                className="absolute -inset-1 hidden pointer-fine:group-data-highlighted/row:flex [&_svg]:size-5"
+                // 32px drawn; 44px wide to the touch. Not taller: rows are 33px
+                // apart, and the extra would reach into the next row's grip.
+                className={cn(
+                  "relative -my-1.5 -me-1.5 hidden size-8 shrink-0 pointer-coarse:flex after:absolute after:inset-y-0 after:-inset-x-1.5",
+                  !active && "pointer-coarse:ms-auto",
+                )}
               />
             ) : null}
-          </span>
-          <RowLabel name={folder.name} count={folder.linkCount} />
-          <CurrentMark active={active} shortcut={shortcut} hideOnTouch={canReorder} />
-          {/* Touch: always there, at the end (no digit keys to show). Until
-              drag loads, an empty slot of its size, so rows don't reflow. */}
-          {canReorder && !grip ? (
-            <span
-              aria-hidden="true"
-              className="-my-1.5 -me-1.5 hidden size-8 shrink-0 pointer-coarse:block"
-            />
-          ) : null}
-          {grip ? (
-            <FolderGrip
-              {...grip}
-              // 32px drawn; 44px wide to the touch. Not taller: rows are 33px
-              // apart, and the extra would reach into the next row's grip.
-              className={cn(
-                "relative -my-1.5 -me-1.5 hidden size-8 shrink-0 pointer-coarse:flex after:absolute after:inset-y-0 after:-inset-x-1.5",
-                !active && "pointer-coarse:ms-auto",
-              )}
-            />
-          ) : null}
-        </Link>
-      </DropdownMenuItem>
+          </Link>
+        </DropdownMenuItem>
+      </SwipeRow>
     );
   };
 
@@ -423,6 +501,9 @@ export function FolderSelectDropdown() {
               )
               : folders.map((folder, index) => folderRow(folder, index))}
         </DropdownMenuGroup>
+        <span id={deleteHintId} className="sr-only">
+          Delete or Backspace deletes this folder.
+        </span>
         {canReorder ? (
           <>
             <span id={reorderHintId} className="sr-only">

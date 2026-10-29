@@ -1,12 +1,17 @@
 "use client";
 
 import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
-import { isApplePlatform } from "@/lib/platform";
+import { UPLOAD_SHORTCUT } from "@/lib/upload-picker";
 import { cn } from "@/lib/utils";
-import { Search, X } from "reicon-react";
+import { Paperclip, Search, X } from "reicon-react";
 import * as React from "react";
 import { BOTTOM_BAR_BAND, OMNIBOX_SHELL } from "./omnibox-shell";
 import { Kbd } from "./ui/kbd";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+
+/** The field's end buttons (✕ and Add files): 32px, quiet until hovered. */
+const FIELD_BUTTON =
+  "flex size-8 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-[opacity,scale,filter,color,background-color] duration-150 ease-out-strong hover:bg-accent hover:text-foreground";
 
 /** Keys that focus the field from anywhere on the page. */
 const FOCUS_KEY = "/";
@@ -15,7 +20,8 @@ const FOCUS_KEY = "/";
  * The search field pinned to the bottom of Home and folder pages. Typing
  * filters the list (the page owns the query); when the text is a URL
  * (or several: `canSave`), Enter saves it instead. `/` or ⌘/Ctrl+K focuses it, Esc
- * clears it (and leaves it when already empty).
+ * clears it (and leaves it when already empty). With `onAddFiles` (uploads
+ * on), an Add files button sits at its end while it's empty.
  */
 export function LinkOmnibox({
   value,
@@ -23,6 +29,7 @@ export function LinkOmnibox({
   onSave,
   canSave,
   placeholder,
+  onAddFiles,
   className,
 }: {
   value: string;
@@ -31,11 +38,11 @@ export function LinkOmnibox({
   onSave: () => void;
   canSave: boolean;
   placeholder: string;
+  /** Opens the page's file picker; no Add files button without it. */
+  onAddFiles?: () => void;
   className?: string;
 }) {
   const inputRef = React.useRef<HTMLInputElement>(null);
-  const [apple, setApple] = React.useState(false);
-  React.useEffect(() => setApple(isApplePlatform()), []);
 
   React.useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -99,16 +106,17 @@ export function LinkOmnibox({
           // 16px text: iOS zooms the page into smaller inputs.
           className="h-full min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted-foreground sm:text-sm [&::-webkit-search-cancel-button]:hidden"
         />
-        {/* ✕ (with text) and the ⌘K hint (empty) share one spot and
+        {/* ✕ (with text) and Add files (empty) share one spot and
             cross-fade: opacity, scale and blur (opacity only with reduced
-            motion). Both stay mounted; the hidden one is inert. */}
+            motion). Both stay mounted; the hidden one is inert. Without
+            uploads, the ✕ alone. */}
         <div className="grid shrink-0 place-items-center *:col-start-1 *:row-start-1">
           <button
             type="button"
             aria-label="Clear search"
             inert={!value}
             className={cn(
-              "flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-[opacity,scale,filter,color,background-color] duration-150 ease-out-strong hover:bg-accent hover:text-foreground",
+              FIELD_BUTTON,
               !value &&
                 "pointer-events-none scale-25 opacity-0 blur-[4px] motion-reduce:scale-100 motion-reduce:blur-none",
             )}
@@ -119,16 +127,33 @@ export function LinkOmnibox({
           >
             <X className="size-4" />
           </button>
-          <Kbd
-            aria-hidden="true"
-            className={cn(
-              "me-1.5 hidden transition-[opacity,scale,filter] duration-150 ease-out-strong [@media(hover:hover)]:inline-flex",
-              value &&
-                "scale-25 opacity-0 blur-[4px] motion-reduce:scale-100 motion-reduce:blur-none",
-            )}
-          >
-            {apple ? "⌘K" : "Ctrl+K"}
-          </Kbd>
+          {onAddFiles ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Add files"
+                  aria-keyshortcuts={UPLOAD_SHORTCUT}
+                  inert={Boolean(value)}
+                  data-cy="omnibox-add-files"
+                  className={cn(
+                    FIELD_BUTTON,
+                    // 44px to the touch, 32px drawn, like the selection bar.
+                    "relative pointer-coarse:after:absolute pointer-coarse:after:-inset-1.5",
+                    value &&
+                      "pointer-events-none scale-25 opacity-0 blur-[4px] motion-reduce:scale-100 motion-reduce:blur-none",
+                  )}
+                  onClick={onAddFiles}
+                >
+                  <Paperclip className="size-4" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={8}>
+                Add files
+                <Kbd>{UPLOAD_SHORTCUT}</Kbd>
+              </TooltipContent>
+            </Tooltip>
+          ) : null}
         </div>
       </form>
     </>

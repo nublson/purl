@@ -6,6 +6,7 @@ import { isViewerKind, linkKind } from "@/lib/link-kind";
 import { linkSecondLine } from "@/lib/upload-meta";
 import { LinkIcon } from "./link-icon";
 import { AudioOpenButton, AudioPlayer } from "./audio-player";
+import { EMBED_OPENER_CLASS, EmbedFace } from "./embed-face";
 import { ImageFace, VideoFace } from "./media-card-face";
 import { MediaOpenButton } from "./media-open-button";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
@@ -69,6 +70,31 @@ export function SharedLinkCard({
       </div>
     );
   }
+  if (kind === "embed") {
+    // The live square is a picture: a click anywhere opens the viewer (the
+    // opener lies over it: `EMBED_OPENER_CLASS`).
+    return (
+      <div
+        data-cy="link-card"
+        className={cn(
+          LINK_CARD_FRAME,
+          "group/card relative overflow-visible has-[>[data-pearl-button]:focus-visible]:ring-3 has-[>[data-pearl-button]:focus-visible]:ring-ring",
+        )}
+      >
+        <MediaOpenButton
+          link={link}
+          selecting={false}
+          className={cn(
+            "absolute inset-0 z-0 cursor-pointer rounded-lg outline-none",
+            EMBED_OPENER_CLASS,
+          )}
+        />
+        <div className="pointer-events-none flex flex-col">
+          <LinkCardContent link={link} eagerThumbnail={eagerThumbnail} mediaAnchor />
+        </div>
+      </div>
+    );
+  }
   if (isViewerKind(kind)) {
     return (
       <MediaOpenButton
@@ -124,6 +150,14 @@ export function LinkCardContent({
       );
     case "video":
       return <VideoFace link={link} badge={badge} anchored={mediaAnchor} />;
+    case "embed":
+      // The page live in a square, then the page card's strip.
+      return (
+        <>
+          <EmbedFace link={link} anchored={mediaAnchor} eager={eagerThumbnail} />
+          <LinkCardStrip link={link} badge={badge} />
+        </>
+      );
     default: {
       const thumbnailSrc = link.thumbnail
         ? safeRemoteImgSrc(link.thumbnail)

@@ -1,26 +1,41 @@
 "use client";
 
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
+import { embedBoxRatio } from "@/lib/embeds";
 import { linkKind } from "@/lib/link-kind";
 import { useIsMediaOpen } from "@/lib/media-viewer";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 import { Image as ImageIcon, Video } from "reicon-react";
+import { EmbedFrame, useEmbedLoadTimeout } from "./embed-frame";
+import { LinkIcon } from "./link-icon";
+import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
 import { Typography } from "./typography";
 
-// What the media viewer (`media-viewer.tsx`) shows of a pearl: an image or
-// a video's player, sized for the viewer. Audio pearls play in place, on
-// their own bar, and never reach it.
+// What the media viewer (`media-viewer.tsx`) shows of a pearl: an image, a
+// video's player or a live page, sized for the viewer. Audio pearls play in
+// place, on their own bar, and never reach it.
 
 /**
  * The viewer's box: 16px from every edge, inside the safe areas (the
- * notch, the home indicator: `--bottom-inset`), 1200px at most.
+ * notch, the home indicator: `--bottom-inset`), 1200px wide at most. Never
+ * the screen's full height: 80% of it, 800px at most, so the page shows
+ * around it (and there's backdrop to press on, to close it).
  */
 export const MAX_WIDTH =
   "min(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right), 1200px)";
-export const MAX_HEIGHT = "calc(100dvh - 32px - env(safe-area-inset-top) - var(--bottom-inset))";
+export const MAX_HEIGHT =
+  "min(100dvh - 32px - env(safe-area-inset-top) - var(--bottom-inset), 80dvh, 800px)";
 
 /** The file to load ahead for a pearl (an image's original, a video's poster). */
 export function preloadSrc(link: Link | null | undefined): string | null {
@@ -48,8 +63,10 @@ export function ViewerMedia({ link, ready }: { link: Link; ready: boolean }) {
       return <ViewerImage link={link} ready={ready} />;
     case "video":
       return <ViewerVideo link={link} ready={ready} />;
+    case "embed":
+      return <ViewerEmbed link={link} ready={ready} />;
     default:
-      // Only image and video pearls are registered (`isViewerKind`):
+      // Only image, video and live pearls are registered (`isViewerKind`):
       // nothing else, audio included, reaches the viewer.
       return null;
   }
@@ -73,7 +90,7 @@ function ImageTile({ style }: { style?: CSSProperties }) {
 
 /**
  * A small image's box is scaled up to this on its shorter side (the image
- * fitted inside, at its ratio), so the X and the arrows never cover it.
+ * fitted inside, at its ratio), so the arrows never cover it.
  */
 export const MIN_IMAGE_SIDE = 240;
 
@@ -270,6 +287,152 @@ function ViewerVideo({ link, ready }: { link: Link; ready: boolean }) {
           <Typography component="p" id={messageId} className="px-4 py-3 text-sm leading-5 text-muted-foreground">
             {CANT_PLAY}
           </Typography>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The live page's header line above its box and the failure line under it
+ * are sized from these, and the box subtracts the same values from the
+ * viewer's height, so the three always fit it together.
+ */
+const EMBED_HEADER_HEIGHT = "2rem";
+const EMBED_FAILED_HEIGHT = "2.75rem";
+
+function subscribeOrientation(onChange: () => void) {
+  const query = window.matchMedia("(orientation: landscape)");
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+/** The live box's shape, following the screen as it turns (`embedBoxRatio`). */
+function useEmbedBoxRatio() {
+  return useSyncExternalStore(
+    subscribeOrientation,
+    () => embedBoxRatio({ width: window.innerWidth, height: window.innerHeight }),
+    () => "16 / 10" as const,
+  );
+}
+/** The way out to the page itself, in the header line and the failure line. */
+const OPEN_IN_NEW_TAB = "Open in new tab";
+
+function OpenInNewTab({ url, className }: { url: string; className?: string }) {
+  return (
+    <Typography
+      component="a"
+      size="small"
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        "shrink-0 rounded-sm leading-5 font-medium text-foreground underline-offset-2 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring",
+        className,
+      )}
+    >
+      {OPEN_IN_NEW_TAB}
+    </Typography>
+  );
+}
+
+/**
+ * A live page's header line, above its box inside the viewer: favicon,
+ * title (one line, the whole of it in its `title`), domain, then "Open in
+ * new tab", the way out for a page that misbehaves framed. Its width is
+ * the box's (`w-0 min-w-full`: it never widens the viewer).
+ */
+export function ViewerEmbedHeader({ link }: { link: Link }) {
+  return (
+    <div
+      data-embed-header=""
+      style={{ height: EMBED_HEADER_HEIGHT }}
+      className="flex w-0 min-w-full shrink-0 items-center gap-2 px-3"
+    >
+      <span className="flex shrink-0 items-center" aria-hidden>
+        <LinkIcon link={link} size="small" />
+      </span>
+      <Typography
+        component="span"
+        size="small"
+        title={link.title}
+        className="min-w-0 truncate leading-5 font-medium text-foreground"
+      >
+        {link.title}
+      </Typography>
+      <Typography
+        component="span"
+        size="small"
+        className="max-w-[40%] min-w-0 shrink truncate leading-5"
+      >
+        {link.domain}
+      </Typography>
+      <OpenInNewTab url={link.url} className="ml-auto" />
+    </div>
+  );
+}
+
+/**
+ * A live page: a fixed box (16:10 on screens wider than tall, 3:4
+ * otherwise, following the screen as it turns), as large as the viewer
+ * allows under the header line. The preview travels in the morph; the sandboxed frame
+ * (`EmbedFrame`) mounts once it has played (`ready`) and fades in on load
+ * (none under reduced motion). It's live at once: keys typed in it stay in
+ * the page. One that hasn't loaded after `embedLoadTimeoutMs()` goes: the
+ * preview stays, with "Couldn't load this page" and the link under it.
+ */
+function ViewerEmbed({ link, ready }: { link: Link; ready: boolean }) {
+  const ratio = useEmbedBoxRatio();
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const framed = ready && !failed;
+  // A frame that unmounts starts over: the next one fades in on its own load.
+  if (!framed && loaded) setLoaded(false);
+  useEmbedLoadTimeout(framed && !loaded, () => setFailed(true));
+  const thumbnailSrc = link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
+  const room = failed
+    ? `(${MAX_HEIGHT} - ${EMBED_HEADER_HEIGHT} - ${EMBED_FAILED_HEIGHT})`
+    : `(${MAX_HEIGHT} - ${EMBED_HEADER_HEIGHT})`;
+
+  return (
+    <div data-viewer-media="embed" className="flex flex-col">
+      <div
+        data-embed-box=""
+        className="relative overflow-hidden bg-muted"
+        style={{ aspectRatio: ratio, width: `min(${MAX_WIDTH}, ${room} * (${ratio}))` }}
+      >
+        <span data-embed-preview="" className="absolute inset-0">
+          <LinkPreviewThumbnail
+            link={link}
+            thumbnailSrc={thumbnailSrc}
+            eagerThumbnail
+            className="absolute inset-0 aspect-auto h-full rounded-none [&_img]:outline-0"
+          />
+        </span>
+        {framed ? (
+          <EmbedFrame
+            link={link}
+            data-state={loaded ? "loaded" : "loading"}
+            onLoad={() => setLoaded(true)}
+            className={cn(
+              "absolute inset-0 size-full border-0 bg-background motion-safe:transition-opacity motion-safe:duration-150 motion-safe:ease-out-strong",
+              loaded ? "opacity-100" : "opacity-0",
+            )}
+          />
+        ) : null}
+      </div>
+      {/* Always there, so the line is announced when it appears. */}
+      <div role="status">
+        {failed ? (
+          <div
+            style={{ height: EMBED_FAILED_HEIGHT }}
+            className="flex items-center gap-3 px-4"
+          >
+            <Typography component="p" size="small" className="min-w-0 truncate leading-5">
+              Couldn&apos;t load this page
+            </Typography>
+            <OpenInNewTab url={link.url} />
+          </div>
         ) : null}
       </div>
     </div>
