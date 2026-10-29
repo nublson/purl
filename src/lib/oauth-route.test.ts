@@ -71,6 +71,12 @@ describe("tokenPreflight", () => {
     expect(res.headers.has("Access-Control-Allow-Origin")).toBe(false);
     expect(res.headers.has("Access-Control-Allow-Credentials")).toBe(false);
   });
+  it("allows a browser extension origin without OAUTH_CORS_ORIGINS", () => {
+    const origin = "chrome-extension://abcdefghijklmnopabcdefghijklmnop";
+    const res = tokenPreflight(req(origin), undefined);
+    expect(res.status).toBe(204);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+  });
 });
 
 describe("withTokenCors", () => {
