@@ -6,6 +6,7 @@ import {
 } from "@/lib/folder-display";
 import { MAX_FOLDERS, MAX_FOLDER_NAME_LENGTH } from "@/lib/limits";
 import prisma, { type Prisma } from "@/lib/prisma";
+import { type BlobOwningRow, deleteBlobsFor } from "@/lib/uploads";
 
 /** Either the root client or an interactive-transaction client; the folder helpers below accept both. */
 type Db = Prisma.TransactionClient;
@@ -538,7 +539,7 @@ export async function updateFolder(
   }
 }
 
-/** Deletes a folder owned by `userId`. With `withLinks`, its links are deleted too (in the same transaction); otherwise they're kept (and un-foldered via the DB's `SetNull`). */
+/** Deletes a folder owned by `userId`. With `withLinks`, its links are deleted too (in the same transaction, their uploaded files after it commits); otherwise they're kept (and un-foldered via the DB's `SetNull`). */
 export async function deleteFolder(
   userId: string,
   id: string,
@@ -546,16 +547,24 @@ export async function deleteFolder(
 ): Promise<{ deletedLinks: number }> {
   // The per-user lock (as in createFolder/reorderFolders) so a reorder
   // can't check this folder, then find it gone when it writes.
-  return prisma.$transaction(async (tx) => {
+  const { deletedLinks, uploads } = await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
     await assertFolderOwned(userId, id, tx);
     let deletedLinks = 0;
+    let uploads: BlobOwningRow[] = [];
     if (opts.withLinks) {
+      uploads = await tx.link.findMany({
+        where: { userId, folderId: id, fileKey: { not: null } },
+        select: { url: true, fileKey: true, thumbnail: true },
+      });
       ({ count: deletedLinks } = await tx.link.deleteMany({
         where: { userId, folderId: id },
       }));
     }
     await tx.folder.delete({ where: { id } });
-    return { deletedLinks };
+    return { deletedLinks, uploads };
   });
+  // Only once the rows are gone for good: a rolled-back delete keeps its files.
+  if (opts.withLinks) await deleteBlobsFor(userId, uploads);
+  return { deletedLinks };
 }

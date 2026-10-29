@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { cache } from "react";
 
 /**
- * The user's saved layout (view, folder tags), read fresh from the
+ * The user's saved layout (view, folder tags, play videos), read fresh from the
  * database (the session's cookie cache can be minutes old, and another
  * device may have changed it). Deduplicated per request.
  */
@@ -18,12 +18,13 @@ export const getLayoutForUser = cache(
   async (userId: string): Promise<LayoutPrefs> => {
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { linkView: true, showFolderTags: true },
+      select: { linkView: true, showFolderTags: true, playVideos: true },
     });
     if (!user) return DEFAULT_LAYOUT;
     return {
       view: linkViewFromDb(user.linkView),
       folderTags: user.showFolderTags,
+      playVideos: user.playVideos,
     };
   },
 );
@@ -39,6 +40,9 @@ export async function setLayoutForUser(
       ...(change.view ? { linkView: linkViewToDb(change.view) } : {}),
       ...(change.folderTags !== undefined
         ? { showFolderTags: change.folderTags }
+        : {}),
+      ...(change.playVideos !== undefined
+        ? { playVideos: change.playVideos }
         : {}),
     },
   });

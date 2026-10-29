@@ -2,7 +2,7 @@ import "server-only";
 
 import { auth } from "@/lib/auth";
 import { parseLinkIds } from "@/lib/bulk-links";
-import { SaveLimitError } from "@/lib/entitlements";
+import { LimitError } from "@/lib/entitlements";
 import {
   createFolder,
   deleteFolder,
@@ -101,7 +101,7 @@ export async function saveLinkTool(
     broadcastLinksChanged(link.userId);
     return jsonContent({ ...serializeLink(link), moved: link.moved });
   } catch (e) {
-    if (e instanceof SaveLimitError) {
+    if (e instanceof LimitError) {
       return errorContent(`Limit reached: ${e.message}`);
     }
     if (e instanceof FolderNotFoundError) {

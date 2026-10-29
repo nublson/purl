@@ -21,6 +21,12 @@ function link(over: Partial<PublicLink> = {}): PublicLink {
     favicon: "",
     contentType: "WEB",
     createdAt: new Date("2026-10-02T10:00:00.000Z"),
+    mimeType: null,
+    width: null,
+    height: null,
+    duration: null,
+    embed: false,
+    upload: false,
     ...over,
   };
 }

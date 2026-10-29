@@ -1,12 +1,11 @@
 "use client";
 
-import { Grid, List3 } from "reicon-react";
 import * as React from "react";
 import {
   SHARED_FOLDER_VIEW_COOKIE,
   type SharedFolderView,
 } from "@/lib/shared-folder-view";
-import { Button } from "./ui/button";
+import { ViewToggle } from "./view-toggle";
 
 /** A year: the choice outlives the visit. */
 const VIEW_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
@@ -49,31 +48,8 @@ export function useSharedFolderView() {
   return { view, switched };
 }
 
-/** The header's List / Grid buttons: the current view is filled. */
+/** The header's List / Grid buttons (`ViewToggle`), for this page's view. */
 export function SharedFolderViewToggle() {
   const { view, setView } = React.useContext(ViewContext);
-  const options = [
-    { value: "list", label: "List view", Icon: List3 },
-    { value: "grid", label: "Grid view", Icon: Grid },
-  ] as const;
-  return (
-    <div role="group" aria-label="View" className="flex shrink-0 items-center gap-1">
-      {options.map(({ value, label, Icon }) => {
-        const active = view === value;
-        return (
-          <Button
-            key={value}
-            variant={active ? "secondary" : "ghost"}
-            size="icon-sm"
-            aria-label={label}
-            aria-pressed={active}
-            className={active ? "cursor-pointer" : "cursor-pointer text-muted-foreground"}
-            onClick={() => setView(value)}
-          >
-            <Icon />
-          </Button>
-        );
-      })}
-    </div>
-  );
+  return <ViewToggle view={view} onChange={setView} />;
 }

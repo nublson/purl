@@ -12,12 +12,20 @@ import {
 } from "@/lib/link-selection";
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
 import { haptic } from "@/lib/haptics";
+import { useAudioView } from "@/hooks/use-audio-player";
+import { isViewerKind, linkKind } from "@/lib/link-kind";
+import {
+  consumeReturningFocus,
+  mediaViewer,
+  useIsMediaOpen,
+} from "@/lib/media-viewer";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
-import { formatDomain } from "@/utils/formatter";
+import { linkSecondLine } from "@/lib/upload-meta";
 import { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
+import { AudioRowIcon, AudioRowSecondLine, AudioRowToggle } from "./audio-row";
 import {
   FolderBadge,
   FolderLinkButton,
@@ -29,6 +37,8 @@ import {
 import { HapticTarget } from "./haptic-target";
 import { LinkIcon } from "./link-icon";
 import { LinkPreview } from "./link-preview";
+import { MediaAnchor, ROW_ICON_RADIUS } from "./media-face-anchor";
+import { MediaOpenButton } from "./media-open-button";
 import { Typography } from "./typography";
 import { Checkbox } from "./ui/checkbox";
 import {
@@ -46,6 +56,14 @@ import {
 const LONG_PRESS_MS = 500;
 /** Finger travel that turns a long-press into a scroll. */
 const LONG_PRESS_SLOP = 10;
+
+/**
+ * The row's link or media button: over the whole row, under its controls.
+ * ring-inset: the list clips each row to its box (content-visibility), so a
+ * ring drawn outside it would be cut to the corners.
+ */
+const OPENER_CLASS =
+  "absolute inset-0 z-0 w-full rounded-md outline-none [-webkit-touch-callout:none] focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset";
 
 const LinkMenu = dynamic(() => import("./link-menu").then((m) => m.LinkMenu), {
   loading: () => <div className="size-8" aria-hidden />,
@@ -86,6 +104,17 @@ export const LinkItem = React.forwardRef<
   const folderTag = useFolderTag(link);
   const linkFolder = useLinkFolder(link);
   const badgeArrives = useFolderBadgeArrival(folderTag);
+  // An image or video pearl opens the media viewer (its row's icon is what
+  // the viewer morphs out of); a page opens in a new tab. The landing demo
+  // has no viewer: its rows are links. An audio pearl never opens the
+  // viewer: a click on its row plays and pauses it (the demo's too).
+  const kind = linkKind(link);
+  const audio = kind === "audio";
+  const media = !demo && isViewerKind(kind);
+  // An audio pearl's row is a view of its playback: what its hover preview
+  // starts plays on once the preview closes, until the row leaves.
+  useAudioView(audio ? link.id : null);
+  const viewerOpen = useIsMediaOpen(link.id);
   const longPressRef = React.useRef<{
     timer: ReturnType<typeof setTimeout>;
     x: number;
@@ -109,7 +138,10 @@ export const LinkItem = React.forwardRef<
   const openedByPointerRef = React.useRef(false);
   const descriptionId = React.useId();
   const folderLabelId = React.useId();
-  const anchorRef = React.useRef<HTMLAnchorElement>(null);
+  const anchorRef = React.useRef<HTMLElement | null>(null);
+  const setAnchor = React.useCallback((el: HTMLElement | null) => {
+    anchorRef.current = el;
+  }, []);
   const hoveringActionsRef = React.useRef(false);
   const hoveringPreviewRef = React.useRef(false);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -135,6 +167,8 @@ export const LinkItem = React.forwardRef<
       if (hoveringActionsRef.current) return;
       // No previews while selecting: the pointer is busy picking rows.
       if (linkSelection.selectedIds().length > 0) return;
+      // Nor over the media viewer this row (or another) just opened.
+      if (mediaViewer.getSnapshot().currentId !== null) return;
       openedByPointerRef.current = true;
       setPreviewOpen(true);
     }, previewOpenDelay());
@@ -156,10 +190,11 @@ export const LinkItem = React.forwardRef<
     };
   }, [clearCloseTimer, clearOpenTimer]);
 
-  // Entering selection mode closes an open preview.
+  // Entering selection mode, or opening this pearl in the media viewer,
+  // closes an open preview.
   React.useEffect(() => {
-    if (selecting) setPreviewOpen(false);
-  }, [selecting]);
+    if (selecting || viewerOpen) setPreviewOpen(false);
+  }, [selecting, viewerOpen]);
 
   const cancelLongPress = React.useCallback(() => {
     if (longPressRef.current) clearTimeout(longPressRef.current.timer);
@@ -179,10 +214,118 @@ export const LinkItem = React.forwardRef<
     deleteLinkKeepingFocus({
       linkId: link.id,
       anchor: anchorRef.current,
-      siblingsSelector: '[data-cy="link-item"] > a[href]',
+      // An audio row's is its play button (`data-audio-toggle`).
+      siblingsSelector:
+        '[data-cy="link-item"] > a[href], [data-cy="link-item"] > [data-pearl-button], [data-cy="link-item"] > [data-audio-toggle]',
       byKeyboard,
       onDeleted: notifyLinksChanged,
     });
+
+  // The description, then the folder (the badge is only its emoji).
+  const describedBy =
+    [link.description && descriptionId, folderTag && folderLabelId]
+      .filter(Boolean)
+      .join(" ") || undefined;
+  // Keyboard users get the same preview mouse users get on hover.
+  // Not when the media viewer hands focus back on close: the row's icon is
+  // still morphing back, and nobody navigated here.
+  const openPreviewOnFocus = (event: React.FocusEvent<HTMLElement>) => {
+    if (consumeReturningFocus()) return;
+    if (!event.currentTarget.matches(":focus-visible")) return;
+    clearCloseTimer();
+    openedByPointerRef.current = false;
+    setPreviewOpen(true);
+  };
+  const closePreviewOnBlur = () => {
+    if (!hoveringPreviewRef.current) setPreviewOpen(false);
+  };
+
+  // An audio pearl that's loaded (playing or paused) draws its play/pause
+  // mark in the icon's place.
+  const glyph = audio ? (
+    <AudioRowIcon link={link}>
+      <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
+    </AudioRowIcon>
+  ) : (
+    <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
+  );
+  const icon = arriving ? (
+    <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
+      {glyph}
+    </Typography>
+  ) : (
+    glyph
+  );
+
+  // The row's own handlers: a long-press selects on touch; a mouse or pen
+  // previews.
+  const hostHandlers = {
+    onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
+      if (demo || event.pointerType !== "touch") return;
+      // A press on the row's actions, or inside a portal (the open menu,
+      // whose React events bubble through here), isn't a long-press on
+      // the row: opening the menu takes the lift away from the row, so
+      // the press would select it behind the menu.
+      const target = event.target as Element;
+      if (
+        !event.currentTarget.contains(target) ||
+        target.closest("[data-row-actions]")
+      ) {
+        return;
+      }
+      cancelLongPress();
+      longPressedRef.current = false;
+      longPressRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+        timer: setTimeout(() => {
+          longPressRef.current = null;
+          longPressedRef.current = true;
+          linkSelection.toggle(link.id);
+          haptic("selection");
+        }, LONG_PRESS_MS),
+      };
+    },
+    onPointerMove: (event: React.PointerEvent<HTMLDivElement>) => {
+      const press = longPressRef.current;
+      if (
+        press &&
+        Math.hypot(event.clientX - press.x, event.clientY - press.y) >
+          LONG_PRESS_SLOP
+      ) {
+        cancelLongPress();
+      }
+    },
+    onPointerUp: cancelLongPress,
+    onPointerCancel: cancelLongPress,
+    onContextMenu: (event: React.MouseEvent<HTMLDivElement>) => {
+      // The long-press selected the row; no browser menu on top of it.
+      if (longPressedRef.current) event.preventDefault();
+    },
+    // Previews follow a real mouse only. A tap sends iOS Safari's
+    // emulated mouseover first, and it holds the tap's click until any
+    // short timer started then has run (it waits to see whether the page
+    // reacts to the "hover"): the preview's timers delayed every row tap
+    // by up to their 400ms. Pointer events report the actual pointer, so
+    // touch is skipped while a mouse or a hovering pen still previews.
+    onPointerEnter: (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType === "touch") return;
+      hoveringActionsRef.current = false;
+      scheduleOpen();
+    },
+    onPointerLeave: (event: React.PointerEvent<HTMLDivElement>) => {
+      if (event.pointerType === "touch") return;
+      hoveringActionsRef.current = false;
+      scheduleClose();
+    },
+  };
+
+  // A long-press selected the row: true once, for the click that follows.
+  const consumeLongPress = () => {
+    if (!longPressedRef.current) return false;
+    longPressedRef.current = false;
+    return true;
+  };
 
   const content = (
     <Item
@@ -209,106 +352,74 @@ export const LinkItem = React.forwardRef<
           "animate-in fade-in-0 slide-in-from-left-2 duration-200 ease-out-strong motion-reduce:[--tw-enter-translate-x:0]",
         className,
       )}
-      onPointerDown={(event) => {
-        if (demo || event.pointerType !== "touch") return;
-        // A press on the row's actions, or inside a portal (the open menu,
-        // whose React events bubble through here), isn't a long-press on
-        // the row: opening the menu takes the lift away from the row, so
-        // the press would select it behind the menu.
-        const target = event.target as Element;
-        if (
-          !event.currentTarget.contains(target) ||
-          target.closest("[data-row-actions]")
-        ) {
-          return;
-        }
-        cancelLongPress();
-        longPressedRef.current = false;
-        longPressRef.current = {
-          x: event.clientX,
-          y: event.clientY,
-          timer: setTimeout(() => {
-            longPressRef.current = null;
-            longPressedRef.current = true;
-            linkSelection.toggle(link.id);
-            haptic("selection");
-          }, LONG_PRESS_MS),
-        };
-      }}
-      onPointerMove={(event) => {
-        const press = longPressRef.current;
-        if (
-          press &&
-          Math.hypot(event.clientX - press.x, event.clientY - press.y) >
-            LONG_PRESS_SLOP
-        ) {
-          cancelLongPress();
-        }
-      }}
-      onPointerUp={cancelLongPress}
-      onPointerCancel={cancelLongPress}
-      onContextMenu={(event) => {
-        // The long-press selected the row; no browser menu on top of it.
-        if (longPressedRef.current) event.preventDefault();
-      }}
-      // Previews follow a real mouse only. A tap sends iOS Safari's
-      // emulated mouseover first, and it holds the tap's click until any
-      // short timer started then has run (it waits to see whether the page
-      // reacts to the "hover"): the preview's timers delayed every row tap
-      // by up to their 400ms. Pointer events report the actual pointer, so
-      // touch is skipped while a mouse or a hovering pen still previews.
-      onPointerEnter={(event) => {
-        if (event.pointerType === "touch") return;
-        hoveringActionsRef.current = false;
-        scheduleOpen();
-      }}
-      onPointerLeave={(event) => {
-        if (event.pointerType === "touch") return;
-        hoveringActionsRef.current = false;
-        scheduleClose();
-      }}
+      {...hostHandlers}
       {...rest}
     >
-      <a
-        ref={anchorRef}
-        href={link.url}
-        aria-label={`${link.title} (opens in new tab)`}
-        // The description, then the folder (the badge is only its emoji).
-        aria-describedby={
-          [link.description && descriptionId, folderTag && folderLabelId]
-            .filter(Boolean)
-            .join(" ") || undefined
-        }
-        target="_blank"
-        rel="noopener noreferrer"
-        // While selecting, the row's checkbox is the keyboard and screen
-        // reader control; a click anywhere on the row toggles it.
-        aria-hidden={selecting || undefined}
-        tabIndex={selecting ? -1 : undefined}
-        // ring-inset: the list clips each row to its box (content-visibility),
-        // so a ring drawn outside the link would be cut to the corners.
-        className="absolute inset-0 z-0 w-full rounded-md outline-none [-webkit-touch-callout:none] focus-visible:ring-3 focus-visible:ring-ring focus-visible:ring-inset"
-        onClick={(event) => {
-          if (longPressedRef.current) {
-            longPressedRef.current = false;
-            event.preventDefault();
-            return;
+      {audio ? (
+        // An audio pearl's row plays and pauses it (it never opens the
+        // viewer); while selecting, a click toggles the row instead.
+        <AudioRowToggle
+          ref={setAnchor}
+          link={link}
+          aria-describedby={describedBy}
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={cn(OPENER_CLASS, "cursor-pointer")}
+          onClick={(event) => {
+            if (consumeLongPress()) return true;
+            if (!selecting) return false;
+            linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+            return true;
+          }}
+          onFocus={openPreviewOnFocus}
+          onBlur={closePreviewOnBlur}
+        />
+      ) : media ? (
+        <MediaOpenButton
+          ref={setAnchor}
+          link={link}
+          preset="snappy"
+          selecting={selecting}
+          consumeLongPress={consumeLongPress}
+          aria-describedby={describedBy}
+          // While selecting, the row's checkbox is the keyboard and screen
+          // reader control; a click anywhere on the row toggles it.
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={cn(OPENER_CLASS, "cursor-pointer")}
+          onClick={(event) =>
+            linkSelection.toggle(link.id, { shiftKey: event.shiftKey })
           }
-          if (!selecting) return;
-          event.preventDefault();
-          linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-        }}
-        onFocus={(event) => {
-          // Keyboard users get the same preview mouse users get on hover.
-          if (!event.currentTarget.matches(":focus-visible")) return;
-          clearCloseTimer();
-          openedByPointerRef.current = false;
-          setPreviewOpen(true);
-        }}
-        onBlur={() => {
-          if (!hoveringPreviewRef.current) setPreviewOpen(false);
-        }}
-      />
+          onFocus={openPreviewOnFocus}
+          onBlur={closePreviewOnBlur}
+        />
+      ) : (
+        <a
+          ref={setAnchor}
+          href={link.url}
+          aria-label={`${link.title} (opens in new tab)`}
+          aria-describedby={describedBy}
+          target="_blank"
+          rel="noopener noreferrer"
+          // While selecting, the row's checkbox is the keyboard and screen
+          // reader control; a click anywhere on the row toggles it.
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={OPENER_CLASS}
+          onClick={(event) => {
+            if (longPressedRef.current) {
+              longPressedRef.current = false;
+              event.preventDefault();
+              return;
+            }
+            if (!selecting) return;
+            event.preventDefault();
+            linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+          }}
+          onFocus={openPreviewOnFocus}
+          onBlur={closePreviewOnBlur}
+        />
+      )}
       {link.description ? (
         <span id={descriptionId} className="sr-only">
           {link.description}
@@ -341,15 +452,23 @@ export const LinkItem = React.forwardRef<
                   ? "opacity-0 motion-safe:scale-80"
                   : // Keyboard focus only: a mouse click leaves focus on the
                     // checkbox, and the favicon must come back once you move away.
-                    "[@media(hover:hover)]:group-hover/item:opacity-0 motion-safe:[@media(hover:hover)]:group-hover/item:scale-80 group-has-[:focus-visible]/media:opacity-0 motion-safe:group-has-[:focus-visible]/media:scale-80",
+                    // While its icon morphs to or from the media viewer it
+                    // stays whole, hovered or not: the morph lands in it.
+                    "[@media(hover:hover)]:group-hover/item:opacity-0 motion-safe:[@media(hover:hover)]:group-hover/item:scale-80 group-has-[:focus-visible]/media:opacity-0 motion-safe:group-has-[:focus-visible]/media:scale-80 group-has-[[data-pearl-morphing]]/item:opacity-100! group-has-[[data-pearl-morphing]]/item:scale-100!",
             )}
           >
-            {arriving ? (
-              <Typography component="span" className={cn("flex", ARRIVE_ICON)}>
-                <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
-              </Typography>
+            {/* A media pearl's icon is the viewer's morph anchor (the
+                badge stays outside it: it overhangs the icon's corner). */}
+            {media ? (
+              <MediaAnchor
+                link={link}
+                radius={ROW_ICON_RADIUS}
+                className="flex size-5 max-md:size-6"
+              >
+                {icon}
+              </MediaAnchor>
             ) : (
-              <LinkIcon link={link} size="row" eagerFavicon={eagerFavicon} />
+              icon
             )}
             {/* Home, with folder tags on: the link's folder on the favicon's
                 corner. Fades with the favicon when the checkbox shows. */}
@@ -370,7 +489,8 @@ export const LinkItem = React.forwardRef<
                   "absolute inset-0.5 z-10 size-4 cursor-pointer bg-background max-md:size-5 transition-[opacity,scale,box-shadow] duration-150 ease-out-strong",
                   selecting
                     ? "opacity-100"
-                    : "opacity-0 motion-safe:scale-125 focus-visible:opacity-100 motion-safe:focus-visible:scale-100 [@media(hover:hover)]:group-hover/item:opacity-100 motion-safe:[@media(hover:hover)]:group-hover/item:scale-100",
+                    : // Hidden while the icon morphs (the favicon shows).
+                      "opacity-0 motion-safe:scale-125 focus-visible:opacity-100 motion-safe:focus-visible:scale-100 [@media(hover:hover)]:group-hover/item:opacity-100 motion-safe:[@media(hover:hover)]:group-hover/item:scale-100 group-has-[[data-pearl-morphing]]/item:opacity-0!",
                 )}
                 onClick={(event) => {
                   event.preventDefault();
@@ -426,7 +546,7 @@ export const LinkItem = React.forwardRef<
               arriving && ARRIVE_LATE,
             )}
           >
-            {formatDomain(link.domain)}
+            {audio ? <AudioRowSecondLine link={link} /> : linkSecondLine(link)}
           </Typography>
           {/* The favicon's folder badge, named for screen readers (and the
               link's description). */}

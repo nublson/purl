@@ -11,7 +11,11 @@ import {
   getEnabledProviders,
   getSocialProviders,
 } from "@/lib/auth-providers";
-import { assignUsernameOnCreate, revokeSaveOnlyAppsOnSignOut } from "@/lib/auth-hooks";
+import {
+  assignUsernameOnCreate,
+  deleteUserBlobsAfterDelete,
+  revokeSaveOnlyAppsOnSignOut,
+} from "@/lib/auth-hooks";
 import { ADVERTISED_SCOPES, SAVE_SCOPE } from "@/lib/oauth-scopes";
 import { API_KEY_PREFIX, getPurlApiKey } from "@/lib/api-key-getter";
 
@@ -59,6 +63,9 @@ export const auth = betterAuth({
   user: {
     deleteUser: {
       enabled: true,
+      afterDelete: async (user) => {
+        await deleteUserBlobsAfterDelete(user);
+      },
     },
     additionalFields: {
       username: {

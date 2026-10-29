@@ -5,6 +5,7 @@ import { Item, ItemActions, ItemContent, ItemTitle } from "./ui/item";
 
 export type UsageMeterData = {
   saves: { used: number; cap: number };
+  storage: { used: number; cap: number };
 };
 
 export type UsageItemProps = {
@@ -12,9 +13,17 @@ export type UsageItemProps = {
   period?: string;
   used: number;
   cap: number | null;
+  /** Formats the used and cap numbers; defaults to `toLocaleString()`. */
+  format?: (n: number) => string;
 };
 
-export function UsageItem({ label, period, used, cap }: UsageItemProps) {
+export function UsageItem({
+  label,
+  period,
+  used,
+  cap,
+  format = (n) => n.toLocaleString(),
+}: UsageItemProps) {
   const pct = cap != null && cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
 
   return (
@@ -24,7 +33,7 @@ export function UsageItem({ label, period, used, cap }: UsageItemProps) {
       </ItemContent>
       <ItemActions>
         <Typography component="span" size="mini" className="tabular-nums">
-          {used.toLocaleString()} / {cap == null ? "∞" : cap.toLocaleString()}{period ? ` · ${period}` : ""}
+          {format(used)} / {cap == null ? "∞" : format(cap)}{period ? ` · ${period}` : ""}
         </Typography>
       </ItemActions>
       <div

@@ -45,9 +45,35 @@ const LINK_ROW = {
   createdAt: new Date("2026-10-01T00:00:00Z"),
   description: "About A",
   thumbnail: "https://a.example/og.png",
+  mimeType: "image/png",
+  width: 800,
+  height: 600,
+  duration: null,
+  embed: false,
   // Private fields the page must not expose:
   userId: "u1",
   folderId: "f1",
+  fileKey: "users/u1/c1/a.png",
+  fileSize: 1234,
+};
+
+/** What visitors get for LINK_ROW: `upload` instead of the file key and size. */
+const PUBLIC_LINK = {
+  id: "l1",
+  url: "https://a.example",
+  title: "A",
+  description: "About A",
+  thumbnail: "https://a.example/og.png",
+  domain: "a.example",
+  favicon: "https://a.example/favicon.ico",
+  contentType: "WEB",
+  createdAt: new Date("2026-10-01T00:00:00Z"),
+  mimeType: "image/png",
+  width: 800,
+  height: 600,
+  duration: null,
+  embed: false,
+  upload: true,
 };
 
 describe("getPublicFolderPage", () => {
@@ -75,19 +101,7 @@ describe("getPublicFolderPage", () => {
       kind: "folder",
       owner: { name: "Nubelson", image: "https://img/a.png", username: "nublson" },
       folder: { name: "Design", slug: "design", emoji: "🦪", description: "Good stuff" },
-      links: [
-        {
-          id: "l1",
-          url: "https://a.example",
-          title: "A",
-          description: "About A",
-          thumbnail: "https://a.example/og.png",
-          domain: "a.example",
-          favicon: "https://a.example/favicon.ico",
-          contentType: "WEB",
-          createdAt: new Date("2026-10-01T00:00:00Z"),
-        },
-      ],
+      links: [PUBLIC_LINK],
       nextCursor: "next",
     });
   });
@@ -178,19 +192,7 @@ describe("listPublicFolderLinks", () => {
       contentType: null,
       folderId: "f1",
     });
-    expect(links).toEqual([
-      {
-        id: "l1",
-        url: "https://a.example",
-        title: "A",
-        description: "About A",
-        thumbnail: "https://a.example/og.png",
-        domain: "a.example",
-        favicon: "https://a.example/favicon.ico",
-        contentType: "WEB",
-        createdAt: new Date("2026-10-01T00:00:00Z"),
-      },
-    ]);
+    expect(links).toEqual([PUBLIC_LINK]);
     expect(nextCursor).toBeNull();
   });
 

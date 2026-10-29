@@ -46,6 +46,9 @@ export function SettingsDialog({
   return (
     <DialogWrapper
       className="dialog-top"
+      // While it's open the page ignores drags (DropHandler), so the Import
+      // tab's own drop zone keeps them.
+      contentData={{ "data-settings-dialog": true }}
       open={open}
       onOpenChange={onOpenChange}
       title="Settings"

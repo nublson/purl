@@ -24,6 +24,8 @@ interface DialogWrapperProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   className?: string;
+  /** `data-*` attributes for the dialog's content element. */
+  contentData?: Record<`data-${string}`, string | boolean>;
 }
 
 export function DialogWrapper({
@@ -34,6 +36,7 @@ export function DialogWrapper({
   open: controlledOpen,
   onOpenChange: controlledOnOpenChange,
   className,
+  contentData,
 }: DialogWrapperProps) {
   const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false);
   const open = controlledOpen ?? uncontrolledOpen;
@@ -43,6 +46,7 @@ export function DialogWrapper({
     <Dialog open={open} onOpenChange={onOpenChange}>
       {children ? <DialogTrigger asChild>{children}</DialogTrigger> : null}
       <DialogContent
+        {...contentData}
         className={cn(
           "gap-4 px-0 z-51",
           // pb-5 + the scroll area's pb-1 keep the 24px bottom inset.

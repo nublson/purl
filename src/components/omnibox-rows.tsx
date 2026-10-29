@@ -141,7 +141,19 @@ export function OmniboxSaveRow({
   const saved = preview ? preview.saved : alreadySaved;
   const shown = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
   const link: Link | null = preview
-    ? { ...preview, id: "preview", createdAt: new Date(0), folderId: null }
+    ? {
+        ...preview,
+        id: "preview",
+        createdAt: new Date(0),
+        folderId: null,
+        mimeType: null,
+        width: null,
+        height: null,
+        duration: null,
+        frameable: null,
+        embed: false,
+        upload: false,
+      }
     : null;
 
   // Saved, but not in this folder's list: saving moves it here.

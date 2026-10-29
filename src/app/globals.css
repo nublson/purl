@@ -293,6 +293,32 @@ body {
   }
 }
 
+/* The playing bars (`EqualizerBars`): each bar rests at its own height
+   (`--eq-rest`) and, unless reduced motion is asked for, bobs between
+   `--eq-low` and full height on its own period, so the three never line
+   up. At rest they still read as "playing": the paused pearl shows the
+   play mark instead, so the state never rides on motion alone. */
+@keyframes eq-bar {
+  0%,
+  100% {
+    transform: scaleY(var(--eq-low));
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+[data-eq-bar] {
+  transform: scaleY(var(--eq-rest));
+  transform-origin: bottom;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-eq-bar] {
+    animation: eq-bar var(--eq-ms) ease-in-out var(--eq-delay) infinite;
+  }
+}
+
 /* Code blocks: shiki emits --shiki-light / --shiki-dark on every token. */
 .shiki span {
   color: var(--shiki-light);

@@ -1,6 +1,7 @@
 "use client";
 
 import { linksOriginHeaders } from "@/lib/links-origin";
+import { requestUsageRefresh } from "@/lib/usage-events";
 import { useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
@@ -199,6 +200,9 @@ export function deleteLinksWithUndo(
         restore(`Unable to delete ${what}. Try again.`);
         return;
       }
+      // An upload frees storage; only ids are known here, and a refetch is
+      // cheap, so any delete refreshes Settings → Usage.
+      requestUsageRefresh();
       onDeleted();
     } catch {
       restore(`Unable to delete ${what}. Check your connection and try again.`);

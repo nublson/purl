@@ -17,6 +17,8 @@ enum ContentType {
   YOUTUBE
   PDF
   AUDIO
+  IMAGE
+  VIDEO
 }
 
 enum LinkView {
@@ -43,6 +45,8 @@ model User {
   linkView      LinkView  @default(LIST)
   /// Whether Home tags each link with its folder (emoji and name).
   showFolderTags Boolean  @default(false)
+  /// Whether video pearls play (muted) in the grid while in view; off plays on hover only.
+  playVideos    Boolean   @default(true)
 
   @@unique([email])
   @@map("users")
@@ -66,8 +70,24 @@ model Link {
   readAt      DateTime?
   /// Saved without metadata (bulk import); the background top-up fills it in.
   needsMetadata Boolean @default(false)
+  /// Blob pathname of an uploaded file; null for links. "Is an upload" is `fileKey !== null`.
+  fileKey     String?
+  /// Size of the uploaded file in bytes (the storage quota sums it).
+  fileSize    Int?
+  /// MIME type of an upload or a media link (the player and Accept checks).
+  mimeType    String?
+  /// Pixel size of an image or video, when known (the grid reserves the card's shape).
+  width       Int?
+  height      Int?
+  /// Length of a video or audio upload in whole seconds (the duration pill).
+  duration    Int?
+  /// Whether the page allows being framed (from its headers at save); null = unknown or not a page.
+  frameable   Boolean?
+  /// Owner's choice: show the page live in an iframe ("Show live").
+  embed       Boolean     @default(false)
 
   @@index([userId, createdAt])
+  @@index([userId, fileKey])
   @@index([userId, folderId, createdAt])
   @@index([needsMetadata, createdAt])
   @@map("links")

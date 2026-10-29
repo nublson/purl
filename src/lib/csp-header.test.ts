@@ -17,4 +17,12 @@ describe("buildContentSecurityPolicy", () => {
       "frame-src 'self' https://vercel.live https://*.vercel.live https://www.youtube-nocookie.com",
     );
   });
+
+  it("lets video and audio play from any host and from local blob: previews", () => {
+    const policy = buildContentSecurityPolicy();
+    const mediaSrc = policy
+      .split("; ")
+      .find((directive) => directive.startsWith("media-src"));
+    expect(mediaSrc).toBe("media-src 'self' blob: https: http:");
+  });
 });

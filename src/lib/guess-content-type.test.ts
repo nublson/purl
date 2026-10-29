@@ -22,6 +22,17 @@ describe("guessContentType", () => {
     },
   );
 
+  it.each(["jpg", "jpeg", "png", "gif", "webp", "avif", "svg"])(
+    "detects .%s as an image",
+    (ext) => {
+      expect(guessContentType(`https://x.test/a.${ext}`)).toBe("IMAGE");
+    },
+  );
+
+  it.each(["mp4", "webm", "mov", "m4v"])("detects .%s as video", (ext) => {
+    expect(guessContentType(`https://x.test/a.${ext}`)).toBe("VIDEO");
+  });
+
   it("falls back to WEB", () => {
     expect(guessContentType("https://example.com/page")).toBe("WEB");
     expect(guessContentType("nonsense")).toBe("WEB");

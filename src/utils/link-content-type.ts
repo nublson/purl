@@ -1,5 +1,7 @@
-import { detectContentTypeWithFetch } from "@/utils/link-content-type-shared";
-import type { Link } from "@/utils/links";
+import {
+  detectContentTypeWithFetch,
+  type DetectedContentType,
+} from "@/utils/link-content-type-shared";
 
 /**
  * Client-safe URL content-type detection (plain `fetch`; subject to browser CORS).
@@ -7,6 +9,6 @@ import type { Link } from "@/utils/links";
  */
 export async function detectContentType(
   url: string,
-): Promise<Link["contentType"]> {
+): Promise<DetectedContentType> {
   return detectContentTypeWithFetch(url, fetch);
 }

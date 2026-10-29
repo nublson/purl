@@ -13,6 +13,14 @@ export type Link = {
   contentType: ContentType;
   createdAt: Date;
   folderId: string | null;
+  mimeType: string | null;
+  width: number | null;
+  height: number | null;
+  duration: number | null;
+  frameable: boolean | null;
+  embed: boolean;
+  /** An uploaded file (derived from `fileKey`, which is never sent to clients). */
+  upload: boolean;
 };
 
 export type LinkGroup = {

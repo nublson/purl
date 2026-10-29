@@ -39,7 +39,7 @@ export async function resetTestUserData(userId: string): Promise<void> {
   // The layout is saved on the account: every test starts in the list,
   // without folder tags.
   await pool.query(
-    `UPDATE "users" SET "linkView" = 'LIST', "showFolderTags" = false WHERE "id" = $1`,
+    `UPDATE "users" SET "linkView" = 'LIST', "showFolderTags" = false, "playVideos" = true WHERE "id" = $1`,
     [userId],
   );
 }
@@ -58,19 +58,33 @@ export async function seedLink(
     description,
     folderId,
     contentType,
+    thumbnail,
+    mimeType,
+    width,
+    height,
+    duration,
+    fileKey,
+    fileSize,
   }: {
     url: string;
     title?: string;
     description?: string;
     folderId?: string;
-    contentType?: "WEB" | "YOUTUBE" | "PDF" | "AUDIO";
+    contentType?: "WEB" | "YOUTUBE" | "PDF" | "AUDIO" | "IMAGE" | "VIDEO";
+    thumbnail?: string;
+    mimeType?: string;
+    width?: number;
+    height?: number;
+    duration?: number;
+    fileKey?: string;
+    fileSize?: number;
   },
 ): Promise<string> {
   const domain = new URL(url).hostname;
   const id = randomUUID();
   await pool.query(
-    `INSERT INTO "links" ("id", "url", "title", "description", "favicon", "domain", "userId", "folderId", "contentType")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    `INSERT INTO "links" ("id", "url", "title", "description", "favicon", "domain", "userId", "folderId", "contentType", "thumbnail", "mimeType", "width", "height", "duration", "fileKey", "fileSize")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
     [
       id,
       url,
@@ -81,6 +95,13 @@ export async function seedLink(
       userId,
       folderId ?? null,
       contentType ?? "WEB",
+      thumbnail ?? null,
+      mimeType ?? null,
+      width ?? null,
+      height ?? null,
+      duration ?? null,
+      fileKey ?? null,
+      fileSize ?? null,
     ],
   );
   return id;

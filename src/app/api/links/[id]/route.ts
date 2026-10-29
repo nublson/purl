@@ -12,6 +12,7 @@ import {
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { LINKS_ORIGIN_HEADER, parseLinksOrigin } from "@/lib/realtime-constants";
 import { serializeLink } from "@/lib/serialize-link";
+import { InvalidUploadError } from "@/lib/uploads";
 import { isValidUrl } from "@/utils/url";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
@@ -34,6 +35,12 @@ export async function GET(
     throw e;
   }
 }
+
+/** `url` sent for an upload (`updateLinkForUser` throws `InvalidUploadError`). */
+const UPLOAD_URL_ERROR = {
+  error: "An upload's file can't be changed",
+  code: "INVALID_UPLOAD",
+};
 
 type PatchBody = UpdateLinkData & { folderId?: string | null };
 
@@ -131,6 +138,9 @@ export async function PATCH(
     }
     if (e instanceof FolderNotFoundError) {
       return NextResponse.json({ error: "Folder not found" }, { status: 404 });
+    }
+    if (e instanceof InvalidUploadError) {
+      return NextResponse.json(UPLOAD_URL_ERROR, { status: 400 });
     }
     throw e;
   }

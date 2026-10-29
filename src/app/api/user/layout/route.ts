@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 /**
  * Saves the current user's layout settings: `{ view?: "list" | "grid",
- * folderTags?: boolean }`, at least one. Responds with what was saved.
+ * folderTags?: boolean, playVideos?: boolean }`, at least one. Responds with what was saved.
  */
 export async function PATCH(request: NextRequest) {
   const userId = await getBrowserSessionUserId();
@@ -24,7 +24,8 @@ export async function PATCH(request: NextRequest) {
   if (!change) {
     return NextResponse.json(
       {
-        error: 'Send view ("list" or "grid") and/or folderTags (true or false)',
+        error:
+          'Send view ("list" or "grid"), folderTags (true or false) and/or playVideos (true or false)',
         code: "INVALID_LAYOUT",
       },
       { status: 400 },

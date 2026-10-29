@@ -1,4 +1,4 @@
-import { SaveLimitError } from "@/lib/entitlements";
+import { LimitError } from "@/lib/entitlements";
 import { FolderNotFoundError } from "@/lib/folders";
 import {
   createLink,
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
         NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
       );
     }
-    if (e instanceof SaveLimitError) {
+    if (e instanceof LimitError) {
       return withCors(
         request,
         NextResponse.json(

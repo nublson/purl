@@ -74,10 +74,15 @@ vi.mock("@/lib/serialize-link", () => ({
   serializeLink: (link: unknown) => link,
 }));
 
-class MockSaveLimitError extends Error {
+class MockLimitError extends Error {}
+class MockSaveLimitError extends MockLimitError {
   readonly feature = "SAVE_LIMIT";
 }
+class MockStorageLimitError extends MockLimitError {
+  readonly feature = "STORAGE_LIMIT";
+}
 vi.mock("@/lib/entitlements", () => ({
+  LimitError: MockLimitError,
   SaveLimitError: MockSaveLimitError,
 }));
 
@@ -643,6 +648,15 @@ describe("saveLinkTool", () => {
     const result = await saveLinkTool("user-1", "https://example.com");
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toBe("Limit reached: Save limit reached");
+  });
+
+  it("surfaces the storage-limit error as tool error text", async () => {
+    mockCreateLinkForUser.mockRejectedValue(
+      new MockStorageLimitError("Storage is full"),
+    );
+    const result = await saveLinkTool("user-1", "https://example.com");
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe("Limit reached: Storage is full");
   });
 
   it("passes folderId through to createLinkForUser", async () => {

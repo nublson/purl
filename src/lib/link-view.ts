@@ -7,21 +7,26 @@
 export type LinkView = "list" | "grid";
 
 /**
- * The owner's layout settings, saved on the account: the view, and whether
+ * The owner's layout settings, saved on the account: the view, whether
  * Home tags each link with its folder (`User.showFolderTags`, off by
- * default).
+ * default) and whether video pearls play in the grid while in view
+ * (`User.playVideos`, on by default; off plays on hover only).
  */
-export type LayoutPrefs = { view: LinkView; folderTags: boolean };
+export type LayoutPrefs = { view: LinkView; folderTags: boolean; playVideos: boolean };
 
-export const DEFAULT_LAYOUT: LayoutPrefs = { view: "list", folderTags: false };
+export const DEFAULT_LAYOUT: LayoutPrefs = {
+  view: "list",
+  folderTags: false,
+  playVideos: true,
+};
 
 /**
- * A layout change from a request body: `view` and/or `folderTags`, at
- * least one, each valid; null otherwise.
+ * A layout change from a request body: `view`, `folderTags` and/or
+ * `playVideos`, at least one, each valid; null otherwise.
  */
 export function parseLayoutChange(body: unknown): Partial<LayoutPrefs> | null {
   if (body === null || typeof body !== "object") return null;
-  const record = body as { view?: unknown; folderTags?: unknown };
+  const record = body as { view?: unknown; folderTags?: unknown; playVideos?: unknown };
   const change: Partial<LayoutPrefs> = {};
   if ("view" in record) {
     const view = parseLinkView(record.view);
@@ -31,6 +36,10 @@ export function parseLayoutChange(body: unknown): Partial<LayoutPrefs> | null {
   if ("folderTags" in record) {
     if (typeof record.folderTags !== "boolean") return null;
     change.folderTags = record.folderTags;
+  }
+  if ("playVideos" in record) {
+    if (typeof record.playVideos !== "boolean") return null;
+    change.playVideos = record.playVideos;
   }
   return Object.keys(change).length > 0 ? change : null;
 }

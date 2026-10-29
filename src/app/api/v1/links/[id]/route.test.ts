@@ -31,6 +31,13 @@ vi.mock("@/lib/folders", () => ({
   FolderNotFoundError: MockFolderNotFoundError,
 }));
 
+class MockInvalidUploadError extends Error {
+  readonly code = "INVALID_UPLOAD";
+}
+vi.mock("@/lib/uploads", () => ({
+  InvalidUploadError: MockInvalidUploadError,
+}));
+
 class MockUnauthorizedError extends Error {
   constructor() { super("Unauthorized"); }
 }
@@ -168,6 +175,27 @@ describe("PATCH /api/v1/links/:id", () => {
       { params }
     );
     expect(res.status).toBe(400);
+  });
+
+  it("returns 400 INVALID_UPLOAD when the url of an upload is changed", async () => {
+    mockUpdateLink.mockRejectedValue(
+      new MockInvalidUploadError("An upload's file can't be changed"),
+    );
+    const { PATCH } = await import("./route");
+    const res = await PATCH(
+      new NextRequest("http://localhost/api/v1/links/link-1", {
+        method: "PATCH",
+        body: JSON.stringify({ url: "https://example.com/other" }),
+        headers: { "content-type": "application/json" },
+      }),
+      { params }
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "An upload's file can't be changed",
+      code: "INVALID_UPLOAD",
+    });
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   });
 
   it("returns 400 for invalid URL", async () => {

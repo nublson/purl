@@ -17,6 +17,7 @@ import {
 } from "@/lib/folder-client";
 import type { FolderSummary } from "@/lib/folders";
 import { saveFolderOrder } from "@/lib/folder-order";
+import { requestUsageRefresh } from "@/lib/usage-events";
 import { resolveCurrentFolder } from "@/lib/current-folder";
 import {
   formatBulkMoveMessage,
@@ -227,6 +228,8 @@ export function useFolderActions(): {
         if (result.data.deletedLinks > 0 && knownTotal !== null) {
           setLinksTotal(Math.max(0, knownTotal - result.data.deletedLinks));
         }
+        // Deleted uploads free storage (Settings → Usage).
+        if (result.data.deletedLinks > 0) requestUsageRefresh();
         toast.success(
           result.data.deletedLinks > 0
             ? `Folder and ${formatLinkCount(result.data.deletedLinks)} deleted`
