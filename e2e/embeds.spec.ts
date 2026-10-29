@@ -121,6 +121,23 @@ test.describe("Live grid cards", () => {
       .toBeGreaterThan(0);
     await page.locator("main").evaluate((el) => (el.scrollTop = 0));
 
+    // Not active, the page is out of the Tab order: neither Tab from the
+    // card's opener (before the frame) nor Shift+Tab from the cover (after
+    // it) lands inside the frame.
+    const insideButton = page
+      .frameLocator('iframe[title="Live demo"]')
+      .getByRole("button", { name: "Inside" });
+    const activeTag = () =>
+      page.evaluate(() => document.activeElement?.tagName.toLowerCase());
+    await card.locator("[data-pearl-button]").first().focus();
+    await page.keyboard.press("Tab");
+    expect(await activeTag()).not.toBe("iframe");
+    await expect(insideButton).not.toBeFocused();
+    await cover.focus();
+    await page.keyboard.press("Shift+Tab");
+    expect(await activeTag()).not.toBe("iframe");
+    await expect(insideButton).not.toBeFocused();
+
     // A click makes it active: the ring, no cover, the page takes the pointer.
     await cover.click();
     await expect(face).toHaveAttribute("data-active", "true");
@@ -192,10 +209,17 @@ test.describe("Live grid cards", () => {
     await a.getByRole("button", { name: "Interact with Live A" }).click();
     await expect(a.locator('[data-face="embed"]')).toHaveAttribute("data-active", "true");
 
-    await a.hover();
-    await a.getByRole("button", { name: "Open link menu" }).click();
-    await page.getByRole("menuitem", { name: "Delete" }).click();
+    // By keyboard: no pointerdown outside the card, so only the card going
+    // away can leave it.
+    const menuButton = a.getByRole("button", { name: "Open link menu" });
+    await waitForHydration(page, '[data-cy="link-card"] [aria-label="Open link menu"]');
+    await menuButton.focus();
+    await page.keyboard.press("Enter");
+    const del = page.getByRole("menuitem", { name: "Delete" });
+    await del.focus();
+    await page.keyboard.press("Enter");
     await expect(a).toHaveCount(0);
+    await expect(page.locator('[data-face="embed"][data-active]')).toHaveCount(0);
 
     const coverB = b.getByRole("button", { name: "Interact with Live B" });
     await coverB.click();

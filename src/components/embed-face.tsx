@@ -4,6 +4,7 @@ import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useLiveCards } from "@/hooks/use-live-cards";
 import { activeEmbed, useIsActiveEmbed } from "@/lib/active-embed";
 import { linkSelection, useIsSelectionActive } from "@/lib/link-selection";
+import { useIsMediaOpen } from "@/lib/media-viewer";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
@@ -89,6 +90,7 @@ export function EmbedFace({
   const coarse = useIsCoarsePointer();
   const selecting = useIsSelectionActive() && !demo;
   const active = useIsActiveEmbed(link.id);
+  const inViewer = useIsMediaOpen(link.id);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const live = useLiveCards(boxRef, !coarse && !demo && !failed);
@@ -102,11 +104,12 @@ export function EmbedFace({
     return () => clearTimeout(timer);
   }, [framed, loaded]);
 
-  // Leaving: no frame any more (the slot lost), a selection starting, or
-  // the card going away.
+  // Leaving: no frame any more (the slot lost), a selection starting, the
+  // pearl opening in the media viewer ("Open large": the viewer owns Esc and
+  // focus from then on), or the card going away.
   useEffect(() => {
-    if (!framed || selecting) activeEmbed.clearIf(link.id);
-  }, [framed, selecting, link.id]);
+    if (!framed || selecting || inViewer) activeEmbed.clearIf(link.id);
+  }, [framed, selecting, inViewer, link.id]);
   useEffect(() => () => activeEmbed.clearIf(link.id), [link.id]);
 
   // While active: Esc (with focus in Purl: inside the frame it's the page's)
@@ -158,7 +161,9 @@ export function EmbedFace({
         <EmbedFrame
           link={link}
           data-state={loaded ? "loaded" : "loading"}
-          inert={selecting}
+          // Out of the Tab order (and the pointer's reach) until the card
+          // is active; it still loads and paints.
+          inert={selecting || !active}
           onLoad={() => setLoaded(true)}
           className={cn(
             "absolute inset-0 size-full border-0 bg-background motion-safe:transition-opacity motion-safe:duration-150 motion-safe:ease-out-strong",
