@@ -11,6 +11,12 @@ export const SWEEP_BUDGET = 500;
 /** Blob's `list` page size (its maximum). */
 const LIST_PAGE_SIZE = 1000;
 
+/** The owner in a blob's pathname (`users/<userId>/…`), else null. */
+function ownerOf(pathname: string): string | null {
+  const match = /^users\/([^/]+)\//.exec(pathname);
+  return match ? match[1] : null;
+}
+
 export type SweepResult = {
   /** Every blob seen under `users/`, old or not. */
   listed: number;
@@ -26,7 +32,9 @@ export type SweepResult = {
  * between the upload and its row, a delete whose `del` failed, a retry that
  * made a new preview.
  * Pages through `users/`, one lookup and one `del` per page, never deleting
- * more than `budget`. A failed `del` is logged and the run goes on; a failed
+ * more than `budget`. The lookup is scoped to the page's owners (each blob's
+ * path names its user), so it reads through the `userId` indexes rather
+ * than every upload row; a blob whose path names no user is left alone. A failed `del` is logged and the run goes on; a failed
  * `list` (or lookup) ends it with what was counted. Never throws.
  */
 export async function sweepOrphanUploads({
@@ -43,15 +51,21 @@ export async function sweepOrphanUploads({
       const page = await list({ prefix: "users/", cursor, limit: LIST_PAGE_SIZE });
       result.listed += page.blobs.length;
 
-      const urls = page.blobs
-        .filter((blob) => new Date(blob.uploadedAt).getTime() < cutoff)
-        .map((blob) => blob.url);
+      const old = page.blobs.filter(
+        (blob) =>
+          new Date(blob.uploadedAt).getTime() < cutoff &&
+          ownerOf(blob.pathname) !== null,
+      );
+      const urls = old.map((blob) => blob.url);
       if (urls.length > 0) {
+        const owners = [...new Set(old.map((blob) => ownerOf(blob.pathname)!))];
         const referenced = new Set<string>();
         const rows = await prisma.link.findMany({
           // Only upload rows count: a page link saved with a blob's URL
-          // doesn't keep it.
+          // doesn't keep it. The owner's own rows only: a blob lives under
+          // its owner's prefix, and only their uploads point at it.
           where: {
+            userId: { in: owners },
             fileKey: { not: null },
             OR: [{ url: { in: urls } }, { thumbnail: { in: urls } }],
           },

@@ -38,38 +38,59 @@ export function LinkIcon({
     case "VIDEO":
       return <Video className={icon} />;
     case "IMAGE": {
-      // The image itself (its preview, else the file), as a rounded square.
-      const previewSrc = safeRemoteImgSrc(link.thumbnail ?? link.url);
-      return previewSrc ? (
-        <RemoteFavicon
-          key={previewSrc}
-          src={previewSrc}
-          px={px}
-          box={box}
-          icon={icon}
-          eager={eagerFavicon}
-          cover
-        />
-      ) : (
-        <Globe className={cn(icon, "text-muted-foreground")} aria-hidden />
-      );
+      // An upload's own preview (a 1,280px WebP), as a rounded square. A
+      // saved image link has no smaller copy (its thumbnail is the file
+      // itself, megabytes for a 20px icon), nor does a GIF upload: those
+      // show their favicon, like any link.
+      const previewSrc =
+        link.upload && link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
+      if (previewSrc) {
+        return (
+          <RemoteFavicon
+            key={previewSrc}
+            src={previewSrc}
+            px={px}
+            box={box}
+            icon={icon}
+            eager={eagerFavicon}
+            cover
+          />
+        );
+      }
+      return <Favicon link={link} px={px} box={box} icon={icon} eager={eagerFavicon} />;
     }
-    default: {
-      const faviconSrc = safeRemoteImgSrc(link.favicon);
-      return faviconSrc ? (
-        <RemoteFavicon
-          key={faviconSrc}
-          src={faviconSrc}
-          px={px}
-          box={box}
-          icon={icon}
-          eager={eagerFavicon}
-        />
-      ) : (
-        <Globe className={cn(icon, "text-muted-foreground")} aria-hidden />
-      );
-    }
+    default:
+      return <Favicon link={link} px={px} box={box} icon={icon} eager={eagerFavicon} />;
   }
+}
+
+/** The link's favicon, else the globe. */
+function Favicon({
+  link,
+  px,
+  box,
+  icon,
+  eager,
+}: {
+  link: Pick<Link, "favicon">;
+  px: number;
+  box: string;
+  icon: string;
+  eager: boolean;
+}) {
+  const faviconSrc = safeRemoteImgSrc(link.favicon);
+  return faviconSrc ? (
+    <RemoteFavicon
+      key={faviconSrc}
+      src={faviconSrc}
+      px={px}
+      box={box}
+      icon={icon}
+      eager={eager}
+    />
+  ) : (
+    <Globe className={cn(icon, "text-muted-foreground")} aria-hidden />
+  );
 }
 
 /**

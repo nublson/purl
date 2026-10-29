@@ -42,6 +42,9 @@ const linksPostLimiter = () => makeLimiter("links_post", 30, "1 m");
 // Each uploaded file asks for two tokens (the file and its preview), so a
 // 20-file drop needs 40.
 const uploadsTokenLimiter = () => makeLimiter("uploads_token", 120, "1 m");
+// The row request (`POST /api/uploads`), one per file: half the tokens'
+// budget, so a drop the tokens let through never fails at its last step.
+const uploadsRowLimiter = () => makeLimiter("uploads_row", 60, "1 m");
 // Per user, in the route: a token taken for a file that never becomes a link
 // isn't counted against storage, so this bounds what such orphans can hold.
 const uploadsTokenUserLimiter = () =>
@@ -65,6 +68,7 @@ const mcpLimiter = () => makeLimiter("mcp", 60, "1 m");
 let cachedAuth: Ratelimit | null | undefined;
 let cachedLinksPost: Ratelimit | null | undefined;
 let cachedUploadsToken: Ratelimit | null | undefined;
+let cachedUploadsRow: Ratelimit | null | undefined;
 let cachedUploadsTokenUser: Ratelimit | null | undefined;
 let cachedLinksImport: Ratelimit | null | undefined;
 let cachedV1: Ratelimit | null | undefined;
@@ -91,6 +95,13 @@ export function getUploadsTokenRateLimiter(): Ratelimit | null {
     cachedUploadsToken = uploadsTokenLimiter();
   }
   return cachedUploadsToken;
+}
+
+export function getUploadsRowRateLimiter(): Ratelimit | null {
+  if (cachedUploadsRow === undefined) {
+    cachedUploadsRow = uploadsRowLimiter();
+  }
+  return cachedUploadsRow;
 }
 
 export function getUploadsTokenUserRateLimiter(): Ratelimit | null {

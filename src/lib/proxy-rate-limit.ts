@@ -7,6 +7,7 @@ import {
   getUsernameCheckRateLimiter,
   getLinkPreviewRateLimiter,
   getPublicFolderRateLimiter,
+  getUploadsRowRateLimiter,
   getUploadsTokenRateLimiter,
   getV1PostRateLimiter,
   getV1RateLimiter,
@@ -73,7 +74,8 @@ export function tooManyRequests(reset: number) {
  * Edge rate limits for sensitive API routes. Returns a response when the limit is exceeded.
  * For `/api/auth/*`, returns `NextResponse.next()` when allowed so the rest of the proxy can skip session work.
  * Also limits POST `/api/feedback`, POST `/api/links/import` (bookmark import
- * chunks), POST `/api/uploads/token` (Blob upload tokens), the username
+ * chunks), POST `/api/uploads/token` (Blob upload tokens), POST `/api/uploads`
+ * (an upload's row), the username
  * availability check, link previews (`/api/links/preview`, which fetch the page) and shared folder
  * pages (`/@username/slug`, `/api/public/folders/...` and their preview
  * images).
@@ -117,6 +119,15 @@ export async function rateLimitApiRequest(
 
   if (pathname === "/api/links" && request.method === "POST") {
     const limiter = getLinksPostRateLimiter();
+    if (limiter) {
+      const { success, reset } = await limiter.limit(ip);
+      if (!success) return tooManyRequests(reset);
+    }
+    return null;
+  }
+
+  if (pathname === "/api/uploads" && request.method === "POST") {
+    const limiter = getUploadsRowRateLimiter();
     if (limiter) {
       const { success, reset } = await limiter.limit(ip);
       if (!success) return tooManyRequests(reset);

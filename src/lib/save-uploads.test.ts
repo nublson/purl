@@ -105,7 +105,7 @@ function tokenCalls(calls: Call[]) {
 }
 
 function rowCalls(calls: Call[]) {
-  return calls.filter((call) => call.url === "/api/links");
+  return calls.filter((call) => call.url === "/api/uploads");
 }
 
 function payloadOf(call: Call) {
@@ -338,7 +338,7 @@ describe("uploadFiles", () => {
 
   it("stops the queue when the row hits the link limit", async () => {
     stubFetch((call) =>
-      call.url === "/api/links"
+      call.url === "/api/uploads"
         ? jsonResponse(403, {
             error: "You've reached the 1,000-link limit.",
             code: "LIMIT_REACHED",
@@ -503,6 +503,29 @@ describe("uploadFiles, leaving and throwing", () => {
     expect(h.onBatchDone).toHaveBeenCalledTimes(1);
   });
 
+  it("stops a transfer in flight when the page leaves, reporting nothing", async () => {
+    const { calls } = stubFetch();
+    const abort = new AbortController();
+    putMock.mockImplementation(
+      (_pathname: string, _body: unknown, options: { abortSignal?: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          options.abortSignal?.addEventListener("abort", () =>
+            reject(new DOMException("Aborted", "AbortError")),
+          );
+        }),
+    );
+    const h = handlers();
+    const done = uploadFiles([png("a.png")], { ...h, signal: abort.signal });
+    await vi.waitFor(() => expect(putMock).toHaveBeenCalled());
+    abort.abort();
+    await done;
+
+    expect(putMock.mock.calls[0][2]).toMatchObject({ abortSignal: abort.signal });
+    expect(rowCalls(calls)).toHaveLength(0);
+    expect(h.onError).not.toHaveBeenCalled();
+    expect(h.onDone).not.toHaveBeenCalled();
+  });
+
   it("fails a file whose onStart throws and keeps going with the rest", async () => {
     stubFetch();
     const h = handlers();
@@ -526,7 +549,7 @@ describe("retryUpload", () => {
     try {
       let fail = true;
       stubFetch((call) =>
-        call.url === "/api/links" && fail ? jsonResponse(500, {}) : undefined,
+        call.url === "/api/uploads" && fail ? jsonResponse(500, {}) : undefined,
       );
       const h = handlers();
       await uploadFiles([png("a.png")], h);
@@ -554,7 +577,7 @@ describe("retryUpload", () => {
   it("re-runs a failed file under the same id", async () => {
     let fail = true;
     stubFetch((call) =>
-      call.url === "/api/links" && fail
+      call.url === "/api/uploads" && fail
         ? jsonResponse(500, { error: "Server error" })
         : undefined,
     );
@@ -572,9 +595,56 @@ describe("retryUpload", () => {
     expect(h.onBatchDone).toHaveBeenCalledTimes(2);
   });
 
+  it("sends the same row again without uploading the file twice", async () => {
+    let fail = true;
+    const { calls } = stubFetch((call) =>
+      call.url === "/api/uploads" && fail ? jsonResponse(500, {}) : undefined,
+    );
+    const h = handlers();
+    await uploadFiles([png("a.png")], h);
+    const id = h.onStart.mock.calls[0][0].id;
+    const puts = putMock.mock.calls.length;
+    const [firstRow] = rowCalls(calls);
+
+    fail = false;
+    await retryUpload(id, h);
+
+    // No new bytes, no new tokens: the row the server may already have
+    // saved is sent again, so it answers with that pearl, not a second one.
+    expect(putMock.mock.calls.length).toBe(puts);
+    expect(tokenCalls(calls)).toHaveLength(2);
+    const rows = rowCalls(calls);
+    expect(rows).toHaveLength(2);
+    expect(rows[1].body).toEqual(firstRow.body);
+    expect(h.onDone).toHaveBeenCalledWith(id, expect.anything());
+  });
+
+  it("uploads again when the row is refused for its blobs", async () => {
+    let rowsSeen = 0;
+    const { calls } = stubFetch((call) => {
+      if (call.url !== "/api/uploads") return undefined;
+      rowsSeen += 1;
+      if (rowsSeen === 1) return jsonResponse(500, {});
+      if (rowsSeen === 2) {
+        return jsonResponse(400, { error: "Upload expired", code: "INVALID_UPLOAD" });
+      }
+      return undefined;
+    });
+    const h = handlers();
+    await uploadFiles([png("a.png")], h);
+    const id = h.onStart.mock.calls[0][0].id;
+    const puts = putMock.mock.calls.length;
+
+    await retryUpload(id, h);
+
+    expect(putMock.mock.calls.length).toBeGreaterThan(puts);
+    expect(rowCalls(calls)).toHaveLength(3);
+    expect(h.onDone).toHaveBeenCalledWith(id, expect.anything());
+  });
+
   it("does nothing for a forgotten file", async () => {
     stubFetch((call) =>
-      call.url === "/api/links" ? jsonResponse(500, {}) : undefined,
+      call.url === "/api/uploads" ? jsonResponse(500, {}) : undefined,
     );
     const h = handlers();
     await uploadFiles([png("a.png")], h);

@@ -14,6 +14,7 @@ import type { PendingUpload } from "@/lib/pending-upload";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Image as ImageIcon, MusicNote, Refresh, Video, X } from "reicon-react";
+import { Typography } from "@/components/typography";
 
 /** What a failed item's buttons do (Retry keeps its slot; Dismiss drops it). */
 export type PendingUploadActions = {
@@ -199,9 +200,9 @@ export function PendingUploadCard({ item, onRetry, onDismiss }: Props) {
         // A 90% scrim over the user's own image: `text-foreground` on it stays
         // over 15:1 above a black photo; muted text on 80% fell to 3:1.
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/90 p-3 text-center backdrop-blur-sm">
-          <p aria-hidden className="text-sm text-foreground">
+          <Typography component="p" aria-hidden className="text-sm text-foreground">
             {message}
-          </p>
+          </Typography>
           <div className="flex flex-wrap items-center justify-center gap-1">
             <FailedActions item={item} onRetry={onRetry} onDismiss={onDismiss} />
           </div>
@@ -274,9 +275,9 @@ function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
       <span className="sr-only">{failed ? `${title}, ${message}` : title}</span>
       {failed ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/90 p-3 text-center backdrop-blur-sm">
-          <p aria-hidden className="text-sm text-foreground">
+          <Typography component="p" aria-hidden className="text-sm text-foreground">
             {message}
-          </p>
+          </Typography>
           <div className="flex flex-wrap items-center justify-center gap-1">
             <FailedActions item={item} onRetry={onRetry} onDismiss={onDismiss} />
           </div>
@@ -323,7 +324,7 @@ export function PendingUploadRow({ item, onRetry, onDismiss }: Props) {
       </ItemMedia>
       <ItemContent className="min-w-0">
         <ItemTitle className="block w-full">
-          <p
+          <Typography component="p"
             // The pearl's title (no extension), as the row will read once it
             // lands; the full file name (and a failure's reason, which a narrow
             // row truncates) in the tooltip.
@@ -340,7 +341,7 @@ export function PendingUploadRow({ item, onRetry, onDismiss }: Props) {
                 <span>{message}</span>
               </>
             ) : null}
-          </p>
+          </Typography>
         </ItemTitle>
       </ItemContent>
       {failed ? (

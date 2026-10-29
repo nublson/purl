@@ -146,7 +146,7 @@ describe("createUploadForUser", () => {
     expect(data).toEqual({
       url: FILE_URL,
       title: "My Shot",
-      favicon: "/icon.png",
+      favicon: "https://purl.live/icon.png",
       domain: "purl.live",
       contentType: "IMAGE",
       mimeType: "image/png",
@@ -206,7 +206,7 @@ describe("createUploadForUser", () => {
       rowFrom({
         url: FILE_URL,
         title: "My Shot",
-        favicon: "/icon.png",
+        favicon: "https://purl.live/icon.png",
         domain: "purl.live",
         contentType: "IMAGE",
         mimeType: "image/png",
@@ -251,13 +251,15 @@ describe("createUploadForUser", () => {
     expect(data.folderId).toBe("f1");
   });
 
-  it("rejects a folder the user doesn't own before any head", async () => {
+  it("rejects a folder the user doesn't own (or one gone meanwhile) and deletes both blobs", async () => {
+    mockHeads();
     vi.mocked(assertFolderOwned).mockRejectedValue(new FolderNotFoundError());
     await expect(
       createUploadForUser("u1", INPUT, { folderId: "f2" }),
     ).rejects.toBeInstanceOf(FolderNotFoundError);
-    expect(head).not.toHaveBeenCalled();
-    expect(del).not.toHaveBeenCalled();
+    // Checked after the heads, so the blobs go like any other refusal.
+    expect(prisma.link.create).not.toHaveBeenCalled();
+    expect(del).toHaveBeenCalledWith([FILE_URL, PREVIEW_URL]);
   });
 
   it("accepts an upload without a preview", async () => {
@@ -471,6 +473,7 @@ describe("createUploadForUser", () => {
       data: Record<string, unknown>;
     };
     expect(data.domain).toBe("purl.live");
+    expect(data.favicon).toBe("https://purl.live/icon.png");
     expect(warn).toHaveBeenCalledTimes(1);
     warn.mockRestore();
   });

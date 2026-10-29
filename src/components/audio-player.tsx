@@ -17,6 +17,7 @@ import {
 import { Export5, MusicNote, Restart } from "reicon-react";
 import { EqualizerBars } from "./equalizer-bars";
 import { PlayMark } from "./play-mark";
+import { Typography } from "./typography";
 
 /**
  * A click inside the player's controls never reaches its host (a click on
@@ -132,23 +133,23 @@ export function AudioPlayer({
           </span>
         ) : null}
         <div className="absolute inset-x-0 bottom-0 flex min-w-0 flex-col p-4 @max-[199px]/player:pe-14">
-          <p
+          <Typography component="p"
             title={link.title}
             className="line-clamp-2 text-base leading-[1.375] font-medium wrap-anywhere text-foreground @max-[199px]/player:text-sm"
           >
             {link.title}
-          </p>
+          </Typography>
           {/* `text-foreground/70`: the muted pair is under 4.5:1 for small
               text. */}
           {link.upload ? (
             // The tile has no times row: its second line is the clock.
-            <p className="hidden truncate text-[13px] leading-[1.385] text-foreground/70 tabular-nums @max-[199px]/player:block">
+            <Typography component="p" className="hidden truncate text-[13px] leading-[1.385] text-foreground/70 tabular-nums @max-[199px]/player:block">
               <TileClock link={link} />
-            </p>
+            </Typography>
           ) : (
-            <p className="truncate text-[13px] leading-[1.385] text-foreground/70">
+            <Typography component="p" className="truncate text-[13px] leading-[1.385] text-foreground/70">
               {linkSecondLine(link)}
-            </p>
+            </Typography>
           )}
         </div>
       </div>

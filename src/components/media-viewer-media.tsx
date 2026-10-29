@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { Image as ImageIcon, Video } from "reicon-react";
+import { Typography } from "./typography";
 
 // What the media viewer (`media-viewer.tsx`) shows of a pearl: an image or
 // a video's player, sized for the viewer. Audio pearls play in place, on
@@ -266,9 +267,9 @@ function ViewerVideo({ link, ready }: { link: Link; ready: boolean }) {
       {/* Always there, so the line is announced when it appears. */}
       <div role="status">
         {cantPlay ? (
-          <p id={messageId} className="px-4 py-3 text-sm leading-5 text-muted-foreground">
+          <Typography component="p" id={messageId} className="px-4 py-3 text-sm leading-5 text-muted-foreground">
             {CANT_PLAY}
-          </p>
+          </Typography>
         ) : null}
       </div>
     </div>

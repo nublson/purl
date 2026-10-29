@@ -80,7 +80,7 @@ function uploadFileName(pathname: string, userId: string): string | null {
  * `LimitError`s propagate.
  *
  * No `onUploadCompleted`: Purl creates the row itself after the upload
- * (`POST /api/links`), and passing one makes the SDK ask Vercel Blob to call
+ * (`POST /api/uploads`), and passing one makes the SDK ask Vercel Blob to call
  * this route back, which it can't do usefully (no session; never localhost).
  */
 export async function issueUploadToken(

@@ -39,8 +39,8 @@ const PREVIEW_MIME_TYPE = "image/webp";
 const MAX_DIMENSION = 100_000;
 /** 100 days, in seconds: keeps nonsense out of the Int column. */
 const MAX_DURATION = 86_400 * 100;
-/** An upload's favicon: Purl's own icon. */
-const UPLOAD_FAVICON = "/icon.png";
+/** An upload's favicon: Purl's own icon, at `BASE_URL` (absolute, as every favicon is). */
+const UPLOAD_FAVICON_PATH = "/icon.png";
 
 /** The body's `upload` with the right field types, or null; values are checked by `createUploadForUser`. */
 export function parseUploadInput(value: unknown): UploadInput | null {
@@ -79,10 +79,10 @@ function normalizeMime(mime: string): string {
 
 let warnedAboutBaseUrl = false;
 
-/** The host of `BASE_URL` (an upload's domain): `purl.live`. */
-function uploadDomain(): string {
+/** `BASE_URL`, parsed: an upload's domain and favicon are Purl's own. */
+function siteUrl(): URL {
   try {
-    return new URL(process.env.BASE_URL as string).host;
+    return new URL(process.env.BASE_URL as string);
   } catch {
     if (!warnedAboutBaseUrl) {
       warnedAboutBaseUrl = true;
@@ -90,7 +90,7 @@ function uploadDomain(): string {
         "[createUploadForUser] BASE_URL is missing or invalid; uploads use purl.live as their domain",
       );
     }
-    return "purl.live";
+    return new URL("https://purl.live");
   }
 }
 
@@ -154,9 +154,9 @@ async function discardBlobs(
  * `preview…`) and stay under `MAX_UPLOAD_PREVIEW_BYTES`, so a full-size file
  * can't ride along uncounted. A blob uploaded more than
  * `UPLOAD_ROW_WINDOW_MS` ago is refused (the sweep may be deleting it). Once
- * both heads succeed, any failure (expired, wrong
- * type, the save or storage limit, the folder gone, the database) deletes
- * the blobs before rethrowing. Saving one blob again (a retried request)
+ * both heads succeed, any failure (the folder not the user's or gone,
+ * expired, wrong type, the save or storage limit, the database) deletes the
+ * blobs before rethrowing. Saving one blob again (a retried request)
  * returns its pearl unchanged; two uploads of one file are two pearls.
  */
 export async function createUploadForUser(
@@ -164,10 +164,6 @@ export async function createUploadForUser(
   input: UploadInput,
   opts?: { folderId?: string },
 ): Promise<Link> {
-  if (opts?.folderId !== undefined) {
-    await assertFolderOwned(userId, opts.folderId);
-  }
-
   if (
     !isSizeOrNull(input.width, MAX_DIMENSION) ||
     !isSizeOrNull(input.height, MAX_DIMENSION) ||
@@ -220,6 +216,11 @@ export async function createUploadForUser(
 
   const urls = preview !== null ? [file.url, preview.url] : [file.url];
   try {
+    // Checked here, after the heads, so a folder gone meanwhile (deleted in
+    // another tab) discards the blobs like any other refusal.
+    if (opts?.folderId !== undefined) {
+      await assertFolderOwned(userId, opts.folderId);
+    }
     // A blob past the row window may already be judged orphaned by the sweep
     // (which waits twice as long), so it can't become a pearl.
     const now = Date.now();
@@ -249,6 +250,7 @@ export async function createUploadForUser(
       throw new InvalidUploadError("Invalid upload size");
     }
 
+    const site = siteUrl();
     const row = await insertWithinSaveLimit(
       userId,
       (tx) =>
@@ -256,8 +258,8 @@ export async function createUploadForUser(
           data: {
             url: file.url,
             title: titleFromFileName(input.name),
-            favicon: UPLOAD_FAVICON,
-            domain: uploadDomain(),
+            favicon: new URL(UPLOAD_FAVICON_PATH, site).href,
+            domain: site.host,
             contentType,
             mimeType,
             thumbnail: preview?.url ?? null,

@@ -292,16 +292,25 @@ test.describe("Media pearls", () => {
     await context.close();
   });
 
-  test("an image row's favicon is its preview", async ({ page, seed, baseURL }) => {
+  test("an uploaded image's row shows its preview; a saved image link its favicon", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
     const icon = `${baseURL}/icon.png`;
+    // An upload: its own small preview stands for it in the row.
     await seed.link({
-      url: "https://shots.example/a.png",
+      url: "https://store.public.blob.vercel-storage.com/users/e2e/a/shot.png",
       title: "Shot A",
       contentType: "IMAGE",
       thumbnail: icon,
       width: 800,
       height: 600,
+      fileKey: "users/e2e/a/shot.png",
+      fileSize: 1000,
     });
+    // A saved image link: its thumbnail is the file itself, too big for a
+    // 20px icon, so the row shows the site's favicon.
     await seed.link({ url: `${icon}?b=1`, title: "Shot B", contentType: "IMAGE" });
     await openHome(page);
 
@@ -309,10 +318,12 @@ test.describe("Media pearls", () => {
       "src",
       icon,
     );
-    await expect(row(page, "Shot B").locator('[data-cy="row-favicon"] img')).toHaveAttribute(
-      "src",
-      `${icon}?b=1`,
-    );
+    // (Its favicon here doesn't load, so the globe stands in; either way the
+    // file itself is never fetched for the row.)
+    await expect(row(page, "Shot B").locator('[data-cy="row-favicon"]')).toBeVisible();
+    await expect(
+      row(page, "Shot B").locator(`[data-cy="row-favicon"] img[src="${icon}?b=1"]`),
+    ).toHaveCount(0);
   });
 });
 

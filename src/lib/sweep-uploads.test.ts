@@ -75,6 +75,7 @@ describe("sweepOrphanUploads", () => {
 
     expect(findMany).toHaveBeenCalledWith({
       where: {
+        userId: { in: ["u1"] },
         fileKey: { not: null },
         OR: [
           { url: { in: [file.url, preview.url, orphan.url] } },
@@ -85,6 +86,30 @@ describe("sweepOrphanUploads", () => {
     });
     expect(vi.mocked(del).mock.calls).toEqual([[[orphan.url]]]);
     expect(result).toEqual({ listed: 3, deleted: 1, stopped: false });
+  });
+
+  it("scopes the lookup to the page's owners, once each", async () => {
+    const a = blob("users/u1/c1/a.png");
+    const b = blob("users/u2/c1/b.png");
+    const c = blob("users/u1/c2/c.png");
+    vi.mocked(list).mockResolvedValueOnce(page([a, b, c]));
+    referencedBy([]);
+
+    await sweepOrphanUploads({ now: NOW });
+
+    const where = (findMany.mock.calls[0][0] as { where: { userId: unknown } }).where;
+    expect(where.userId).toEqual({ in: ["u1", "u2"] });
+  });
+
+  it("leaves a blob whose path names no user alone", async () => {
+    const stray = blob("users/loose.png");
+    vi.mocked(list).mockResolvedValueOnce(page([stray]));
+
+    const result = await sweepOrphanUploads({ now: NOW });
+
+    expect(findMany).not.toHaveBeenCalled();
+    expect(del).not.toHaveBeenCalled();
+    expect(result).toEqual({ listed: 1, deleted: 0, stopped: false });
   });
 
   it("deletes an old blob referenced only by a page link (no fileKey)", async () => {

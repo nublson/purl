@@ -11,6 +11,8 @@ import { validateUploadFile } from "@/lib/uploads/validate";
 import { parseJsonLinks, type Link } from "@/utils/links";
 
 const TOKEN_ROUTE = "/api/uploads/token";
+/** Where a file in Blob becomes its pearl. */
+const ROW_ROUTE = "/api/uploads";
 const PREVIEW_MIME_TYPE = "image/webp";
 const UNAVAILABLE_MESSAGE = "Uploads aren't available here";
 /** Object URLs outlive their item a moment, until what replaced it is drawn. */
@@ -42,11 +44,20 @@ export type UploadHandlers = {
 
 type QueuedFile = { id: string; file: File; mimeType: string };
 
+/** What `POST /api/uploads` takes: the file (and preview) already in Blob. */
+type RowBody = { upload: Record<string, unknown>; folderId?: string };
+
 /**
- * Files on the page, by pending id: the `File` (for Retry) and the object
- * URLs made for it (revoked when it's forgotten).
+ * Files on the page, by pending id: the `File` (for Retry), the object URLs
+ * made for it (revoked when it's forgotten) and, once its bytes are in
+ * Blob, the row request (`row`): Retry sends that again before uploading
+ * anything, so a row that was saved but whose answer was lost comes back as
+ * the same pearl (the server reuses it by its blob), not a second one.
  */
-const kept = new Map<string, QueuedFile & { objectUrls: string[] }>();
+const kept = new Map<
+  string,
+  QueuedFile & { objectUrls: string[]; row?: RowBody }
+>();
 
 function revokeUrls(urls: string[]) {
   for (const url of urls) URL.revokeObjectURL(url);
@@ -79,7 +90,7 @@ function releaseSlot() {
   else activeUploads -= 1;
 }
 
-/** The token route or `POST /api/links` said no. */
+/** The token route or `POST /api/uploads` said no. */
 class UploadRequestError extends Error {
   constructor(
     readonly status: number,
@@ -144,6 +155,28 @@ async function requestClientToken(
   return data.clientToken;
 }
 
+/** Asks for the pearl of a file already in Blob. */
+async function postRow(body: RowBody, signal?: AbortSignal): Promise<Link> {
+  const res = await fetch(ROW_ROUTE, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...linksOriginHeaders },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!res.ok) throw await readError(res);
+  const [link] = parseJsonLinks([await res.json()]);
+  return link;
+}
+
+/** A row the server refuses for its blobs (gone, expired): upload again. */
+function blobsRefused(error: unknown): boolean {
+  return (
+    error instanceof UploadRequestError &&
+    error.status === 400 &&
+    error.code === "INVALID_UPLOAD"
+  );
+}
+
 /** A fresh id per upload: the pathname's folder and the pending item's id. */
 function newUploadId(): string {
   return crypto.randomUUID().replace(/-/g, "");
@@ -164,9 +197,12 @@ async function uploadOne(
 ) {
   const kind = kindOf(mimeType);
   const objectUrls: string[] = [];
+  const signal = handlers.signal;
+  const prior = kept.get(id);
   // A retry's previous URLs are on screen until `onStart` replaces them.
-  const stale = kept.get(id)?.objectUrls ?? [];
-  kept.set(id, { id, file, mimeType, objectUrls });
+  const stale = prior?.objectUrls ?? [];
+  const entry = { id, file, mimeType, objectUrls, row: prior?.row };
+  kept.set(id, entry);
 
   try {
     const previewUrl = kind === "audio" ? null : URL.createObjectURL(file);
@@ -184,87 +220,113 @@ async function uploadOne(
     });
     if (stale.length > 0) setTimeout(() => revokeUrls(stale), REVOKE_DELAY_MS);
 
-    const preview = await makePreview(file, mimeType);
-    if (preview.width !== null || preview.blob) {
-      const patch: Parameters<NonNullable<UploadHandlers["onPreview"]>>[1] = {
-        width: preview.width,
-        height: preview.height,
-      };
-      // A video's file can't be drawn as an image: its poster frame can.
-      if (kind === "video" && preview.blob) {
-        patch.previewUrl = URL.createObjectURL(preview.blob);
-        objectUrls.push(patch.previewUrl);
-      }
-      handlers.onPreview?.(id, patch);
-    }
-
-    const folder = `users/${handlers.userId}/${id}`;
-    const pathname = `${folder}/${sanitizeUploadName(file.name, mimeType)}`;
-    const fileToken = await requestClientToken(
-      pathname,
-      { kind: "file", mimeType, size: file.size },
-      true,
-    );
-    const uploaded = await put(pathname, file, {
-      access: "public",
-      token: fileToken,
-      contentType: mimeType,
-      multipart: true,
-      onUploadProgress: ({ percentage }) =>
-        handlers.onProgress(id, Math.min(99, Math.round(percentage))),
-    });
-
-    // The preview is a nicety: when it can't be stored, the pearl goes
-    // without one (the card draws the file itself).
-    let remotePreviewUrl: string | null = null;
-    if (preview.blob) {
+    let link: Link | null = null;
+    // A retry whose bytes are already in Blob: its row again first.
+    if (entry.row) {
       try {
-        const previewPath = `${folder}/preview.webp`;
-        const previewToken = await requestClientToken(
-          previewPath,
-          { kind: "preview", mimeType: PREVIEW_MIME_TYPE, size: preview.blob.size },
-          false,
-        );
-        const stored = await put(previewPath, preview.blob, {
-          access: "public",
-          token: previewToken,
-          contentType: PREVIEW_MIME_TYPE,
-        });
-        remotePreviewUrl = stored.url;
-      } catch {
-        remotePreviewUrl = null;
+        link = await postRow(entry.row, signal);
+      } catch (error) {
+        if (!blobsRefused(error)) throw error;
+        entry.row = undefined;
       }
     }
-
-    const body: { upload: Record<string, unknown>; folderId?: string } = {
-      upload: {
-        url: uploaded.url,
-        previewUrl: remotePreviewUrl,
-        name: file.name,
-        mimeType,
-        width: preview.width,
-        height: preview.height,
-        // Whole seconds, as the row requires (`makePreview` rounds already).
-        duration: roundDuration(preview.duration),
-      },
-    };
-    if (handlers.folderId) body.folderId = handlers.folderId;
-    const res = await fetch("/api/links", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...linksOriginHeaders },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw await readError(res);
-    const [link] = parseJsonLinks([await res.json()]);
-
+    if (!link) {
+      entry.row = await uploadBytes(entry, kind, handlers);
+      link = await postRow(entry.row, signal);
+    }
     batch.uploaded += 1;
     await handlers.onDone(id, link);
     // A moment later, once the pearl's card has taken the item's place.
     kept.delete(id);
     setTimeout(() => revokeUrls(objectUrls), REVOKE_DELAY_MS);
   } catch (error) {
+    // The page left: nothing is shown any more, and nothing to report.
+    if (signal?.aborted) return;
     handlers.onError(id, failureMessage(error, file, batch));
   }
+}
+
+/**
+ * Puts the file (and its preview) in Blob: its preview first (the item
+ * shows its size, and a video its poster frame, meanwhile), then the file,
+ * then the preview, best effort. Returns the row request for the pearl.
+ * Leaving the page (`signal`) stops a transfer in flight.
+ */
+async function uploadBytes(
+  entry: QueuedFile & { objectUrls: string[] },
+  kind: PendingUpload["kind"],
+  handlers: UploadHandlers,
+): Promise<RowBody> {
+  const { id, file, mimeType, objectUrls } = entry;
+  const signal = handlers.signal;
+  const preview = await makePreview(file, mimeType);
+  if (preview.width !== null || preview.blob) {
+    const patch: Parameters<NonNullable<UploadHandlers["onPreview"]>>[1] = {
+      width: preview.width,
+      height: preview.height,
+    };
+    // A video's file can't be drawn as an image: its poster frame can.
+    if (kind === "video" && preview.blob) {
+      patch.previewUrl = URL.createObjectURL(preview.blob);
+      objectUrls.push(patch.previewUrl);
+    }
+    handlers.onPreview?.(id, patch);
+  }
+
+  const folder = `users/${handlers.userId}/${id}`;
+  const pathname = `${folder}/${sanitizeUploadName(file.name, mimeType)}`;
+  const fileToken = await requestClientToken(
+    pathname,
+    { kind: "file", mimeType, size: file.size },
+    true,
+  );
+  const uploaded = await put(pathname, file, {
+    access: "public",
+    token: fileToken,
+    contentType: mimeType,
+    multipart: true,
+    abortSignal: signal,
+    onUploadProgress: ({ percentage }) =>
+      handlers.onProgress(id, Math.min(99, Math.round(percentage))),
+  });
+
+  // The preview is a nicety: when it can't be stored, the pearl goes
+  // without one (the card draws the file itself).
+  let remotePreviewUrl: string | null = null;
+  if (preview.blob) {
+    try {
+      const previewPath = `${folder}/preview.webp`;
+      const previewToken = await requestClientToken(
+        previewPath,
+        { kind: "preview", mimeType: PREVIEW_MIME_TYPE, size: preview.blob.size },
+        false,
+      );
+      const stored = await put(previewPath, preview.blob, {
+        access: "public",
+        token: previewToken,
+        contentType: PREVIEW_MIME_TYPE,
+        abortSignal: signal,
+      });
+      remotePreviewUrl = stored.url;
+    } catch {
+      remotePreviewUrl = null;
+    }
+  }
+
+  const body: RowBody = {
+    upload: {
+      url: uploaded.url,
+      previewUrl: remotePreviewUrl,
+      name: file.name,
+      mimeType,
+      width: preview.width,
+      height: preview.height,
+      // Whole seconds, as the row requires (`makePreview` rounds already).
+      duration: roundDuration(preview.duration),
+    },
+  };
+  if (handlers.folderId) body.folderId = handlers.folderId;
+  return body;
 }
 
 /** Toasts what the whole batch needs to know; returns the item's message. */
@@ -320,7 +382,7 @@ async function runBatch(files: QueuedFile[], handlers: UploadHandlers) {
  * Turns files into pearls: each is validated (a rejection toasts why), then
  * the rest upload `MAX_CONCURRENT_UPLOADS` at a time, in order. Per file: its
  * pending item, its preview, the file and the preview to Blob, then
- * `POST /api/links { upload }`. A limit (or uploads being off) toasts once
+ * `POST /api/uploads { upload }`. A limit (or uploads being off) toasts once
  * and stops the files not yet started; any other failure fails that file
  * only.
  */
@@ -342,7 +404,9 @@ export async function uploadFiles(
 
 /**
  * Retry: the kept file runs again under the same id (same item, same slot).
- * False when the file is no longer kept (nothing to run).
+ * When its bytes reached Blob, its row is sent again first (the same pearl
+ * if the first one was saved), and only a row refused for its blobs
+ * uploads them again. False when the file is no longer kept.
  */
 export async function retryUpload(
   id: string,

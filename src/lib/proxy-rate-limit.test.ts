@@ -22,6 +22,7 @@ vi.mock("@/lib/upstash-rate-limit", () => ({
   getLinkPreviewRateLimiter: vi.fn(),
   getPublicFolderRateLimiter: vi.fn(),
   getUploadsTokenRateLimiter: vi.fn(),
+  getUploadsRowRateLimiter: vi.fn(),
   getV1RateLimiter: vi.fn().mockReturnValue({ limit: limitMock }),
   getV1PostRateLimiter: vi.fn(),
   getMcpRateLimiter: vi.fn(),
@@ -36,6 +37,7 @@ const {
   getLinkPreviewRateLimiter,
   getPublicFolderRateLimiter,
   getUploadsTokenRateLimiter,
+  getUploadsRowRateLimiter,
   getV1RateLimiter,
   getV1PostRateLimiter,
   getMcpRateLimiter,
@@ -228,6 +230,21 @@ describe("rateLimitApiRequest", () => {
     it("does not use the plain links POST limiter", async () => {
       vi.mocked(getLinksImportRateLimiter).mockReturnValue(null);
       await rateLimitApiRequest(makeRequest("/api/links/import", "POST"));
+      expect(getLinksPostRateLimiter).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("POST /api/uploads (an upload's row)", () => {
+    it("has its own limiter, not the link saves'", async () => {
+      vi.mocked(getUploadsRowRateLimiter).mockReturnValue(mockLimiter() as never);
+      limitMock.mockResolvedValue({ success: false, reset: Date.now() + 30_000 });
+
+      const result = await rateLimitApiRequest(
+        makeRequest("/api/uploads", "POST", { "x-forwarded-for": "1.2.3.4" }),
+      );
+
+      expect(limitMock).toHaveBeenCalledWith("1.2.3.4");
+      expect(result!.status).toBe(429);
       expect(getLinksPostRateLimiter).not.toHaveBeenCalled();
     });
   });
