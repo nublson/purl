@@ -98,7 +98,6 @@ export function AudioPlayer({
   return (
     <div data-face="audio" className="flex flex-col">
       <div
-        data-hero-press={src && !inert ? "" : undefined}
         className={cn(
           "relative h-[180px] w-full shrink-0 overflow-hidden rounded-t-lg",
           src && !inert ? "pointer-events-auto cursor-pointer" : "pointer-events-none",
@@ -125,16 +124,16 @@ export function AudioPlayer({
           <span className="pointer-events-none absolute top-3 left-3 size-1">{badge}</span>
         ) : null}
         {playing ? (
-          // On the menu button's backing, centred where the checkbox is
-          // (16px in), so the swap on hover doesn't move the corner.
+          // The checkbox's box exactly (16px, 8px in, its corners), so the
+          // swap on hover doesn't move or resize the corner.
           <span
             data-playing=""
             className={cn(
-              "pointer-events-none absolute top-1 left-1 flex size-6 items-center justify-center rounded-md bg-background/80 text-foreground backdrop-blur-sm transition-opacity duration-150 ease-out-strong",
+              "pointer-events-none absolute top-2 left-2 flex size-4 items-center justify-center rounded-[4px] border border-input bg-background shadow-sm text-foreground backdrop-blur-sm transition-opacity duration-150 ease-out-strong",
               indicatorClassName,
             )}
           >
-            <EqualizerBars className="size-4" />
+            <EqualizerBars className="size-full" />
           </span>
         ) : null}
         <div className="absolute inset-x-0 bottom-0 flex min-w-0 flex-col p-4">

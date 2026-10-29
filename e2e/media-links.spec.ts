@@ -445,9 +445,23 @@ test.describe("Audio pearls: the grid card is the player card", () => {
     await clickAt(page, song.locator("[data-hero]"));
     await expect(song.getByRole("button", { name: "Pause Song" })).toBeVisible();
     await expect(bars).toBeVisible();
+    // Focus meets the checkbox, drawn in the top-left corner, before the
+    // transport at the foot.
+    const order = await song.evaluate((el) =>
+      Array.from(el.querySelectorAll("[role=checkbox], [data-play]")).map((c) =>
+        c.getAttribute("role") ?? "play",
+      ),
+    );
+    expect(order).toEqual(["checkbox", "play"]);
     // Bars have no action: on hover the checkbox takes the corner.
     await page.mouse.move(0, 0);
     await expect(bars).toHaveCSS("opacity", "1");
+    // The checkbox's own box, so the swap doesn't move or resize the corner.
+    const tile = (await bars.boundingBox())!;
+    const box = (await song.getByRole("checkbox", { name: "Select Song" }).boundingBox())!;
+    expect(Math.abs(tile.x - box.x)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(tile.y - box.y)).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(tile.width - box.width)).toBeLessThanOrEqual(0.5);
     const hero = (await song.locator("[data-hero]").boundingBox())!;
     await page.mouse.move(hero.x + hero.width / 2, hero.y + hero.height / 2);
     await expect(bars).toHaveCSS("opacity", "0");
@@ -554,6 +568,13 @@ test.describe("Audio pearls on a phone", () => {
     ).toBeVisible();
     await expect(page.getByText("1 selected")).toHaveCount(0);
     await expect(song).not.toHaveAttribute("data-selected", "true");
+
+    // The playing bars hold the corner and do nothing: a tap on them
+    // selects nothing (a long-press still does).
+    const bars = (await song.locator("[data-playing]").boundingBox())!;
+    await page.touchscreen.tap(bars.x + bars.width / 2, bars.y + bars.height / 2);
+    await expect(page.getByText("1 selected")).toHaveCount(0);
+    await expect(song).not.toHaveAttribute("data-selected", "true");
   });
 });
 /** A row's second line (under its title), as shown. */
@@ -647,13 +668,12 @@ test.describe("Audio pearls in the list: a row that plays", () => {
       .poll(() => page.evaluate(() => document.querySelector("audio")?.paused))
       .toBe(false);
 
-    // A second click pauses it; the mark stays (the play shape) while it's
-    // paused.
+    // A second click pauses it; the music icon comes back (the icon isn't
+    // a control: no play mark), and the second line keeps its time.
     await clickAt(page, song.locator('[data-slot="item-title"]'));
     await expect(rowToggle(song)).toHaveAttribute("aria-label", "Play Song");
-    await expect(rowMark(song)).toHaveAttribute("data-row-mark", "play");
+    await expect(rowMark(song)).toHaveCount(0);
     await page.mouse.move(0, 0);
-    await expect(rowMark(song)).toBeVisible();
   });
 
   test("the checkbox swaps in on hover and the ⋯ floats, as on other rows", async ({ page }) => {

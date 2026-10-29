@@ -388,3 +388,19 @@ export function useAudioPlayer(
 export function useAudioView(id: string | null): void {
   useEffect(() => (id === null ? undefined : audioPlayerStore.attach(id)), [id]);
 }
+
+/**
+ * Whether pearl `id` is playing, read without holding it as a view (the
+ * owner's card, whose corner tap gives way to the playing bars). Null:
+ * never.
+ */
+export function useIsAudioPlaying(id: string | null): boolean {
+  return useSyncExternalStore(
+    audioPlayerStore.subscribe,
+    () => {
+      const snapshot = audioPlayerStore.getSnapshot();
+      return id !== null && snapshot.id === id && snapshot.playing;
+    },
+    () => false,
+  );
+}

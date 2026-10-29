@@ -2,6 +2,7 @@
 
 import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
+import { useIsAudioPlaying } from "@/hooks/use-audio-player";
 import { useLongPress } from "@/hooks/use-long-press";
 import { useLeavingLinks } from "@/lib/leaving-links";
 import {
@@ -85,6 +86,10 @@ export function LinkCard({
   // opener: its player plays in place, and never opens the viewer.
   const kind = linkKind(link);
   const audio = kind === "audio";
+  // On touch screens a playing audio card's corner shows the playing bars,
+  // which do nothing: the corner's tap gives way (a long-press still
+  // selects, and while selecting the whole card does).
+  const cornerTapOff = useIsAudioPlaying(audio ? link.id : null) && !selecting;
   const media = !demo && isViewerKind(kind);
   // An image or video face is the viewer's morph anchor: it rounds and
   // clips itself, so the card doesn't crop the morph back.
@@ -142,6 +147,39 @@ export function LinkCard({
         : "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/card:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/card:opacity-100",
   );
 
+  // The checkbox (and its touch tap) in the top-left corner. An audio
+  // card puts it before its player in the page, so focus meets it where
+  // it's drawn, before the transport at the foot; other cards after their
+  // opener, which is the whole card.
+  const checkbox = demo ? null : (
+    <>
+      <Checkbox
+        checked={selected}
+        aria-label={`Select ${link.title}`}
+        className={cn(
+          "absolute top-2 left-2 z-10 cursor-pointer bg-background shadow-sm transition-opacity duration-150 ease-out-strong",
+          cornerTapOff && "pointer-coarse:pointer-events-none",
+          selecting || selected
+            ? "opacity-100"
+            : "opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:group-hover/card:opacity-100",
+        )}
+        onClick={(event) => {
+          event.preventDefault();
+          if (consumeLongPress()) return;
+          linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+        }}
+      />
+      {/* Touch: the checkbox's tap, with a tick, over its hit area (its
+      after: extension included: 40×32 around the 16px box at 8, 8). */}
+      {cornerTapOff ? null : (
+        <HapticTarget
+          className="inset-auto top-0 -left-1 z-[11] h-8 w-10"
+          onTap={tapToSelect}
+        />
+      )}
+    </>
+  );
+
   return (
     <div
       data-cy="link-card"
@@ -184,7 +222,6 @@ export function LinkCard({
         // card's focus anchor is the player's Play.
         <div
           aria-hidden
-          data-select-surface={selecting || undefined}
           className={cn("absolute inset-0 z-0 rounded-lg", selecting && "cursor-pointer")}
           onClick={(event) => {
             if (consumeLongPress()) return;
@@ -228,6 +265,7 @@ export function LinkCard({
           }}
         />
       )}
+      {audio ? checkbox : null}
       {/* The content is a picture of the link: clicks go to the link. */}
       <div className="pointer-events-none flex flex-col">
         {audio ? (
@@ -259,29 +297,9 @@ export function LinkCard({
         )}
       </div>
       {folderTag ? <FolderTagLabel id={folderLabelId} folder={folderTag} /> : null}
+      {audio ? null : checkbox}
       {demo ? null : (
         <>
-          <Checkbox
-            checked={selected}
-            aria-label={`Select ${link.title}`}
-            className={cn(
-              "absolute top-2 left-2 z-10 cursor-pointer bg-background shadow-sm transition-opacity duration-150 ease-out-strong",
-              selecting || selected
-                ? "opacity-100"
-                : "opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:group-hover/card:opacity-100",
-            )}
-            onClick={(event) => {
-              event.preventDefault();
-              if (consumeLongPress()) return;
-              linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-            }}
-          />
-          {/* Touch: the checkbox's tap, with a tick, over its hit area (its
-          after: extension included: 40×32 around the 16px box at 8, 8). */}
-          <HapticTarget
-            className="inset-auto top-0 -left-1 z-[11] h-8 w-10"
-            onTap={tapToSelect}
-          />
           <div
             inert={selecting}
             className={cn(

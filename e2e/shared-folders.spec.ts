@@ -162,10 +162,10 @@ test.describe("Shared folders, visited signed out", () => {
       .toMatch(/^0:0\d \/ (1:05|0:10)$/);
     await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(page.url()).not.toContain("pearl");
-    // A click on the row pauses it; the mark stays (the play shape).
+    // A click on the row pauses it; the music icon comes back.
     await button.click();
     await expect(button).toHaveAttribute("aria-label", "Play Song");
-    await expect(mark).toHaveAttribute("data-row-mark", "play");
+    await expect(mark).toHaveCount(0);
   });
 
   test("the grid has 2 columns on phones and 3 on small tablets, every card on screen", async ({

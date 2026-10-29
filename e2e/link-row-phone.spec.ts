@@ -140,7 +140,7 @@ test.describe("Link rows on phones", () => {
     // A second tap pauses it.
     await page.touchscreen.tap(title.x + 20, title.y + title.height / 2);
     await expect(toggle).toHaveAttribute("aria-label", "Play Song");
-    await expect(mark).toHaveAttribute("data-row-mark", "play");
+    await expect(mark).toHaveCount(0);
   });
 
   test("an audio row: a long-press selects it, and doesn't play it", async ({

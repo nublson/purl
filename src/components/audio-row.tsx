@@ -1,14 +1,12 @@
 "use client";
 
 import { useAudioPlayer } from "@/hooks/use-audio-player";
-import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { linkSecondLine } from "@/lib/upload-meta";
 import { formatDuration } from "@/utils/format-duration";
 import type { Link } from "@/utils/links";
 import * as React from "react";
 import { EqualizerBars } from "./equalizer-bars";
-import { PlayMark } from "./play-mark";
 
 /**
  * An audio row's main element, in the place of a row's link: a button over
@@ -62,10 +60,11 @@ export function AudioRowSecondLine({ link }: { link: Link }) {
 }
 
 /**
- * An audio row's icon slot: the icon (`children`) at rest; while the pearl
- * plays, the playing bars in its place, and while it's loaded but paused,
- * the drawn play mark, both at the slot's size (20px, 24px on phones) in
- * the icon's color. Decorative (`data-row-mark`): the row's button says it.
+ * An audio row's icon slot: the music icon (`children`), and while the
+ * pearl plays, the playing bars in its place, at the slot's size (20px,
+ * 24px on phones) in the icon's color. Paused, it's the icon again (no play
+ * mark: the icon isn't a control, the row is), and the second line keeps
+ * its time. Decorative (`data-row-mark`): the row's button says it.
  */
 export function AudioRowIcon({
   link,
@@ -74,20 +73,15 @@ export function AudioRowIcon({
   link: Link;
   children: React.ReactNode;
 }) {
-  const { active, playing } = useAudioPlayer(link.id, link.duration);
-  const reducedMotion = usePrefersReducedMotion();
-  if (!active) return <>{children}</>;
+  const { playing } = useAudioPlayer(link.id, link.duration);
+  if (!playing) return <>{children}</>;
   return (
     <span
-      data-row-mark={playing ? "playing" : "play"}
+      data-row-mark="playing"
       aria-hidden
-      className="flex size-5 shrink-0 items-center justify-center max-md:size-6 [&>svg]:size-full"
+      className="flex size-5 shrink-0 items-center justify-center max-md:size-6"
     >
-      {playing ? (
-        <EqualizerBars className="size-full" />
-      ) : (
-        <PlayMark playing={false} size={24} reducedMotion={reducedMotion} />
-      )}
+      <EqualizerBars className="size-full" />
     </span>
   );
 }

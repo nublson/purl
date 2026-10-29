@@ -22,12 +22,12 @@ const CARD_FRAME =
 export const LINK_CARD_FRAME = `${CARD_FRAME} active:scale-[0.98] motion-reduce:active:scale-100`;
 
 /**
- * An audio card's frame: pressed to 0.98 through its hero (which plays and
- * pauses, `data-hero-press`) or, on the owner's card while selecting, its
- * surface (`data-select-surface`), never through the transport or the
- * track, which have their own press.
+ * An audio card's frame: pressed to 0.98 like every card (its hero, its
+ * checkbox, its surface while selecting), except through its controls
+ * (`data-card-menu`: the transport, the track and the `⋯`), which have
+ * their own press.
  */
-export const AUDIO_CARD_FRAME = `${CARD_FRAME} has-[[data-hero-press]:active]:scale-[0.98] has-[[data-select-surface]:active]:scale-[0.98] motion-reduce:has-[[data-hero-press]:active]:scale-100 motion-reduce:has-[[data-select-surface]:active]:scale-100`;
+export const AUDIO_CARD_FRAME = `${CARD_FRAME} active:scale-[0.98] has-[[data-card-menu]:active]:scale-100 motion-reduce:active:scale-100`;
 
 /**
  * A link in the shared folder's grid: the page's thumbnail full-bleed on
