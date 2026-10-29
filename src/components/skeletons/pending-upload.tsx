@@ -231,9 +231,12 @@ function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
       aria-busy={failed ? undefined : true}
       data-cy="pending-upload"
       data-status={item.status}
-      className={cn("relative flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10", ARRIVE)}
+      className={cn("@container/player relative flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10", ARRIVE)}
     >
-      <div aria-hidden className="relative h-[180px] w-full shrink-0">
+      <div
+        aria-hidden
+        className="relative h-[180px] w-full shrink-0 @max-[199px]/player:aspect-square @max-[199px]/player:h-auto"
+      >
         <AudioHeroIcon>
           <ProgressRing progress={item.progress} />
         </AudioHeroIcon>
@@ -241,7 +244,7 @@ function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
         <div className="absolute inset-x-0 bottom-0 flex min-w-0 flex-col p-4">
           <span
             title={item.name}
-            className="line-clamp-2 text-base leading-[1.375] font-medium wrap-anywhere text-foreground"
+            className="line-clamp-2 text-base leading-[1.375] font-medium wrap-anywhere text-foreground @max-[199px]/player:text-sm"
           >
             {title}
           </span>
@@ -251,7 +254,13 @@ function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
         </div>
       </div>
       {/* The player's empty rail, times band and transport. */}
-      <div aria-hidden className="@container flex flex-col p-4">
+      {/* The player's controls; on the cover tile (under 200px) its empty
+          progress line along the foot instead. */}
+      <span
+        aria-hidden
+        className="absolute inset-x-0 bottom-0 hidden h-[3px] bg-foreground/45 @max-[199px]/player:block"
+      />
+      <div aria-hidden className="@container flex flex-col p-4 @max-[199px]/player:hidden">
         <span className="h-[3px] rounded-full bg-foreground/45" />
         <span className="mt-2 h-3" />
         <span className={cn("mt-4 flex h-[46px] items-center justify-center", TRANSPORT_GAP)}>

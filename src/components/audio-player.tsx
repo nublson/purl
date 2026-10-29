@@ -38,8 +38,11 @@ export function keepAudioClick(event: MouseEvent<HTMLElement>) {
 export const TRANSPORT_GAP =
   "gap-[clamp(4px,calc((100cqw_-_114px)/2),14px)] @max-[122px]:gap-3.5";
 
-/** Hidden where the transport doesn't fit three buttons (see `TRANSPORT_GAP`). */
-export const TRANSPORT_SIDE_NARROW = "@max-[122px]:hidden";
+/**
+ * Hidden where the transport doesn't fit three buttons (see `TRANSPORT_GAP`),
+ * and on the cover tile (under 200px of card), which keeps Play alone.
+ */
+export const TRANSPORT_SIDE_NARROW = "@max-[122px]:hidden @max-[199px]/player:hidden";
 
 /** The fade into each surface the player sits on (literal, for Tailwind). */
 const FADE = {
@@ -63,6 +66,13 @@ const FADE = {
  * the length, and the transport centred (Restart, Play/Pause, Open file),
  * 16px under it. A size container: on a narrow card the transport's gaps
  * close up, and under 122px Restart goes (the track seeks back to 0).
+ *
+ * Under 200px of its own width (`@container/player`: a phone's two-column
+ * grid) it's a cover tile instead, the same elements laid out again: a
+ * square hero with the title and its clock over the foot, Play alone in
+ * the bottom-right corner, and the track as a progress line along the
+ * card's edge (no seeking: a control there drags while the grid scrolls).
+ * No Restart or Open file (the `⋯` menu has Open file).
  *
  * A view of the page's one player: every view of a pearl (its card, its
  * row, its preview) shows and drives the same `<audio>`. The controls are
@@ -96,10 +106,10 @@ export function AudioPlayer({
   const { playing, toggle } = useAudioPlayer(link.id, link.duration);
   const src = safeRemoteImgSrc(link.url);
   return (
-    <div data-face="audio" className="flex flex-col">
+    <div data-face="audio" className="@container/player relative flex flex-col">
       <div
         className={cn(
-          "relative h-[180px] w-full shrink-0 overflow-hidden rounded-t-lg",
+          "relative h-[180px] w-full shrink-0 overflow-hidden rounded-t-lg @max-[199px]/player:aspect-square @max-[199px]/player:h-auto",
           src && !inert ? "pointer-events-auto cursor-pointer" : "pointer-events-none",
         )}
         onClick={(event) => {
@@ -138,16 +148,21 @@ export function AudioPlayer({
             <EqualizerBars className="size-full" halo />
           </span>
         ) : null}
-        <div className="absolute inset-x-0 bottom-0 flex min-w-0 flex-col p-4">
+        <div className="absolute inset-x-0 bottom-0 flex min-w-0 flex-col p-4 @max-[199px]/player:pe-14">
           <p
             title={link.title}
-            className="line-clamp-2 text-base leading-[1.375] font-medium wrap-anywhere text-foreground"
+            className="line-clamp-2 text-base leading-[1.375] font-medium wrap-anywhere text-foreground @max-[199px]/player:text-sm"
           >
             {link.title}
           </p>
           {/* `text-foreground/70`: the muted pair is under 4.5:1 for small
               text. */}
-          {link.upload ? null : (
+          {link.upload ? (
+            // The tile has no times row: its second line is the clock.
+            <p className="hidden truncate text-[13px] leading-[1.385] text-foreground/70 tabular-nums @max-[199px]/player:block">
+              <TileClock link={link} />
+            </p>
+          ) : (
             <p className="truncate text-[13px] leading-[1.385] text-foreground/70">
               {linkSecondLine(link)}
             </p>
@@ -160,17 +175,43 @@ export function AudioPlayer({
       <div
         data-card-menu
         inert={inert}
-        className={cn("@container relative flex flex-col p-4", inert ? "pointer-events-none" : "pointer-events-auto")}
+        className={cn(
+          // The tile: the controls lie over the hero, taking no presses
+          // themselves (they reach the hero) but through Play.
+          "@container relative flex flex-col p-4 @max-[199px]/player:absolute @max-[199px]/player:inset-0 @max-[199px]/player:p-0 @max-[199px]/player:pointer-events-none",
+          inert ? "pointer-events-none" : "pointer-events-auto",
+        )}
       >
-        {/* A press on the track stays in the player: never its host's. */}
-        <div onClick={keepAudioClick}>
+        {/* A press on the track stays in the player: never its host's. On
+            the tile it's the progress line along the foot. */}
+        <div
+          onClick={keepAudioClick}
+          className="@max-[199px]/player:absolute @max-[199px]/player:inset-x-0 @max-[199px]/player:bottom-0"
+        >
           <AudioTrack link={link} />
         </div>
-        <AudioTimes link={link} className="mt-2 h-3" />
-        <AudioTransport link={link} playRef={playRef} className={cn("mt-4 h-[46px]", TRANSPORT_GAP)} />
+        <AudioTimes link={link} className="mt-2 h-3 @max-[199px]/player:hidden" />
+        <AudioTransport
+          link={link}
+          playRef={playRef}
+          className={cn(
+            "mt-4 h-[46px] @max-[199px]/player:pointer-events-auto @max-[199px]/player:absolute @max-[199px]/player:right-2.5 @max-[199px]/player:bottom-3.5 @max-[199px]/player:mt-0 @max-[199px]/player:h-auto",
+            TRANSPORT_GAP,
+          )}
+        />
       </div>
     </div>
   );
+}
+
+/**
+ * The cover tile's clock: the length while the pearl is idle ("5:10"), the
+ * elapsed over it once it's loaded ("0:43 / 5:10").
+ */
+function TileClock({ link }: { link: Link }) {
+  const { active, elapsed, length } = useAudioPlayer(link.id, link.duration);
+  if (!length) return <>{active ? formatDuration(elapsed) : null}</>;
+  return <>{active ? `${formatDuration(elapsed)} / ${formatDuration(length)}` : formatDuration(length)}</>;
 }
 
 /** The hero: the sleeve art, else (none, or failed) the music icon on the tint. */
@@ -204,9 +245,10 @@ export function AudioHeroIcon({ children }: { children?: ReactNode }) {
   return (
     <div
       data-hero="icon"
-      className="absolute inset-0 flex items-center justify-center bg-muted text-muted-foreground"
+      // On the cover tile the icon rides high, clear of the title's fade.
+      className="absolute inset-0 flex items-center justify-center bg-muted text-muted-foreground @max-[199px]/player:items-start @max-[199px]/player:pt-7"
     >
-      {children ?? <MusicNote aria-hidden className="size-12" />}
+      {children ?? <MusicNote aria-hidden className="size-12 @max-[199px]/player:size-10" />}
     </div>
   );
 }
@@ -280,7 +322,7 @@ export function AudioTransport({
         data-play=""
         disabled={!src}
         aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
-        className="flex size-[46px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out-strong focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100"
+        className="relative flex size-[46px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out-strong focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100 @max-[199px]/player:size-[38px] pointer-coarse:after:absolute pointer-coarse:after:-inset-[3px]"
         onClick={(event) => {
           keepAudioClick(event);
           if (src) toggle(src);
@@ -295,7 +337,7 @@ export function AudioTransport({
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Open file"
-        className={SIDE_BUTTON}
+        className={cn(SIDE_BUTTON, "@max-[199px]/player:hidden")}
         onClick={(event) => event.stopPropagation()}
       >
         <Export5 className="size-4" aria-hidden />
@@ -319,13 +361,13 @@ export function AudioTrack({ link }: { link: Link }) {
   const played = length ? Math.min(1, Math.max(0, elapsed / length)) : 0;
 
   return (
-    <div className="relative h-[3px] rounded-full bg-foreground/45 has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring">
+    <div className="relative h-[3px] rounded-full bg-foreground/45 has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring @max-[199px]/player:rounded-none">
       <div
         data-run=""
         aria-hidden
         // Scaled, not sized: the run grows on every time update, and a
         // width would lay the card out each time.
-        className="absolute inset-0 origin-left rounded-full bg-foreground"
+        className="absolute inset-0 origin-left rounded-full bg-foreground @max-[199px]/player:rounded-none"
         style={{ transform: `scaleX(${played})` }}
       />
       <input
@@ -338,7 +380,9 @@ export function AudioTrack({ link }: { link: Link }) {
         disabled={!src || !length || failed}
         aria-label={`Seek ${link.title}`}
         aria-valuetext={time}
-        className="absolute inset-x-0 top-1/2 m-0 h-4 w-full -translate-y-1/2 cursor-pointer appearance-none opacity-0 disabled:cursor-default pointer-coarse:h-11"
+        // On the cover tile the line only shows progress: a seek control
+        // along a card's foot is too easy to drag while scrolling the grid.
+        className="absolute inset-x-0 top-1/2 m-0 h-4 w-full -translate-y-1/2 cursor-pointer appearance-none opacity-0 disabled:cursor-default pointer-coarse:h-11 @max-[199px]/player:hidden"
         onChange={(event) => {
           if (src) seek(src, Number(event.currentTarget.value));
         }}

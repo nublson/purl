@@ -589,7 +589,19 @@ test.describe("Audio pearls on a phone", () => {
     await openHome(page);
 
     const song = cards(page).filter({ hasText: "Song for a long drive home" });
-    expect((await song.boundingBox())!.width).toBeLessThanOrEqual(175);
+    const box = (await song.boundingBox())!;
+    expect(box.width).toBeLessThanOrEqual(175);
+    // Under 200px the player is a cover tile: square, Play alone in the
+    // corner, the length as its second line, no times row or seek control.
+    expect(Math.abs(box.height - box.width)).toBeLessThanOrEqual(1);
+    await expect(song.getByRole("button", { name: /^Restart/ })).toBeHidden();
+    await expect(song.getByRole("link", { name: "Open file" })).toBeHidden();
+    await expect(song.getByRole("slider")).toBeHidden();
+    await expect(song.locator("[data-times]")).toBeHidden();
+    await expect(song).toContainText("2:36");
+    const play = (await song.locator("[data-play]").boundingBox())!;
+    expect(box.x + box.width - (play.x + play.width)).toBeLessThanOrEqual(12);
+    expect(box.y + box.height - (play.y + play.height)).toBeLessThanOrEqual(16);
     await expect(song.getByRole("button", { name: "Open link menu" })).toBeVisible();
     await song.getByRole("button", { name: "Play Song for a long drive home" }).tap();
     await expect(
