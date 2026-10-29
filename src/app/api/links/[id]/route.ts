@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
-import { canEmbed } from "@/lib/embeds";
+import { canEmbed, embedSrc } from "@/lib/embeds";
 import { checkFrameable } from "@/lib/frameable";
 import { tooManyRequests } from "@/lib/proxy-rate-limit";
 import { getLinkPreviewRateLimiter } from "@/lib/upstash-rate-limit";
@@ -12,13 +12,16 @@ import {
   deleteLink,
   moveLinkToFolder,
   type UpdateLinkData,
+  type UpdateLinkForUserData,
   UnauthorizedError,
+  LinkChangedError,
 } from "@/lib/links";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { LINKS_ORIGIN_HEADER, parseLinksOrigin } from "@/lib/realtime-constants";
 import { serializeLink } from "@/lib/serialize-link";
 import { InvalidUploadError } from "@/lib/uploads";
 import { isValidUrl } from "@/utils/url";
+import { getYouTubeEmbedUrl } from "@/utils/youtube";
 import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -97,7 +100,7 @@ export async function PATCH(
     );
   }
 
-  const data: UpdateLinkData = {};
+  const data: UpdateLinkForUserData = {};
   if (url !== undefined) data.url = url;
   if (hasTitle) data.title = body.title as string;
   if (hasDescription) data.description = body.description;
@@ -163,6 +166,21 @@ export async function PATCH(
       if (!canEmbed(stored)) {
         return embedError("This page can't be shown live", "INVALID_EMBED");
       }
+      // A YouTube pearl frames its embed URL; without a video id there is
+      // none, and youtube.com itself refuses framing.
+      if (
+        stored.contentType === "YOUTUBE" &&
+        getYouTubeEmbedUrl(stored.url) === null
+      ) {
+        return embedError("This page can't be shown live", "INVALID_EMBED");
+      }
+      // The CSP's frame-src is https: only, and an http frame is mixed
+      // content: it could never load.
+      if (new URL(embedSrc(stored)).protocol !== "https:") {
+        return embedError("Only https pages can be shown live", "INVALID_EMBED");
+      }
+      // Write only while the url is still the one checked here.
+      data.expectedUrl = stored.url;
       // YouTube's pages refuse framing; its embed URL is what gets framed.
       if (stored.contentType !== "YOUTUBE") {
         const verdict = await checkFrameable(stored.url);
@@ -203,6 +221,12 @@ export async function PATCH(
     }
     if (e instanceof InvalidUploadError) {
       return NextResponse.json(UPLOAD_URL_ERROR, { status: 400 });
+    }
+    if (e instanceof LinkChangedError) {
+      return NextResponse.json(
+        { error: "This link changed. Try again.", code: "CHANGED" },
+        { status: 409 },
+      );
     }
     throw e;
   }

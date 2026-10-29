@@ -100,6 +100,18 @@ export class UnauthorizedError extends Error {
   }
 }
 
+/**
+ * Thrown by `updateLinkForUser` when `expectedUrl` is set and the link's url
+ * is no longer that one: it changed after the caller checked it (routes
+ * answer 409 CHANGED).
+ */
+export class LinkChangedError extends Error {
+  readonly name = "LinkChangedError";
+  constructor() {
+    super("This link changed. Try again.");
+  }
+}
+
 function formatFileSize(bytes: number | null): string | null {
   if (bytes === null || !Number.isFinite(bytes) || bytes <= 0) return null;
   if (bytes < 1024) return `${bytes} B`;
@@ -775,6 +787,13 @@ export async function updateLink(
 export type UpdateLinkForUserData = UpdateLinkData & {
   /** Present (string or null) to also move/unfile the link in the same write; omitted leaves the folder untouched. */
   folderId?: string | null;
+  /**
+   * Write only while the stored url is still this one (the url a caller
+   * checked, e.g. for framing before `embed: true`); otherwise throw
+   * `LinkChangedError` and write nothing. The write itself is conditional,
+   * so an edit landing between the read and the write can't slip through.
+   */
+  expectedUrl?: string;
 };
 
 /**
@@ -797,6 +816,9 @@ export async function updateLinkForUser(
     where: { id, userId },
   });
   if (!existing) return null;
+  if (data.expectedUrl !== undefined && existing.url !== data.expectedUrl) {
+    throw new LinkChangedError();
+  }
   // An upload's URL is its file in Blob: re-pointing it would orphan the
   // file and leave its size counted against the storage cap. Sending the
   // same URL back (a client echoing the row) is fine.
@@ -847,12 +869,18 @@ export async function updateLinkForUser(
 
   try {
     return await prisma.link.update({
-      where: { id },
+      where:
+        data.expectedUrl !== undefined
+          ? { id, url: data.expectedUrl }
+          : { id },
       data: updatePayload,
     });
   } catch (error) {
     if (isForeignKeyConstraintError(error)) {
       throw new FolderNotFoundError();
+    }
+    if (data.expectedUrl !== undefined && isRecordNotFoundError(error)) {
+      throw new LinkChangedError();
     }
     throw error;
   }

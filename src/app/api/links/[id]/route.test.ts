@@ -7,6 +7,9 @@ vi.mock("@/lib/links", () => {
   class UnauthorizedError extends Error {
     readonly name = "UnauthorizedError";
   }
+  class LinkChangedError extends Error {
+    readonly name = "LinkChangedError";
+  }
 
   return {
     readLink: vi.fn(),
@@ -16,6 +19,7 @@ vi.mock("@/lib/links", () => {
     deleteLink: vi.fn(),
     moveLinkToFolder: vi.fn(),
     UnauthorizedError,
+    LinkChangedError,
   };
 });
 
@@ -65,6 +69,7 @@ const {
   deleteLink,
   moveLinkToFolder,
   UnauthorizedError,
+  LinkChangedError,
 } = links;
 
 const { FolderNotFoundError, assertFolderOwned } = await import("@/lib/folders");
@@ -758,7 +763,60 @@ describe("links/[id] API route", () => {
       expect(res.status).toBe(200);
       expect((await res.json()).embed).toBe(true);
       expect(checkFrameable).toHaveBeenCalledWith("https://stored.example/page");
-      expect(updateLinkForUser).toHaveBeenCalledWith("u1", ID, { embed: true });
+      expect(updateLinkForUser).toHaveBeenCalledWith("u1", ID, {
+        embed: true,
+        expectedUrl: "https://stored.example/page",
+      });
+    });
+
+    it("answers 409 CHANGED when the url changed after the check", async () => {
+      vi.mocked(updateLinkForUser).mockRejectedValue(new LinkChangedError());
+      const res = await call({ embed: true });
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({
+        error: "This link changed. Try again.",
+        code: "CHANGED",
+      });
+      expect(broadcastLinksChanged).not.toHaveBeenCalled();
+    });
+
+    it("refuses an http page with INVALID_EMBED before checking", async () => {
+      vi.mocked(readLinkForUser).mockResolvedValue(
+        stored({ url: "http://stored.example/page" }),
+      );
+      const res = await call({ embed: true });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "Only https pages can be shown live",
+        code: "INVALID_EMBED",
+      });
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("accepts an http YouTube url (its frame is the https embed)", async () => {
+      vi.mocked(readLinkForUser).mockResolvedValue(
+        stored({
+          contentType: "YOUTUBE",
+          url: "http://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        }),
+      );
+      const res = await call({ embed: true });
+      expect(res.status).toBe(200);
+    });
+
+    it("refuses a YouTube pearl without a valid video id", async () => {
+      vi.mocked(readLinkForUser).mockResolvedValue(
+        stored({
+          contentType: "YOUTUBE",
+          url: "https://www.youtube.com/@somechannel",
+        }),
+      );
+      const res = await call({ embed: true });
+      expect(res.status).toBe(400);
+      expect((await res.json()).code).toBe("INVALID_EMBED");
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(updateLinkForUser).not.toHaveBeenCalled();
     });
 
     it("answers NOT_FRAMEABLE and writes nothing when blocked", async () => {
@@ -797,7 +855,10 @@ describe("links/[id] API route", () => {
 
     it("skips the framing check for YouTube", async () => {
       vi.mocked(readLinkForUser).mockResolvedValue(
-        stored({ contentType: "YOUTUBE" }),
+        stored({
+          contentType: "YOUTUBE",
+          url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        }),
       );
       const res = await call({ embed: true });
       expect(res.status).toBe(200);
