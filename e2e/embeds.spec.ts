@@ -77,6 +77,10 @@ async function serveLivePage(page: Page) {
   );
 }
 
+/** The live page's frame in the media viewer (the card's own is outside it). */
+const viewerFrame = (page: Page, title: string) =>
+  page.getByRole("dialog", { name: title }).locator("iframe");
+
 const liveCard = (page: Page, title: string) =>
   page.locator('[data-cy="link-card"]').filter({ hasText: title });
 
@@ -166,10 +170,8 @@ test.describe("Live grid cards", () => {
     const box = (await card.boundingBox())!;
     // The strip under the square.
     await card.click({ position: { x: 24, y: box.height - 16 } });
-    // The viewer draws nothing for a live page yet: it opens, named by the
-    // title, on this pearl.
     const dialog = page.getByRole("dialog", { name: "Live demo" });
-    await expect(dialog).toHaveCount(1);
+    await expect(viewerFrame(page, "Live demo")).toBeVisible();
     await expect(page).toHaveURL(/[?&]pearl=/);
     await page.keyboard.press("Escape");
     await expect(page).not.toHaveURL(/[?&]pearl=/);
@@ -177,7 +179,8 @@ test.describe("Live grid cards", () => {
 
     await card.hover();
     await card.getByRole("button", { name: "Open large" }).click();
-    await expect(dialog).toHaveCount(1);
+    await expect(viewerFrame(page, "Live demo")).toBeVisible();
+    await expect(dialog.getByRole("link", { name: "Open in new tab" })).toBeVisible();
     await expect(page).toHaveURL(/[?&]pearl=/);
   });
 
@@ -246,7 +249,7 @@ test.describe("Live grid cards on phones", () => {
     await expect(card.locator("iframe")).toHaveCount(0);
     await expect(card.getByRole("button", { name: "Interact with Live demo" })).toBeHidden();
     await card.tap();
-    await expect(page.getByRole("dialog", { name: "Live demo" })).toHaveCount(1);
+    await expect(viewerFrame(page, "Live demo")).toBeVisible();
     await expect(page).toHaveURL(/[?&]pearl=/);
   });
 });
@@ -304,8 +307,195 @@ test.describe("Live list rows", () => {
     let popup = false;
     page.on("popup", () => (popup = true));
     await row.click();
-    await expect(page.getByRole("dialog", { name: "Live demo" })).toHaveCount(1);
+    await expect(viewerFrame(page, "Live demo")).toBeVisible();
     await expect(page).toHaveURL(/[?&]pearl=/);
     expect(popup).toBe(false);
+  });
+});
+
+// Live pages in the media viewer: the box (16:10 landscape, 3:4 portrait),
+// the frame once the morph has played, the header line, moving, the URL,
+// focus leaving the page, and a page that never loads.
+
+/** The viewer's live box, as width over height. */
+async function viewerBoxRatio(page: Page) {
+  const box = await page.locator("[data-media-viewer] [data-embed-box]").boundingBox();
+  expect(box).not.toBeNull();
+  return box!.width / box!.height;
+}
+
+test.describe("Live pages in the viewer", () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test("a live card opens the preview, then the frame, in a 16:10 box with the header line", async ({
+    page,
+    seed,
+  }) => {
+    await serveLivePage(page);
+    await seed.link({
+      url: "https://live.example/demo",
+      title: "Live demo",
+      embed: true,
+    });
+    await openGrid(page);
+
+    const card = liveCard(page, "Live demo");
+    const box = (await card.boundingBox())!;
+    await card.click({ position: { x: 24, y: box.height - 16 } });
+    const dialog = page.getByRole("dialog", { name: "Live demo" });
+    await expect(dialog.locator("[data-embed-preview]")).toHaveCount(1);
+    const frame = viewerFrame(page, "Live demo");
+    await expect(frame).toBeVisible();
+    await expect(frame).toHaveAttribute("data-state", "loaded");
+    await expect(frame).toHaveAttribute("title", "Live demo");
+    await expect(frame).not.toHaveAttribute("sandbox", /allow-top-navigation/);
+    expect(Math.abs((await viewerBoxRatio(page)) - 1.6)).toBeLessThan(0.02);
+    // The box and its header stay within the viewer's 80% of the height.
+    const popup = (await page.locator("[data-media-viewer]").boundingBox())!;
+    expect(popup.height).toBeLessThanOrEqual(900 * 0.8 + 1);
+
+    const header = dialog.locator("[data-embed-header]");
+    await expect(header.getByText("Live demo", { exact: true })).toBeVisible();
+    await expect(header.getByText("live.example", { exact: true })).toBeVisible();
+    const link = header.getByRole("link", { name: "Open in new tab" });
+    await expect(link).toHaveAttribute("href", "https://live.example/demo");
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(link).toHaveAttribute("rel", /noopener/);
+
+    // The page is live at once: a click reaches it.
+    await frame.contentFrame().getByRole("button", { name: "Inside" }).click();
+    await expect(frame.contentFrame().locator('body[data-clicked="1"]')).toHaveCount(1);
+  });
+
+  test("Next and Previous move between an image and a live page, past audio", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await serveLivePage(page);
+    const pause = () => new Promise((resolve) => setTimeout(resolve, 15));
+    await seed.link({ url: "https://live.example/", title: "Live demo", embed: true });
+    await pause();
+    await seed.link({
+      url: "https://sounds.example/song.wav",
+      title: "Song",
+      contentType: "AUDIO",
+      duration: 10,
+    });
+    await pause();
+    const icon = `${baseURL}/icon.png`;
+    await seed.link({
+      url: `${icon}?a=1`,
+      title: "Shot A",
+      contentType: "IMAGE",
+      thumbnail: icon,
+      width: 800,
+      height: 600,
+    });
+    await openGrid(page);
+
+    await page.getByRole("button", { name: "Shot A", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
+    await expect(page.locator("[data-embed-header]")).toHaveCount(0);
+    await page.keyboard.press("ArrowRight");
+    await expect(viewerFrame(page, "Live demo")).toBeVisible();
+    await expect(page.locator("[data-media-viewer] [data-viewer-status]")).toHaveText(
+      "2 of 2: Live demo",
+    );
+    await expect(page.locator("[data-embed-header]")).toHaveCount(1);
+    await page.getByRole("dialog").hover();
+    await expect(page.getByRole("button", { name: "Next pearl" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Previous pearl" }).click();
+    await expect(page.getByRole("dialog", { name: "Shot A" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Song" })).toHaveCount(0);
+  });
+
+  test("?pearl=<live id> opens it on load", async ({ page, seed }) => {
+    await serveLivePage(page);
+    const id = await seed.link({ url: "https://live.example/", title: "Live demo", embed: true });
+    await page.goto(`/home?pearl=${id}`);
+    await expect(viewerFrame(page, "Live demo")).toBeVisible();
+    await expect(viewerFrame(page, "Live demo")).toHaveAttribute("data-state", "loaded");
+  });
+
+  test("Tab out of the page reaches the viewer's Close", async ({ page, seed }) => {
+    await serveLivePage(page);
+    const id = await seed.link({ url: "https://live.example/", title: "Live demo", embed: true });
+    await page.goto(`/home?pearl=${id}`);
+    const frame = viewerFrame(page, "Live demo");
+    await expect(frame).toHaveAttribute("data-state", "loaded");
+    const inside = frame.contentFrame().locator("button");
+    await inside.focus();
+    await expect(inside).toBeFocused();
+
+    const close = page.getByRole("dialog", { name: "Live demo" }).getByRole("button", {
+      name: "Close",
+    });
+    let reached = false;
+    for (let i = 0; i < 6 && !reached; i++) {
+      await page.keyboard.press("Tab");
+      reached = await close.evaluate((el) => el === document.activeElement);
+    }
+    expect(reached).toBe(true);
+    // Esc from Purl (not the page) closes it.
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
+  });
+
+  test("a page that never loads keeps the preview and says so, with the link", async ({
+    page,
+    seed,
+  }) => {
+    await page.addInitScript(() => {
+      (window as Window & { __purlEmbedTimeoutMs?: number }).__purlEmbedTimeoutMs = 300;
+    });
+    // Never answered: the frame never loads. (An aborted request isn't
+    // that: the browser's error page fires `load`, like a blocked frame.)
+    await page.route("https://live.example/**", () => {});
+    const id = await seed.link({ url: "https://live.example/", title: "Live demo", embed: true });
+    await page.goto(`/home?pearl=${id}`);
+
+    const dialog = page.getByRole("dialog", { name: "Live demo" });
+    const status = dialog.getByRole("status").filter({ hasText: "Couldn't load this page" });
+    await expect(status).toBeVisible();
+    await expect(status.getByRole("link", { name: "Open in new tab" })).toHaveAttribute(
+      "href",
+      "https://live.example/",
+    );
+    await expect(dialog.locator("iframe")).toHaveCount(0);
+    await expect(dialog.locator("[data-embed-preview]")).toBeVisible();
+    const popup = (await page.locator("[data-media-viewer]").boundingBox())!;
+    expect(popup.height).toBeLessThanOrEqual(900 * 0.8 + 1);
+  });
+});
+
+test.describe("Live pages in the viewer on phones", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("the box is 3:4", async ({ page, seed }) => {
+    await serveLivePage(page);
+    await seed.link({ url: "https://live.example/", title: "Live demo", embed: true });
+    await openGrid(page, { tap: true });
+    await liveCard(page, "Live demo").tap();
+    await expect(viewerFrame(page, "Live demo")).toBeVisible();
+    expect(Math.abs((await viewerBoxRatio(page)) - 0.75)).toBeLessThan(0.02);
+  });
+});
+
+test.describe("Live pages in the viewer, visited signed out", () => {
+  test.use({ signedIn: false, viewport: { width: 1280, height: 720 } });
+
+  test("?pearl=<live id> opens it on a shared folder", async ({ page, seed, testUser }) => {
+    await serveLivePage(page);
+    const folder = await seed.folder({ name: "Live", slug: "live", isPublic: true });
+    const id = await seed.link({
+      url: "https://live.example/",
+      title: "Live demo",
+      embed: true,
+      folderId: folder,
+    });
+    await page.goto(`/@${testUser.username}/live?pearl=${id}`);
+    await expect(viewerFrame(page, "Live demo")).toBeVisible();
+    await expect(page.locator("[data-embed-header]")).toHaveCount(1);
   });
 });

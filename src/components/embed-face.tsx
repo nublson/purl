@@ -16,7 +16,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import { EmbedFrame, embedLoadTimeoutMs } from "./embed-frame";
+import { EmbedFrame, useEmbedLoadTimeout } from "./embed-frame";
 import { MediaAnchor } from "./media-face-anchor";
 import { MediaOpenButton } from "./media-open-button";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
@@ -98,11 +98,7 @@ export function EmbedFace({
   if (!framed && loaded) setLoaded(false);
 
   // Not loaded in time: drop the frame, keep the preview.
-  useEffect(() => {
-    if (!framed || loaded) return;
-    const timer = setTimeout(() => setFailed(true), embedLoadTimeoutMs());
-    return () => clearTimeout(timer);
-  }, [framed, loaded]);
+  useEmbedLoadTimeout(framed && !loaded, () => setFailed(true));
 
   // Leaving: no frame any more (the slot lost), a selection starting, the
   // pearl opening in the media viewer ("Open large": the viewer owns Esc and

@@ -2,7 +2,7 @@
 
 import { embedSrc } from "@/lib/embeds";
 import type { Link } from "@/utils/links";
-import type { Ref } from "react";
+import { useEffect, useLayoutEffect, useRef, type Ref } from "react";
 
 /** How long a live frame may take to load before the preview stays instead. */
 export const EMBED_LOAD_TIMEOUT_MS = 8000;
@@ -21,6 +21,23 @@ export function embedLoadTimeoutMs(): number {
   return typeof override === "number" && Number.isFinite(override) && override >= 0
     ? override
     : EMBED_LOAD_TIMEOUT_MS;
+}
+
+/**
+ * Calls `onTimeout` once a live frame has been `waiting` (mounted, not yet
+ * loaded) for `embedLoadTimeoutMs()`; the card and the viewer then drop the
+ * frame and keep the preview. Stops counting once it loads or goes.
+ */
+export function useEmbedLoadTimeout(waiting: boolean, onTimeout: () => void) {
+  const latest = useRef(onTimeout);
+  useLayoutEffect(() => {
+    latest.current = onTimeout;
+  });
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setTimeout(() => latest.current(), embedLoadTimeoutMs());
+    return () => clearTimeout(timer);
+  }, [waiting]);
 }
 
 /**
