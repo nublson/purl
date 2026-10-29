@@ -147,7 +147,7 @@ function ViewerImage({ link, ready }: { link: Link; ready: boolean }) {
           draggable={false}
           referrerPolicy="strict-origin-when-cross-origin"
           className={cn(
-            "absolute inset-0 size-full object-contain transition-opacity duration-150 ease-out",
+            "absolute inset-0 size-full object-contain transition-opacity duration-150 ease-out-strong",
             loaded ? "opacity-100" : "opacity-0",
           )}
           onLoad={() => setLoaded(true)}

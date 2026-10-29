@@ -13,9 +13,18 @@ const BARS = [
  * a list row's icon slot and in its card's corner. Decorative
  * (`aria-hidden`): the Play/Pause button's name says it's playing. In
  * `currentColor`, filling its box; still (at their rest heights) under
- * reduced motion.
+ * reduced motion. `halo`: a faint ring of the page's background on each
+ * bar, for bars drawn over art; on the bars themselves (a shadow moves with
+ * the bar's transform), never a filter on their parent, which would be
+ * redrawn on every frame of the loop.
  */
-export function EqualizerBars({ className }: { className?: string }) {
+export function EqualizerBars({
+  className,
+  halo = false,
+}: {
+  className?: string;
+  halo?: boolean;
+}) {
   return (
     <span
       aria-hidden
@@ -26,7 +35,10 @@ export function EqualizerBars({ className }: { className?: string }) {
         <span
           key={bar.ms}
           data-eq-bar=""
-          className="h-full w-[22%] rounded-[1px] bg-current"
+          className={cn(
+            "h-full w-[22%] rounded-[1px] bg-current",
+            halo && "shadow-[0_0_1.5px_var(--background)]",
+          )}
           style={
             {
               "--eq-rest": bar.rest,

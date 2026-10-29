@@ -106,7 +106,13 @@ function ImageFaceImg({
   anchored,
 }: FaceProps & { src: string; eager: boolean; anchored: boolean }) {
   const known = Boolean(link.width && link.height);
-  const [state, setState] = useState<"loading" | "loaded" | "failed">("loading");
+  // "unknown" until the image is seen: drawn as is, so the server's HTML
+  // shows an image the browser already has. Only one still on its way
+  // ("loading") is hidden and fades in once it lands; an image that's
+  // already there (a cached one, a remount) appears at once.
+  const [state, setState] = useState<"unknown" | "loading" | "loaded" | "failed">(
+    "unknown",
+  );
   const [natural, setNatural] = useState<string | null>(null);
 
   const settle = (img: HTMLImageElement) => {
@@ -121,7 +127,9 @@ function ImageFaceImg({
   // A server-rendered image can finish (or fail) before React hydrates and
   // attaches onLoad / onError: read where it ended up.
   const ref = (img: HTMLImageElement | null) => {
-    if (img?.complete && state === "loading") settle(img);
+    if (!img || state !== "unknown") return;
+    if (img.complete) settle(img);
+    else setState("loading");
   };
 
   if (state === "failed") {
@@ -142,7 +150,7 @@ function ImageFaceImg({
         data-face="image"
         className={cn(
           "relative w-full overflow-hidden",
-          state === "loading" && "bg-muted",
+          (state === "unknown" || state === "loading") && "bg-muted",
           className,
         )}
         style={{ aspectRatio: natural ?? cardAspectRatio(link) }}
@@ -158,8 +166,8 @@ function ImageFaceImg({
           decoding="async"
           referrerPolicy="strict-origin-when-cross-origin"
           className={cn(
-            "absolute inset-0 size-full object-cover transition-opacity duration-150 ease-out",
-            state === "loaded" ? "opacity-100" : "opacity-0",
+            "absolute inset-0 size-full object-cover transition-opacity duration-150 ease-out-strong",
+            state === "loading" ? "opacity-0" : "opacity-100",
           )}
           onLoad={(event) => settle(event.currentTarget)}
           onError={() => setState("failed")}

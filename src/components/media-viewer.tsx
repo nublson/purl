@@ -32,6 +32,7 @@ import {
   ViewerStage,
   ViewerStatus,
   viewerKeyMove,
+  type MoveVia,
   type ViewerMove,
 } from "./media-viewer-nav";
 import {
@@ -185,7 +186,11 @@ export function MediaViewer() {
   // it went from the first move on (opening reads the dialog itself).
   const [moved, setMoved] = useState(false);
   if (closed && moved) setMoved(false);
-  const move = (to: ViewerMove) => {
+  // How the last move was made: a key crossfades in place and the box
+  // snaps to the new pearl (a held arrow repeats); a swipe leaves at its
+  // own speed; an arrow button slides, the box resizing with it.
+  const [via, setVia] = useState<MoveVia>("slide");
+  const move = (to: ViewerMove, how: MoveVia = "slide") => {
     if (closing || closed) return;
     // Focus inside the leaving slide (a player's button) would go with it.
     const media = mediaRef.current;
@@ -194,12 +199,13 @@ export function MediaViewer() {
       media.focus({ preventScroll: true });
     }
     setMoved(true);
-    captureBoxSize();
+    setVia(how);
+    if (how !== "key") captureBoxSize();
     mediaViewer[to]();
   };
   const onDragOutcome = (outcome: DragOutcome) => {
     if (outcome === "close") requestClose();
-    else if (outcome !== "none") move(outcome);
+    else if (outcome !== "none") move(outcome, "fling");
   };
   // A button that went away at an end (Next on the last pearl) had focus:
   // keep it in the viewer.
@@ -261,7 +267,7 @@ export function MediaViewer() {
             const to = viewerKeyMove(event);
             if (!to) return;
             event.preventDefault();
-            move(to);
+            move(to, "key");
           }}
           onLayoutAnimationStart={() => {
             morphStarted.current = true;
@@ -302,6 +308,7 @@ export function MediaViewer() {
                   hasPrev={hasPrev}
                   hasNext={hasNext}
                   reducedMotion={reducedMotion}
+                  via={via}
                   onDragOutcome={onDragOutcome}
                 >
                   <ViewerMedia link={current} ready={ready} />

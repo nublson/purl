@@ -127,15 +127,15 @@ export function AudioPlayer({
           // In the checkbox's box (16px, 8px in), so the swap on hover doesn't
           // move the corner. No tile of its own: the bars sit on the hero in
           // the text's color, softened, with a faint halo of the page's
-          // background that keeps them legible over bright art.
+          // background on each bar that keeps them legible over bright art.
           <span
             data-playing=""
             className={cn(
-              "pointer-events-none absolute top-2 left-2 flex size-4 items-center justify-center text-foreground/80 [filter:drop-shadow(0_0_1.5px_var(--background))] transition-opacity duration-150 ease-out-strong",
+              "pointer-events-none absolute top-2 left-2 flex size-4 items-center justify-center text-foreground/80 transition-opacity duration-150 ease-out-strong",
               indicatorClassName,
             )}
           >
-            <EqualizerBars className="size-full" />
+            <EqualizerBars className="size-full" halo />
           </span>
         ) : null}
         <div className="absolute inset-x-0 bottom-0 flex min-w-0 flex-col p-4">
@@ -236,7 +236,7 @@ export function AudioTimes({
 
 /** The transport's side buttons (Restart, Open file): 34px, outlined, 44px to the touch. */
 const SIDE_BUTTON =
-  "relative flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-border text-foreground/70 outline-none transition-[background-color,color,scale] duration-150 ease-out hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100 pointer-coarse:after:absolute pointer-coarse:after:-inset-[5px]";
+  "relative flex size-[34px] shrink-0 cursor-pointer items-center justify-center rounded-full border border-border text-foreground/70 outline-none transition-[background-color,color,scale] duration-150 ease-out-strong hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100 pointer-coarse:after:absolute pointer-coarse:after:-inset-[5px]";
 
 /**
  * The player's transport, centred: Restart (34px, outlined; off at the
@@ -277,7 +277,7 @@ export function AudioTransport({
         data-play=""
         disabled={!src}
         aria-label={`${playing ? "Pause" : "Play"} ${link.title}`}
-        className="flex size-[46px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100"
+        className="flex size-[46px] shrink-0 cursor-pointer items-center justify-center rounded-full bg-foreground text-background outline-none transition-[scale] duration-150 ease-out-strong focus-visible:ring-3 focus-visible:ring-ring active:scale-[0.96] disabled:cursor-default disabled:opacity-50 motion-reduce:active:scale-100"
         onClick={(event) => {
           keepAudioClick(event);
           if (src) toggle(src);
@@ -320,8 +320,10 @@ export function AudioTrack({ link }: { link: Link }) {
       <div
         data-run=""
         aria-hidden
-        className="absolute inset-y-0 left-0 rounded-full bg-foreground"
-        style={{ width: `${played * 100}%` }}
+        // Scaled, not sized: the run grows on every time update, and a
+        // width would lay the card out each time.
+        className="absolute inset-0 origin-left rounded-full bg-foreground"
+        style={{ transform: `scaleX(${played})` }}
       />
       <input
         type="range"

@@ -8,6 +8,7 @@ import {
   TRANSPORT_SIDE_NARROW,
 } from "@/components/audio-player";
 import { cardAspectRatio } from "@/lib/link-kind";
+import { ARRIVE } from "@/lib/motion";
 import { titleFromFileName } from "@/utils/media-title";
 import type { PendingUpload } from "@/lib/pending-upload";
 import { cn } from "@/lib/utils";
@@ -106,7 +107,7 @@ function ProgressRing({ progress }: { progress: number }) {
         strokeLinecap="round"
         strokeDasharray={circumference}
         strokeDashoffset={offset}
-        className="stroke-foreground transition-[stroke-dashoffset] duration-150 ease-out motion-reduce:transition-none"
+        className="stroke-foreground transition-[stroke-dashoffset] duration-150 ease-linear motion-reduce:transition-none"
       />
     </svg>
   );
@@ -175,7 +176,7 @@ export function PendingUploadCard({ item, onRetry, onDismiss }: Props) {
       aria-busy={failed ? undefined : true}
       data-cy="pending-upload"
       data-status={item.status}
-      className="relative flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 animate-in fade-in-0 duration-300"
+      className={cn("relative flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10", ARRIVE)}
     >
       <div
         className="relative grid w-full place-items-center overflow-hidden bg-muted text-muted-foreground"
@@ -230,7 +231,7 @@ function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
       aria-busy={failed ? undefined : true}
       data-cy="pending-upload"
       data-status={item.status}
-      className="relative flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 animate-in fade-in-0 duration-300"
+      className={cn("relative flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10", ARRIVE)}
     >
       <div aria-hidden className="relative h-[180px] w-full shrink-0">
         <AudioHeroIcon>
@@ -289,7 +290,10 @@ export function PendingUploadRow({ item, onRetry, onDismiss }: Props) {
       aria-busy={failed ? undefined : true}
       data-cy="pending-upload"
       data-status={item.status}
-      className="relative grid h-12 grid-cols-[20px_1fr_auto] gap-4 border-0 p-2 animate-in fade-in-0 slide-in-from-bottom-2 duration-300 max-md:h-14 max-md:grid-cols-[24px_1fr_auto]"
+      className={cn(
+        "relative grid h-12 grid-cols-[20px_1fr_auto] gap-4 border-0 p-2 max-md:h-14 max-md:grid-cols-[24px_1fr_auto]",
+        ARRIVE,
+      )}
     >
       <ItemMedia
         variant="image"

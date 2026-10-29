@@ -1,11 +1,9 @@
 "use client";
 
-import { EASE_OUT_STRONG } from "@/lib/motion";
+import { VIEWER_MOVE } from "@/lib/motion";
 import { animate, type AnimationPlaybackControls } from "motion/react";
 import { useCallback, useLayoutEffect, useRef, type RefObject } from "react";
 
-/** The box resizes with the slide: the same length and curve. */
-const RESIZE_TRANSITION = { duration: 0.2, ease: EASE_OUT_STRONG };
 
 /** How long the box waits for a pearl's media to take a size before it snaps. */
 const UNSIZED_WAIT_MS = 1000;
@@ -99,7 +97,7 @@ export function useBoxResize(
           height: start.height + (to.height - start.height) * progress,
         });
       size(0);
-      const controls = animate(0, 1, { ...RESIZE_TRANSITION, onUpdate: size });
+      const controls = animate(0, 1, { ...VIEWER_MOVE, onUpdate: size });
       running.current = controls;
       controls.then(() => {
         // Only the resize that finished clears the size; a newer one owns it.

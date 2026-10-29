@@ -753,8 +753,11 @@ test.describe("Media viewer", () => {
     // The original shows once the open morph has played.
     await expect(popup.locator('img[src$="?w=1"]')).toHaveAttribute("alt", "Wide");
 
+    // The Next button: a key move crossfades and the box snaps instead.
+    const next = popup.getByRole("button", { name: "Next pearl" });
+    await next.hover();
     const heights = sampleDrawnHeights(page, 8);
-    await page.keyboard.press("End");
+    await next.click();
     const seen = await heights;
     // Growing towards the tall pearl's height, never back, and never
     // drawn at the new size before the resize starts.
@@ -768,6 +771,11 @@ test.describe("Media viewer", () => {
     await expect
       .poll(() => popup.evaluate((el) => el.style.width + el.style.height), { timeout: 500 })
       .toBe("");
+    // A key move (a held arrow repeats) crossfades and the box snaps: no
+    // resize is pinned on it.
+    await page.keyboard.press("Home");
+    await expect(page.getByRole("dialog", { name: "Wide" })).toBeVisible();
+    expect(await popup.evaluate((el) => el.style.width + el.style.height)).toBe("");
   });
 
   test("moving to an image with no stored size holds the box until it has one, then resizes", async ({
@@ -807,8 +815,10 @@ test.describe("Media viewer", () => {
     const popup = page.locator("[data-media-viewer]");
     await expect(popup.locator('img[src$="?t=1"]')).toHaveAttribute("alt", "Tall");
 
+    const next = popup.getByRole("button", { name: "Next pearl" });
+    await next.hover();
     const sizes = sampleDrawnSizes(page, 900);
-    await page.keyboard.press("End");
+    await next.click();
     await expect(page.getByRole("dialog", { name: "Loose" })).toBeVisible();
     await page.waitForTimeout(300);
     release();

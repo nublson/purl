@@ -2,6 +2,12 @@
 export const EASE_OUT_STRONG = [0.23, 1, 0.32, 1] as const;
 
 /**
+ * The media viewer's move between pearls: the slide, the box resizing with
+ * it and the swipe's pull settling back, all one length and curve.
+ */
+export const VIEWER_MOVE = { duration: 0.2, ease: EASE_OUT_STRONG } as const;
+
+/**
  * A link's real details arriving in place of a placeholder (after a save,
  * or a Save row's preview): fade in as the blur clears, 200ms. Reduced
  * motion: fade only.

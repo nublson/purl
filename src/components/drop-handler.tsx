@@ -187,7 +187,7 @@ export function DropHandler({
     <div
       data-cy="drop-overlay"
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-60 grid place-items-center bg-background/70 p-4 backdrop-blur-[2px] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-150"
+      className="pointer-events-none fixed inset-0 z-60 grid place-items-center bg-background/70 p-4 backdrop-blur-[2px] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-150 motion-safe:ease-out-strong"
     >
       <p className="rounded-2xl border-2 border-dashed border-foreground/40 bg-background px-8 py-6 text-base font-medium text-foreground shadow-sm">
         {folder ? `Drop to save to ${folder.emoji} ${folder.name}` : "Drop to save"}
