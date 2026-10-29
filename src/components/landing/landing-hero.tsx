@@ -36,7 +36,7 @@ export function LandingHero({ providers }: { providers: ProviderId[] }) {
             New
           </span>
           <span className="sr-only">: </span>
-          Upload images, video and audio
+          Now with image, video and audio uploads
         </Typography>
       </div>
       <Typography
