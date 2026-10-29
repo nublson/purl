@@ -270,10 +270,10 @@ test.describe("Media pearls", () => {
     await expect(shotA.locator(`img[src="${icon}"]`)).toBeVisible();
     await expect(shotA).not.toContainText("Shot A");
 
-    // An audio card is its player: no button of its own opens it; Play
-    // plays in place, never the media viewer.
+    // An audio card's opener, like every card's, is named by its title; it
+    // plays in place (pressed while playing), never the media viewer.
     const songCard = cards(page).filter({ has: page.locator('[data-face="audio"]') });
-    await expect(sharedCard("Song")).toHaveCount(0);
+    await expect(sharedCard("Song")).toHaveAttribute("aria-pressed", "false");
     let popups = 0;
     page.on("popup", () => popups++);
     const url = page.url();
@@ -351,9 +351,13 @@ test.describe("Audio pearls: the grid card is the player card", () => {
 
     const song = card(page, "Song");
     const birds = card(page, "Birds");
-    // The card is its player: no link or button of its own opens anything
-    // (Open file is the transport's).
-    await expect(song.getByRole("button", { name: "Song", exact: true })).toHaveCount(0);
+    // Like every card, it has an opener under the whole card, named by its
+    // title: here it plays and pauses (pressed while playing), never a
+    // viewer or a new tab (Open file is the transport's link).
+    await expect(song.getByRole("button", { name: "Song", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
     await expect(song.getByRole("link")).toHaveCount(1);
     await expect(song.getByRole("link", { name: "Open file" })).toHaveAttribute(
       "href",
@@ -445,14 +449,15 @@ test.describe("Audio pearls: the grid card is the player card", () => {
     await clickAt(page, song.locator("[data-hero]"));
     await expect(song.getByRole("button", { name: "Pause Song" })).toBeVisible();
     await expect(bars).toBeVisible();
-    // Focus meets the checkbox, drawn in the top-left corner, before the
-    // transport at the foot.
-    const order = await song.evaluate((el) =>
-      Array.from(el.querySelectorAll("[role=checkbox], [data-play]")).map((c) =>
-        c.getAttribute("role") ?? "play",
-      ),
+    // The card's opener says it's playing, and is its first focus stop.
+    await expect(song.getByRole("button", { name: "Song", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true",
     );
-    expect(order).toEqual(["checkbox", "play"]);
+    const first = await song.evaluate(
+      (el) => el.querySelector("button, a[href], input")?.hasAttribute("data-audio-open") ?? false,
+    );
+    expect(first).toBe(true);
     // Bars have no action: on hover the checkbox takes the corner.
     await page.mouse.move(0, 0);
     await expect(bars).toHaveCSS("opacity", "1");
@@ -629,6 +634,54 @@ function rowSecondLine(scope: Locator) {
 const rowToggle = (scope: Locator) => scope.locator("[data-audio-toggle]");
 /** The icon slot while the pearl is loaded: the playing bars, or the play mark while paused. */
 const rowMark = (scope: Locator) => scope.locator('[data-cy="row-favicon"] [data-row-mark]');
+
+test.describe("Audio pearls on a phone: the tile's menu", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("tapping the ⋯, or the art to close its menu, plays nothing", async ({ page, seed }) => {
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
+    await seedSong(seed);
+    const saved = await page.request.patch("/api/user/layout", { data: { view: "grid" } });
+    expect(saved.ok()).toBe(true);
+    await openHome(page);
+
+    const song = card(page, "Song");
+    // The menu opens on the press; the tap's click then lands on whatever
+    // under the finger still takes pointer events. It must not be the art.
+    const menu = (await song.getByRole("button", { name: "Open link menu" }).boundingBox())!;
+    await page.touchscreen.tap(menu.x + menu.width / 2, menu.y + menu.height / 2);
+    await expect(page.getByRole("menu")).toBeVisible();
+    await page.waitForTimeout(300);
+    // (The open menu hides the page from assistive tech: read the DOM.)
+    await expect(song.locator("[data-play]")).toHaveAttribute("aria-label", "Play Song");
+    expect(await page.evaluate(() => document.querySelector("audio")?.paused ?? true)).toBe(true);
+
+    // A second tap on the ⋯ closes the menu, and only closes it (while the
+    // menu is open the button itself takes no pointer events: the art
+    // under it gets the press).
+    await page.touchscreen.tap(menu.x + menu.width / 2, menu.y + menu.height / 2);
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await page.waitForTimeout(300);
+    await expect(song.locator("[data-play]")).toHaveAttribute("aria-label", "Play Song");
+    expect(await page.evaluate(() => document.querySelector("audio")?.paused ?? true)).toBe(true);
+
+    // So does a tap on the art.
+    await page.touchscreen.tap(menu.x + menu.width / 2, menu.y + menu.height / 2);
+    await expect(page.getByRole("menu")).toBeVisible();
+    const art = (await song.locator("[data-hero]").boundingBox())!;
+    await page.touchscreen.tap(art.x + art.width / 2, art.y + art.height / 3);
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await page.waitForTimeout(300);
+    await expect(song.locator("[data-play]")).toHaveAttribute("aria-label", "Play Song");
+    expect(await page.evaluate(() => document.querySelector("audio")?.paused ?? true)).toBe(true);
+
+    // With nothing open, the same tap plays.
+    await page.touchscreen.tap(art.x + art.width / 2, art.y + art.height / 3);
+    await expect(song.locator("[data-play]")).toHaveAttribute("aria-label", "Pause Song");
+  });
+});
 
 test.describe("Audio pearls in the list: a row that plays", () => {
   test.beforeEach(async ({ page, seed }) => {

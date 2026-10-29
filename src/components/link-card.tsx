@@ -27,7 +27,7 @@ import {
   useFolderTag,
   useLinkFolder,
 } from "./folder-tag";
-import { AudioPlayer } from "./audio-player";
+import { AudioOpenButton, AudioPlayer } from "./audio-player";
 import { HapticTarget } from "./haptic-target";
 import { MediaOpenButton } from "./media-open-button";
 import { AUDIO_CARD_FRAME, LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
@@ -126,9 +126,8 @@ export function LinkCard({
         deleteLinkKeepingFocus({
           linkId: link.id,
           anchor: anchorRef.current,
-          // An audio card's is its player's Play.
           siblingsSelector:
-            '[data-cy="link-card"] > a[href], [data-cy="link-card"] > [data-pearl-button], [data-cy="link-card"] [data-play]',
+            '[data-cy="link-card"] > a[href], [data-cy="link-card"] > [data-pearl-button], [data-cy="link-card"] > [data-audio-open]',
           byKeyboard,
           onDeleted: notifyLinksChanged,
         })
@@ -147,10 +146,7 @@ export function LinkCard({
         : "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/card:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/card:opacity-100",
   );
 
-  // The checkbox (and its touch tap) in the top-left corner. An audio
-  // card puts it before its player in the page, so focus meets it where
-  // it's drawn, before the transport at the foot; other cards after their
-  // opener, which is the whole card.
+  // The checkbox (and its touch tap) in the top-left corner.
   const checkbox = demo ? null : (
     <>
       <Checkbox
@@ -189,7 +185,7 @@ export function LinkCard({
         // The opener (below, a direct child) is the focus target: its ring
         // is the card's. Not any link inside: the audio transport's Open
         // file and the folder button ring themselves.
-        "group/card relative select-none has-[>a:focus-visible]:ring-3 has-[>a:focus-visible]:ring-ring has-[>[data-pearl-button]:focus-visible]:ring-3 has-[>[data-pearl-button]:focus-visible]:ring-ring",
+        "group/card relative select-none has-[>a:focus-visible]:ring-3 has-[>a:focus-visible]:ring-ring has-[>[data-pearl-button]:focus-visible]:ring-3 has-[>[data-pearl-button]:focus-visible]:ring-ring has-[>[data-audio-open]:focus-visible]:ring-3 has-[>[data-audio-open]:focus-visible]:ring-ring",
         selected &&
           "ring-2 ring-primary [@media(hover:hover)]:hover:ring-primary",
         anchoredFace && "overflow-visible",
@@ -217,16 +213,18 @@ export function LinkCard({
       }}
     >
       {audio ? (
-        // A plain surface under the player: while selecting, a click on it
-        // toggles the card (the player's controls step aside then). The
-        // card's focus anchor is the player's Play.
-        <div
-          aria-hidden
-          className={cn("absolute inset-0 z-0 rounded-lg", selecting && "cursor-pointer")}
-          onClick={(event) => {
-            if (consumeLongPress()) return;
-            if (selecting) linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-          }}
+        // The card plays and pauses the pearl (the demo's too); the
+        // player's track and transport take their own presses over it.
+        <AudioOpenButton
+          ref={setAnchor}
+          link={link}
+          selecting={selecting}
+          consumeLongPress={consumeLongPress}
+          aria-describedby={describedBy}
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={OPENER_CLASS}
+          onSelect={(event) => linkSelection.toggle(link.id, { shiftKey: event.shiftKey })}
         />
       ) : media ? (
         <MediaOpenButton
@@ -265,7 +263,6 @@ export function LinkCard({
           }}
         />
       )}
-      {audio ? checkbox : null}
       {/* The content is a picture of the link: clicks go to the link. */}
       <div className="pointer-events-none flex flex-col">
         {audio ? (
@@ -274,8 +271,6 @@ export function LinkCard({
             surface="card"
             badge={badge}
             inert={selecting}
-            playRef={demo ? undefined : setAnchor}
-            consumePress={consumeLongPress}
             // The checkbox takes the corner on hover, on its keyboard focus
             // and while selecting (the demo has none).
             indicatorClassName={
@@ -297,7 +292,7 @@ export function LinkCard({
         )}
       </div>
       {folderTag ? <FolderTagLabel id={folderLabelId} folder={folderTag} /> : null}
-      {audio ? null : checkbox}
+      {checkbox}
       {demo ? null : (
         <>
           <div

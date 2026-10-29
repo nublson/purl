@@ -61,8 +61,9 @@ const FADE = {
  * hero and the times row already say it's audio and how long). While it
  * plays, the playing bars sit in the hero's top-left corner, where the
  * owner's checkbox shows on hover (`indicatorClassName` hides them then).
- * A press on the hero plays and pauses, as on a list row (a pointer
- * shortcut for the transport's Play, which keyboards reach). Under it, 16px in: the track (a scrubber), the elapsed and
+ * It's a picture of the pearl: the card plays it through its opener
+ * (`AudioOpenButton`, under the whole card, as every card has one), and
+ * only the track and the transport take presses here. Under it, 16px in: the track (a scrubber), the elapsed and
  * the length, and the transport centred (Restart, Play/Pause, Open file),
  * 16px under it. A size container: on a narrow card the transport's gaps
  * close up, and under 122px Restart goes (the track seeks back to 0).
@@ -77,16 +78,13 @@ const FADE = {
  * A view of the page's one player: every view of a pearl (its card, its
  * row, its preview) shows and drives the same `<audio>`. The controls are
  * `data-card-menu`, so a press on them isn't the owner's card's
- * long-press; `inert` (while selecting) steps them and the hero's press
- * aside.
+ * long-press; `inert` (while selecting) steps them aside.
  */
 export function AudioPlayer({
   link,
   surface,
   badge,
   inert = false,
-  playRef,
-  consumePress,
   indicatorClassName,
 }: {
   link: Link;
@@ -96,28 +94,13 @@ export function AudioPlayer({
   badge?: ReactNode;
   /** While selecting: the controls step aside. */
   inert?: boolean;
-  /** The Play button (the owner's card's focus anchor). */
-  playRef?: Ref<HTMLButtonElement>;
-  /** True once when this press ends a long-press (which already selected). */
-  consumePress?: () => boolean;
   /** The playing bars' extra classes (the owner's card hides them on hover). */
   indicatorClassName?: string;
 }) {
-  const { playing, toggle } = useAudioPlayer(link.id, link.duration);
-  const src = safeRemoteImgSrc(link.url);
+  const { playing } = useAudioPlayer(link.id, link.duration);
   return (
     <div data-face="audio" className="@container/player relative flex flex-col">
-      <div
-        className={cn(
-          "relative h-[180px] w-full shrink-0 overflow-hidden rounded-t-lg @max-[199px]/player:aspect-square @max-[199px]/player:h-auto",
-          src && !inert ? "pointer-events-auto cursor-pointer" : "pointer-events-none",
-        )}
-        onClick={(event) => {
-          if (consumePress?.()) return;
-          keepAudioClick(event);
-          if (src) toggle(src);
-        }}
-      >
+      <div className="relative h-[180px] w-full shrink-0 overflow-hidden rounded-t-lg @max-[199px]/player:aspect-square @max-[199px]/player:h-auto">
         <AudioHero link={link} />
         {/* The fade: over the hero's lower 120px, already 90% surface by
             the top of a two-line title (35%, 102px down) and solid at the
@@ -169,38 +152,81 @@ export function AudioPlayer({
           )}
         </div>
       </div>
-      {/* Positioned (`relative`), so the controls paint above the owner's
-          card's select surface (`absolute inset-0 z-0`), which would
-          otherwise cover any of them that isn't positioned itself. */}
+      {/* Positioned (`relative`), so the controls paint above the card's
+          opener (`absolute inset-0 z-0`). The band itself takes no presses
+          (they reach the opener); only the track and the transport's
+          buttons do. */}
       <div
         data-card-menu
         inert={inert}
-        className={cn(
-          // The tile: the controls lie over the hero, taking no presses
-          // themselves (they reach the hero) but through Play.
-          "@container relative flex flex-col p-4 @max-[199px]/player:absolute @max-[199px]/player:inset-0 @max-[199px]/player:p-0 @max-[199px]/player:pointer-events-none",
-          inert ? "pointer-events-none" : "pointer-events-auto",
-        )}
+        className="@container pointer-events-none relative flex flex-col p-4 @max-[199px]/player:absolute @max-[199px]/player:inset-0 @max-[199px]/player:p-0"
       >
         {/* A press on the track stays in the player: never its host's. On
             the tile it's the progress line along the foot. */}
         <div
           onClick={keepAudioClick}
-          className="@max-[199px]/player:absolute @max-[199px]/player:inset-x-0 @max-[199px]/player:bottom-0"
+          className="pointer-events-auto @max-[199px]/player:pointer-events-none @max-[199px]/player:absolute @max-[199px]/player:inset-x-0 @max-[199px]/player:bottom-0"
         >
           <AudioTrack link={link} />
         </div>
         <AudioTimes link={link} className="mt-2 h-3 @max-[199px]/player:hidden" />
         <AudioTransport
           link={link}
-          playRef={playRef}
           className={cn(
-            "mt-4 h-[46px] @max-[199px]/player:pointer-events-auto @max-[199px]/player:absolute @max-[199px]/player:right-2.5 @max-[199px]/player:bottom-3.5 @max-[199px]/player:mt-0 @max-[199px]/player:h-auto",
+            "mt-4 h-[46px] *:pointer-events-auto @max-[199px]/player:absolute @max-[199px]/player:right-2.5 @max-[199px]/player:bottom-3.5 @max-[199px]/player:mt-0 @max-[199px]/player:h-auto",
             TRANSPORT_GAP,
           )}
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * An audio card's opener, as every card has one: a button under the whole
+ * card (the player over it is a picture; its track and transport take
+ * their own presses) that plays and pauses the pearl, named by its title
+ * and pressed while it plays, the card's focus target and keyboard-delete
+ * anchor (`data-audio-open`). While selecting, a click toggles the card
+ * instead (the checkbox is the keyboard control then); the click that
+ * ends a long-press does nothing.
+ */
+export function AudioOpenButton({
+  ref,
+  link,
+  selecting,
+  consumeLongPress,
+  onSelect,
+  className,
+  ...rest
+}: Omit<ComponentPropsWithoutRef<"button">, "onSelect"> & {
+  ref?: Ref<HTMLButtonElement>;
+  link: Link;
+  selecting: boolean;
+  consumeLongPress?: () => boolean;
+  /** While selecting: the click toggles the card. */
+  onSelect?: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  const { playing, toggle } = useAudioPlayer(link.id, link.duration);
+  const src = safeRemoteImgSrc(link.url);
+  return (
+    <button
+      ref={ref}
+      type="button"
+      data-audio-open=""
+      aria-label={link.title}
+      aria-pressed={playing}
+      className={className}
+      {...rest}
+      onClick={(event) => {
+        if (consumeLongPress?.()) return;
+        if (selecting) {
+          onSelect?.(event);
+          return;
+        }
+        if (src) toggle(src);
+      }}
+    />
   );
 }
 
@@ -291,10 +317,9 @@ const SIDE_BUTTON =
  */
 export function AudioTransport({
   link,
-  playRef,
   className,
   ...rest
-}: ComponentPropsWithoutRef<"div"> & { link: Link; playRef?: Ref<HTMLButtonElement> }) {
+}: ComponentPropsWithoutRef<"div"> & { link: Link }) {
   const { playing, elapsed, toggle, restart } = useAudioPlayer(link.id, link.duration);
   const reducedMotion = usePrefersReducedMotion();
   const src = safeRemoteImgSrc(link.url);
@@ -317,7 +342,6 @@ export function AudioTransport({
         <Restart className="size-4" aria-hidden />
       </button>
       <button
-        ref={playRef}
         type="button"
         data-play=""
         disabled={!src}

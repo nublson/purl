@@ -5,7 +5,7 @@ import type { Link as LinkType } from "@/utils/links";
 import { isViewerKind, linkKind } from "@/lib/link-kind";
 import { linkSecondLine } from "@/lib/upload-meta";
 import { LinkIcon } from "./link-icon";
-import { AudioPlayer } from "./audio-player";
+import { AudioOpenButton, AudioPlayer } from "./audio-player";
 import { ImageFace, VideoFace } from "./media-card-face";
 import { MediaOpenButton } from "./media-open-button";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
@@ -47,11 +47,25 @@ export function SharedLinkCard({
 }) {
   const kind = linkKind(link);
   if (kind === "audio") {
-    // A frame around the player, whose controls are its own: an audio
+    // The card plays and pauses the pearl through its opener, under the
+    // player, whose track and transport take their own presses; an audio
     // pearl never opens the media viewer.
     return (
-      <div data-cy="link-card" className={AUDIO_CARD_FRAME}>
-        <AudioPlayer link={link} surface="card" />
+      <div
+        data-cy="link-card"
+        className={cn(
+          AUDIO_CARD_FRAME,
+          "relative has-[>[data-audio-open]:focus-visible]:ring-3 has-[>[data-audio-open]:focus-visible]:ring-ring",
+        )}
+      >
+        <AudioOpenButton
+          link={link}
+          selecting={false}
+          className="absolute inset-0 z-0 cursor-pointer rounded-lg outline-none"
+        />
+        <div className="pointer-events-none flex flex-col">
+          <AudioPlayer link={link} surface="card" />
+        </div>
       </div>
     );
   }
