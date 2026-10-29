@@ -29,6 +29,11 @@ import { ImageResponse } from "next/og";
 export const SITE_OG_SIZE = { width: 1200, height: 630 };
 export const SITE_OG_CONTENT_TYPE = "image/png";
 
+/** Headline size beside the showcase cards; long titles step down to fit three lines. */
+export function siteOgHeadlineSize(title: string, showcase: boolean): number {
+  return showcase && title.length > 28 ? 52 : 64;
+}
+
 type ShowcaseLink = {
   title: string;
   domain: string;
@@ -228,7 +233,7 @@ export async function renderSiteOgImage({
     ),
     loadInter(),
   ]);
-  const headlineSize = showcase && title.length > 28 ? 52 : 64;
+  const headlineSize = siteOgHeadlineSize(title, showcase);
 
   return new ImageResponse(
     (
