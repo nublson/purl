@@ -1,9 +1,11 @@
 "use client";
 
-import { decideSwipe, SWIPE_REVEAL } from "@/lib/swipe-row";
+import { afterTap, haptic } from "@/lib/haptics";
+import { decideSwipe, settleDuration, SWIPE_REVEAL } from "@/lib/swipe-row";
 import { cn } from "@/lib/utils";
 import { Pen, Trash2 } from "reicon-react";
 import * as React from "react";
+import { HapticTarget } from "./haptic-target";
 import { Typography } from "./typography";
 
 /** Movement (px) before a touch counts as a swipe or a scroll. */
@@ -60,22 +62,27 @@ export function SwipeRow({
   // The release (or a tap that shut the row) mustn't click the row.
   const swallowClick = React.useRef(false);
 
-  const place = React.useCallback((offset: number, animate: boolean) => {
-    const content = contentRef.current;
-    if (!content) return;
-    content.style.transition = animate ? "" : "none";
-    content.style.transform = offset ? `translateX(${offset}px)` : "";
-    // Each button fills what the row uncovers on its side, so a full swipe
-    // reads as one; only the uncovered one is drawn.
-    for (const [button, shown] of [
-      [editRef.current, offset > 0],
-      [deleteRef.current, offset < 0],
-    ] as const) {
-      if (!button) continue;
-      button.style.visibility = shown ? "visible" : "";
-      button.style.width = `${Math.max(SWIPE_REVEAL, Math.abs(offset))}px`;
-    }
-  }, []);
+  /** Moves the row; `animate` slides it (over `duration` ms, else 200). */
+  const place = React.useCallback(
+    (offset: number, animate: boolean, duration?: number) => {
+      const content = contentRef.current;
+      if (!content) return;
+      content.style.transition = animate ? "" : "none";
+      content.style.transitionDuration = duration ? `${duration}ms` : "";
+      content.style.transform = offset ? `translateX(${offset}px)` : "";
+      // Each button fills what the row uncovers on its side, so a full swipe
+      // reads as one; only the uncovered one is drawn.
+      for (const [button, shown] of [
+        [editRef.current, offset > 0],
+        [deleteRef.current, offset < 0],
+      ] as const) {
+        if (!button) continue;
+        button.style.visibility = shown ? "visible" : "";
+        button.style.width = `${Math.max(SWIPE_REVEAL, Math.abs(offset))}px`;
+      }
+    },
+    [],
+  );
 
   const restingOffset = (side: SwipeSide | null) =>
     side === "edit" ? SWIPE_REVEAL : side === "delete" ? -SWIPE_REVEAL : 0;
@@ -160,20 +167,28 @@ export function SwipeRow({
             width,
           });
     if (outcome === "full" && side) {
-      place(sign * width, true);
+      place(
+        sign * width,
+        true,
+        settleDuration(sign * width - g.offset, g.velocity),
+      );
       if (side === "edit") onEdit();
       else onDelete();
       return;
     }
     const next = outcome === "open" ? side : null;
-    place(restingOffset(next), true);
+    const target = restingOffset(next);
+    place(target, true, settleDuration(target - g.offset, g.velocity));
     onOpenChange(next);
   };
 
-  const act = (run: () => void) => (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    run();
+  // Haptics as on the row menu's Delete: Android vibrates from the tap, and
+  // iOS ticks from the button's `HapticTarget` as long as the button is
+  // still on the page, so the action (which closes the menu) runs a task
+  // later.
+  const act = (kind: "selection" | "warning", run: () => void) => () => {
+    haptic(kind);
+    afterTap(run);
   };
 
   return (
@@ -190,12 +205,13 @@ export function SwipeRow({
         title={`Edit ${name}`}
         data-folder-swipe-edit=""
         className={cn(ACTION, "left-0 bg-foreground text-background")}
-        onClick={act(onEdit)}
+        onClick={act("selection", onEdit)}
       >
         <Pen className="size-4 shrink-0" />
         <Typography component="span" size="small" className="font-medium text-background">
           Edit
         </Typography>
+        <HapticTarget />
       </button>
       <button
         ref={deleteRef}
@@ -205,12 +221,13 @@ export function SwipeRow({
         title={`Delete ${name}`}
         data-folder-swipe-delete=""
         className={cn(ACTION, "right-0 bg-red-600 text-white")}
-        onClick={act(onDelete)}
+        onClick={act("warning", onDelete)}
       >
         <Trash2 className="size-4 shrink-0" />
         <Typography component="span" size="small" className="font-medium text-white">
           Delete
         </Typography>
+        <HapticTarget />
       </button>
       <div
         ref={contentRef}

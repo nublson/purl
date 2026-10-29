@@ -50,7 +50,9 @@ export function ViewMenuItems() {
           className={cn(
             "relative pr-2 in-data-[input=keyboard]:focus:ring-2 in-data-[input=keyboard]:focus:ring-ring in-data-[input=keyboard]:focus:ring-inset [&>[data-slot=dropdown-menu-radio-item-indicator]]:hidden",
             view === value
-              ? "bg-accent text-accent-foreground"
+              ? // An inset ring as well as the fill: the fill alone is ~1.2:1
+                // against the menu, the ring ~3.4:1 (a state needs 3:1).
+                "bg-accent text-accent-foreground ring-1 ring-foreground/40 ring-inset"
               : "text-muted-foreground focus:bg-accent/50 [&_svg]:text-muted-foreground",
           )}
         >

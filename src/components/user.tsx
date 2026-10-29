@@ -123,6 +123,7 @@ export function User() {
           </DropdownMenuLabel>
           <ViewMenuItems />
         </DropdownMenuGroup>
+        <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
             Layout

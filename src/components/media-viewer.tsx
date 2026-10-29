@@ -8,6 +8,7 @@ import {
   useMediaViewer,
 } from "@/lib/media-viewer";
 import { linkSecondLine } from "@/lib/upload-meta";
+import { cn } from "@/lib/utils";
 import type { DragOutcome } from "@/lib/viewer-drag";
 import { Cambio } from "cambio";
 import {
@@ -18,6 +19,7 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { X } from "reicon-react";
 import {
   FACE_LAYOUT_DEPENDENCY,
   MEDIA_RADIUS,
@@ -25,6 +27,7 @@ import {
   pearlLayoutId,
 } from "./media-face-anchor";
 import {
+  VIEWER_BUTTON,
   ViewerArrows,
   ViewerStage,
   ViewerStatus,
@@ -311,9 +314,20 @@ export function MediaViewer() {
                   <ViewerMedia link={current} ready={ready} />
                 </ViewerStage>
               </div>
-              {/* No close button: Esc, a press outside the media, a
-                  vertical swipe and Back all close it. */}
               <ViewerArrows hasPrev={hasPrev} hasNext={hasNext} onMove={move} />
+              {/* No visible close button: Esc, a press outside the media, a
+                  vertical swipe and Back close it. This one is for screen
+                  readers (on a phone, swipes move between controls instead)
+                  and shows only on keyboard focus. */}
+              <Cambio.Close
+                aria-label="Close"
+                className={cn(
+                  VIEWER_BUTTON,
+                  "top-2 right-2 not-focus-visible:sr-only",
+                )}
+              >
+                <X className="size-4" aria-hidden />
+              </Cambio.Close>
             </>
           ) : null}
         </Cambio.Popup>

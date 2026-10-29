@@ -274,8 +274,11 @@ test.describe("Media viewer", () => {
     // from the preview.
     await expect(dialog.locator('img[src$="?a=1"]')).toHaveAttribute("alt", "Shot A");
     await expect(dialog.locator('img[alt="Shot A"]')).toHaveCount(1);
-    // No close button: Esc, the backdrop, a swipe or Back close it.
-    expect(await dialog.getByRole("button", { name: "Close" }).count()).toBe(0);
+    // No visible close button (Esc, the backdrop, a swipe or Back close it),
+    // only one for screen readers, drawn once keyboard focus reaches it.
+    const close = dialog.getByRole("button", { name: "Close" });
+    await expect(close).toHaveCount(1);
+    expect((await close.boundingBox())!.width).toBeLessThanOrEqual(1);
     // App shortcuts (folder digits, selection keys) stand down while it's open.
     await expect(page.locator("[data-media-viewer][data-open]")).toHaveCount(1);
     await expect.poll(() => new URL(page.url()).searchParams.get("pearl")).toBe(shotA);
@@ -336,6 +339,29 @@ test.describe("Media viewer", () => {
     const inside = next.l >= image.l && next.r <= image.r && next.t >= image.t && next.b <= image.b;
     expect(inside, JSON.stringify(layout)).toBe(true);
     expect(layout.centreIsImage).toBe(true);
+  });
+
+  test("the keyboard reaches a Close button, drawn while it has focus", async ({
+    page,
+    seed,
+    baseURL,
+  }) => {
+    await seedPearls(seed, baseURL!);
+    await openHome(page);
+    await chooseGrid(page);
+    await expect(cards(page)).toHaveCount(3);
+
+    await openButton(page, "Shot A").click();
+    const dialog = page.getByRole("dialog", { name: "Shot A" });
+    await expect(dialog.locator('img[src$="?a=1"]')).toHaveAttribute("alt", "Shot A");
+    const close = dialog.getByRole("button", { name: "Close" });
+    for (let i = 0; i < 4 && !(await close.evaluate((el) => el === document.activeElement)); i++) {
+      await page.keyboard.press("Tab");
+    }
+    await expect(close).toBeFocused();
+    expect((await close.boundingBox())!.width).toBeGreaterThanOrEqual(32);
+    await page.keyboard.press("Enter");
+    await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
   });
 
   test("a press on the backdrop closes the viewer and gives focus back", async ({

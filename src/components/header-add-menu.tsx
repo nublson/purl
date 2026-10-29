@@ -6,7 +6,7 @@ import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
 import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { isApplePlatform } from "@/lib/platform";
 import { Chrome, Export5, Plus } from "reicon-react";
-import { useEffect } from "react";
+import { useEffect, useId, useSyncExternalStore } from "react";
 import { AddLinksPopover } from "./add-links-popover";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Button } from "./ui/button";
@@ -17,11 +17,15 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import { Kbd } from "./ui/kbd";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 // Chrome Web Store listing for the extension; the section is hidden until set.
 const CHROME_EXTENSION_URL = safeHttpsUrl(
   process.env.NEXT_PUBLIC_CHROME_EXTENSION_URL,
 );
+
+/** The platform never changes while the page is open. */
+const noSubscription = () => () => {};
 
 function safeHttpsUrl(value: string | undefined) {
   if (!value) return null;
@@ -42,6 +46,13 @@ function safeHttpsUrl(value: string | undefined) {
 export function HeaderAddMenu() {
   const currentFolder = useCurrentFolder();
   const isDemo = useIsDemo();
+  const hintId = useId();
+  // The server can't know the platform: Ctrl+V until hydrated.
+  const pasteKeys = useSyncExternalStore(
+    noSubscription,
+    () => (isApplePlatform() ? "⌘V" : "Ctrl+V"),
+    () => "Ctrl+V",
+  );
 
   // `A` on a folder page opens "Add links" (not while typing, or with a
   // dialog or menu open).
@@ -61,59 +72,77 @@ export function HeaderAddMenu() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [currentFolder, isDemo]);
 
-  const menu = (
-    <DropdownWrapper
-      align="end"
-      className="w-64"
-      trigger={
-        <Button
-          aria-label="Add"
-          variant="ghost"
-          size="icon-sm"
-          className="hidden cursor-pointer text-muted-foreground [@media(hover:hover)]:inline-flex"
-        >
-          <Plus />
-        </Button>
-      }
+  // The paste hint also describes the button: inside the menu it's a label,
+  // which screen readers skip while moving between the menu's items.
+  const trigger = (
+    <Button
+      aria-label="Add"
+      aria-describedby={hintId}
+      variant="ghost"
+      size="icon-sm"
+      className="hidden cursor-pointer text-muted-foreground [@media(hover:hover)]:inline-flex"
     >
+      <Plus />
+    </Button>
+  );
+
+  // Without the extension's link the menu would hold no items, only the
+  // hint: a tooltip instead.
+  const menu = !CHROME_EXTENSION_URL ? (
+    <Tooltip>
+      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipContent side="bottom" sideOffset={6}>
+        Paste to save
+        <Kbd>{pasteKeys}</Kbd>
+      </TooltipContent>
+    </Tooltip>
+  ) : (
+    <DropdownWrapper align="end" className="w-64" trigger={trigger}>
       <DropdownMenuLabel className="flex flex-col gap-1 px-2 py-1.5">
         <span className="text-sm font-medium text-foreground">
           Paste to save
         </span>
         <span className="text-xs font-normal text-muted-foreground">
-          Press <Kbd>{isApplePlatform() ? "⌘V" : "Ctrl+V"}</Kbd> anywhere on
-          this page to save a link.
+          Press <Kbd>{pasteKeys}</Kbd> anywhere on this page to save a
+          link.
         </span>
       </DropdownMenuLabel>
-      {CHROME_EXTENSION_URL ? (
-        <>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>Apps & Extensions</DropdownMenuLabel>
-            <DropdownMenuItem asChild>
-              <a
-                href={CHROME_EXTENSION_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Chrome />
-                Chrome Extension
-                <span className="sr-only">(opens in new tab)</span>
-                <Export5 className="ml-auto text-muted-foreground" />
-              </a>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        </>
-      ) : null}
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuLabel>Apps & Extensions</DropdownMenuLabel>
+        <DropdownMenuItem asChild>
+          <a
+            href={CHROME_EXTENSION_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Chrome />
+            Chrome Extension
+            <span className="sr-only">(opens in new tab)</span>
+            <Export5 className="ml-auto text-muted-foreground" />
+          </a>
+        </DropdownMenuItem>
+      </DropdownMenuGroup>
     </DropdownWrapper>
+  );
+  const hint = (
+    <span id={hintId} hidden>
+      Press {pasteKeys} anywhere on this page to save a link.
+    </span>
   );
 
   // On a folder page, "Add links" opens under the + button.
   return currentFolder && !isDemo ? (
     <AddLinksPopover folder={currentFolder} placement="header" align="end">
-      <div className="inline-flex">{menu}</div>
+      <div className="inline-flex">
+        {menu}
+        {hint}
+      </div>
     </AddLinksPopover>
   ) : (
-    menu
+    <>
+      {menu}
+      {hint}
+    </>
   );
 }

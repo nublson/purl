@@ -33,3 +33,21 @@ export function decideSwipe({
   }
   return "closed";
 }
+
+/** The settle's default length, and its bounds when it follows a flick. */
+export const SWIPE_SETTLE_MS = 200;
+const SETTLE_MIN_MS = 120;
+const SETTLE_MAX_MS = 240;
+
+/**
+ * How long a released row takes to settle: the time the finger's speed
+ * would take to cover what's left (so a flick carries on at its own pace
+ * instead of braking), within 120–240ms. Slow releases (under 0.1px/ms)
+ * take the default.
+ */
+export function settleDuration(remaining: number, speed: number): number {
+  const pace = Math.abs(speed);
+  if (pace < 0.1) return SWIPE_SETTLE_MS;
+  const ms = Math.abs(remaining) / pace;
+  return Math.round(Math.min(SETTLE_MAX_MS, Math.max(SETTLE_MIN_MS, ms)));
+}

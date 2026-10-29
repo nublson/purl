@@ -321,7 +321,7 @@ export function FolderSelectDropdown() {
               }}
               // 24px, 2px past the end: centred on the 20px slot the check and
               // the digit keys sit in (`CurrentMark`), so they share one axis.
-              className="-my-1 -me-0.5 ms-auto hidden size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground transition-colors duration-150 ease-out-strong hover:bg-destructive/10 hover:text-destructive pointer-fine:group-data-highlighted/row:flex"
+              className="-my-1 -me-0.5 ms-auto hidden size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground transition-[color,background-color,scale] duration-150 ease-out-strong hover:bg-destructive/10 hover:text-destructive active:scale-[0.96] motion-reduce:active:scale-100 pointer-fine:group-data-highlighted/row:flex"
             >
               <Trash2 className="size-4" />
             </span>
