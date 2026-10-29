@@ -24,12 +24,7 @@ type TestFixtures = {
   signedIn: boolean;
   /** Seeding helpers bound to `testUser`. */
   seed: {
-    link: (link: {
-      url: string;
-      title?: string;
-      description?: string;
-      folderId?: string;
-    }) => Promise<string>;
+    link: (link: Parameters<typeof seedLink>[1]) => Promise<string>;
     folder: (folder: {
       name: string;
       slug: string;
@@ -129,4 +124,28 @@ export async function waitForHydration(page: Page, selector: string): Promise<vo
     },
     selector,
   );
+}
+
+/**
+ * Switches Home and folders to `view` from the user menu's Layout group,
+ * then closes the menu. Waits for the account to save it unless `save` is
+ * false (the landing demo keeps it local). `tap` for touch-screen tests.
+ */
+export async function chooseView(
+  page: Page,
+  view: "List" | "Grid",
+  { save = true, tap = false }: { save?: boolean; tap?: boolean } = {},
+): Promise<void> {
+  await waitForHydration(page, 'button[aria-label="Account menu"]');
+  const press = (locator: ReturnType<Page["getByRole"]>) =>
+    tap ? locator.tap() : locator.click();
+  await press(page.getByRole("button", { name: "Account menu" }));
+  const saved = save
+    ? page.waitForResponse(
+        (res) => res.url().endsWith("/api/user/layout") && res.request().method() === "PATCH",
+      )
+    : null;
+  await press(page.getByRole("menuitemradio", { name: view }));
+  if (saved) expect((await saved).ok()).toBe(true);
+  await page.keyboard.press("Escape");
 }

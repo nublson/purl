@@ -13,7 +13,11 @@ import {
   OmniboxAddSection,
   useOmniboxAddResults,
 } from "@/components/omnibox-add-section";
+import { DropHandler } from "@/components/drop-handler";
 import { PasteHandler } from "@/components/paste-handler";
+import { MediaViewerLazy, loadMediaViewer } from "@/components/media-viewer-lazy";
+import { UploadInput } from "@/components/upload-input";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   LinkResultsSkeleton,
   OmniboxAddSkeleton,
@@ -33,18 +37,38 @@ import {
 } from "@/lib/leaving-links";
 import { coolPreviews } from "@/lib/link-preview-warmth";
 import { linkSelection, setSelectableLinks } from "@/lib/link-selection";
+import { isViewerLink, mediaViewer, onCloseSettled } from "@/lib/media-viewer";
+import { pearlParam } from "@/lib/media-viewer-url";
+import { useMediaViewerUrl } from "@/lib/media-viewer-url-hook";
 import { isSameLinkUrl, omniboxSaveUrl } from "@/lib/omnibox";
 import { captureFlip, playFlip, type FlipSnapshot } from "@/lib/flip";
 import { cn } from "@/lib/utils";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { parsePastedUrls } from "@/lib/pasted-urls";
 import type { PendingSave } from "@/lib/pending-save";
+import {
+  addPending,
+  countUploading,
+  removePending,
+  updatePending,
+  uploadingStatusText,
+  type PendingUpload,
+} from "@/lib/pending-upload";
 import { requestSaveUrl } from "@/lib/save-link";
+import {
+  forgetUpload,
+  retryUpload,
+  UPLOAD_FILES_EVENT,
+  uploadFiles,
+  type UploadHandlers,
+} from "@/lib/save-uploads";
+import { requestUsageRefresh } from "@/lib/usage-events";
 import {
   countGroupedLinks,
   groupLinksByDate,
   mergeLinkGroups,
   parseJsonLinkGroups,
+  parseJsonLinks,
   type Link,
   type LinkGroup as LinkGroupType,
 } from "@/utils/links";
@@ -135,6 +159,11 @@ export function HomeShell({
   const [groups, setGroups] = useState(initialGroups);
   const [nextCursor, setNextCursor] = useState(initialNextCursor);
   const [pendingSave, setPendingSave] = useState<PendingSave | null>(null);
+  // Files on their way to becoming pearls (`uploadFiles`), first in "Today".
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+  // Uploads whose pearl exists: the next reload that commits takes their
+  // items away in the same update that brings the pearls (in its glide).
+  const landedUploadsRef = useRef(new Set<string>());
   // The link just saved, while its row plays the arrival.
   const [arrivingId, setArrivingId] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -186,7 +215,23 @@ export function HomeShell({
    * a selected link a search hid can't linger after being deleted or moved
    * out in another tab.
    */
-  const reload = useCallback(async ({ fresh = false, glide: glideRows = false, endsBatch = false, reconcile = false } = {}) => {
+  const takeLandedUploads = useCallback(() => {
+    const landed = new Set(landedUploadsRef.current);
+    landedUploadsRef.current.clear();
+    return landed;
+  }, []);
+
+  const reload = useCallback(async ({
+    fresh = false,
+    glide: glideRows = false,
+    endsBatch = false,
+    reconcile = false,
+  }: {
+    fresh?: boolean;
+    glide?: boolean;
+    endsBatch?: boolean;
+    reconcile?: boolean;
+  } = {}) => {
     const seq = ++reloadSeq.current;
     const startedAt = Date.now();
     const limit = fresh
@@ -211,6 +256,12 @@ export function HomeShell({
       // A batch's last link lands where its indicator was: they go in one
       // update, so the rows below stay put (no drop and spring back).
       if (endsBatch) setPendingSave(null);
+      // Uploads that landed before this reload began: their pearls are in
+      // `page`, so their items leave in this same update.
+      const landed = takeLandedUploads();
+      if (landed.size > 0) {
+        setPendingUploads((list) => list.filter((item) => !landed.has(item.id)));
+      }
       setGroups(page.groups);
       setNextCursor(page.nextCursor);
       if (reconcile) {
@@ -229,9 +280,19 @@ export function HomeShell({
       // Keep the current list; the next change or reload will retry. It
       // stands as this search's answer, rather than a skeleton that never
       // ends.
-      if (seq === reloadSeq.current) setLoadedQuery(searchQueryRef.current);
+      if (seq === reloadSeq.current) {
+        setLoadedQuery(searchQueryRef.current);
+        // No reload is coming to bring landed pearls: their items go now
+        // (the next change or reload shows the pearls).
+        const landed = takeLandedUploads();
+        if (landed.size > 0) {
+          setPendingUploads((list) =>
+            list.filter((item) => !landed.has(item.id)),
+          );
+        }
+      }
     }
-  }, [setLinksTotal, folderId, glide]);
+  }, [setLinksTotal, folderId, glide, takeLandedUploads]);
 
   // A folder page: links moved out of it fade out (like a delete) before
   // the reload drops them.
@@ -590,7 +651,8 @@ export function HomeShell({
       // Set before the reload, so the real row mounts already arriving.
       if (newLinkId) setArrivingId(newLinkId);
       // In a batch the indicator stays put and the link lands under it: the
-      // rows below glide down a row instead of jumping.
+      // rows below glide down a row instead of jumping. An upload's pearl
+      // takes its pending item's slot (see `landedUploadsRef`).
       await reload({ glide: opts?.quiet, endsBatch: opts?.last });
       // One link of a multi-link paste: the batch's indicator stays until the
       // last one is in (`onBatchDone`), so it doesn't blink between links.
@@ -633,13 +695,120 @@ export function HomeShell({
     setPendingSave(null);
   }, []);
 
+  // Leaving the page stops its batches: queued files don't start. Made in
+  // the effect below (Strict Mode's rehearsal unmount aborts its own).
+  const uploadsAbort = useRef<AbortController | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
+  const { uploadsEnabled } = useCurrentUser();
+  // Uploads (`uploadFiles`): each file's pending item from its start until
+  // its pearl lands in its slot; a failed one stays with Retry and Dismiss.
+  const uploadHandlers = useMemo<UploadHandlers | null>(() => {
+    if (!userId) return null;
+    return {
+      userId,
+      folderId: folderId ?? null,
+      onStart: (item) => {
+        // The rows below make room for it.
+        glide();
+        setPendingUploads((list) => addPending(list, item));
+      },
+      onProgress: (id, progress) =>
+        setPendingUploads((list) => updatePending(list, id, { progress })),
+      onPreview: (id, patch) =>
+        setPendingUploads((list) => updatePending(list, id, patch)),
+      onDone: async (id, link) => {
+        // Marked before the reload starts, so whichever reload commits
+        // next (this one, or a newer one overtaking it) has the pearl.
+        landedUploadsRef.current.add(id);
+        await onSaveSuccess(link.id, { quiet: true });
+      },
+      onError: (id, message) =>
+        setPendingUploads((list) =>
+          updatePending(list, id, { status: "failed", message }),
+        ),
+      onBatchDone: ({ uploaded }) => {
+        if (uploaded === 0) return;
+        // Settings → Usage's storage line.
+        requestUsageRefresh();
+        // A save here files the pearls into this folder: its count changed.
+        if (folderId) refreshFolders();
+      },
+    };
+  }, [userId, folderId, glide, onSaveSuccess, refreshFolders]);
+
+  /** What the entry points (+ menu, drop, paste) call, via `requestUploadFiles`. */
+  const startUploads = useCallback(
+    (files: File[]) => {
+      if (!uploadHandlers) return;
+      void uploadFiles(files, {
+        ...uploadHandlers,
+        signal: uploadsAbort.current?.signal,
+      });
+    },
+    [uploadHandlers],
+  );
+  useEffect(() => {
+    const onUploadFiles = (event: Event) => {
+      const files = (event as CustomEvent<File[]>).detail;
+      if (!uploadHandlers || !Array.isArray(files)) return;
+      event.preventDefault();
+      startUploads(files);
+    };
+    window.addEventListener(UPLOAD_FILES_EVENT, onUploadFiles);
+    return () => window.removeEventListener(UPLOAD_FILES_EVENT, onUploadFiles);
+  }, [startUploads, uploadHandlers]);
+
+  const uploadActions = useMemo(
+    () => ({
+      onRetry: (id: string) => {
+        if (!uploadHandlers) return;
+        setPendingUploads((list) =>
+          updatePending(list, id, { status: "uploading", progress: 0, message: null }),
+        );
+        void retryUpload(id, {
+          ...uploadHandlers,
+          signal: uploadsAbort.current?.signal,
+        }).then((ran) => {
+          // Its file is gone: nothing to retry, so the item goes too.
+          if (!ran) setPendingUploads((list) => removePending(list, id));
+        });
+      },
+      onDismiss: (id: string) => {
+        forgetUpload(id);
+        // The rows below close the gap.
+        glide();
+        setPendingUploads((list) => removePending(list, id));
+      },
+    }),
+    [uploadHandlers, glide],
+  );
+
+  // Leaving the page drops its pending items: their files go too.
+  const pendingUploadsRef = useRef(pendingUploads);
+  useEffect(() => {
+    pendingUploadsRef.current = pendingUploads;
+  }, [pendingUploads]);
+  useEffect(() => {
+    const abort = new AbortController();
+    uploadsAbort.current = abort;
+    return () => {
+      abort.abort();
+      for (const item of pendingUploadsRef.current) forgetUpload(item.id);
+    };
+  }, []);
+  const uploads = useMemo(
+    () => ({ items: pendingUploads, actions: uploadActions }),
+    [pendingUploads, uploadActions],
+  );
+  const uploadingCount = countUploading(pendingUploads);
+
   const { view } = useLinkView();
   // What's on screen: the settled answer (see `settled`).
   const shownGroups = settled.groups;
   const todayGroup = shownGroups.find((g) => g.label === "Today");
 
-  // Optimistic row only for a URL this tab is saving.
-  const showSkeleton = pendingSave !== null;
+  // Optimistic rows only for what this tab is saving or uploading.
+  const showSkeleton = pendingSave !== null || pendingUploads.length > 0;
   const showSyntheticToday = showSkeleton && !todayGroup;
   // Every loaded link deleted (awaiting Undo) and nothing left to load reads
   // as empty, so the empty state shows instead of a blank list.
@@ -669,20 +838,90 @@ export function HomeShell({
   // selection as they go.
   // The list on screen and its cursor come from the same answer (`settled`).
   const listComplete = !settled.query && !settled.nextCursor;
+  // `?pearl=<id>` (a reload, a shared link, Back onto a pearl's entry): the
+  // viewer opens on it once the list below registers it. A pearl the list
+  // doesn't have (past the first page, which is already here from the
+  // server) is fetched on its own and opens standalone: no neighbours, and
+  // no card to morph from, so the dialog fades. Not found, not an image or
+  // video (an audio pearl plays in place, never in the viewer) or not
+  // reachable: the param goes, quietly. Declared before the unmount
+  // cleanup below, so the URL binding is disposed first when the page goes.
+  const { pendingId, dismissPending } = useMediaViewerUrl();
+  const [deepLinked, setDeepLinked] = useState<Link | null>(null);
+  useEffect(() => {
+    if (pendingId === null) return;
+    const id = pendingId;
+    let stale = false;
+    // The dialog's chunk loads alongside, not after the fetch. A failed
+    // prefetch is fine: mounting the viewer loads it again.
+    void loadMediaViewer().catch(() => {});
+    // Stale once the page moved on: unmounted or another pending pearl
+    // (cleanup), the URL no longer naming it (Back), or the viewer showing
+    // something else meanwhile.
+    const current = () =>
+      !stale &&
+      pearlParam(location.search) === id &&
+      mediaViewer.getSnapshot().currentId === null;
+    void (async () => {
+      let link: Link | undefined;
+      try {
+        const response = await fetch(`/api/links/${encodeURIComponent(id)}`);
+        if (response.ok) link = parseJsonLinks([await response.json()])[0];
+      } catch {
+        // Offline or a bad answer: the same as not found.
+      }
+      if (!current()) return;
+      if (!link || link.id !== id || !isViewerLink(link)) {
+        dismissPending(id);
+        return;
+      }
+      setDeepLinked(link);
+      const { items } = mediaViewer.getSnapshot();
+      mediaViewer.register([...items.filter((item) => item.id !== id), link]);
+      mediaViewer.open(link.id, { standalone: true });
+    })();
+    return () => {
+      stale = true;
+    };
+  }, [pendingId, dismissPending]);
+  // It stays registered until the viewer's close settles, then leaves with
+  // the list's next registration (the dialog stays mounted for its exit,
+  // even when that was the page's only pearl: `MediaViewerLazy`).
+  useEffect(() => {
+    if (deepLinked === null) return;
+    return onCloseSettled(() => setDeepLinked(null));
+  }, [deepLinked]);
+
+  // The media viewer steps through the same links (its image and video
+  // pearls; audio plays in place), in the same order.
   useEffect(() => {
     const shown: string[] = [];
+    const shownLinks: Link[] = [];
     const gone: string[] = [];
     for (const group of shownGroups) {
       for (const link of group.links) {
         const hidden =
           pendingDeletes.get(link.id) === "hidden" ||
           leavingLinks.get(link.id)?.phase === "hidden";
-        (hidden ? gone : shown).push(link.id);
+        if (hidden) {
+          gone.push(link.id);
+        } else {
+          shown.push(link.id);
+          shownLinks.push(link);
+        }
       }
     }
     if (gone.length) linkSelection.remove(gone);
     setSelectableLinks(shown, { complete: listComplete });
-  }, [shownGroups, pendingDeletes, leavingLinks, listComplete]);
+    // A pearl opened from the URL that the list doesn't show, last.
+    if (deepLinked && !shownLinks.some((link) => link.id === deepLinked.id)) {
+      shownLinks.push(deepLinked);
+    }
+    mediaViewer.register(shownLinks.filter(isViewerLink));
+  }, [shownGroups, pendingDeletes, leavingLinks, listComplete, deepLinked]);
+  // Leaving the page takes its pearls (and an open viewer) with it,
+  // without counting as a close (the URL keeps `?pearl=`).
+  useEffect(() => () => mediaViewer.unregisterPage(), []);
 
   // Each link loaded in this list, searches included, for the selection
   // bar: its folder ("Remove from folders"), also for selected links the
@@ -730,12 +969,21 @@ export function HomeShell({
 
   return (
     <>
+      {/* Always mounted (only its text changes), so each count is read. */}
+      <span className="sr-only" role="status">
+        {uploadingCount > 0 ? uploadingStatusText(uploadingCount) : ""}
+      </span>
       <PasteHandler
         onPasteStart={onPasteStart}
         onSaveSuccess={onSaveSuccess}
         onSaveError={onSaveError}
         onBatchDone={onBatchDone}
       />
+      <MediaViewerLazy />
+      {/* The other ways in: files dropped on the page (or a dragged link),
+          and the picker (`U`, or the search field's Add files button). */}
+      <DropHandler folder={folderId ? currentFolder : null} />
+      <UploadInput inputRef={uploadInputRef} />
       {savableUrls.length > 0 ? (
         <div className="wrapper-private flex flex-col">
           {savableUrls.map((url, index) => (
@@ -795,12 +1043,20 @@ export function HomeShell({
               newLinkId={arrivingId}
               groups={[
                 ...(showSyntheticToday
-                  ? [{ label: "Today", links: [], pending: pendingSave }]
+                  ? [
+                      {
+                        label: "Today",
+                        links: [],
+                        pending: pendingSave,
+                        uploads,
+                      },
+                    ]
                   : []),
                 ...shownGroups.map((group, groupIndex) => ({
                   label: group.label,
                   links: group.links,
                   pending: group.label === "Today" ? pendingSave : null,
+                  uploads: group.label === "Today" ? uploads : undefined,
                   eagerFavicons: eagerFaviconsByGroup[groupIndex],
                 })),
               ]}
@@ -820,6 +1076,7 @@ export function HomeShell({
                 links={group.links}
                 newLinkId={arrivingId}
                 pending={group.label === "Today" ? pendingSave : null}
+                uploads={group.label === "Today" ? uploads : undefined}
                 eagerFavicons={
                   eagerFaviconsByGroup[groupIndex - (showSyntheticToday ? 1 : 0)]
                 }
@@ -887,6 +1144,9 @@ export function HomeShell({
         onChange={setQuery}
         onSave={saveFromField}
         canSave={Boolean(saveUrl) || pastedUrls.length > 0}
+        onAddFiles={
+          uploadsEnabled ? () => uploadInputRef.current?.click() : undefined
+        }
         placeholder={
           folderId
             ? `Search ${currentFolder?.name ?? "this folder"} or paste a link`

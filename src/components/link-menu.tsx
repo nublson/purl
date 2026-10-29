@@ -1,8 +1,11 @@
 "use client";
 
+import { useIsDemo } from "@/contexts/demo-mode-context";
+import { canEmbed } from "@/lib/embeds";
 import { useIsPhone } from "@/hooks/use-is-phone";
 import { copyToClipboard } from "@/lib/clipboard";
 import { haptic } from "@/lib/haptics";
+import { isMediaKind, linkKind } from "@/lib/link-kind";
 import type { Link as LinkType } from "@/utils/links";
 import NextLink from "next/link";
 import {
@@ -19,6 +22,7 @@ import { FolderEmoji } from "./folder-emoji";
 import { useLinkFolder } from "./folder-tag";
 import { HapticTarget } from "./haptic-target";
 import { LinkFolderSubmenu } from "./link-folder-submenu";
+import { ShowLiveMenuItem } from "./show-live-menu-item";
 import { Typography } from "./typography";
 import { Button } from "./ui/button";
 import {
@@ -40,10 +44,14 @@ interface LinkMenuProps {
 
 export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
   const isPhone = useIsPhone();
+  const isDemo = useIsDemo();
   // Off a folder page (every link there is in it): the link's folder, for
   // "Go to …". The quick way there on every screen, touch included (the
   // row's own Go to folder button shows only with a pointer that hovers).
   const linkFolder = useLinkFolder(link);
+  // An image or video pearl's row and card open the media viewer, and an
+  // audio pearl's play in place, so its menu is the way to the file itself.
+  const media = isMediaKind(linkKind(link));
 
   async function handleOpenInNewTab() {
     window.open(link.url, "_blank");
@@ -96,13 +104,24 @@ export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
             <DropdownMenuSeparator />
           </>
         ) : null}
-        <DropdownMenuItem
-          onSelect={() => {
-            void handleOpenInNewTab();
-          }}
-        >
-          <Export5 /> Open in new tab
-        </DropdownMenuItem>
+        {media ? (
+          // A real link: Cmd/Ctrl-click and the browser's own link handling
+          // work as on any link.
+          <DropdownMenuItem asChild>
+            <a href={link.url} target="_blank" rel="noopener noreferrer">
+              <Export5 /> Open file
+            </a>
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem
+            onSelect={() => {
+              void handleOpenInNewTab();
+            }}
+          >
+            <Export5 /> Open in new tab
+          </DropdownMenuItem>
+        )}
+        {canEmbed(link) && !isDemo ? <ShowLiveMenuItem link={link} /> : null}
         <DropdownMenuItem
           onSelect={() => {
             void handleCopyLink();

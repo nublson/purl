@@ -226,7 +226,7 @@ body {
    in the page sets data-landing-seen on <html> before first paint on later
    visits, which switches all of this off. `both` fill keeps content visible
    whatever happens (no JS, interrupted). Nothing here touches pointer-events.
-   Timeline (ms): words 0-740, sub 340-840, actions 420-920, panel 500-1000,
+   Timeline (ms): badge 40-540, words 0-740, sub 340-840, actions 420-920, panel 500-1000,
    rows 600-1270. */
 @keyframes landing-arrive {
   from {
@@ -262,6 +262,10 @@ body {
     [data-landing-block="mark"] {
       animation: landing-arrive 500ms var(--ease-out-strong) both;
     }
+    /* The badge, just after the mark, before the headline's words. */
+    [data-landing-block="badge"] {
+      animation: landing-arrive 500ms var(--ease-out-strong) 40ms both;
+    }
     [data-landing-word] {
       display: inline-block;
       animation: landing-arrive 500ms var(--ease-out-strong) both;
@@ -291,6 +295,32 @@ body {
     [data-landing-row] {
       animation: landing-fade 200ms ease both;
     }
+  }
+}
+
+/* The playing bars (`EqualizerBars`): each bar rests at its own height
+   (`--eq-rest`) and, unless reduced motion is asked for, bobs between
+   `--eq-low` and full height on its own period, so the three never line
+   up. At rest they still read as "playing": the paused pearl shows the
+   play mark instead, so the state never rides on motion alone. */
+@keyframes eq-bar {
+  0%,
+  100% {
+    transform: scaleY(var(--eq-low));
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+[data-eq-bar] {
+  transform: scaleY(var(--eq-rest));
+  transform-origin: bottom;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-eq-bar] {
+    animation: eq-bar var(--eq-ms) ease-in-out var(--eq-delay) infinite;
   }
 }
 

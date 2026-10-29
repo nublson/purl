@@ -10,20 +10,23 @@
  *
  * Vercel Live (preview toolbar / feedback) loads `https://vercel.live` in an iframe; without
  * `frame-src` the policy falls back to `default-src` and the frame is blocked. The static
- * pages embed YouTube videos from `https://www.youtube-nocookie.com`, the only other frame host.
- *
- * `media-src` covers the static pages' `<video>` and `<audio>`: linked files from any https
- * host, and files uploaded to Notion, which `/api/notion/file/[blockId]` redirects to
- * Notion's file host (a redirect's target is checked too). Without it, `default-src` blocks them.
+ * pages embed YouTube videos from `https://www.youtube-nocookie.com`, and a page pearl switched
+ * live frames its page (or YouTube's embed), so any https host may be framed; the live frame's
+ * own sandbox and the server's framing check (`checkFrameable`) bound what that allows.
  */
 export function buildContentSecurityPolicy(): string {
   const directives = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com https://vercel.live",
-    "frame-src 'self' https://vercel.live https://*.vercel.live https://www.youtube-nocookie.com",
+    "frame-src 'self' https: https://vercel.live https://*.vercel.live",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https: http:",
-    "media-src 'self' https:",
+    // Video and audio pearls play their files from Vercel Blob or from any
+    // host a media link points at (the same reach as img-src), and pending
+    // uploads draw a video's local object URL (`blob:`).
+    // It also covers the static pages' video and audio, including Notion
+    // uploads, which /api/notion/file/[blockId] redirects to Notion's host.
+    "media-src 'self' blob: https: http:",
     "font-src 'self'",
     [
       "connect-src 'self'",

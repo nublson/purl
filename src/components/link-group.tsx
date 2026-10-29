@@ -10,7 +10,13 @@ import { LinkCard } from "./link-card";
 import { LinkItem } from "./link-item";
 import { MasonryItem, useMasonry } from "./masonry";
 import type { PendingSave } from "@/lib/pending-save";
+import type { PendingUpload } from "@/lib/pending-upload";
 import { LinkItemSkeleton } from "./skeletons";
+import {
+  PendingUploadCard,
+  PendingUploadRow,
+  type PendingUploadActions,
+} from "./skeletons/pending-upload";
 import { PendingLinkCard } from "./skeletons/pending-link-card";
 import { SharedLinkCardSkeleton } from "./skeletons/shared-folder";
 import { ItemGroup } from "./ui/item";
@@ -22,6 +28,8 @@ interface LinkGroupProps {
   newLinkId?: string | null;
   /** A save in flight here: its placeholder comes first. */
   pending?: PendingSave | null;
+  /** Files uploading here, with their Retry/Dismiss: first, in order. */
+  uploads?: { items: PendingUpload[]; actions: PendingUploadActions };
   /** How many of the first links load their favicons (or thumbnails) eagerly. */
   eagerFavicons?: number;
 }
@@ -49,12 +57,15 @@ export const LinkGroup = ({
   links,
   newLinkId,
   pending,
+  uploads,
   eagerFavicons = 0,
 }: LinkGroupProps) => {
   const headingId = `link-group-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   // A day whose links are all hidden drops its heading too.
   const visibleLinks = useVisibleLinks(links);
-  if (visibleLinks.length === 0 && !pending) return null;
+  if (visibleLinks.length === 0 && !pending && !uploads?.items.length) {
+    return null;
+  }
 
   return (
     <section
@@ -69,6 +80,15 @@ export const LinkGroup = ({
         {label}
       </h2>
       <ItemGroup aria-labelledby={headingId} className="w-full gap-0">
+        {uploads?.items.map((item) => (
+          <div
+            key={`upload-${item.id}`}
+            role="listitem"
+            data-flip={`upload:${item.id}`}
+          >
+            <PendingUploadRow item={item} {...uploads.actions} />
+          </div>
+        ))}
         {pending ? (
           <LinkItemSkeleton
             url={pending.url}
@@ -80,11 +100,13 @@ export const LinkGroup = ({
           // content-visibility skips layout/paint for off-screen rows; the
           // intrinsic size (one row) keeps the scrollbar stable. Adjacent
           // selected rows join into one shape: square the corners they share.
+          // While a media pearl's icon morphs to or from the viewer, the
+          // containment lifts so the morph isn't clipped to the row.
           <div
             key={link.id}
             role="listitem"
             data-flip={`link:${link.id}`}
-            className="[content-visibility:auto] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px] [&:has(+div_[data-selected])_[data-selected]]:rounded-b-none [&:has([data-selected])+div_[data-selected]]:rounded-t-none"
+            className="[content-visibility:auto] has-[[data-pearl-morphing]]:[content-visibility:visible] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px] [&:has(+div_[data-selected])_[data-selected]]:rounded-b-none [&:has([data-selected])+div_[data-selected]]:rounded-t-none"
           >
             <LinkItem
               link={link}
@@ -139,6 +161,16 @@ export function LinkGrid({
       </h2>
     );
     const groupCells: { key: string; node: ReactNode; flip?: string }[] = [];
+    const uploads = group.uploads;
+    if (uploads) {
+      for (const item of uploads.items) {
+        groupCells.push({
+          key: `upload-${item.id}`,
+          flip: `upload:${item.id}`,
+          node: <PendingUploadCard item={item} {...uploads.actions} />,
+        });
+      }
+    }
     if (group.pending) {
       groupCells.push({
         key: `pending-${group.label}`,

@@ -59,6 +59,7 @@ type Row = {
   favicon: string;
   domain: string;
   contentType: string;
+  mimeType: string | null;
   createdAt: Date;
 };
 
@@ -80,6 +81,7 @@ function storeRow(id: string, row: Partial<Row> = {}) {
     favicon: "https://example.com/default.ico",
     domain: "example.com",
     contentType: "WEB",
+    mimeType: null,
     createdAt: CREATED_AT,
     ...row,
   });
@@ -119,6 +121,7 @@ function resolved(url: string) {
     description: `About ${url}`,
     favicon: "https://example.com/favicon.ico",
     thumbnail: "https://example.com/og.png",
+    mimeType: "text/html",
   };
 }
 
@@ -218,6 +221,7 @@ describe("enrichFlaggedLinks", () => {
       favicon: "https://example.com/favicon.ico",
       domain: "example.com",
       contentType: "WEB",
+      mimeType: "text/html",
       createdAt: CREATED_AT,
     });
     expect(writtenIds()).toEqual(["link-1"]);
@@ -226,6 +230,29 @@ describe("enrichFlaggedLinks", () => {
     }
     // One lookup's writes land together.
     expect(transaction).toHaveBeenCalledTimes(1);
+  });
+
+  it("switches a live pearl off when its page turns out not to be one", async () => {
+    queryRaw.mockResolvedValue([claimed(1), claimed(2)]);
+    storeRow("link-1");
+    storeRow("link-2");
+    resolve.mockImplementation(async (url: string) => ({
+      ...resolved(url),
+      contentType: url.endsWith("/1") ? ("PDF" as const) : ("WEB" as const),
+    }));
+
+    await enrichFlaggedLinks();
+
+    // A guessed WEB that is a PDF: `embed` is reset (only pages can be live).
+    const pdfWrite = updateMany.mock.calls.find(
+      ([arg]) => arg!.where!.id === "link-1" && "contentType" in arg!.data!,
+    );
+    expect(pdfWrite![0]!.data).toMatchObject({ contentType: "PDF", embed: false });
+    // A page keeps whatever the owner chose.
+    const pageWrite = updateMany.mock.calls.find(
+      ([arg]) => arg!.where!.id === "link-2" && "contentType" in arg!.data!,
+    );
+    expect(pageWrite![0]!.data).not.toHaveProperty("embed");
   });
 
   it("writes nothing when the user changed the link's URL while it waited", async () => {
@@ -287,6 +314,7 @@ describe("enrichFlaggedLinks", () => {
       favicon: "https://example.com/favicon.ico",
       domain: "example.com",
       contentType: "WEB",
+      mimeType: "text/html",
       createdAt: CREATED_AT,
     });
   });

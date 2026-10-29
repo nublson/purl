@@ -1,5 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "ignoreCommand": "node scripts/vercel-wait-github-ci.mjs",
-  "crons": [{ "path": "/api/cron/enrich-links", "schedule": "* * * * *" }]
+  "crons": [
+    { "path": "/api/cron/enrich-links", "schedule": "* * * * *" },
+    { "path": "/api/cron/sweep-uploads", "schedule": "0 * * * *" }
+  ]
 }

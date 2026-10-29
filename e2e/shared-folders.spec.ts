@@ -1,5 +1,6 @@
 import { expect, test, waitForHydration } from "./fixtures";
 import { pool, setFolderPublic } from "./support/db";
+import { silentWav } from "./support/media";
 
 // Public folders at /@username/slug: readable by anyone (no session),
 // never indexed, 404 when private, and old URLs redirect after a rename.
@@ -50,7 +51,7 @@ test.describe("Shared folders, visited signed out", () => {
     );
   });
 
-  test("the view toggle switches between the list and a grid of cards", async ({
+  test("visitors start in the grid; the view toggle switches to the list, remembered", async ({
     page,
     seed,
     testUser,
@@ -67,12 +68,9 @@ test.describe("Shared folders, visited signed out", () => {
     await page.goto(`/@${testUser.username}/design`);
     await waitForHydration(page, 'button[aria-label="Grid view"]');
 
+    // A visitor starts in the grid.
     const list = page.getByRole("button", { name: "List view" });
     const grid = page.getByRole("button", { name: "Grid view" });
-    await expect(list).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
-
-    await grid.click();
     await expect(grid).toHaveAttribute("aria-pressed", "true");
     await expect(list).toHaveAttribute("aria-pressed", "false");
     await expect(page.locator('[data-cy="link-item"]')).toHaveCount(0);
@@ -87,19 +85,93 @@ test.describe("Shared folders, visited signed out", () => {
       await page.screenshot({ path: `${process.env.SHARE_SCREENSHOTS}/${testInfo.project.name}-grid.png` });
     }
 
-    // The choice is remembered: a reload opens straight in the grid.
+    await list.click();
+    await expect(list).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
+    await expect(cards).toHaveCount(0);
+
+    // The choice is remembered: a reload opens straight in the list.
     await page.reload();
-    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(5);
-    await expect(page.getByRole("button", { name: "Grid view" })).toHaveAttribute(
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
+    await expect(page.getByRole("button", { name: "List view" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
 
-    await waitForHydration(page, 'button[aria-label="Grid view"]');
-    await page.getByRole("button", { name: "List view" }).click();
-    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
+    // The list streams in after the header: switching before it has
+    // hydrated would make React redo it (a hydration mismatch).
+    await waitForHydration(page, '[data-cy="link-item"]');
+    await page.getByRole("button", { name: "Grid view" }).click();
+    await expect(cards).toHaveCount(5);
     await page.reload();
-    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
+    await expect(cards).toHaveCount(5);
+  });
+
+  test("the list view's audio row is a row that plays: a Tab stop, read-only", async ({
+    page,
+    seed,
+    testUser,
+    browserName,
+  }) => {
+    await page.context().route("https://sounds.example/**", (route) =>
+      route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
+    );
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    await seed.link({
+      url: "https://sounds.example/song.mp3",
+      title: "Song",
+      contentType: "AUDIO",
+      duration: 65,
+      folderId: design,
+    });
+    await seed.link({ url: "https://alpha.example", title: "Alpha article", folderId: design });
+    await page.goto(`/@${testUser.username}/design`);
+    await waitForHydration(page, 'button[aria-label="Grid view"]');
+    // Visitors start in the grid.
+    await page.getByRole("button", { name: "List view" }).click();
+    await expect(page.getByRole("button", { name: "List view" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    const song = page.locator('[data-cy="link-item"]').filter({ hasText: "Song" });
+    const alpha = page.locator('[data-cy="link-item"]').filter({ hasText: "Alpha article" });
+    // A row like the others: no bar, the same height.
+    await expect(song.locator('[data-face="audio"]')).toHaveCount(0);
+    expect(Math.abs((await song.boundingBox())!.height - 48)).toBeLessThanOrEqual(1);
+    expect((await song.boundingBox())!.height).toBe((await alpha.boundingBox())!.height);
+    // Read-only: no checkbox, no menu.
+    await expect(song.getByRole("checkbox")).toHaveCount(0);
+    await expect(song.getByRole("button", { name: "Open link menu" })).toHaveCount(0);
+    await expect(song.getByRole("link")).toHaveCount(0);
+
+    // Tab from the row above reaches its button.
+    const button = song.locator("[data-audio-toggle]");
+    await expect(button).toHaveAttribute("aria-label", "Play Song");
+    await page.getByRole("link", { name: "Alpha article (opens in new tab)" }).focus();
+    // WebKit's Tab skips buttons; Option-Tab doesn't.
+    await page.keyboard.press(browserName === "webkit" ? "Alt+Tab" : "Tab");
+    await expect(button).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(button).toHaveAttribute("aria-label", "Pause Song");
+    // The mark in the icon's place, and the second line counts.
+    const mark = song.locator("[data-row-mark]");
+    await expect(mark).toBeVisible();
+    await expect(mark).toHaveAttribute("data-row-mark", "playing");
+    await expect(song.getByRole("button", { name: "Pause Song" })).toHaveCount(1);
+    await expect
+      .poll(() =>
+        song
+          .locator('[data-slot="item-title"] > :nth-child(2)')
+          .evaluate((el) => (el as HTMLElement).innerText.trim()),
+      )
+      .toMatch(/^0:0\d \/ (1:05|0:10)$/);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(page.url()).not.toContain("pearl");
+    // A click on the row pauses it; the music icon comes back.
+    await button.click();
+    await expect(button).toHaveAttribute("aria-label", "Play Song");
+    await expect(mark).toHaveCount(0);
   });
 
   test("the grid has 2 columns on phones and 3 on small tablets, every card on screen", async ({
@@ -150,7 +222,7 @@ test.describe("Shared folders, visited signed out", () => {
     for (let i = 0; i < 51; i++) {
       await seed.link({ url: `https://l${i}.example`, title: `Link ${i}`, folderId: design });
     }
-    // A returning visitor who chose the grid.
+    // The grid (the default), set explicitly as a returning visitor would.
     await page.context().addCookies([
       { name: "purl-shared-view", value: "grid", url: testInfo.project.use.baseURL! },
     ]);
@@ -240,8 +312,10 @@ test.describe("Shared folders, visited signed out", () => {
     });
 
     await page.goto(`/@${testUser.username}/design`);
-    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(50);
     await waitForHydration(page, 'button[aria-label="Grid view"]');
+    // Visitors start in the grid.
+    await page.getByRole("button", { name: "List view" }).click();
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(50);
     // The page scrolls inside <main>; off-screen rows skip rendering
     // (content-visibility), which WebKit's scrollIntoView won't reach.
     await page.evaluate(() => {
@@ -417,13 +491,22 @@ test.describe("Shared folders, visited signed out", () => {
         "createdAt",
         "description",
         "domain",
+        "duration",
+        "embed",
         "favicon",
+        "height",
         "id",
+        "mimeType",
         "thumbnail",
         "title",
+        "upload",
         "url",
+        "width",
       ].sort(),
     );
+    // An upload's storage key and size never leave the server.
+    expect(body.links[0]).not.toHaveProperty("fileKey");
+    expect(body.links[0]).not.toHaveProperty("fileSize");
   });
 });
 

@@ -13,10 +13,13 @@ import prisma, { type Prisma } from "@/lib/prisma";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
 import { getSessionUser } from "@/lib/session";
 import { detectContentType } from "@/lib/server-detect-content-type";
+import { deleteBlobsFor, InvalidUploadError } from "@/lib/uploads";
 import { getDefaultFaviconUrl } from "@/utils/default-favicon";
 import { timeoutSignal } from "@/utils/abort-signal";
 import { getUrlDomain } from "@/utils/formatter";
+import { detectContentTypeFromUrlRules } from "@/utils/link-content-type-shared";
 import type { Link } from "@/utils/links";
+import { mediaTitleFromUrl } from "@/utils/media-title";
 import { isPdfUrl } from "@/utils/pdf";
 import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
 import { isYouTubeUrl } from "@/utils/youtube";
@@ -94,6 +97,18 @@ export class UnauthorizedError extends Error {
   readonly name = "UnauthorizedError";
   constructor() {
     super("Unauthorized");
+  }
+}
+
+/**
+ * Thrown by `updateLinkForUser` when `expectedUrl` is set and the link's url
+ * is no longer that one: it changed after the caller checked it (routes
+ * answer 409 CHANGED).
+ */
+export class LinkChangedError extends Error {
+  readonly name = "LinkChangedError";
+  constructor() {
+    super("This link changed. Try again.");
   }
 }
 
@@ -205,9 +220,16 @@ type LinkRow = {
   thumbnail: string | null;
   createdAt: Date;
   folderId?: string | null;
+  fileKey?: string | null;
+  mimeType?: string | null;
+  width?: number | null;
+  height?: number | null;
+  duration?: number | null;
+  frameable?: boolean | null;
+  embed?: boolean;
 };
 
-function mapRowToLink(row: LinkRow): Link {
+export function mapRowToLink(row: LinkRow): Link {
   return {
     id: row.id,
     url: row.url,
@@ -219,6 +241,51 @@ function mapRowToLink(row: LinkRow): Link {
     contentType: row.contentType,
     createdAt: row.createdAt,
     folderId: row.folderId ?? null,
+    mimeType: row.mimeType ?? null,
+    width: row.width ?? null,
+    height: row.height ?? null,
+    duration: row.duration ?? null,
+    frameable: row.frameable ?? null,
+    embed: row.embed ?? false,
+    upload: row.fileKey != null,
+  };
+}
+
+export type MediaContentType = Extract<
+  ContentType,
+  "IMAGE" | "VIDEO" | "AUDIO"
+>;
+
+export type ScrapedLinkMetadata = {
+  title: string;
+  description: string | null;
+  favicon: string;
+  thumbnail: string | null;
+};
+
+function isMediaContentType(
+  contentType: ContentType,
+): contentType is MediaContentType {
+  return (
+    contentType === "IMAGE" || contentType === "VIDEO" || contentType === "AUDIO"
+  );
+}
+
+/**
+ * Metadata for an image, video or audio file, from its URL alone: the file
+ * name as the title, no description, the domain's favicon, and the image
+ * itself as an image's thumbnail. There is no page to read, so no fetch.
+ */
+export function mediaMetadata(
+  url: string,
+  domain: string,
+  contentType: MediaContentType,
+): ScrapedLinkMetadata {
+  return {
+    title: mediaTitleFromUrl(url, domain),
+    description: null,
+    favicon: getDefaultFaviconUrl(domain),
+    thumbnail: contentType === "IMAGE" ? url : null,
   };
 }
 
@@ -232,14 +299,16 @@ export type LookupOptions = { signal?: AbortSignal };
 export async function scrapeLinkMetadata(
   url: string,
   { signal }: LookupOptions = {},
-): Promise<{
-  title: string;
-  description: string | null;
-  favicon: string;
-  thumbnail: string | null;
-}> {
+): Promise<ScrapedLinkMetadata> {
   const domain = getUrlDomain(url);
   const defaultFavicon = getDefaultFaviconUrl(domain);
+  // A media file by its extension (the URL rules' order: YouTube and PDF win)
+  // has no page to scrape: fetching it would download the file itself.
+  const ruleType = detectContentTypeFromUrlRules(url);
+  if (ruleType !== null && isMediaContentType(ruleType)) {
+    return mediaMetadata(url, domain, ruleType);
+  }
+
   if (isPdfUrl(url)) {
     const pdfMetadata = await scrapePdfMetadata(url, domain, signal);
     return {
@@ -356,6 +425,8 @@ export type ResolvedLinkFields = {
   description: string | null;
   favicon: string;
   thumbnail: string | null;
+  /** The MIME type the HEAD sniff saw; null when the URL rules decided the type. */
+  mimeType: string | null;
 };
 
 /** Resolves domain, content type, and scraped metadata for a URL (shared by create/update and preview API). */
@@ -365,12 +436,18 @@ export async function resolveLinkFromUrl(
 ): Promise<ResolvedLinkFields> {
   const domain = getUrlDomain(url);
   // Independent network work: run the HEAD/sniff and the page scrape in parallel.
-  const [detected, { title, description, favicon, thumbnail }] =
-    await Promise.all([
-      detectContentType(url, options),
-      scrapeLinkMetadata(url, options),
-    ]);
-  const contentType = detected as ContentType;
+  const [detected, scraped] = await Promise.all([
+    detectContentType(url, options),
+    scrapeLinkMetadata(url, options),
+  ]);
+  const contentType: ContentType = detected.contentType;
+  // A media file the sniff found (no telling extension, so the scrape read it
+  // as a page and fell back to the domain): describe the file instead.
+  const { title, description, favicon, thumbnail } = isMediaContentType(
+    contentType,
+  )
+    ? mediaMetadata(url, domain, contentType)
+    : scraped;
   return {
     url,
     domain,
@@ -379,6 +456,7 @@ export async function resolveLinkFromUrl(
     description,
     favicon,
     thumbnail,
+    mimeType: detected.mimeType,
   };
 }
 
@@ -447,8 +525,8 @@ function isRecordNotFoundError(error: unknown): boolean {
 
 /**
  * Writes freshly resolved metadata to `existing` — title, description,
- * favicon, thumbnail, domain, contentType, and a `createdAt` bump — plus
- * `folderId` when given, all in a single update scoped by `existing.id`.
+ * favicon, thumbnail, domain, contentType, mimeType, and a `createdAt` bump —
+ * plus `folderId` when given, all in a single update scoped by `existing.id`.
  *
  * It does not resolve the acting user from the session: `createLinkForUser`
  * already scoped `existing` to `userId` via `{ userId, url }` before calling
@@ -471,10 +549,34 @@ async function refreshExistingLink(
       thumbnail: resolved.thumbnail,
       domain: resolved.domain,
       contentType: resolved.contentType,
+      mimeType: resolved.mimeType,
       createdAt: new Date(),
       ...(folderId !== undefined ? { folderId } : {}),
     },
   });
+}
+
+/**
+ * Re-saving an upload's own URL (Copy link → paste, the folder page's "saved
+ * elsewhere" row, v1, MCP) must not re-resolve it: the file would read as a
+ * media link, titled after the suffixed blob name, on the store's host, and a
+ * video would lose its preview (which the sweep then deletes). Only the
+ * folder may change, and `createdAt` is never bumped. Returns the row as it
+ * is (`moved: false`) when `folderId` is absent or already its folder.
+ */
+async function resaveUploadRow(
+  row: RefreshLinkResult,
+  folderId: string | undefined,
+  db: Pick<Prisma.TransactionClient, "link"> = prisma,
+): Promise<RefreshLinkResult & { moved: boolean }> {
+  if (folderId === undefined || folderId === row.folderId) {
+    return { ...row, moved: false };
+  }
+  const moved = await db.link.update({
+    where: { id: row.id },
+    data: { folderId },
+  });
+  return { ...moved, moved: true };
 }
 
 /**
@@ -506,6 +608,7 @@ async function insertResolvedLink(
             thumbnail: resolved.thumbnail,
             domain: resolved.domain,
             contentType: resolved.contentType,
+            mimeType: resolved.mimeType,
             userId,
             ...(folderId !== undefined ? { folderId } : {}),
           },
@@ -521,6 +624,9 @@ async function insertResolvedLink(
           const folderChanged =
             folderId !== undefined && folderId !== row.folderId;
           try {
+            if (row.fileKey != null) {
+              return await resaveUploadRow(row, folderId, tx);
+            }
             const refreshed = await refreshExistingLink(
               row,
               resolved,
@@ -568,7 +674,8 @@ export async function createLink(
  * the folder is only changed when `opts.folderId` is explicitly provided and
  * differs from the link's current folder — re-saving with no `folderId`
  * leaves the link's folder untouched. `moved` reports whether the folder
- * changed as a result of this call.
+ * changed as a result of this call. An existing upload (`fileKey` set) is
+ * never re-resolved or bumped: only its folder can change.
  */
 export async function createLinkForUser(
   userId: string,
@@ -588,6 +695,20 @@ export async function createLinkForUser(
     const folderChanged =
       requestedFolderId !== undefined &&
       requestedFolderId !== existing.folderId;
+
+    if (existing.fileKey != null) {
+      try {
+        return await resaveUploadRow(existing, requestedFolderId);
+      } catch (error) {
+        if (isForeignKeyConstraintError(error)) {
+          throw new FolderNotFoundError();
+        }
+        // No resolve runs first, so the row can only vanish in the instant
+        // before this write; its blobs go with it, so there is nothing to
+        // save fresh.
+        throw error;
+      }
+    }
 
     const resolved = await resolveLinkFromUrl(existing.url);
     try {
@@ -648,6 +769,8 @@ export type UpdateLinkData = {
   url?: string;
   title?: string;
   description?: string | null;
+  /** Show the page live in its card (the route has already checked it can be framed). */
+  embed?: boolean;
 };
 
 export type UpdateLinkResult = Awaited<ReturnType<typeof prisma.link.update>>;
@@ -664,6 +787,13 @@ export async function updateLink(
 export type UpdateLinkForUserData = UpdateLinkData & {
   /** Present (string or null) to also move/unfile the link in the same write; omitted leaves the folder untouched. */
   folderId?: string | null;
+  /**
+   * Write only while the stored url is still this one (the url a caller
+   * checked, e.g. for framing before `embed: true`); otherwise throw
+   * `LinkChangedError` and write nothing. The write itself is conditional,
+   * so an edit landing between the read and the write can't slip through.
+   */
+  expectedUrl?: string;
 };
 
 /**
@@ -686,6 +816,19 @@ export async function updateLinkForUser(
     where: { id, userId },
   });
   if (!existing) return null;
+  if (data.expectedUrl !== undefined && existing.url !== data.expectedUrl) {
+    throw new LinkChangedError();
+  }
+  // An upload's URL is its file in Blob: re-pointing it would orphan the
+  // file and leave its size counted against the storage cap. Sending the
+  // same URL back (a client echoing the row) is fine.
+  if (
+    existing.fileKey &&
+    data.url !== undefined &&
+    data.url.trim() !== existing.url
+  ) {
+    throw new InvalidUploadError("An upload's file can't be changed");
+  }
 
   const nextUrl = data.url?.trim();
   const urlChanged =
@@ -705,6 +848,9 @@ export async function updateLinkForUser(
       favicon: resolved.favicon,
       thumbnail: resolved.thumbnail,
       contentType: resolved.contentType,
+      mimeType: resolved.mimeType,
+      // A new URL was never checked for framing: switching it live again re-checks.
+      embed: false,
     };
   } else {
     if (typeof data.title === "string") updatePayload.title = data.title;
@@ -715,17 +861,26 @@ export async function updateLinkForUser(
   if (data.folderId !== undefined) {
     updatePayload.folderId = data.folderId;
   }
+  if (typeof data.embed === "boolean" && !(urlChanged && data.embed)) {
+    updatePayload.embed = data.embed;
+  }
 
   if (Object.keys(updatePayload).length === 0) return existing;
 
   try {
     return await prisma.link.update({
-      where: { id },
+      where:
+        data.expectedUrl !== undefined
+          ? { id, url: data.expectedUrl }
+          : { id },
       data: updatePayload,
     });
   } catch (error) {
     if (isForeignKeyConstraintError(error)) {
       throw new FolderNotFoundError();
+    }
+    if (data.expectedUrl !== undefined && isRecordNotFoundError(error)) {
+      throw new LinkChangedError();
     }
     throw error;
   }
@@ -838,6 +993,10 @@ export async function moveLinksToFolder(
     notFound: linkIds.filter((id) => !previousById.has(id)),
   };
 }
+
+/** What a deleted row's blobs are found from (`deleteBlobsFor`). */
+const BLOB_FIELDS = { url: true, fileKey: true, thumbnail: true } as const;
+
 /**
  * Deletes every link in `linkIds` owned by `userId` in one write; ids that
  * aren't the user's are ignored. Returns how many links were deleted.
@@ -846,9 +1005,15 @@ export async function deleteLinksForUser(
   userId: string,
   linkIds: string[],
 ): Promise<number> {
+  // The uploads among them, read first: their blobs go once the rows have.
+  const uploads = await prisma.link.findMany({
+    where: { id: { in: linkIds }, userId, fileKey: { not: null } },
+    select: BLOB_FIELDS,
+  });
   const { count } = await prisma.link.deleteMany({
     where: { id: { in: linkIds }, userId },
   });
+  await deleteBlobsFor(userId, uploads);
   return count;
 }
 
@@ -857,9 +1022,11 @@ export async function deleteLink(id: string): Promise<boolean> {
   const userId = await getCurrentUserId();
   const existing = await prisma.link.findFirst({
     where: { id, userId },
+    select: BLOB_FIELDS,
   });
   if (!existing) return false;
   await prisma.link.delete({ where: { id } });
+  await deleteBlobsFor(userId, [existing]);
   return true;
 }
 

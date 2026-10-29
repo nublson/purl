@@ -12,6 +12,7 @@ vi.mock("@/lib/prisma", () => ({
       delete: vi.fn(),
     },
     link: {
+      findMany: vi.fn(),
       deleteMany: vi.fn(),
     },
     folderSlugRedirect: {
@@ -21,7 +22,12 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
+vi.mock("@/lib/uploads", () => ({
+  deleteBlobsFor: vi.fn().mockResolvedValue(undefined),
+}));
+
 const prisma = (await import("@/lib/prisma")).default;
+const { deleteBlobsFor } = await import("@/lib/uploads");
 const {
   slugifyFolderName,
   FolderNotFoundError,
@@ -71,7 +77,9 @@ function resetMocks() {
   vi.mocked(prisma.folder.create).mockReset();
   vi.mocked(prisma.folder.update).mockReset();
   vi.mocked(prisma.folder.delete).mockReset();
+  vi.mocked(prisma.link.findMany).mockReset().mockResolvedValue([]);
   vi.mocked(prisma.link.deleteMany).mockReset();
+  vi.mocked(deleteBlobsFor).mockReset().mockResolvedValue(undefined);
   vi.mocked(prisma.folderSlugRedirect.upsert).mockReset();
   vi.mocked(prisma.$transaction)
     .mockReset()
@@ -1035,6 +1043,58 @@ describe("deleteFolder", () => {
     expect(result).toEqual({ deletedLinks: 5 });
   });
 
+  it("deletes the folder's uploads' blobs after the transaction", async () => {
+    const uploads = [
+      {
+        url: "https://abc.public.blob.vercel-storage.com/users/user-1/c1/a.png",
+        fileKey: "users/user-1/c1/a.png",
+        thumbnail: null,
+      },
+    ];
+    const order: string[] = [];
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue(owned as never);
+    vi.mocked(prisma.link.findMany).mockImplementation((async () => {
+      order.push("select");
+      return uploads;
+    }) as never);
+    vi.mocked(prisma.link.deleteMany).mockImplementation((async () => {
+      order.push("delete links");
+      return { count: 1 };
+    }) as never);
+    vi.mocked(prisma.folder.delete).mockResolvedValue({} as never);
+    vi.mocked(prisma.$transaction).mockImplementation((async (
+      cb: (t: typeof tx) => unknown,
+    ) => {
+      const result = await cb(tx);
+      order.push("commit");
+      return result;
+    }) as never);
+    vi.mocked(deleteBlobsFor).mockImplementation(async () => {
+      order.push("blobs");
+    });
+
+    const result = await deleteFolder("user-1", "folder-1", { withLinks: true });
+
+    expect(result).toEqual({ deletedLinks: 1 });
+    expect(prisma.link.findMany).toHaveBeenCalledWith({
+      where: { userId: "user-1", folderId: "folder-1", fileKey: { not: null } },
+      select: { url: true, fileKey: true, thumbnail: true },
+    });
+    expect(deleteBlobsFor).toHaveBeenCalledWith("user-1", uploads);
+    expect(order).toEqual(["select", "delete links", "commit", "blobs"]);
+  });
+
+  it("deletes no blobs when the transaction fails", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValue(owned as never);
+    vi.mocked(prisma.link.deleteMany).mockResolvedValue({ count: 1 } as never);
+    vi.mocked(prisma.folder.delete).mockRejectedValue(new Error("db down"));
+
+    await expect(
+      deleteFolder("user-1", "folder-1", { withLinks: true }),
+    ).rejects.toThrow("db down");
+    expect(deleteBlobsFor).not.toHaveBeenCalled();
+  });
+
   it("keeps links when not withLinks", async () => {
     vi.mocked(prisma.folder.findFirst).mockResolvedValue(owned as never);
     vi.mocked(prisma.folder.delete).mockResolvedValue({} as never);
@@ -1047,6 +1107,8 @@ describe("deleteFolder", () => {
       where: { id: "folder-1" },
     });
     expect(prisma.link.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.link.findMany).not.toHaveBeenCalled();
+    expect(deleteBlobsFor).not.toHaveBeenCalled();
   });
 });
 

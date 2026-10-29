@@ -14,6 +14,9 @@ type LinkViewContextValue = {
   folderTags: boolean;
   /** Turns folder tags on or off at once, then saves; reverts if that fails. */
   setFolderTags: (on: boolean) => void;
+  /** Whether video pearls play in the grid while in view (off: on hover only). */
+  playVideos: boolean;
+  setPlayVideos: (on: boolean) => void;
 };
 
 const LinkViewContext = React.createContext<LinkViewContextValue | null>(null);
@@ -86,6 +89,10 @@ const tagsFailed = (on: boolean) =>
   on
     ? "Unable to show folder tags. Try again."
     : "Unable to hide folder tags. Try again.";
+const videosFailed = (on: boolean) =>
+  on
+    ? "Unable to turn video playback on. Try again."
+    : "Unable to turn video playback off. Try again.";
 
 /**
  * The owner's layout settings (the view, rows or a grid of cards, and
@@ -109,6 +116,12 @@ export function LinkViewProvider({
     tagsFailed,
     persist,
   );
+  const [playVideos, setPlayVideos] = useSavedSetting(
+    "playVideos",
+    initialLayout.playVideos,
+    videosFailed,
+    persist,
+  );
   const [switched, setSwitched] = React.useState(false);
 
   const setView = React.useCallback(
@@ -119,12 +132,20 @@ export function LinkViewProvider({
   );
 
   const value = React.useMemo(
-    () => ({ view, setView, switched, folderTags, setFolderTags }),
-    [view, setView, switched, folderTags, setFolderTags],
+    () => ({ view, setView, switched, folderTags, setFolderTags, playVideos, setPlayVideos }),
+    [view, setView, switched, folderTags, setFolderTags, playVideos, setPlayVideos],
   );
   return (
     <LinkViewContext.Provider value={value}>{children}</LinkViewContext.Provider>
   );
+}
+
+/**
+ * "Play videos", where a provider may be missing (the shared folder page,
+ * which has no account settings): on by default.
+ */
+export function usePlayVideos(): boolean {
+  return React.useContext(LinkViewContext)?.playVideos ?? true;
 }
 
 export function useLinkView(): LinkViewContextValue {

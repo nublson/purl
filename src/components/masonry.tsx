@@ -98,6 +98,26 @@ export function chooseMasonryColumn(bottoms: number[], previous: number): number
   return toTheRight !== -1 ? toTheRight : bottoms.findIndex(level);
 }
 
+/**
+ * Where each card goes, by its box's height: its column (0-based), its
+ * first 1px row (1-based) and how many rows it spans.
+ */
+export function placeMasonry(
+  heights: readonly number[],
+  columns: number,
+): { column: number; row: number; span: number }[] {
+  // Where each column ends.
+  const bottoms = new Array<number>(columns).fill(0);
+  let previous = -1;
+  return heights.map((height) => {
+    const column = chooseMasonryColumn(bottoms, previous);
+    previous = column;
+    const row = bottoms[column] + 1;
+    bottoms[column] += height;
+    return { column, row, span: Math.max(height, 1) };
+  });
+}
+
 function placeCards(list: HTMLElement) {
   const items = Array.from(list.children) as HTMLElement[];
   // Count the template's columns with no card placed: a card left in
@@ -109,21 +129,22 @@ function placeCards(list: HTMLElement) {
     .gridTemplateColumns.split(" ")
     .filter(Boolean).length;
   if (columns === 0) return;
-  const bottoms = new Array<number>(columns).fill(0);
-  let previous = -1;
+  const placed: HTMLElement[] = [];
+  const heights: number[] = [];
   for (const item of items) {
     const box = item.firstElementChild;
     if (!(box instanceof HTMLElement)) continue;
+    placed.push(item);
     // Layout height, whole pixels (fractional 16:10 thumbnails round to
     // within half a pixel of the gutter), ignoring transforms: a card
     // mid-arrival (scaled) still takes its full height.
-    const height = box.offsetHeight;
-    const column = chooseMasonryColumn(bottoms, previous);
-    previous = column;
-    item.style.gridColumn = String(column + 1);
-    item.style.gridRow = `${bottoms[column] + 1} / span ${Math.max(height, 1)}`;
-    bottoms[column] += height;
+    heights.push(box.offsetHeight);
   }
+  placeMasonry(heights, columns).forEach(({ column, row, span }, index) => {
+    const item = placed[index];
+    item.style.gridColumn = String(column + 1);
+    item.style.gridRow = `${row} / span ${span}`;
+  });
 }
 
 function clearPlacement(item: HTMLElement) {

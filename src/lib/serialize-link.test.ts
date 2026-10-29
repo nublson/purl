@@ -105,4 +105,45 @@ describe("serializeLink", () => {
     const result = serializeLink(makeLink({ folderId: null }));
     expect(result.folderId).toBeNull();
   });
+
+  it("carries the media fields and derives upload from fileKey", () => {
+    const out = serializeLink(
+      makeLink({
+        fileKey: "users/u1/c1/a.png",
+        mimeType: "image/png",
+        width: 800,
+        height: 600,
+        duration: null,
+        frameable: null,
+        embed: false,
+      }),
+    );
+    expect(out).toMatchObject({
+      upload: true,
+      mimeType: "image/png",
+      width: 800,
+      height: 600,
+      duration: null,
+      frameable: null,
+      embed: false,
+    });
+    expect(out).not.toHaveProperty("fileKey");
+    expect(out).not.toHaveProperty("fileSize");
+  });
+
+  it("keeps upload from an already-mapped link (no fileKey)", () => {
+    expect(serializeLink(makeLink({ upload: true })).upload).toBe(true);
+  });
+
+  it("defaults the media fields for a plain link", () => {
+    expect(serializeLink(makeLink())).toMatchObject({
+      upload: false,
+      mimeType: null,
+      width: null,
+      height: null,
+      duration: null,
+      frameable: null,
+      embed: false,
+    });
+  });
 });

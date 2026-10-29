@@ -8,18 +8,21 @@ describe("buildContentSecurityPolicy", () => {
     expect(policy).toContain("chrome-extension:");
   });
 
-  it("allows only vercel.live and YouTube (no-cookie) as frame sources", () => {
+  it("allows any https host (live pearls) and vercel.live as frame sources", () => {
     const policy = buildContentSecurityPolicy();
     const frameSrc = policy
       .split("; ")
       .find((directive) => directive.startsWith("frame-src"));
     expect(frameSrc).toBe(
-      "frame-src 'self' https://vercel.live https://*.vercel.live https://www.youtube-nocookie.com",
+      "frame-src 'self' https: https://vercel.live https://*.vercel.live",
     );
   });
 
-  it("lets video and audio load from https hosts (Notion's file host included)", () => {
+  it("lets video and audio play from any host and from local blob: previews", () => {
     const policy = buildContentSecurityPolicy();
-    expect(policy).toContain("media-src 'self' https:");
+    const mediaSrc = policy
+      .split("; ")
+      .find((directive) => directive.startsWith("media-src"));
+    expect(mediaSrc).toBe("media-src 'self' blob: https: http:");
   });
 });

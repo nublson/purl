@@ -22,6 +22,7 @@ import {
 import { deleteLinksWithUndo } from "@/lib/pending-link-deletes";
 import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { EASE_OUT_STRONG } from "@/lib/motion";
+import { loadMotionFeatures } from "@/lib/motion-features-loader";
 import { isApplePlatform } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import {
@@ -52,9 +53,6 @@ import {
 } from "./ui/dropdown-menu";
 import { Kbd } from "./ui/kbd";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-
-const loadMotionFeatures = () =>
-  import("@/lib/motion-features").then((mod) => mod.default);
 
 /**
  * Touch screens (tablets, phones) get finger-sized controls: 40px instead

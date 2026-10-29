@@ -2,17 +2,12 @@
 
 import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useCurrentFolder } from "@/hooks/use-folders";
-import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
 import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { isApplePlatform } from "@/lib/platform";
-import { parsePastedUrls } from "@/lib/pasted-urls";
-import { requestSaveUrl, saveLink } from "@/lib/save-link";
-import { Additem, Chrome, ClipboardImport, Export5, Plus } from "reicon-react";
-import { usePathname } from "next/navigation";
-import { useEffect, useId, useRef } from "react";
+import { Chrome, Export5, Plus } from "reicon-react";
+import { useEffect, useId, useSyncExternalStore } from "react";
 import { AddLinksPopover } from "./add-links-popover";
-import { toast } from "sonner";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Button } from "./ui/button";
 import {
@@ -22,11 +17,15 @@ import {
   DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import { Kbd } from "./ui/kbd";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 // Chrome Web Store listing for the extension; the section is hidden until set.
 const CHROME_EXTENSION_URL = safeHttpsUrl(
   process.env.NEXT_PUBLIC_CHROME_EXTENSION_URL,
 );
+
+/** The platform never changes while the page is open. */
+const noSubscription = () => () => {};
 
 function safeHttpsUrl(value: string | undefined) {
   if (!value) return null;
@@ -38,22 +37,22 @@ function safeHttpsUrl(value: string | undefined) {
 }
 
 /**
- * The header's + menu (pointer devices): teaches paste-anywhere and offers
- * "Paste link" for people who can't easily press the shortcut (voice
- * control, switch access, trackpad-only). On a folder page it also offers
- * "Add links" (also `A`), which opens `AddLinksPopover` under the + button.
- * In the landing demo, Paste link and Add links are disabled; the apps and
- * extensions links still open.
+ * The header's + menu, for pointers that hover (desktop): teaches
+ * paste-anywhere and links the apps and extensions. Nothing else: saving,
+ * uploading and adding links have their own ways in (paste, drop, `U`, the
+ * search field, `A`). On a folder page `A` opens `AddLinksPopover` under
+ * the + button.
  */
 export function HeaderAddMenu() {
-  const { notifyLinksChanged } = useLinksSyncActions();
   const currentFolder = useCurrentFolder();
   const isDemo = useIsDemo();
-  const pathname = usePathname();
   const hintId = useId();
-  // Set by "Add links": the popover opens once the menu has closed and
-  // handed focus back to the + button, so it returns focus there.
-  const pendingAddLinks = useRef(false);
+  // The server can't know the platform: Ctrl+V until hydrated.
+  const pasteKeys = useSyncExternalStore(
+    noSubscription,
+    () => (isApplePlatform() ? "⌘V" : "Ctrl+V"),
+    () => "Ctrl+V",
+  );
 
   // `A` on a folder page opens "Add links" (not while typing, or with a
   // dialog or menu open).
@@ -73,148 +72,77 @@ export function HeaderAddMenu() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [currentFolder, isDemo]);
 
-  async function handlePasteLink() {
-    let text: string;
-    try {
-      text = (await navigator.clipboard.readText()).trim();
-    } catch {
-      toast.error(
-        "Unable to read your clipboard. Allow clipboard access, or paste anywhere on the page.",
-      );
-      return;
-    }
-    if (!text) {
-      toast.error("Your clipboard is empty. Copy a link, then try again.");
-      return;
-    }
-
-    // Prefer the page's paste flow (optimistic row, list refresh). On a
-    // folder page this files into the page's own folder (by id): the page's
-    // PasteHandler sits inside its CurrentFolderProvider, this header doesn't.
-    if (requestSaveUrl(text)) return;
-
-    // Several links need the page's paste flow (progress, one summary toast).
-    if (parsePastedUrls(text).urls.length >= 2) {
-      toast.error("Unable to save these links yet. Try again in a moment.");
-      return;
-    }
-
-    // Fallback (no page handler mounted yet, e.g. the folder page is still
-    // streaming): `currentFolder` here comes from the URL slug. On a folder
-    // route where that lookup misses, don't silently save unfiled.
-    if (!currentFolder && pathname?.startsWith("/folders/")) {
-      toast.error("Unable to save to this folder yet. Try again in a moment.");
-      return;
-    }
-
-    const result = await saveLink(
-      text,
-      currentFolder
-        ? {
-            folder: {
-              id: currentFolder.id,
-              name: currentFolder.name,
-              emoji: currentFolder.emoji,
-            },
-          }
-        : undefined,
-    );
-    if (result && "id" in result) {
-      // saveLink already toasts "Saved to {name}"/"Moved to {name}" when a
-      // folder is passed; avoid a second "Link saved" toast on top of it.
-      if (!currentFolder) toast.success("Link saved");
-      notifyLinksChanged();
-    }
-  }
-
-  const menu = (
-    <DropdownWrapper
-      align="end"
-      className="w-64"
-      onCloseAutoFocus={(event) => {
-        if (!pendingAddLinks.current) return;
-        pendingAddLinks.current = false;
-        event.preventDefault();
-        addLinksPopover.open("header");
-      }}
-      trigger={
-        <Button
-          aria-label="Add"
-          variant="ghost"
-          size="icon-sm"
-          className="hidden cursor-pointer text-muted-foreground [@media(hover:hover)]:inline-flex"
-        >
-          <Plus />
-        </Button>
-      }
+  // The paste hint also describes the button: inside the menu it's a label,
+  // which screen readers skip while moving between the menu's items.
+  const trigger = (
+    <Button
+      aria-label="Add"
+      aria-describedby={hintId}
+      variant="ghost"
+      size="icon-sm"
+      className="hidden cursor-pointer text-muted-foreground [@media(hover:hover)]:inline-flex"
     >
+      <Plus />
+    </Button>
+  );
+
+  // Without the extension's link the menu would hold no items, only the
+  // hint: a tooltip instead.
+  const menu = !CHROME_EXTENSION_URL ? (
+    <Tooltip>
+      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipContent side="bottom" sideOffset={6}>
+        Paste to save
+        <Kbd>{pasteKeys}</Kbd>
+      </TooltipContent>
+    </Tooltip>
+  ) : (
+    <DropdownWrapper align="end" className="w-64" trigger={trigger}>
       <DropdownMenuLabel className="flex flex-col gap-1 px-2 py-1.5">
         <span className="text-sm font-medium text-foreground">
           Paste to save
         </span>
-        <span id={hintId} className="text-xs font-normal text-muted-foreground">
-          Press <Kbd>{isApplePlatform() ? "⌘V" : "Ctrl+V"}</Kbd> anywhere on
-          this page to save a link.
+        <span className="text-xs font-normal text-muted-foreground">
+          Press <Kbd>{pasteKeys}</Kbd> anywhere on this page to save a
+          link.
         </span>
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
-        <DropdownMenuItem
-          aria-describedby={hintId}
-          disabled={isDemo}
-          onSelect={() => {
-            void handlePasteLink();
-          }}
-        >
-          <ClipboardImport />
-          Paste link
-        </DropdownMenuItem>
-        {/* Folder pages only: pick links you've already saved. */}
-        {currentFolder ? (
-          <DropdownMenuItem
-            aria-keyshortcuts={isDemo ? undefined : ADD_LINKS_SHORTCUT}
-            disabled={isDemo}
-            onSelect={() => {
-              pendingAddLinks.current = true;
-            }}
+        <DropdownMenuLabel>Apps & Extensions</DropdownMenuLabel>
+        <DropdownMenuItem asChild>
+          <a
+            href={CHROME_EXTENSION_URL}
+            target="_blank"
+            rel="noopener noreferrer"
           >
-            <Additem />
-            Add links
-            <Kbd aria-hidden="true" className="ms-auto">
-              {ADD_LINKS_SHORTCUT}
-            </Kbd>
-          </DropdownMenuItem>
-        ) : null}
+            <Chrome />
+            Chrome Extension
+            <span className="sr-only">(opens in new tab)</span>
+            <Export5 className="ml-auto text-muted-foreground" />
+          </a>
+        </DropdownMenuItem>
       </DropdownMenuGroup>
-      {CHROME_EXTENSION_URL ? (
-        <>
-          <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>Apps & Extensions</DropdownMenuLabel>
-            <DropdownMenuItem asChild>
-              <a
-                href={CHROME_EXTENSION_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Chrome />
-                Chrome Extension
-                <span className="sr-only">(opens in new tab)</span>
-                <Export5 className="ml-auto text-muted-foreground" />
-              </a>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        </>
-      ) : null}
     </DropdownWrapper>
+  );
+  const hint = (
+    <span id={hintId} hidden>
+      Press {pasteKeys} anywhere on this page to save a link.
+    </span>
   );
 
   // On a folder page, "Add links" opens under the + button.
   return currentFolder && !isDemo ? (
     <AddLinksPopover folder={currentFolder} placement="header" align="end">
-      <div className="inline-flex">{menu}</div>
+      <div className="inline-flex">
+        {menu}
+        {hint}
+      </div>
     </AddLinksPopover>
   ) : (
-    menu
+    <>
+      {menu}
+      {hint}
+    </>
   );
 }

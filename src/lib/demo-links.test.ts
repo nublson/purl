@@ -20,6 +20,12 @@ const FOLDER: DemoFolder = {
       favicon: "https://a.example/favicon.ico",
       contentType: "WEB",
       createdAt: new Date("2026-10-01T00:00:00Z"),
+      mimeType: null,
+      width: null,
+      height: null,
+      duration: null,
+      embed: false,
+      upload: false,
     },
   ],
 };
@@ -34,7 +40,7 @@ describe("demo constants", () => {
 describe("toDemoLinks", () => {
   it("maps public links to app links, filed in the folder", () => {
     expect(toDemoLinks(FOLDER)).toEqual([
-      { ...FOLDER.links[0], folderId: "f1" },
+      { ...FOLDER.links[0], folderId: "f1", frameable: null },
     ]);
   });
 

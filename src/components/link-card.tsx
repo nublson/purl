@@ -2,6 +2,7 @@
 
 import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
+import { useIsAudioPlaying } from "@/hooks/use-audio-player";
 import { useLongPress } from "@/hooks/use-long-press";
 import { useLeavingLinks } from "@/lib/leaving-links";
 import {
@@ -12,6 +13,7 @@ import {
 import { ARRIVE } from "@/lib/motion";
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
 import { haptic } from "@/lib/haptics";
+import { isViewerKind, linkKind } from "@/lib/link-kind";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
 import type { Link as LinkType } from "@/utils/links";
@@ -25,8 +27,15 @@ import {
   useFolderTag,
   useLinkFolder,
 } from "./folder-tag";
+import { AudioOpenButton, AudioPlayer } from "./audio-player";
+import { EMBED_OPENER_CLASS } from "./embed-face";
 import { HapticTarget } from "./haptic-target";
-import { LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
+import { MediaOpenButton } from "./media-open-button";
+import {
+  AUDIO_CARD_FRAME,
+  LINK_CARD_FRAME,
+  LinkCardContent,
+} from "./shared-link-card";
 import { Checkbox } from "./ui/checkbox";
 
 // Loaded on demand, like the rows' menu.
@@ -34,13 +43,18 @@ const LinkMenu = dynamic(() => import("./link-menu").then((m) => m.LinkMenu), {
   loading: () => <div className="size-8" aria-hidden />,
 });
 
+/** The card's link or media button: over the whole card, under its controls. */
+const OPENER_CLASS =
+  "absolute inset-0 z-0 cursor-pointer rounded-lg outline-none [-webkit-touch-callout:none]";
+
 /**
  * A link in the owner's grid: the shared folder's card (same frame and
  * content), plus what the owner's rows do. A checkbox in the thumbnail's top
  * corner selects it (shown on hover or focus, and on every card while
  * selecting, when a click anywhere toggles the card); a long-press does
  * the same on touch. The row menu (`⋯`) sits in the other corner, on hover
- * or always on touch. Deleted or moved-away cards fade out, and Undo
+ * or always on touch. An audio pearl's card is its player (`AudioPlayer`),
+ * with the same checkbox and menu in its hero's corners. Deleted or moved-away cards fade out, and Undo
  * brings them back.
  */
 export function LinkCard({
@@ -71,7 +85,27 @@ export function LinkCard({
   const badgeArrives = useFolderBadgeArrival(folderTag);
   const folderLabelId = React.useId();
   const [menuOpen, setMenuOpen] = React.useState(false);
-  const anchorRef = React.useRef<HTMLAnchorElement>(null);
+  // The card's opener: a link to the page, or for an image or video pearl
+  // the button that opens the media viewer (the demo has no viewer: its
+  // cards are links). An audio pearl's card (the demo's too) has no
+  // opener: its player plays in place, and never opens the viewer.
+  const kind = linkKind(link);
+  const audio = kind === "audio";
+  // On touch screens a playing audio card's corner shows the playing bars,
+  // which do nothing: the corner's tap gives way (a long-press still
+  // selects, and while selecting the whole card does).
+  const cornerTapOff = useIsAudioPlaying(audio ? link.id : null) && !selecting;
+  const media = !demo && isViewerKind(kind);
+  // An image or video face is the viewer's morph anchor: it rounds and
+  // clips itself, so the card doesn't crop the morph back.
+  const anchoredFace = media;
+  const anchorRef = React.useRef<HTMLElement | null>(null);
+  const setAnchor = React.useCallback((el: HTMLElement | null) => {
+    anchorRef.current = el;
+  }, []);
+  // The day, then the folder (the favicon's badge is only its emoji).
+  const describedBy =
+    [dayHeadingId, folderTag && folderLabelId].filter(Boolean).join(" ") || undefined;
   const { handlers: longPress, consumeLongPress } = useLongPress(() => {
     linkSelection.toggle(link.id);
     haptic("selection");
@@ -85,16 +119,81 @@ export function LinkCard({
     linkSelection.toggle(link.id, { shiftKey });
   };
 
+  const badge = folderTag ? (
+    <FolderBadge key={folderTag.id} folder={folderTag} inCard arrive={badgeArrives} />
+  ) : null;
+  const menu = (
+    <LinkMenu
+      link={link}
+      onOpenChange={setMenuOpen}
+      onDelete={({ byKeyboard }) =>
+        // Keyboard users land on the next card, not the page.
+        deleteLinkKeepingFocus({
+          linkId: link.id,
+          anchor: anchorRef.current,
+          siblingsSelector:
+            '[data-cy="link-card"] > a[href], [data-cy="link-card"] > [data-pearl-button], [data-cy="link-card"] > [data-audio-open]',
+          byKeyboard,
+          onDeleted: notifyLinksChanged,
+        })
+      }
+    />
+  );
+  // The menu shows on hover or focus with a pointer, always on touch, and
+  // while it's open; hidden (and inert) while selecting: every action goes
+  // through the selection bar then.
+  const menuReveal = cn(
+    "transition-opacity duration-150 ease-out-strong",
+    selecting
+      ? "invisible opacity-0"
+      : menuOpen
+        ? "opacity-100"
+        : "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/card:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/card:opacity-100",
+  );
+
+  // The checkbox (and its touch tap) in the top-left corner.
+  const checkbox = demo ? null : (
+    <>
+      <Checkbox
+        checked={selected}
+        aria-label={`Select ${link.title}`}
+        className={cn(
+          "absolute top-2 left-2 z-10 cursor-pointer bg-background shadow-sm transition-opacity duration-150 ease-out-strong",
+          cornerTapOff && "pointer-coarse:pointer-events-none",
+          selecting || selected
+            ? "opacity-100"
+            : "opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:group-hover/card:opacity-100",
+        )}
+        onClick={(event) => {
+          event.preventDefault();
+          if (consumeLongPress()) return;
+          linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+        }}
+      />
+      {/* Touch: the checkbox's tap, with a tick, over its hit area (its
+      after: extension included: 40×32 around the 16px box at 8, 8). */}
+      {cornerTapOff ? null : (
+        <HapticTarget
+          className="inset-auto top-0 -left-1 z-[11] h-8 w-10"
+          onTap={tapToSelect}
+        />
+      )}
+    </>
+  );
+
   return (
     <div
       data-cy="link-card"
       data-selected={selected || undefined}
       className={cn(
-        LINK_CARD_FRAME,
-        // The link (below) is the focus target: its ring is the card's.
-        "group/card relative select-none has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring",
+        audio ? AUDIO_CARD_FRAME : LINK_CARD_FRAME,
+        // The opener (below, a direct child) is the focus target: its ring
+        // is the card's. Not any link inside: the audio transport's Open
+        // file and the folder button ring themselves.
+        "group/card relative select-none has-[>a:focus-visible]:ring-3 has-[>a:focus-visible]:ring-ring has-[>[data-pearl-button]:focus-visible]:ring-3 has-[>[data-pearl-button]:focus-visible]:ring-ring has-[>[data-audio-open]:focus-visible]:ring-3 has-[>[data-audio-open]:focus-visible]:ring-ring",
         selected &&
           "ring-2 ring-primary [@media(hover:hover)]:hover:ring-primary",
+        anchoredFace && "overflow-visible",
         arriving && ARRIVE,
         (deletePhase === "fading" || leaving) &&
           "pointer-events-none animate-out fade-out-0 zoom-out-95 duration-200 ease-out-strong",
@@ -118,103 +217,99 @@ export function LinkCard({
         longPress.onPointerDown(event);
       }}
     >
-      <a
-        ref={anchorRef}
-        href={link.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label={`${link.title} (opens in new tab)`}
-        // The day, then the folder (the favicon's badge is only its emoji).
-        aria-describedby={
-          [dayHeadingId, folderTag && folderLabelId].filter(Boolean).join(" ") ||
-          undefined
-        }
-        // While selecting, the checkbox is the keyboard and screen reader
-        // control; a click anywhere on the card toggles it.
-        aria-hidden={selecting || undefined}
-        tabIndex={selecting ? -1 : undefined}
-        className="absolute inset-0 z-0 rounded-lg outline-none [-webkit-touch-callout:none]"
-        onClick={(event) => {
-          if (consumeLongPress()) {
-            event.preventDefault();
-            return;
-          }
-          if (selecting) {
-            event.preventDefault();
-            linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-          }
-        }}
-      />
+      {audio ? (
+        // The card plays and pauses the pearl (the demo's too); the
+        // player's track and transport take their own presses over it.
+        <AudioOpenButton
+          ref={setAnchor}
+          link={link}
+          selecting={selecting}
+          consumeLongPress={consumeLongPress}
+          aria-describedby={describedBy}
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={OPENER_CLASS}
+          onSelect={(event) => linkSelection.toggle(link.id, { shiftKey: event.shiftKey })}
+        />
+      ) : media ? (
+        <MediaOpenButton
+          ref={setAnchor}
+          link={link}
+          selecting={selecting}
+          consumeLongPress={consumeLongPress}
+          aria-describedby={describedBy}
+          // While selecting, the checkbox is the keyboard and screen reader
+          // control; a click anywhere on the card toggles it.
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={cn(OPENER_CLASS, kind === "embed" && EMBED_OPENER_CLASS)}
+          onClick={(event) => linkSelection.toggle(link.id, { shiftKey: event.shiftKey })}
+        />
+      ) : (
+        <a
+          ref={setAnchor}
+          href={link.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`${link.title} (opens in new tab)`}
+          aria-describedby={describedBy}
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={OPENER_CLASS}
+          onClick={(event) => {
+            if (consumeLongPress()) {
+              event.preventDefault();
+              return;
+            }
+            if (selecting) {
+              event.preventDefault();
+              linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+            }
+          }}
+        />
+      )}
       {/* The content is a picture of the link: clicks go to the link. */}
       <div className="pointer-events-none flex flex-col">
-        <LinkCardContent
-          link={link}
-          eagerThumbnail={eagerThumbnail}
-          badge={
-            folderTag ? (
-              <FolderBadge
-                key={folderTag.id}
-                folder={folderTag}
-                inCard
-                arrive={badgeArrives}
-              />
-            ) : null
-          }
-        />
+        {audio ? (
+          <AudioPlayer
+            link={link}
+            surface="card"
+            badge={badge}
+            inert={selecting}
+            // The checkbox takes the corner on hover, on its keyboard focus
+            // and while selecting (the demo has none).
+            indicatorClassName={
+              demo
+                ? undefined
+                : cn(
+                    selecting && "opacity-0",
+                    "[@media(hover:hover)]:group-hover/card:opacity-0 group-has-[[role=checkbox]:focus-visible]/card:opacity-0",
+                  )
+            }
+          />
+        ) : (
+          <LinkCardContent
+            link={link}
+            eagerThumbnail={eagerThumbnail}
+            mediaAnchor={anchoredFace}
+            badge={badge}
+          />
+        )}
       </div>
       {folderTag ? <FolderTagLabel id={folderLabelId} folder={folderTag} /> : null}
+      {checkbox}
       {demo ? null : (
         <>
-          <Checkbox
-            checked={selected}
-            aria-label={`Select ${link.title}`}
-            className={cn(
-              "absolute top-2 left-2 z-10 cursor-pointer bg-background shadow-sm transition-opacity duration-150 ease-out-strong",
-              selecting || selected
-                ? "opacity-100"
-                : "opacity-0 focus-visible:opacity-100 [@media(hover:hover)]:group-hover/card:opacity-100",
-            )}
-            onClick={(event) => {
-              event.preventDefault();
-              if (consumeLongPress()) return;
-              linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
-            }}
-          />
-          {/* Touch: the checkbox's tap, with a tick, over its hit area (its
-          after: extension included: 40×32 around the 16px box at 8, 8). */}
-          <HapticTarget
-            className="inset-auto top-0 -left-1 z-[11] h-8 w-10"
-            onTap={tapToSelect}
-          />
-          {/* Hidden (and inert) while selecting: every action goes through the
-          selection bar then. */}
           <div
             inert={selecting}
             className={cn(
-              "absolute top-1.5 right-1.5 z-10 flex rounded-md bg-background/80 backdrop-blur-sm transition-opacity duration-150 ease-out-strong",
-              selecting
-                ? "invisible opacity-0"
-                : menuOpen
-                  ? "opacity-100"
-                  : "opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/card:opacity-100 [@media(hover:hover)]:group-has-[:focus-visible]/card:opacity-100",
+              "absolute top-1.5 right-1.5 z-10 flex rounded-md bg-background/80 backdrop-blur-sm",
+              menuReveal,
             )}
             data-card-menu
           >
             {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}
-            <LinkMenu
-              link={link}
-              onOpenChange={setMenuOpen}
-              onDelete={({ byKeyboard }) =>
-                // Keyboard users land on the next card, not the page.
-                deleteLinkKeepingFocus({
-                  linkId: link.id,
-                  anchor: anchorRef.current,
-                  siblingsSelector: '[data-cy="link-card"] > a[href]',
-                  byKeyboard,
-                  onDeleted: notifyLinksChanged,
-                })
-              }
-            />
+            {menu}
           </div>
         </>
       )}

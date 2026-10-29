@@ -62,6 +62,7 @@ vi.mock("@/lib/realtime-broadcast", () => ({
 }));
 
 const { auth } = await import("@/lib/auth");
+const { FolderNotFoundError } = await import("@/lib/folders");
 const { broadcastLinksChanged } = await import("@/lib/realtime-broadcast");
 const prisma = (await import("@/lib/prisma")).default;
 const ogs = (await import("open-graph-scraper")).default;
@@ -310,6 +311,13 @@ describe("POST /api/links", () => {
         contentType: "WEB",
         createdAt: CREATED_AT.toISOString(),
         folderId: null,
+        mimeType: null,
+        width: null,
+        height: null,
+        duration: null,
+        frameable: null,
+        embed: false,
+        upload: false,
         moved: false,
       });
     });

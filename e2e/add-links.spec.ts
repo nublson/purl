@@ -25,7 +25,7 @@ async function seedSpaced(seed: { link: (l: { url: string; title: string; folder
 test.use({ colorScheme: "dark" });
 
 test.describe("Add links", () => {
-  test("from the + menu: 10 most recent by default, check several, add them together", async ({ page, seed }, testInfo) => {
+  test("10 most recent by default, check several, add them together", async ({ page, seed }, testInfo) => {
     const reading = await seed.folder({ name: "Reading", slug: "reading", emoji: "📚" });
     await seed.link({ url: "https://in-reading.example", title: "Already here", folderId: reading });
     await seedSpaced(seed, Array.from({ length: 12 }, (_, i) => ({
@@ -35,8 +35,8 @@ test.describe("Add links", () => {
 
     await openFolder(page, "reading");
     await expect(rows(page)).toHaveCount(1);
-    await page.getByRole("button", { name: "Add", exact: true }).click();
-    await page.getByRole("menuitem", { name: /Add links/ }).click();
+    // `A` opens it under the header's + button.
+    await page.keyboard.press("a");
     await expect(popover(page)).toBeVisible();
     await expect(search(page)).toBeFocused();
 
@@ -63,7 +63,6 @@ test.describe("Add links", () => {
 
     await page.keyboard.press("Escape");
     await expect(popover(page)).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Add", exact: true })).toBeFocused();
   });
 
   test("the empty state's button and the A shortcut open it; Enter checks, Cmd/Ctrl+Enter adds", async ({ page, seed }) => {
@@ -135,10 +134,6 @@ test.describe("Add links", () => {
   test("Home has no Add links", async ({ page }) => {
     await page.goto("/home");
     await waitForHydration(page, 'button[aria-label^="Folder:"]');
-    await page.getByRole("button", { name: "Add", exact: true }).click();
-    await expect(page.getByRole("menuitem", { name: "Paste link" })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: /Add links/ })).toHaveCount(0);
-    await page.keyboard.press("Escape");
     await page.keyboard.press("a");
     await expect(popover(page)).toHaveCount(0);
   });

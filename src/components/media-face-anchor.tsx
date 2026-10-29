@@ -1,0 +1,137 @@
+"use client";
+
+import { onCloseSettled, useIsMediaOpen } from "@/lib/media-viewer";
+import { loadMotionFeatures } from "@/lib/motion-features-loader";
+import { cn } from "@/lib/utils";
+import type { Link } from "@/utils/links";
+import { LazyMotion, m } from "motion/react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+
+/**
+ * Faces and the viewer's Popup share this `layoutDependency`. A face never
+ * changes it, so its re-renders (the image loading, the masonry moving it)
+ * never start a layout animation: only the shared transition with the
+ * Popup does. The viewer gives its Popup the same value while it swaps
+ * which face it belongs to (see `media-viewer.tsx`): Motion reads equal
+ * dependencies on the Popup and a face as "nothing to morph". The Popup
+ * switching from `undefined` to this value (and back) is itself a
+ * dependency change, so Motion takes a snapshot of it then; that's
+ * harmless, since the Popup's box doesn't move.
+ */
+export const FACE_LAYOUT_DEPENDENCY = "pearl-face";
+
+/**
+ * The viewer's Popup's `layoutDependency` while it's open: fixed, so moving
+ * between pearls (a re-render with a new size) never morphs its box. It
+ * still changes to `FACE_LAYOUT_DEPENDENCY` and back while the viewer
+ * swaps faces before closing, and the close itself is a presence change.
+ */
+export const VIEWER_LAYOUT_DEPENDENCY = "pearl-viewer";
+
+/**
+ * A card's corner radius (`rounded-lg`, 10px), in px: Motion keeps a
+ * corner round while it scales a box only when the radius is a style value
+ * it can correct, so faces and the Popup set it inline.
+ */
+export const MEDIA_RADIUS = 10;
+
+/**
+ * A list row's icon radius, in px: the favicon's own (`rounded-[3px]` in
+ * `LinkIcon`), so a row's anchor clips its image pearl as the row drew it.
+ */
+export const ROW_ICON_RADIUS = 3;
+
+/** The `layoutId` a pearl's face and the viewer's Popup share. */
+export function pearlLayoutId(id: string): string {
+  return `pearl-${id}`;
+}
+
+/**
+ * What the media viewer morphs out of and back into: a face's media box,
+ * tagged with the pearl's `layoutId`. No `layout` prop: the face itself
+ * never animates on its own; Motion hides it while the viewer is open and
+ * morphs it back from the viewer's box on close. It rounds and clips
+ * itself (its card doesn't clip it, or the morph back would be cropped to
+ * the card) and rides above its neighbours while the viewer is open and
+ * until the morph back has played.
+ */
+export function MediaAnchor({
+  link,
+  radius = MEDIA_RADIUS,
+  topOnly = false,
+  className,
+  children,
+}: {
+  link: Pick<Link, "id">;
+  /** The corners' radius in px: a card's by default; a list row's icon is smaller. */
+  radius?: number;
+  /**
+   * Only the top corners round: a face with the card's strip under it (a
+   * live page's square).
+   */
+  topOnly?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  const open = useIsMediaOpen(link.id);
+  const [morphing, setMorphing] = useState(false);
+  if (open && !morphing) setMorphing(true);
+  const ref = useRef<HTMLDivElement>(null);
+  // A face that won't morph back (the viewer closed onto another card, or
+  // moved past this one, or there's no morph under reduced motion) lowers
+  // as soon as the viewer's close completes; the timer is the fallback.
+  useEffect(() => {
+    if (open || !morphing) return;
+    const timer = setTimeout(() => setMorphing(false), 1000);
+    const stop = onCloseSettled((into) => {
+      if (into !== link.id) setMorphing(false);
+    });
+    return () => {
+      clearTimeout(timer);
+      stop();
+    };
+  }, [open, morphing, link.id]);
+  // Motion hid this face when the viewer opened from it. If the viewer then
+  // closed onto another card, Motion shows it again without a morph, and
+  // without a morph it never clears the `visibility: hidden` it wrote: clear
+  // it once the viewer is off this pearl.
+  useEffect(() => {
+    if (open) return;
+    const frame = requestAnimationFrame(() => {
+      const el = ref.current;
+      if (el?.style.visibility === "hidden") el.style.visibility = "";
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open]);
+
+  return (
+    <LazyMotion features={loadMotionFeatures} strict>
+      <m.div
+        ref={ref}
+        layoutId={pearlLayoutId(link.id)}
+        layoutDependency={FACE_LAYOUT_DEPENDENCY}
+        onLayoutAnimationComplete={() => {
+          if (!open) setMorphing(false);
+        }}
+        // While it morphs (open, then back): lists lift their rows'
+        // `content-visibility` containment, which would clip the morph to
+        // the row, and rows keep a hovered row's icon shown (`LinkItem`).
+        data-pearl-morphing={morphing || undefined}
+        className={cn("w-full overflow-hidden", morphing && "relative z-10", className)}
+        // Inline, so Motion can keep the corners round while it scales.
+        style={
+          topOnly
+            ? {
+                borderTopLeftRadius: radius,
+                borderTopRightRadius: radius,
+                borderBottomLeftRadius: 0,
+                borderBottomRightRadius: 0,
+              }
+            : { borderRadius: radius }
+        }
+      >
+        {children}
+      </m.div>
+    </LazyMotion>
+  );
+}

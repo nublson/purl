@@ -16,12 +16,15 @@ export type CurrentUserContextValue = {
   setUser: Dispatch<SetStateAction<SessionUser | null>>;
   /** Sign-in providers configured for this deployment (Settings → Account). */
   enabledProviders: ProviderId[];
+  /** A Blob store is configured: the upload entry points show (+ menu, drop, paste). */
+  uploadsEnabled: boolean;
 };
 
 export const CurrentUserContext = createContext<CurrentUserContextValue>({
   user: null,
   setUser: () => {},
   enabledProviders: [],
+  uploadsEnabled: false,
 });
 
 /**
@@ -31,15 +34,19 @@ export const CurrentUserContext = createContext<CurrentUserContextValue>({
 export function CurrentUserProvider({
   user: initialUser,
   enabledProviders = [],
+  uploadsEnabled = false,
   children,
 }: {
   user: SessionUser | null;
   enabledProviders?: ProviderId[];
+  uploadsEnabled?: boolean;
   children: ReactNode;
 }) {
   const [user, setUser] = useState(initialUser);
   return (
-    <CurrentUserContext.Provider value={{ user, setUser, enabledProviders }}>
+    <CurrentUserContext.Provider
+      value={{ user, setUser, enabledProviders, uploadsEnabled }}
+    >
       {children}
     </CurrentUserContext.Provider>
   );

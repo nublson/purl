@@ -2,6 +2,8 @@
 
 import { LINK_GRID_FRAME } from "@/lib/link-view";
 import { coolPreviews } from "@/lib/link-preview-warmth";
+import { isViewerLink, mediaViewer } from "@/lib/media-viewer";
+import { useMediaViewerUrl } from "@/lib/media-viewer-url-hook";
 import type { PublicLink } from "@/lib/public-folders";
 import type { Link } from "@/utils/links";
 import { Box } from "reicon-react";
@@ -18,6 +20,7 @@ import { SHARED_GRID_COLUMNS } from "@/lib/shared-folder-view";
 import { cn } from "@/lib/utils";
 import { SharedLinkCardSkeleton } from "./skeletons/shared-folder";
 import { SharedFolderDescription } from "./shared-folder-description";
+import { MediaViewerLazy } from "./media-viewer-lazy";
 import { SharedLinkCard } from "./shared-link-card";
 
 /**
@@ -51,6 +54,7 @@ function toLink(link: PublicLink): Link {
     ...link,
     createdAt: new Date(link.createdAt),
     folderId: null,
+    frameable: null,
   };
 }
 
@@ -153,6 +157,26 @@ export function SharedFolderList({
 
   useEffect(() => coolPreviews, []);
 
+  // Declared before the unmount cleanup below, so the URL binding is
+  // disposed first when the page goes (React runs cleanups in order).
+  // `?pearl=<id>`: the viewer opens on it once it's registered below. One
+  // the page doesn't show (past the first page, not an image or video, not
+  // in this folder) is dropped quietly: visitors have no endpoint for one link.
+  const { pendingId, dismissPending } = useMediaViewerUrl();
+  useEffect(() => {
+    if (pendingId !== null) dismissPending(pendingId);
+  }, [pendingId, dismissPending]);
+
+  // The media viewer's pearls: the image and video links on the page, in
+  // list order (audio plays in place; `register` keeps only those too),
+  // after each load.
+  useEffect(() => {
+    mediaViewer.register(links.filter(isViewerLink));
+  }, [links]);
+  // Leaving the page takes its pearls (and an open viewer) with it,
+  // without counting as a close (the URL keeps `?pearl=`).
+  useEffect(() => () => mediaViewer.unregisterPage(), []);
+
   // Grid: room for four 210px cards and their 40px gaps (4×210 + 3×40).
   const frame = cn(
     // pb-28: the last links scroll clear of the fixed footer.
@@ -185,6 +209,9 @@ export function SharedFolderList({
 
   return (
     <div className={frame} onMouseLeave={coolPreviews}>
+      {/* One per page: mounts the dialog once a media pearl is registered
+          (`?pearl=` is bound above, by `useMediaViewerUrl`). */}
+      <MediaViewerLazy />
       {descriptionLine}
       {/* Keyed by view: switching remounts it, and after a switch (not on
           page load) the new layout fades in, opacity only, 150ms. */}
@@ -253,7 +280,9 @@ export function SharedFolderList({
               <div
                 key={link.id}
                 role="listitem"
-                className="[content-visibility:auto] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px]"
+                // Containment lifts while the row's icon morphs to or from
+                // the media viewer, so the morph isn't clipped to the row.
+                className="[content-visibility:auto] has-[[data-pearl-morphing]]:[content-visibility:visible] [contain-intrinsic-size:auto_48px] max-md:[contain-intrinsic-size:auto_56px]"
               >
                 <SharedLinkItem link={link} eagerFavicon={index < EAGER_ROWS} />
               </div>

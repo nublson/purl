@@ -18,7 +18,7 @@ const inter = Inter({
 });
 
 const description =
-  "Purl is a calm place to save and share the links you find. Keep articles, PDFs, videos and audio in folders, and share any folder with a link.";
+  "Purl is a calm place to save and share your links and files. Keep articles, PDFs and videos, upload your images, video and audio, and share any folder with a link.";
 
 export const metadata: Metadata = {
   applicationName: "Purl",
@@ -81,7 +81,7 @@ export default function RootLayout({
             visitor so the landing page renders settled. */}
         <script dangerouslySetInnerHTML={{ __html: LANDING_SEEN_SCRIPT }} />
       </head>
-      <body className={`antialiased h-full flex flex-col relative`}>
+      <body className={`antialiased h-full flex flex-col relative isolate`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

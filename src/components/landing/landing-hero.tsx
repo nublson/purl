@@ -23,11 +23,27 @@ export function LandingHero({ providers }: { providers: ProviderId[] }) {
       <div data-landing-block="mark">
         <BrandMark />
       </div>
+      {/* What's new, read before the headline: a quiet pill, not a link
+          (there's no page to send it to). "New" reads as its own word to
+          screen readers too. */}
+      <div data-landing-block="badge" className="mt-8 md:mt-10">
+        <Typography
+          component="p"
+          size="small"
+          className="inline-flex items-center gap-2 rounded-full border border-border py-1 ps-1 pe-3"
+        >
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
+            New
+          </span>
+          <span className="sr-only">: </span>
+          Image, video and audio uploads
+        </Typography>
+      </div>
       <Typography
         component="h1"
         variant="h1"
         id="landing-title"
-        className="mt-8 md:mt-10"
+        className="mt-4 md:mt-5"
       >
         {WORDS.map((word, i) => (
           <Fragment key={word}>
@@ -40,8 +56,8 @@ export function LandingHero({ providers }: { providers: ProviderId[] }) {
       </Typography>
       <div data-landing-block="sub" className="mt-3.5">
         <Typography className="max-w-[42ch] text-pretty text-lg">
-          Save the links worth keeping, all in one calm place. Share a folder
-          when one’s worth passing on.
+          Save the links and files worth keeping, all in one calm place.
+          Share a folder when one’s worth passing on.
         </Typography>
       </div>
       <div

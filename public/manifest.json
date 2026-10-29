@@ -1,7 +1,7 @@
 {
   "name": "Purl",
   "short_name": "Purl",
-  "description": "A calm place to save and share the links you find.",
+  "description": "A calm place to save and share your links and files.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import type { PoolClient } from "pg";
-import { expect, test } from "./fixtures";
+import { chooseView, expect, test } from "./fixtures";
 import { createTestUser, deleteTestUser, pool, seedFolder, seedLink } from "./support/db";
 
 // The landing page's live demo: the `purl` account's public folders, shown in
@@ -213,22 +213,30 @@ test.describe("Landing demo", () => {
       }
     });
 
-    test("+ menu: Paste link and Add links are disabled; A opens no picker; no API request", async ({ page, isMobile }) => {
+    test("+ menu: only Paste to save and the apps; A and U open no picker; no API request", async ({ page, isMobile }) => {
       test.skip(isMobile, "the + menu shows only with a pointer that hovers");
       const { apiRequests } = watch(page);
       await openDemo(page);
       await page.getByRole("button", { name: "Add", exact: true }).click();
       const menu = page.getByRole("menu");
-      for (const name of ["Paste link", "Add links"]) {
-        await expect(menu.getByRole("menuitem", { name })).toHaveAttribute("aria-disabled", "true");
+      await expect(menu).toContainText("Paste to save");
+      for (const name of ["Paste link", "Upload files", "Add links"]) {
+        await expect(menu.getByRole("menuitem", { name })).toHaveCount(0);
       }
       await page.keyboard.press("Escape");
       await expect(menu).toHaveCount(0);
 
       await page.keyboard.press("a");
       await expect(page.getByLabel("Search your links")).toHaveCount(0);
+      let picked = false;
+      page.on("filechooser", () => {
+        picked = true;
+      });
+      await page.keyboard.press("u");
+      await expect(page.locator('[data-cy="upload-input"]')).toHaveCount(0);
       await page.waitForLoadState("networkidle");
       expect(apiRequests).toEqual([]);
+      expect(picked).toBe(false);
     });
 
     test("account menu: Grid shows cards without saving; account items are disabled", async ({ page }) => {
@@ -243,8 +251,8 @@ test.describe("Landing demo", () => {
           "true",
         );
       }
-      await menu.getByRole("menuitem", { name: "View mode" }).click();
-      await page.getByRole("menuitemradio", { name: "Grid" }).click();
+      await page.keyboard.press("Escape");
+      await chooseView(page, "Grid", { save: false });
 
       await expect(page.locator('[data-cy="link-card"]')).toHaveCount(4);
       expect(apiRequests.filter((url) => url.includes("/api/user/layout"))).toEqual([]);

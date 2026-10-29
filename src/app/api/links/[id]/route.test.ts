@@ -7,14 +7,19 @@ vi.mock("@/lib/links", () => {
   class UnauthorizedError extends Error {
     readonly name = "UnauthorizedError";
   }
+  class LinkChangedError extends Error {
+    readonly name = "LinkChangedError";
+  }
 
   return {
     readLink: vi.fn(),
+    readLinkForUser: vi.fn(),
     updateLink: vi.fn(),
     updateLinkForUser: vi.fn(),
     deleteLink: vi.fn(),
     moveLinkToFolder: vi.fn(),
     UnauthorizedError,
+    LinkChangedError,
   };
 });
 
@@ -25,6 +30,19 @@ vi.mock("@/lib/folders", () => {
 
   return { FolderNotFoundError, assertFolderOwned: vi.fn() };
 });
+
+vi.mock("@/lib/uploads", () => ({
+  InvalidUploadError: class InvalidUploadError extends Error {
+    readonly name = "InvalidUploadError";
+    readonly code = "INVALID_UPLOAD";
+  },
+}));
+
+vi.mock("@/lib/frameable", () => ({ checkFrameable: vi.fn() }));
+
+vi.mock("@/lib/upstash-rate-limit", () => ({
+  getLinkPreviewRateLimiter: vi.fn(),
+}));
 
 vi.mock("@/lib/realtime-broadcast", () => ({
   broadcastLinksChanged: vi.fn().mockResolvedValue(undefined),
@@ -45,16 +63,21 @@ vi.mock("next/headers", () => ({
 const links = await import("@/lib/links");
 const {
   readLink,
+  readLinkForUser,
   updateLink,
   updateLinkForUser,
   deleteLink,
   moveLinkToFolder,
   UnauthorizedError,
+  LinkChangedError,
 } = links;
 
 const { FolderNotFoundError, assertFolderOwned } = await import("@/lib/folders");
 const { broadcastLinksChanged } = await import("@/lib/realtime-broadcast");
 const { auth } = await import("@/lib/auth");
+const { InvalidUploadError } = await import("@/lib/uploads");
+const { checkFrameable } = await import("@/lib/frameable");
+const { getLinkPreviewRateLimiter } = await import("@/lib/upstash-rate-limit");
 
 const { GET, PATCH, DELETE: DELETE_HANDLER } = await import("./route");
 
@@ -124,6 +147,13 @@ describe("links/[id] API route", () => {
         contentType: "WEB",
         createdAt,
         folderId: null,
+        mimeType: null,
+        width: null,
+        height: null,
+        duration: null,
+        frameable: null,
+        embed: false,
+        upload: false,
       });
 
       const req = createRequest(`/api/links/${ID}`, { method: "GET" });
@@ -143,6 +173,13 @@ describe("links/[id] API route", () => {
         contentType: "WEB",
         createdAt: createdAt.toISOString(),
         folderId: null,
+        mimeType: null,
+        width: null,
+        height: null,
+        duration: null,
+        frameable: null,
+        embed: false,
+        upload: false,
       });
     });
   });
@@ -170,7 +207,8 @@ describe("links/[id] API route", () => {
 
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({
-        error: "At least one of url, title, description, or folderId is required",
+        error:
+          "At least one of url, title, description, folderId, or embed is required",
       });
     });
 
@@ -199,6 +237,14 @@ describe("links/[id] API route", () => {
         folderId: null,
         readAt: null,
         needsMetadata: false,
+        fileKey: null,
+        fileSize: null,
+        mimeType: null,
+        width: null,
+        height: null,
+        duration: null,
+        frameable: null,
+        embed: false,
       });
 
       const res = await PATCH(
@@ -230,6 +276,14 @@ describe("links/[id] API route", () => {
         folderId: null,
         readAt: null,
         needsMetadata: false,
+        fileKey: null,
+        fileSize: null,
+        mimeType: null,
+        width: null,
+        height: null,
+        duration: null,
+        frameable: null,
+        embed: false,
       });
 
       await PATCH(patchRequest({ description: null }), {
@@ -262,6 +316,41 @@ describe("links/[id] API route", () => {
 
       expect(res.status).toBe(401);
       expect(await res.json()).toEqual({ error: "Unauthorized" });
+    });
+
+    it("returns 400 INVALID_UPLOAD when the url of an upload is changed", async () => {
+      vi.mocked(updateLink).mockRejectedValue(
+        new InvalidUploadError("An upload's file can't be changed"),
+      );
+
+      const res = await PATCH(
+        patchRequest({ url: "https://example.com/other", title: "New" }),
+        { params: Promise.resolve({ id: ID }) },
+      );
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "An upload's file can't be changed",
+        code: "INVALID_UPLOAD",
+      });
+      expect(vi.mocked(broadcastLinksChanged)).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 INVALID_UPLOAD when an upload's url changes along with a move", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue({
+        user: { id: "user-1" },
+      } as never);
+      vi.mocked(updateLinkForUser).mockRejectedValue(
+        new InvalidUploadError("An upload's file can't be changed"),
+      );
+
+      const res = await PATCH(
+        patchRequest({ url: "https://example.com/other", folderId: null }),
+        { params: Promise.resolve({ id: ID }) },
+      );
+
+      expect(res.status).toBe(400);
+      expect((await res.json()).code).toBe("INVALID_UPLOAD");
     });
 
     it("returns 400 when folderId is not a string or null", async () => {
@@ -452,6 +541,14 @@ describe("links/[id] API route", () => {
           folderId: "folder-1",
           readAt: null,
           needsMetadata: false,
+          fileKey: null,
+          fileSize: null,
+          mimeType: null,
+          width: null,
+          height: null,
+          duration: null,
+          frameable: null,
+          embed: false,
         });
 
         const res = await PATCH(
@@ -501,6 +598,14 @@ describe("links/[id] API route", () => {
           folderId: null,
           readAt: null,
           needsMetadata: false,
+          fileKey: null,
+          fileSize: null,
+          mimeType: null,
+          width: null,
+          height: null,
+          duration: null,
+          frameable: null,
+          embed: false,
         });
 
         const res = await PATCH(
@@ -610,6 +715,217 @@ describe("links/[id] API route", () => {
 
       expect(res.status).toBe(401);
       expect(await res.json()).toEqual({ error: "Unauthorized" });
+    });
+  });
+
+  describe("PATCH embed", () => {
+    const stored = (over: Record<string, unknown> = {}) =>
+      ({
+        id: ID,
+        url: "https://stored.example/page",
+        title: "T",
+        contentType: "WEB",
+        upload: false,
+        embed: false,
+        ...over,
+      }) as never;
+    const row = (over: Record<string, unknown> = {}) =>
+      ({
+        id: ID,
+        userId: "u1",
+        url: "https://stored.example/page",
+        title: "T",
+        description: null,
+        favicon: null,
+        thumbnail: null,
+        domain: "stored.example",
+        contentType: "WEB",
+        createdAt: new Date("2025-06-20T12:00:00Z"),
+        folderId: null,
+        embed: true,
+        ...over,
+      }) as never;
+    const call = (body: unknown) =>
+      PATCH(patchRequest(body), { params: Promise.resolve({ id: ID }) });
+
+    beforeEach(() => {
+      vi.mocked(readLinkForUser).mockReset().mockResolvedValue(stored());
+      vi.mocked(checkFrameable).mockReset().mockResolvedValue("allowed");
+      vi.mocked(getLinkPreviewRateLimiter).mockReset().mockReturnValue(null);
+      vi.mocked(auth.api.getSession).mockResolvedValue({
+        user: { id: "u1" },
+      } as never);
+      vi.mocked(updateLinkForUser).mockReset().mockResolvedValue(row());
+    });
+
+    it("turns a WEB link live when the site allows framing", async () => {
+      const res = await call({ embed: true });
+      expect(res.status).toBe(200);
+      expect((await res.json()).embed).toBe(true);
+      expect(checkFrameable).toHaveBeenCalledWith("https://stored.example/page");
+      expect(updateLinkForUser).toHaveBeenCalledWith("u1", ID, {
+        embed: true,
+        expectedUrl: "https://stored.example/page",
+      });
+    });
+
+    it("answers 409 CHANGED when the url changed after the check", async () => {
+      vi.mocked(updateLinkForUser).mockRejectedValue(new LinkChangedError());
+      const res = await call({ embed: true });
+      expect(res.status).toBe(409);
+      expect(await res.json()).toEqual({
+        error: "This link changed. Try again.",
+        code: "CHANGED",
+      });
+      expect(broadcastLinksChanged).not.toHaveBeenCalled();
+    });
+
+    it("refuses an http page with INVALID_EMBED before checking", async () => {
+      vi.mocked(readLinkForUser).mockResolvedValue(
+        stored({ url: "http://stored.example/page" }),
+      );
+      const res = await call({ embed: true });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "Only https pages can be shown live",
+        code: "INVALID_EMBED",
+      });
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("accepts an http YouTube url (its frame is the https embed)", async () => {
+      vi.mocked(readLinkForUser).mockResolvedValue(
+        stored({
+          contentType: "YOUTUBE",
+          url: "http://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        }),
+      );
+      const res = await call({ embed: true });
+      expect(res.status).toBe(200);
+    });
+
+    it("refuses a YouTube pearl without a valid video id", async () => {
+      vi.mocked(readLinkForUser).mockResolvedValue(
+        stored({
+          contentType: "YOUTUBE",
+          url: "https://www.youtube.com/@somechannel",
+        }),
+      );
+      const res = await call({ embed: true });
+      expect(res.status).toBe(400);
+      expect((await res.json()).code).toBe("INVALID_EMBED");
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("answers NOT_FRAMEABLE and writes nothing when blocked", async () => {
+      vi.mocked(checkFrameable).mockResolvedValue("blocked");
+      const res = await call({ embed: true });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "This site doesn't allow being shown live",
+        code: "NOT_FRAMEABLE",
+      });
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("answers UNREACHABLE when the site can't be reached", async () => {
+      vi.mocked(checkFrameable).mockResolvedValue("unreachable");
+      const res = await call({ embed: true });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "Couldn't reach this site",
+        code: "UNREACHABLE",
+      });
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["an upload", { upload: true }],
+      ["an image link", { contentType: "IMAGE" }],
+    ])("refuses %s with INVALID_EMBED without checking", async (_n, over) => {
+      vi.mocked(readLinkForUser).mockResolvedValue(stored(over));
+      const res = await call({ embed: true });
+      expect(res.status).toBe(400);
+      expect((await res.json()).code).toBe("INVALID_EMBED");
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("skips the framing check for YouTube", async () => {
+      vi.mocked(readLinkForUser).mockResolvedValue(
+        stored({
+          contentType: "YOUTUBE",
+          url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        }),
+      );
+      const res = await call({ embed: true });
+      expect(res.status).toBe(200);
+      expect(checkFrameable).not.toHaveBeenCalled();
+    });
+
+    it("turns off without checking or rate limiting", async () => {
+      const limit = vi.fn();
+      vi.mocked(getLinkPreviewRateLimiter).mockReturnValue({ limit } as never);
+      vi.mocked(updateLinkForUser).mockResolvedValue(row({ embed: false }));
+      const res = await call({ embed: false });
+      expect(res.status).toBe(200);
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(limit).not.toHaveBeenCalled();
+    });
+
+    it("rejects a non-boolean embed", async () => {
+      const res = await call({ embed: "yes" });
+      expect(res.status).toBe(400);
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("checks the stored url when the request sends the same url back", async () => {
+      await call({ embed: true, url: "https://stored.example/page" });
+      expect(readLinkForUser).toHaveBeenCalledWith("u1", ID);
+      expect(checkFrameable).toHaveBeenCalledWith("https://stored.example/page");
+    });
+
+    it.each([
+      ["a WEB link", "WEB"],
+      ["a YouTube link", "YOUTUBE"],
+    ])("refuses %s with a changed url and embed:true", async (_n, contentType) => {
+      vi.mocked(readLinkForUser).mockResolvedValue(stored({ contentType }));
+      const res = await call({ embed: true, url: "https://other.example/x" });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "Change the link and turn on Show live separately",
+        code: "INVALID_EMBED",
+      });
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("answers 404 when the link is missing or not the user's", async () => {
+      vi.mocked(readLinkForUser).mockResolvedValue(null);
+      const res = await call({ embed: true });
+      expect(res.status).toBe(404);
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("answers 429 when the per-user limit is hit, only for embed:true", async () => {
+      const limit = vi
+        .fn()
+        .mockResolvedValue({ success: false, reset: Date.now() + 30_000 });
+      vi.mocked(getLinkPreviewRateLimiter).mockReturnValue({ limit } as never);
+      const res = await call({ embed: true });
+      expect(res.status).toBe(429);
+      expect(limit).toHaveBeenCalledWith("u1");
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("401s without a session", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(null as never);
+      const res = await call({ embed: true });
+      expect(res.status).toBe(401);
     });
   });
 });

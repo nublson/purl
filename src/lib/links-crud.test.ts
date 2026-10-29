@@ -42,6 +42,14 @@ vi.mock("open-graph-scraper", () => ({
   default: vi.fn(),
 }));
 
+vi.mock("@/lib/uploads", () => ({
+  deleteBlobsFor: vi.fn().mockResolvedValue(undefined),
+  InvalidUploadError: class InvalidUploadError extends Error {
+    readonly name = "InvalidUploadError";
+    readonly code = "INVALID_UPLOAD";
+  },
+}));
+
 vi.mock("@/lib/folders", () => ({
   assertFolderOwned: vi.fn(),
   FolderNotFoundError: class FolderNotFoundError extends Error {
@@ -54,6 +62,7 @@ const prisma = (await import("@/lib/prisma")).default;
 const ogs = (await import("open-graph-scraper")).default;
 const { assertFolderOwned, FolderNotFoundError } = await import("@/lib/folders");
 const { SaveLimitError } = await import("@/lib/entitlements");
+const { deleteBlobsFor, InvalidUploadError } = await import("@/lib/uploads");
 const { MAX_SAVED_LINKS } = await import("@/lib/limits");
 const {
   createLink,
@@ -72,6 +81,7 @@ const {
   isUrlSavedForUser,
   scrapeLinkMetadata,
   UnauthorizedError,
+  LinkChangedError,
 } = await import("./links");
 
 const MOCK_SESSION = { user: { id: "user-123", username: "user-123" }, session: {} };
@@ -608,6 +618,7 @@ describe("createLink", () => {
         thumbnail: "https://img.youtube.com/vi/abc/hqdefault.jpg",
         domain: "youtu.be",
         contentType: "YOUTUBE",
+        mimeType: null,
         createdAt: expect.any(Date),
         },
     });
@@ -843,6 +854,7 @@ describe("createLinkForUser – folders", () => {
         thumbnail: null,
         domain: expect.any(String),
         contentType: "WEB",
+        mimeType: null,
         createdAt: expect.any(Date),
         folderId: "folder-2",
       },
@@ -1040,6 +1052,109 @@ describe("createLinkForUser – folders", () => {
 
     expect(vi.mocked(prisma.link.update)).toHaveBeenCalledTimes(1);
     expect(result.moved).toBe(false);
+  });
+
+  // An upload's own URL (Copy link → paste, the folder page's "saved
+  // elsewhere" row, v1, MCP) must never be re-resolved as a media link: that
+  // would rename it after the suffixed blob, put the store's host in its
+  // domain and drop a video's preview (which the sweep then deletes).
+  // No extension on purpose: re-resolving it would have to fetch, so a
+  // fetch or scrape spy proves resolveLinkFromUrl never ran.
+  const UPLOAD_URL =
+    "https://abc.public.blob.vercel-storage.com/users/user-123/c1/clip-Xy12";
+  function makeUploadRow(folderId: string | null) {
+    return {
+      ...makeRow({
+        url: UPLOAD_URL,
+        title: "clip",
+        domain: "purl.live",
+        thumbnail:
+          "https://abc.public.blob.vercel-storage.com/users/user-123/c1/preview-Ab34.webp",
+        contentType: "VIDEO" as never,
+        folderId,
+      }),
+      favicon: "/icon.png",
+      fileKey: "users/user-123/c1/clip-Xy12",
+      fileSize: 1234,
+      mimeType: "video/mp4",
+      width: 1920,
+      height: 1080,
+      duration: 12,
+    };
+  }
+
+  it("re-saving an upload's URL into another folder only moves it", async () => {
+    const existing = makeUploadRow("folder-1");
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
+    vi.mocked(prisma.link.update).mockImplementation(
+      (async ({ data }: { data: object }) => ({ ...existing, ...data })) as never,
+    );
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    fetchSpy.mockClear();
+
+    const result = await createLinkForUser("user-123", UPLOAD_URL, {
+      folderId: "folder-2",
+    });
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: existing.id },
+      data: { folderId: "folder-2" },
+    });
+    expect(result).toEqual({ ...existing, folderId: "folder-2", moved: true });
+    expect(result.createdAt).toBe(existing.createdAt);
+    expect(vi.mocked(ogs)).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("re-saving an upload's URL with no folder leaves it untouched", async () => {
+    const existing = makeUploadRow("folder-1");
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    fetchSpy.mockClear();
+
+    const result = await createLinkForUser("user-123", UPLOAD_URL);
+
+    expect(result).toEqual({ ...existing, moved: false });
+    expect(vi.mocked(prisma.link.update)).not.toHaveBeenCalled();
+    expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
+    // resolveLinkFromUrl never ran: no HEAD/sniff, no scrape.
+    expect(vi.mocked(ogs)).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("re-saving an upload's URL into its own folder leaves it untouched", async () => {
+    const existing = makeUploadRow("folder-1");
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(existing as never);
+
+    const result = await createLinkForUser("user-123", UPLOAD_URL, {
+      folderId: "folder-1",
+    });
+
+    expect(result).toEqual({ ...existing, moved: false });
+    expect(vi.mocked(prisma.link.update)).not.toHaveBeenCalled();
+  });
+
+  it("an upload row a concurrent save finds under the lock is only moved, never refreshed", async () => {
+    // Nothing found before the scrape; the upload row is there under the lock.
+    const upload = makeUploadRow(null);
+    vi.mocked(prisma.link.findFirst)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(upload as never);
+    vi.mocked(prisma.link.update).mockImplementation(
+      (async ({ data }: { data: object }) => ({ ...upload, ...data })) as never,
+    );
+
+    const result = await createLinkForUser("user-123", UPLOAD_URL, {
+      folderId: "folder-2",
+    });
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: upload.id },
+      data: { folderId: "folder-2" },
+    });
+    expect(result).toEqual({ ...upload, folderId: "folder-2", moved: true });
+    expect(vi.mocked(prisma.link.create)).not.toHaveBeenCalled();
   });
 });
 
@@ -1326,6 +1441,37 @@ describe("deleteLinksForUser", () => {
       where: { id: { in: ["l1", "l2", "foreign"] }, userId: "user-123" },
     });
   });
+
+  it("deletes the uploads' blobs after the rows", async () => {
+    const order: string[] = [];
+    const uploads = [
+      {
+        url: "https://abc.public.blob.vercel-storage.com/users/user-123/c1/a.png",
+        fileKey: "users/user-123/c1/a.png",
+        thumbnail: "https://abc.public.blob.vercel-storage.com/users/user-123/c1/preview.webp",
+      },
+    ];
+    vi.mocked(prisma.link.findMany).mockImplementationOnce((async () => {
+      order.push("select");
+      return uploads;
+    }) as never);
+    vi.mocked(prisma.link.deleteMany).mockImplementationOnce((async () => {
+      order.push("delete");
+      return { count: 2 };
+    }) as never);
+    vi.mocked(deleteBlobsFor).mockImplementationOnce(async () => {
+      order.push("blobs");
+    });
+
+    expect(await deleteLinksForUser("user-123", ["l1", "l2"])).toBe(2);
+
+    expect(prisma.link.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ["l1", "l2"] }, userId: "user-123", fileKey: { not: null } },
+      select: { url: true, fileKey: true, thumbnail: true },
+    });
+    expect(deleteBlobsFor).toHaveBeenCalledWith("user-123", uploads);
+    expect(order).toEqual(["select", "delete", "blobs"]);
+  });
 });
 
 describe("readLink", () => {
@@ -1535,6 +1681,110 @@ describe("updateLinkForUser", () => {
     fetchSpy.mockRestore();
   });
 
+  it("refuses to change an upload's URL, writing nothing", async () => {
+    const row = {
+      ...makeRow({ url: "https://abc.public.blob.vercel-storage.com/users/user-123/c1/a.png" }),
+      fileKey: "users/user-123/c1/a.png",
+    };
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+
+    const err = await updateLinkForUser("user-123", "link-1", {
+      url: "https://example.com/other",
+      title: "New",
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(InvalidUploadError);
+    expect((err as Error).message).toBe("An upload's file can't be changed");
+    expect(vi.mocked(prisma.link.update)).not.toHaveBeenCalled();
+    expect(vi.mocked(ogs)).not.toHaveBeenCalled();
+  });
+
+  it("accepts an upload's unchanged URL alongside a title edit", async () => {
+    const url = "https://abc.public.blob.vercel-storage.com/users/user-123/c1/a.png";
+    const row = { ...makeRow({ url }), fileKey: "users/user-123/c1/a.png" };
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue({ ...row, title: "New" } as never);
+
+    await updateLinkForUser("user-123", "link-1", { url, title: "New" });
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: "link-1" },
+      data: { title: "New" },
+    });
+    expect(vi.mocked(ogs)).not.toHaveBeenCalled();
+  });
+
+  it("still edits an upload's title", async () => {
+    const row = {
+      ...makeRow({ url: "https://abc.public.blob.vercel-storage.com/users/user-123/c1/a.png" }),
+      fileKey: "users/user-123/c1/a.png",
+    };
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue({ ...row, title: "New" } as never);
+
+    await updateLinkForUser("user-123", "link-1", { title: "New" });
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: "link-1" },
+      data: { title: "New" },
+    });
+  });
+
+  it("writes embed:false when the url changes, so a live pearl is re-checked", async () => {
+    const row = { ...makeRow({ url: "https://example.com/a" }), embed: true };
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue(row as never);
+
+    await updateLinkForUser("user-123", "link-1", { url: "https://example.com/b" });
+
+    const data = vi.mocked(prisma.link.update).mock.calls[0][0].data;
+    expect(data.embed).toBe(false);
+  });
+
+  it("writes embed only while the url is still the one checked (expectedUrl)", async () => {
+    const row = makeRow({ url: "https://example.com/a" });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue({ ...row, embed: true } as never);
+
+    await updateLinkForUser("user-123", "link-1", {
+      embed: true,
+      expectedUrl: "https://example.com/a",
+    });
+
+    expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
+      where: { id: "link-1", url: "https://example.com/a" },
+      data: { embed: true },
+    });
+  });
+
+  it("throws LinkChangedError when the url changed since the check", async () => {
+    const row = makeRow({ url: "https://example.com/b" });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+
+    const err = await updateLinkForUser("user-123", "link-1", {
+      embed: true,
+      expectedUrl: "https://example.com/a",
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(LinkChangedError);
+    expect(vi.mocked(prisma.link.update)).not.toHaveBeenCalled();
+  });
+
+  it("throws LinkChangedError when the url changes between the read and the write (P2025)", async () => {
+    const row = makeRow({ url: "https://example.com/a" });
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockRejectedValue(
+      Object.assign(new Error("not found"), { code: "P2025" }),
+    );
+
+    const err = await updateLinkForUser("user-123", "link-1", {
+      embed: true,
+      expectedUrl: "https://example.com/a",
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(LinkChangedError);
+  });
+
   it("scopes the lookup to the given user and returns null for a link it doesn't own", async () => {
     vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
 
@@ -1653,6 +1903,7 @@ describe("deleteLink", () => {
     vi.mocked(auth.api.getSession).mockReset();
     vi.mocked(prisma.link.findFirst).mockReset();
     vi.mocked(prisma.link.delete as ReturnType<typeof vi.fn>).mockReset();
+    vi.mocked(deleteBlobsFor).mockReset().mockResolvedValue(undefined);
   });
 
   it("throws UnauthorizedError when there is no session", async () => {
@@ -1694,7 +1945,34 @@ describe("deleteLink", () => {
 
     expect(vi.mocked(prisma.link.findFirst)).toHaveBeenCalledWith({
       where: { id: "link-1", userId: "user-123" },
+      select: { url: true, fileKey: true, thumbnail: true },
     });
+    expect(deleteBlobsFor).not.toHaveBeenCalled();
+  });
+
+  it("deletes an upload's blobs after its row", async () => {
+    vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+    const selected = {
+      url: "https://abc.public.blob.vercel-storage.com/users/user-123/c1/a.png",
+      fileKey: "users/user-123/c1/a.png",
+      thumbnail: null,
+    };
+    const order: string[] = [];
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(selected as never);
+    vi.mocked(prisma.link.delete as ReturnType<typeof vi.fn>).mockImplementation(
+      async () => {
+        order.push("delete");
+        return {};
+      },
+    );
+    vi.mocked(deleteBlobsFor).mockImplementation(async () => {
+      order.push("blobs");
+    });
+
+    expect(await deleteLink("link-42")).toBe(true);
+
+    expect(deleteBlobsFor).toHaveBeenCalledWith("user-123", [selected]);
+    expect(order).toEqual(["delete", "blobs"]);
   });
 });
 

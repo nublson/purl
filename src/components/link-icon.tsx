@@ -3,7 +3,7 @@
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
-import { FileText, Globe, MusicNote } from "reicon-react";
+import { FileText, Globe, MusicNote, Video } from "reicon-react";
 import * as React from "react";
 
 interface LinkIconProps {
@@ -35,28 +35,69 @@ export function LinkIcon({
       return <FileText className={icon} />;
     case "AUDIO":
       return <MusicNote className={icon} />;
-    default: {
-      const faviconSrc = safeRemoteImgSrc(link.favicon);
-      return faviconSrc ? (
-        <RemoteFavicon
-          key={faviconSrc}
-          src={faviconSrc}
-          px={px}
-          box={box}
-          icon={icon}
-          eager={eagerFavicon}
-        />
-      ) : (
-        <Globe className={cn(icon, "text-muted-foreground")} aria-hidden />
-      );
+    case "VIDEO":
+      return <Video className={icon} />;
+    case "IMAGE": {
+      // An upload's own preview (a 1,280px WebP), as a rounded square. A
+      // saved image link has no smaller copy (its thumbnail is the file
+      // itself, megabytes for a 20px icon), nor does a GIF upload: those
+      // show their favicon, like any link.
+      const previewSrc =
+        link.upload && link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
+      if (previewSrc) {
+        return (
+          <RemoteFavicon
+            key={previewSrc}
+            src={previewSrc}
+            px={px}
+            box={box}
+            icon={icon}
+            eager={eagerFavicon}
+            cover
+          />
+        );
+      }
+      return <Favicon link={link} px={px} box={box} icon={icon} eager={eagerFavicon} />;
     }
+    default:
+      return <Favicon link={link} px={px} box={box} icon={icon} eager={eagerFavicon} />;
   }
 }
 
+/** The link's favicon, else the globe. */
+function Favicon({
+  link,
+  px,
+  box,
+  icon,
+  eager,
+}: {
+  link: Pick<Link, "favicon">;
+  px: number;
+  box: string;
+  icon: string;
+  eager: boolean;
+}) {
+  const faviconSrc = safeRemoteImgSrc(link.favicon);
+  return faviconSrc ? (
+    <RemoteFavicon
+      key={faviconSrc}
+      src={faviconSrc}
+      px={px}
+      box={box}
+      icon={icon}
+      eager={eager}
+    />
+  ) : (
+    <Globe className={cn(icon, "text-muted-foreground")} aria-hidden />
+  );
+}
+
 /**
- * A favicon from another site, which can take a moment: a muted square
- * holds its place, then it fades in (150ms, opacity only) instead of
- * popping into an empty gap. A favicon that fails shows the globe.
+ * A favicon (or an image pearl's preview, `cover`) from another site, which
+ * can take a moment: a muted square holds its place, then it fades in
+ * (150ms, opacity only) instead of popping into an empty gap. One that
+ * fails shows the globe.
  */
 function RemoteFavicon({
   src,
@@ -64,12 +105,15 @@ function RemoteFavicon({
   box,
   icon,
   eager,
+  cover = false,
 }: {
   src: string;
   px: number;
   box: string;
   icon: string;
   eager: boolean;
+  /** Fill the square, cropping (an image's preview), not fit a favicon. */
+  cover?: boolean;
 }) {
   const [state, setState] = React.useState<"loading" | "loaded" | "failed">(
     "loading",
@@ -105,7 +149,12 @@ function RemoteFavicon({
         height={px}
         referrerPolicy="no-referrer"
         className={cn(
-          "aspect-square object-contain transition-opacity duration-150 ease-out",
+          "aspect-square transition-opacity duration-150 ease-out",
+          cover
+            ? // An image pearl's preview gets the card strip's 1px edge, so a
+              // light photo doesn't dissolve into the row.
+              "object-cover outline outline-black/10 -outline-offset-1 dark:outline-white/10"
+            : "object-contain",
           box,
           state === "loaded" ? "opacity-100" : "opacity-0",
         )}

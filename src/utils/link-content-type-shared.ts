@@ -1,13 +1,21 @@
 import { timeoutSignal } from "@/utils/abort-signal";
 import { isAudioUrl } from "@/utils/audio";
+import { isImageUrl } from "@/utils/image";
 import type { Link } from "@/utils/links";
 import { isPdfUrl } from "@/utils/pdf";
+import { isVideoUrl } from "@/utils/video";
 import { isYouTubeUrl } from "@/utils/youtube";
 
 const USER_AGENT =
   "Mozilla/5.0 (compatible; Purl/1.0; +https://github.com/nublson/purl)";
 
 export const SNIFF_TIMEOUT_MS = 5000;
+
+/** A content type plus the MIME type the HEAD sniff saw (null when no request decided it). */
+export type DetectedContentType = {
+  contentType: Link["contentType"];
+  mimeType: string | null;
+};
 
 export type HeadFetchFn = (
   input: string | URL,
@@ -23,7 +31,7 @@ export async function sniffContentTypeFromHeadWithFetch(
   url: string,
   fetchImpl: HeadFetchFn,
   signal?: AbortSignal,
-): Promise<Link["contentType"]> {
+): Promise<DetectedContentType> {
   try {
     const response = await fetchImpl(url, {
       method: "HEAD",
@@ -34,11 +42,18 @@ export async function sniffContentTypeFromHeadWithFetch(
     });
     const mimeType = parseMimeType(response.headers.get("content-type"));
     await response.body?.cancel();
-    if (mimeType === "application/pdf") return "PDF";
-    if (mimeType.startsWith("audio/")) return "AUDIO";
-    return "WEB";
+    const mime = mimeType || null;
+    if (mimeType === "application/pdf")
+      return { contentType: "PDF", mimeType: mime };
+    if (mimeType.startsWith("audio/"))
+      return { contentType: "AUDIO", mimeType: mime };
+    if (mimeType.startsWith("image/"))
+      return { contentType: "IMAGE", mimeType: mime };
+    if (mimeType.startsWith("video/"))
+      return { contentType: "VIDEO", mimeType: mime };
+    return { contentType: "WEB", mimeType: mime };
   } catch {
-    return "WEB";
+    return { contentType: "WEB", mimeType: null };
   }
 }
 
@@ -48,6 +63,8 @@ export function detectContentTypeFromUrlRules(
   if (isYouTubeUrl(url)) return "YOUTUBE";
   if (isPdfUrl(url)) return "PDF";
   if (isAudioUrl(url)) return "AUDIO";
+  if (isImageUrl(url)) return "IMAGE";
+  if (isVideoUrl(url)) return "VIDEO";
   return null;
 }
 
@@ -55,8 +72,8 @@ export async function detectContentTypeWithFetch(
   url: string,
   fetchImpl: HeadFetchFn,
   signal?: AbortSignal,
-): Promise<Link["contentType"]> {
+): Promise<DetectedContentType> {
   const fromRules = detectContentTypeFromUrlRules(url);
-  if (fromRules !== null) return fromRules;
+  if (fromRules !== null) return { contentType: fromRules, mimeType: null };
   return sniffContentTypeFromHeadWithFetch(url, fetchImpl, signal);
 }

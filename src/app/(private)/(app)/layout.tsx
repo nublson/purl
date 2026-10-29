@@ -1,10 +1,13 @@
 import Header from "@/components/header";
+import { CurrentUserProvider } from "@/contexts/current-user-context";
 import { FoldersProvider } from "@/contexts/folders-context";
 import { LinkViewProvider } from "@/contexts/link-view-context";
 import { LinksSyncProvider } from "@/contexts/links-sync-context";
+import { getEnabledProviders } from "@/lib/auth-providers";
 import { listFoldersForUser } from "@/lib/folders";
 import { getLayoutForUser } from "@/lib/link-view-store";
 import { getSessionUser } from "@/lib/session";
+import { uploadsEnabled } from "@/lib/uploads";
 import { getUsageSummaryForUser } from "@/lib/usage-summary";
 import { redirect } from "next/navigation";
 
@@ -33,21 +36,29 @@ export default async function AppShellLayout({
 
   // Wraps header and page: the folder selector's counts and the usage meter
   // follow link changes made in the list, and vice versa.
+  // The user (and what this deployment offers them) for the header and the
+  // page alike: the page's upload entry points read `uploadsEnabled`.
   return (
-    <LinksSyncProvider>
-      <FoldersProvider
-        initialFolders={initialFolders}
-        initialTotalLinks={usageSummary.saves.used}
-      >
-        {/* The layout (rows or grid, folder tags), saved on the account:
-            the user menu changes it, the pages render with it. */}
-        <LinkViewProvider initialLayout={layout}>
-          <Header />
-          <main className="flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-4 md:px-0">
-            {children}
-          </main>
-        </LinkViewProvider>
-      </FoldersProvider>
-    </LinksSyncProvider>
+    <CurrentUserProvider
+      user={user}
+      enabledProviders={getEnabledProviders()}
+      uploadsEnabled={uploadsEnabled()}
+    >
+      <LinksSyncProvider>
+        <FoldersProvider
+          initialFolders={initialFolders}
+          initialTotalLinks={usageSummary.saves.used}
+        >
+          {/* The layout (rows or grid, folder tags), saved on the account:
+              the user menu changes it, the pages render with it. */}
+          <LinkViewProvider initialLayout={layout}>
+            <Header />
+            <main className="flex flex-1 flex-col items-center justify-start overflow-y-auto px-4 pt-4 md:px-0">
+              {children}
+            </main>
+          </LinkViewProvider>
+        </FoldersProvider>
+      </LinksSyncProvider>
+    </CurrentUserProvider>
   );
 }

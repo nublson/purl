@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseMasonryColumn } from "./masonry";
+import { chooseMasonryColumn, placeMasonry } from "./masonry";
 
 describe("chooseMasonryColumn", () => {
   it("fills the first row left to right", () => {
@@ -28,5 +28,15 @@ describe("chooseMasonryColumn", () => {
   it("takes the shortest column when the others are clearly taller", () => {
     expect(chooseMasonryColumn([400, 300], 0)).toBe(1);
     expect(chooseMasonryColumn([300, 400], 1)).toBe(0);
+  });
+});
+
+describe("placeMasonry", () => {
+  it("stacks cards in their columns, each spanning its height", () => {
+    expect(placeMasonry([100, 100, 50], 2)).toEqual([
+      { column: 0, row: 1, span: 100 },
+      { column: 1, row: 1, span: 100 },
+      { column: 0, row: 101, span: 50 },
+    ]);
   });
 });

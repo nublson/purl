@@ -67,6 +67,12 @@ export async function getDemoFolders(
         favicon: link.favicon,
         contentType: link.contentType,
         createdAt: link.createdAt,
+        mimeType: link.mimeType,
+        width: link.width,
+        height: link.height,
+        duration: link.duration,
+        embed: link.embed,
+        upload: link.fileKey != null,
       })),
     })),
   };
