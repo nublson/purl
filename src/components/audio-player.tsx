@@ -124,12 +124,14 @@ export function AudioPlayer({
           <span className="pointer-events-none absolute top-3 left-3 size-1">{badge}</span>
         ) : null}
         {playing ? (
-          // The checkbox's box exactly (16px, 8px in, its corners), so the
-          // swap on hover doesn't move or resize the corner.
+          // In the checkbox's box (16px, 8px in), so the swap on hover doesn't
+          // move the corner. No tile of its own: the bars sit on the hero in
+          // the text's color, softened, with a faint halo of the page's
+          // background that keeps them legible over bright art.
           <span
             data-playing=""
             className={cn(
-              "pointer-events-none absolute top-2 left-2 flex size-4 items-center justify-center rounded-[4px] border border-input bg-background shadow-sm text-foreground backdrop-blur-sm transition-opacity duration-150 ease-out-strong",
+              "pointer-events-none absolute top-2 left-2 flex size-4 items-center justify-center text-foreground/80 [filter:drop-shadow(0_0_1.5px_var(--background))] transition-opacity duration-150 ease-out-strong",
               indicatorClassName,
             )}
           >
