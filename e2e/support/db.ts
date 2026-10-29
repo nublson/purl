@@ -65,6 +65,7 @@ export async function seedLink(
     duration,
     fileKey,
     fileSize,
+    embed,
   }: {
     url: string;
     title?: string;
@@ -78,13 +79,15 @@ export async function seedLink(
     duration?: number;
     fileKey?: string;
     fileSize?: number;
+    /** Shown live (the owner turned on "Show live"). */
+    embed?: boolean;
   },
 ): Promise<string> {
   const domain = new URL(url).hostname;
   const id = randomUUID();
   await pool.query(
-    `INSERT INTO "links" ("id", "url", "title", "description", "favicon", "domain", "userId", "folderId", "contentType", "thumbnail", "mimeType", "width", "height", "duration", "fileKey", "fileSize")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+    `INSERT INTO "links" ("id", "url", "title", "description", "favicon", "domain", "userId", "folderId", "contentType", "thumbnail", "mimeType", "width", "height", "duration", "fileKey", "fileSize", "embed")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
     [
       id,
       url,
@@ -102,6 +105,7 @@ export async function seedLink(
       duration ?? null,
       fileKey ?? null,
       fileSize ?? null,
+      embed ?? false,
     ],
   );
   return id;
