@@ -6,7 +6,7 @@ import { isViewerKind, linkKind } from "@/lib/link-kind";
 import { linkSecondLine } from "@/lib/upload-meta";
 import { LinkIcon } from "./link-icon";
 import { AudioOpenButton, AudioPlayer } from "./audio-player";
-import { EmbedFace, EmbedOpenLarge } from "./embed-face";
+import { EmbedFace } from "./embed-face";
 import { ImageFace, VideoFace } from "./media-card-face";
 import { MediaOpenButton } from "./media-open-button";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
@@ -29,12 +29,6 @@ export const LINK_CARD_FRAME = `${CARD_FRAME} active:scale-[0.98] motion-reduce:
  * their own press.
  */
 export const AUDIO_CARD_FRAME = `${CARD_FRAME} active:scale-[0.98] has-[[data-card-menu]:active]:scale-100 motion-reduce:active:scale-100`;
-
-/**
- * A live page's card frame: pressed like every card, except while it's
- * active (the page has the pointer) or through its controls.
- */
-export const EMBED_CARD_FRAME = `${LINK_CARD_FRAME} has-[[data-face=embed][data-active]]:scale-100 has-[[data-card-menu]:active]:scale-100`;
 
 /**
  * A link in the shared folder's grid: the page's thumbnail full-bleed on
@@ -77,29 +71,24 @@ export function SharedLinkCard({
     );
   }
   if (kind === "embed") {
-    // The square's cover sits over the opener; the strip under it opens the
-    // viewer, and so does "Open large".
+    // The live square is a picture: a click anywhere opens the viewer. The
+    // opener lies over it (Chromium sends the wheel to the topmost frame,
+    // even an inert one, so the grid only scrolls if the opener is on top).
     return (
       <div
         data-cy="link-card"
         className={cn(
-          EMBED_CARD_FRAME,
+          LINK_CARD_FRAME,
           "group/card relative overflow-visible has-[>[data-pearl-button]:focus-visible]:ring-3 has-[>[data-pearl-button]:focus-visible]:ring-ring",
         )}
       >
         <MediaOpenButton
           link={link}
           selecting={false}
-          className="absolute inset-0 z-0 cursor-pointer rounded-lg outline-none"
+          className="absolute inset-0 z-[1] cursor-pointer rounded-lg outline-none"
         />
         <div className="pointer-events-none flex flex-col">
           <LinkCardContent link={link} eagerThumbnail={eagerThumbnail} mediaAnchor />
-        </div>
-        <div
-          data-card-menu
-          className="absolute top-1.5 right-1.5 z-10 flex rounded-md bg-background/80 opacity-0 backdrop-blur-sm transition-opacity duration-150 ease-out-strong group-hover/card:opacity-100 group-has-[:focus-visible]/card:opacity-100 pointer-coarse:hidden"
-        >
-          <EmbedOpenLarge link={link} />
         </div>
       </div>
     );

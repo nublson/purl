@@ -30,10 +30,8 @@ import {
 import { AudioOpenButton, AudioPlayer } from "./audio-player";
 import { HapticTarget } from "./haptic-target";
 import { MediaOpenButton } from "./media-open-button";
-import { EmbedOpenLarge } from "./embed-face";
 import {
   AUDIO_CARD_FRAME,
-  EMBED_CARD_FRAME,
   LINK_CARD_FRAME,
   LinkCardContent,
 } from "./shared-link-card";
@@ -187,7 +185,7 @@ export function LinkCard({
       data-cy="link-card"
       data-selected={selected || undefined}
       className={cn(
-        audio ? AUDIO_CARD_FRAME : kind === "embed" ? EMBED_CARD_FRAME : LINK_CARD_FRAME,
+        audio ? AUDIO_CARD_FRAME : LINK_CARD_FRAME,
         // The opener (below, a direct child) is the focus target: its ring
         // is the card's. Not any link inside: the audio transport's Open
         // file and the folder button ring themselves.
@@ -243,7 +241,10 @@ export function LinkCard({
           // control; a click anywhere on the card toggles it.
           aria-hidden={selecting || undefined}
           tabIndex={selecting ? -1 : undefined}
-          className={OPENER_CLASS}
+          // A live page's opener lies over its square: Chromium sends the
+          // wheel to the topmost frame, even an inert one, so the grid only
+          // scrolls if the opener is on top.
+          className={cn(OPENER_CLASS, kind === "embed" && "z-[1]")}
           onClick={(event) => linkSelection.toggle(link.id, { shiftKey: event.shiftKey })}
         />
       ) : (
@@ -309,7 +310,6 @@ export function LinkCard({
             )}
             data-card-menu
           >
-            {kind === "embed" ? <EmbedOpenLarge link={link} /> : null}
             {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}
             {menu}
           </div>

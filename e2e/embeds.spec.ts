@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { chooseView, expect, test, waitForHydration } from "./fixtures";
 
 // Show live goes through the real PATCH route, which checks the site's
@@ -123,6 +123,12 @@ const viewerFrame = (page: Page, title: string) =>
 const liveCard = (page: Page, title: string) =>
   page.locator('[data-cy="link-card"]').filter({ hasText: title });
 
+/** Clicks a live card in the middle of its square (it lands on the card's opener). */
+async function clickSquare(card: Locator) {
+  const box = (await card.locator('[data-face="embed"]').boundingBox())!;
+  await card.click({ position: { x: box.width / 2, y: box.height / 2 } });
+}
+
 async function openGrid(page: Page, { tap = false } = {}) {
   await page.goto("/home");
   await waitForHydration(page, '[data-cy="link-item"], [data-cy="link-card"]');
@@ -133,7 +139,7 @@ async function openGrid(page: Page, { tap = false } = {}) {
 test.describe("Live grid cards", () => {
   test.use({ viewport: { width: 1280, height: 720 } });
 
-  test("a square face that shows the page, takes the wheel, and is interactive on click", async ({
+  test("a square face shows the page as a picture; the wheel scrolls the grid; a click opens the viewer", async ({
     page,
     seed,
   }) => {
@@ -154,73 +160,40 @@ test.describe("Live grid cards", () => {
     await expect(frame).toHaveAttribute("data-state", "loaded");
     await expect(frame).toHaveAttribute("sandbox", /allow-scripts/);
     await expect(frame).not.toHaveAttribute("sandbox", /allow-top-navigation/);
+    // A picture: inert, so neither the pointer nor Tab reaches the page.
+    await expect(frame).toHaveAttribute("inert", "");
 
-    // The cover takes the wheel: the page scrolls, not the frame.
-    const cover = card.getByRole("button", { name: "Interact with Live demo" });
-    await cover.hover();
+    // The wheel over the square scrolls the grid, not the frame.
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
     await page.mouse.wheel(0, 300);
     await expect
       .poll(() => page.locator("main").evaluate((el) => el.scrollTop))
       .toBeGreaterThan(0);
     await page.locator("main").evaluate((el) => (el.scrollTop = 0));
 
-    // Not active, the page is out of the Tab order: neither Tab from the
-    // card's opener (before the frame) nor Shift+Tab from the cover (after
-    // it) lands inside the frame.
     const insideButton = page
       .frameLocator('iframe[title="Live demo"]')
       .getByRole("button", { name: "Inside" });
-    const activeTag = () =>
-      page.evaluate(() => document.activeElement?.tagName.toLowerCase());
     await card.locator("[data-pearl-button]").first().focus();
     await page.keyboard.press("Tab");
-    expect(await activeTag()).not.toBe("iframe");
-    await expect(insideButton).not.toBeFocused();
-    await cover.focus();
-    await page.keyboard.press("Shift+Tab");
-    expect(await activeTag()).not.toBe("iframe");
+    expect(await page.evaluate(() => document.activeElement?.tagName.toLowerCase())).not.toBe(
+      "iframe",
+    );
     await expect(insideButton).not.toBeFocused();
 
-    // A click makes it active: the ring, no cover, the page takes the pointer.
-    await cover.click();
-    await expect(face).toHaveAttribute("data-active", "true");
-    await expect(card.getByText("Esc to leave")).toBeVisible();
-    await expect(cover).toBeHidden();
-    // Esc (focus is in Purl) gives the cover back.
-    await page.keyboard.press("Escape");
-    await expect(cover).toBeVisible();
-    await expect(face).not.toHaveAttribute("data-active", "true");
-
-    await cover.click();
-    const inside = page.frameLocator('iframe[title="Live demo"]');
-    await inside.getByRole("button", { name: "Inside" }).click();
-    await expect(inside.locator('body[data-clicked="1"]')).toHaveCount(1);
-    // A press outside the card leaves it.
-    await page.getByRole("heading", { name: "Today" }).click();
-    await expect(cover).toBeVisible();
-  });
-
-  test("the title strip and Open large open the viewer", async ({ page, seed }) => {
-    await serveLivePage(page);
-    await seed.link({ url: "https://live.example/", title: "Live demo", embed: true });
-    await openGrid(page);
-
-    const card = liveCard(page, "Live demo");
-    const box = (await card.boundingBox())!;
-    // The strip under the square.
-    await card.click({ position: { x: 24, y: box.height - 16 } });
+    // A click on the square opens the viewer, where the page is live.
+    await clickSquare(card);
     const dialog = page.getByRole("dialog", { name: "Live demo" });
-    await expect(viewerFrame(page, "Live demo")).toBeVisible();
-    await expect(page).toHaveURL(/[?&]pearl=/);
-    await page.keyboard.press("Escape");
-    await expect(page).not.toHaveURL(/[?&]pearl=/);
-    await expect(page.locator("[data-media-viewer][data-open]")).toHaveCount(0);
-
-    await card.hover();
-    await card.getByRole("button", { name: "Open large" }).click();
     await expect(viewerFrame(page, "Live demo")).toBeVisible();
     await expect(dialog.getByRole("link", { name: "Open in new tab" })).toBeVisible();
     await expect(page).toHaveURL(/[?&]pearl=/);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-media-viewer][data-open]")).toHaveCount(0);
+
+    // So does a click on the title strip under it.
+    const cardBox = (await card.boundingBox())!;
+    await card.click({ position: { x: 24, y: cardBox.height - 16 } });
+    await expect(viewerFrame(page, "Live demo")).toBeVisible();
   });
 
   test("the card's frame stops while its pearl is open in the viewer", async ({
@@ -234,8 +207,7 @@ test.describe("Live grid cards", () => {
     const card = liveCard(page, "Live demo");
     const cardFrame = card.locator('iframe[title="Live demo"]');
     await expect(cardFrame).toHaveAttribute("data-state", "loaded");
-    await card.hover();
-    await card.getByRole("button", { name: "Open large" }).click();
+    await clickSquare(card);
     await expect(viewerFrame(page, "Live demo")).toHaveAttribute("data-state", "loaded");
     await expect(cardFrame).toHaveCount(0);
 
@@ -257,37 +229,8 @@ test.describe("Live grid cards", () => {
     await expect(card.getByText("Couldn't load")).toBeVisible();
     await expect(card.locator("iframe")).toHaveCount(0);
     await expect(card.locator("[data-embed-preview]")).toBeVisible();
-    // No frame, no cover: the square opens the viewer.
-    await expect(card.getByRole("button", { name: "Interact with Live demo" })).toHaveCount(0);
-  });
-
-  test("deleting the active card leaves no card active", async ({ page, seed }) => {
-    await serveLivePage(page);
-    await seed.link({ url: "https://live.example/b", title: "Live B", embed: true });
-    await seed.link({ url: "https://live.example/a", title: "Live A", embed: true });
-    await openGrid(page);
-
-    const a = liveCard(page, "Live A");
-    const b = liveCard(page, "Live B");
-    await a.getByRole("button", { name: "Interact with Live A" }).click();
-    await expect(a.locator('[data-face="embed"]')).toHaveAttribute("data-active", "true");
-
-    // By keyboard: no pointerdown outside the card, so only the card going
-    // away can leave it.
-    const menuButton = a.getByRole("button", { name: "Open link menu" });
-    await waitForHydration(page, '[data-cy="link-card"] [aria-label="Open link menu"]');
-    await menuButton.focus();
-    await page.keyboard.press("Enter");
-    const del = page.getByRole("menuitem", { name: "Delete" });
-    await del.focus();
-    await page.keyboard.press("Enter");
-    await expect(a).toHaveCount(0);
-    await expect(page.locator('[data-face="embed"][data-active]')).toHaveCount(0);
-
-    const coverB = b.getByRole("button", { name: "Interact with Live B" });
-    await coverB.click();
-    await expect(b.locator('[data-face="embed"]')).toHaveAttribute("data-active", "true");
-    await expect(coverB).toBeHidden();
+    await clickSquare(card);
+    await expect(page.getByRole("dialog", { name: "Live demo" })).toHaveCount(1);
   });
 });
 
@@ -305,9 +248,11 @@ test.describe("Live grid cards on phones", () => {
     const card = liveCard(page, "Live demo");
     await expect(card.locator('[data-face="embed"]')).toBeVisible();
     await expect(card.getByText("Live", { exact: true })).toBeVisible();
+    // No frame on touch: the preview keeps a page card's 16:10, uncropped.
+    const box = (await card.locator('[data-face="embed"]').boundingBox())!;
+    expect(box.width / box.height).toBeCloseTo(1.6, 1);
     await page.waitForTimeout(500);
     await expect(card.locator("iframe")).toHaveCount(0);
-    await expect(card.getByRole("button", { name: "Interact with Live demo" })).toBeHidden();
     await card.tap();
     await expect(viewerFrame(page, "Live demo")).toBeVisible();
     await expect(page).toHaveURL(/[?&]pearl=/);
@@ -336,7 +281,8 @@ test.describe("Live grid cards, visited signed out", () => {
       "data-state",
       "loaded",
     );
-    await expect(card.getByRole("button", { name: "Interact with Live demo" })).toBeVisible();
+    await clickSquare(card);
+    await expect(viewerFrame(page, "Live demo")).toBeVisible();
   });
 });
 
