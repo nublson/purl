@@ -128,7 +128,7 @@ export function PlayVideosMenuItem() {
  * The switch's look (ui/switch) without its button: the menu item is the
  * control, and a button can't sit inside it.
  */
-function SwitchIndicator({ on }: { on: boolean }) {
+export function SwitchIndicator({ on }: { on: boolean }) {
   return (
     <span
       aria-hidden
