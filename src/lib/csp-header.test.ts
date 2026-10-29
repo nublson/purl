@@ -17,4 +17,9 @@ describe("buildContentSecurityPolicy", () => {
       "frame-src 'self' https://vercel.live https://*.vercel.live https://www.youtube-nocookie.com",
     );
   });
+
+  it("lets video and audio load from https hosts (Notion's file host included)", () => {
+    const policy = buildContentSecurityPolicy();
+    expect(policy).toContain("media-src 'self' https:");
+  });
 });

@@ -11,6 +11,10 @@
  * Vercel Live (preview toolbar / feedback) loads `https://vercel.live` in an iframe; without
  * `frame-src` the policy falls back to `default-src` and the frame is blocked. The static
  * pages embed YouTube videos from `https://www.youtube-nocookie.com`, the only other frame host.
+ *
+ * `media-src` covers the static pages' `<video>` and `<audio>`: linked files from any https
+ * host, and files uploaded to Notion, which `/api/notion/file/[blockId]` redirects to
+ * Notion's file host (a redirect's target is checked too). Without it, `default-src` blocks them.
  */
 export function buildContentSecurityPolicy(): string {
   const directives = [
@@ -19,6 +23,7 @@ export function buildContentSecurityPolicy(): string {
     "frame-src 'self' https://vercel.live https://*.vercel.live https://www.youtube-nocookie.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https: http:",
+    "media-src 'self' https:",
     "font-src 'self'",
     [
       "connect-src 'self'",
