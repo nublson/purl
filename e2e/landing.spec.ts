@@ -26,7 +26,7 @@ test.describe("Landing page", () => {
     await expect(page.getByRole("heading", { level: 1, name: "A home for your pearls" })).toBeVisible();
     await expect(
       page.getByText(
-        "Save the links worth keeping, all in one calm place. Share a folder when one’s worth passing on.",
+        "Save the links and files worth keeping, all in one calm place. Share a folder when one’s worth passing on.",
       ),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();

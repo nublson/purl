@@ -213,14 +213,15 @@ test.describe("Landing demo", () => {
       }
     });
 
-    test("+ menu: Paste link, Upload files and Add links are disabled; A and U open no picker; no API request", async ({ page, isMobile }) => {
+    test("+ menu: only Paste to save and the apps; A and U open no picker; no API request", async ({ page, isMobile }) => {
       test.skip(isMobile, "the + menu shows only with a pointer that hovers");
       const { apiRequests } = watch(page);
       await openDemo(page);
       await page.getByRole("button", { name: "Add", exact: true }).click();
       const menu = page.getByRole("menu");
+      await expect(menu).toContainText("Paste to save");
       for (const name of ["Paste link", "Upload files", "Add links"]) {
-        await expect(menu.getByRole("menuitem", { name })).toHaveAttribute("aria-disabled", "true");
+        await expect(menu.getByRole("menuitem", { name })).toHaveCount(0);
       }
       await page.keyboard.press("Escape");
       await expect(menu).toHaveCount(0);

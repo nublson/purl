@@ -21,8 +21,13 @@ async function HeaderActions() {
     <UsageProvider usageSummary={usageSummary}>
       <div className="flex items-center justify-end gap-2">
         <FolderSharePopover />
-        <LinkViewToggle />
         <HeaderAddMenu />
+        <LinkViewToggle />
+        {/* The folder's tools, then you: a hairline between them. */}
+        <Separator
+          orientation="vertical"
+          className="data-vertical:h-5 data-vertical:self-center"
+        />
         <User />
       </div>
     </UsageProvider>

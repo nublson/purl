@@ -125,18 +125,6 @@ test.describe("Upload entry points", () => {
     expect(opened).toBe(false);
   });
 
-  test("the + menu's Upload files opens the same picker", async ({ page }) => {
-    await openHome(page);
-    await waitForHydration(page, 'button[aria-label="Add"]');
-    await page.getByRole("button", { name: "Add", exact: true }).click();
-    const item = page.getByRole("menuitem", { name: "Upload files" });
-    await expect(item.locator('[data-slot="kbd"]')).toHaveText("U");
-    const chooser = page.waitForEvent("filechooser");
-    await item.click();
-    await (await chooser).setFiles(PIXEL);
-    await expectFailedUpload(page);
-  });
-
   test("dropping a file uploads it", async ({ page }) => {
     await openHome(page);
     // The page takes the drop, so the browser never opens the file.
@@ -263,16 +251,9 @@ test.describe("Upload entry points on a phone", () => {
     isMobile: true,
   });
 
-  test("the + button shows on touch, and Upload files opens the picker", async ({ page }) => {
-    await refuseTokens(page);
+  test("the + menu is for pointers that hover: hidden on touch", async ({ page }) => {
     await page.goto("/home");
-    await waitForHydration(page, 'button[aria-label="Add"]');
-    const add = page.getByRole("button", { name: "Add", exact: true });
-    await expect(add).toBeVisible();
-    await add.tap();
-    const chooser = page.waitForEvent("filechooser");
-    await page.getByRole("menuitem", { name: "Upload files" }).tap();
-    await (await chooser).setFiles(PIXEL);
-    await expectFailedUpload(page);
+    await waitForHydration(page, 'button[aria-label^="Folder:"]');
+    await expect(page.getByRole("button", { name: "Add", exact: true })).toBeHidden();
   });
 });

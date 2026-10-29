@@ -1,32 +1,13 @@
 "use client";
 
 import { useIsDemo } from "@/contexts/demo-mode-context";
-import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCurrentFolder } from "@/hooks/use-folders";
-import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { addLinksPopover, ADD_LINKS_SHORTCUT } from "@/lib/add-links-popover";
 import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { isApplePlatform } from "@/lib/platform";
-import { parsePastedUrls } from "@/lib/pasted-urls";
-import { requestSaveUrl, saveLink } from "@/lib/save-link";
-import { cn } from "@/lib/utils";
-import {
-  NO_UPLOAD_PAGE_MESSAGE,
-  openUploadPicker,
-  UPLOAD_SHORTCUT,
-} from "@/lib/upload-picker";
-import {
-  Additem,
-  Chrome,
-  ClipboardImport,
-  Export5,
-  Plus,
-  Upload,
-} from "reicon-react";
-import { usePathname } from "next/navigation";
-import { useEffect, useId, useRef } from "react";
+import { Chrome, Export5, Plus } from "reicon-react";
+import { useEffect } from "react";
 import { AddLinksPopover } from "./add-links-popover";
-import { toast } from "sonner";
 import { DropdownWrapper } from "./dropdown-wrapper";
 import { Button } from "./ui/button";
 import {
@@ -52,27 +33,15 @@ function safeHttpsUrl(value: string | undefined) {
 }
 
 /**
- * The header's + menu (pointer devices, and touch screens too when uploads
- * are on): teaches paste-anywhere and offers
- * "Paste link" for people who can't easily press the shortcut (voice
- * control, switch access, trackpad-only). On a folder page it also offers
- * "Add links" (also `A`), which opens `AddLinksPopover` under the + button.
- * "Upload files" (also `U`) opens the page's file picker; it's disabled
- * without a Blob store. In the landing demo, Paste link, Upload files and
- * Add links are disabled; the apps and extensions links still open.
+ * The header's + menu, for pointers that hover (desktop): teaches
+ * paste-anywhere and links the apps and extensions. Nothing else: saving,
+ * uploading and adding links have their own ways in (paste, drop, `U`, the
+ * search field, `A`). On a folder page `A` opens `AddLinksPopover` under
+ * the + button.
  */
 export function HeaderAddMenu() {
-  const { notifyLinksChanged } = useLinksSyncActions();
   const currentFolder = useCurrentFolder();
   const isDemo = useIsDemo();
-  const { uploadsEnabled } = useCurrentUser();
-  // "Upload files" opens the page's picker (`UploadInput`, also `U`).
-  const canUpload = uploadsEnabled && !isDemo;
-  const pathname = usePathname();
-  const hintId = useId();
-  // Set by "Add links": the popover opens once the menu has closed and
-  // handed focus back to the + button, so it returns focus there.
-  const pendingAddLinks = useRef(false);
 
   // `A` on a folder page opens "Add links" (not while typing, or with a
   // dialog or menu open).
@@ -92,81 +61,16 @@ export function HeaderAddMenu() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [currentFolder, isDemo]);
 
-  async function handlePasteLink() {
-    let text: string;
-    try {
-      text = (await navigator.clipboard.readText()).trim();
-    } catch {
-      toast.error(
-        "Unable to read your clipboard. Allow clipboard access, or paste anywhere on the page.",
-      );
-      return;
-    }
-    if (!text) {
-      toast.error("Your clipboard is empty. Copy a link, then try again.");
-      return;
-    }
-
-    // Prefer the page's paste flow (optimistic row, list refresh). On a
-    // folder page this files into the page's own folder (by id): the page's
-    // PasteHandler sits inside its CurrentFolderProvider, this header doesn't.
-    if (requestSaveUrl(text)) return;
-
-    // Several links need the page's paste flow (progress, one summary toast).
-    if (parsePastedUrls(text).urls.length >= 2) {
-      toast.error("Unable to save these links yet. Try again in a moment.");
-      return;
-    }
-
-    // Fallback (no page handler mounted yet, e.g. the folder page is still
-    // streaming): `currentFolder` here comes from the URL slug. On a folder
-    // route where that lookup misses, don't silently save unfiled.
-    if (!currentFolder && pathname?.startsWith("/folders/")) {
-      toast.error("Unable to save to this folder yet. Try again in a moment.");
-      return;
-    }
-
-    const result = await saveLink(
-      text,
-      currentFolder
-        ? {
-            folder: {
-              id: currentFolder.id,
-              name: currentFolder.name,
-              emoji: currentFolder.emoji,
-            },
-          }
-        : undefined,
-    );
-    if (result && "id" in result) {
-      // saveLink already toasts "Saved to {name}"/"Moved to {name}" when a
-      // folder is passed; avoid a second "Link saved" toast on top of it.
-      if (!currentFolder) toast.success("Link saved");
-      notifyLinksChanged();
-    }
-  }
-
   const menu = (
     <DropdownWrapper
       align="end"
       className="w-64"
-      onCloseAutoFocus={(event) => {
-        if (!pendingAddLinks.current) return;
-        pendingAddLinks.current = false;
-        event.preventDefault();
-        addLinksPopover.open("header");
-      }}
       trigger={
         <Button
           aria-label="Add"
           variant="ghost"
           size="icon-sm"
-          className={cn(
-            "cursor-pointer text-muted-foreground",
-            // With uploads on, "Upload files" is the way in on touch
-            // screens too; otherwise the menu is for pointers that hover.
-            canUpload ? "inline-flex" : "hidden [@media(hover:hover)]:inline-flex",
-          )}
+          className="hidden cursor-pointer text-muted-foreground [@media(hover:hover)]:inline-flex"
         >
           <Plus />
         </Button>
@@ -176,53 +80,11 @@ export function HeaderAddMenu() {
         <span className="text-sm font-medium text-foreground">
           Paste to save
         </span>
-        <span id={hintId} className="text-xs font-normal text-muted-foreground">
+        <span className="text-xs font-normal text-muted-foreground">
           Press <Kbd>{isApplePlatform() ? "⌘V" : "Ctrl+V"}</Kbd> anywhere on
           this page to save a link.
         </span>
       </DropdownMenuLabel>
-      <DropdownMenuSeparator />
-      <DropdownMenuGroup>
-        <DropdownMenuItem
-          aria-describedby={hintId}
-          disabled={isDemo}
-          onSelect={() => {
-            void handlePasteLink();
-          }}
-        >
-          <ClipboardImport />
-          Paste link
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          aria-keyshortcuts={canUpload ? UPLOAD_SHORTCUT : undefined}
-          disabled={!canUpload}
-          onSelect={() => {
-            if (!openUploadPicker()) toast.error(NO_UPLOAD_PAGE_MESSAGE);
-          }}
-        >
-          <Upload />
-          Upload files
-          <Kbd aria-hidden="true" className="ms-auto">
-            {UPLOAD_SHORTCUT}
-          </Kbd>
-        </DropdownMenuItem>
-        {/* Folder pages only: pick links you've already saved. */}
-        {currentFolder ? (
-          <DropdownMenuItem
-            aria-keyshortcuts={isDemo ? undefined : ADD_LINKS_SHORTCUT}
-            disabled={isDemo}
-            onSelect={() => {
-              pendingAddLinks.current = true;
-            }}
-          >
-            <Additem />
-            Add links
-            <Kbd aria-hidden="true" className="ms-auto">
-              {ADD_LINKS_SHORTCUT}
-            </Kbd>
-          </DropdownMenuItem>
-        ) : null}
-      </DropdownMenuGroup>
       {CHROME_EXTENSION_URL ? (
         <>
           <DropdownMenuSeparator />

@@ -1,10 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  UPLOAD_PICK_EVENT,
-  UPLOAD_SHORTCUT,
-  isUploadShortcut,
-  openUploadPicker,
-} from "./upload-picker";
+import { UPLOAD_SHORTCUT, isUploadShortcut } from "./upload-picker";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -15,25 +10,6 @@ describe("upload picker", () => {
     expect(UPLOAD_SHORTCUT).toBe("U");
   });
 
-  it("openUploadPicker dispatches purl:upload-pick on window", () => {
-    const target = new EventTarget();
-    vi.stubGlobal("window", target);
-    const heard = vi.fn();
-    target.addEventListener("purl:upload-pick", heard);
-
-    expect(openUploadPicker()).toBe(false);
-
-    expect(UPLOAD_PICK_EVENT).toBe("purl:upload-pick");
-    expect(heard).toHaveBeenCalledTimes(1);
-  });
-
-  it("returns true once a mounted picker takes the event", () => {
-    const target = new EventTarget();
-    vi.stubGlobal("window", target);
-    target.addEventListener("purl:upload-pick", (event) => event.preventDefault());
-
-    expect(openUploadPicker()).toBe(true);
-  });
 });
 
 describe("isUploadShortcut", () => {

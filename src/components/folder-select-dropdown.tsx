@@ -82,6 +82,7 @@ export function FolderSelectDropdown() {
   const { reorderFolders } = useFolderActions();
   const canReorder = !isDemo && folders.length >= 2;
   const reorderHintId = React.useId();
+  const deleteHintId = React.useId();
   const [announcement, setAnnouncement] = React.useState("");
   // Clear, then set on the next frame: a message identical to the last one
   // ("Alpha is already last" twice) is still a change, so it's read again.
@@ -202,6 +203,12 @@ export function FolderSelectDropdown() {
   const [dialog, setDialog] = React.useState<FolderDialog | null>(null);
   const [dialogOpen, setDialogOpen] = React.useState(false);
 
+  /** Asks to delete `folder`: its dialog opens once the menu has closed. */
+  const askToDelete = (folder: FolderSummary) => {
+    pendingDialog.current = { kind: "delete", folder };
+    setMenuOpen(false);
+  };
+
   /** A folder's menu row; `grip` once drag has loaded. */
   const folderRow = (
     folder: FolderSummary,
@@ -214,14 +221,32 @@ export function FolderSelectDropdown() {
       <DropdownMenuItem
         key={folder.id}
         asChild
-        onKeyDown={(event) => moveWithKeyboard(event, folder)}
+        onKeyDown={(event) => {
+          // Delete or Backspace on the highlighted row: the keyboard's way to
+          // the delete button its pointer twin shows (announced, below).
+          if (
+            (event.key === "Delete" || event.key === "Backspace") &&
+            !event.altKey &&
+            !event.metaKey &&
+            !event.ctrlKey &&
+            !event.shiftKey
+          ) {
+            event.preventDefault();
+            event.stopPropagation();
+            askToDelete(folder);
+            return;
+          }
+          moveWithKeyboard(event, folder);
+        }}
       >
         <Link
           href={`/folders/${folder.slug}`}
           data-folder-id={folder.id}
           aria-current={active ? "page" : undefined}
           aria-keyshortcuts={shortcut ?? undefined}
-          aria-describedby={canReorder ? reorderHintId : undefined}
+          aria-describedby={
+            [canReorder && reorderHintId, deleteHintId].filter(Boolean).join(" ")
+          }
           onFocus={() => {
             focusedId.current = folder.id;
           }}
@@ -247,7 +272,35 @@ export function FolderSelectDropdown() {
             ) : null}
           </span>
           <RowLabel name={folder.name} count={folder.linkCount} />
-          <CurrentMark active={active} shortcut={shortcut} hideOnTouch={canReorder} />
+          <CurrentMark
+            active={active}
+            shortcut={shortcut}
+            hideOnTouch={canReorder}
+            // The highlighted row's delete button takes its place.
+            className="pointer-fine:group-data-highlighted/row:hidden"
+          />
+          {/* Mouse and keyboard: on the highlighted row (hover or arrow
+              keys), a delete button at the end, so a folder can go without
+              opening it first. Decorative to assistive tech, like the grip:
+              the row is a link (no button inside it), and Delete or
+              Backspace does the same (`deleteHintId`). Opens the delete
+              dialog, which confirms. Not on touch: its grip is there. */}
+          <span
+            aria-hidden="true"
+            data-folder-delete=""
+            title={`Delete ${folder.name}`}
+            // Rows are links: no native link drag, no focus move from here.
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={(event) => {
+              // Not the row's navigation, nor the menu's select.
+              event.preventDefault();
+              event.stopPropagation();
+              askToDelete(folder);
+            }}
+            className="-my-1 -me-1 ms-auto hidden size-6 shrink-0 cursor-pointer items-center justify-center rounded-sm text-muted-foreground transition-colors duration-150 ease-out-strong hover:bg-destructive/10 hover:text-destructive pointer-fine:group-data-highlighted/row:flex"
+          >
+            <Trash2 className="size-4" />
+          </span>
           {/* Touch: always there, at the end (no digit keys to show). Until
               drag loads, an empty slot of its size, so rows don't reflow. */}
           {canReorder && !grip ? (
@@ -423,6 +476,9 @@ export function FolderSelectDropdown() {
               )
               : folders.map((folder, index) => folderRow(folder, index))}
         </DropdownMenuGroup>
+        <span id={deleteHintId} className="sr-only">
+          Delete or Backspace deletes this folder.
+        </span>
         {canReorder ? (
           <>
             <span id={reorderHintId} className="sr-only">

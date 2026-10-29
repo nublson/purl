@@ -11,7 +11,7 @@ import {
  */
 export const revalidate = 86400;
 
-export const alt = "Purl: a home for your pearls, beside a few saved links";
+export const alt = "Purl: a home for your pearls, beside a few saved pearls";
 export const size = SITE_OG_SIZE;
 export const contentType = SITE_OG_CONTENT_TYPE;
 
@@ -19,7 +19,7 @@ export default function Image() {
   return renderSiteOgImage({
     title: "A home for your pearls.",
     description:
-      "Save the links worth keeping. Share a folder when one’s worth passing on.",
+      "Save the links and files worth keeping. Share a folder when one’s worth passing on.",
     showcase: true,
   });
 }

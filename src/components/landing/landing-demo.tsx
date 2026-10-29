@@ -86,8 +86,12 @@ export function LandingDemo({
           </div>
           <div className="flex shrink-0 items-center justify-end gap-2">
             <FolderSharePopover />
-            <LinkViewToggle />
             <HeaderAddMenu />
+            <LinkViewToggle />
+            <Separator
+              orientation="vertical"
+              className="data-vertical:h-5 data-vertical:self-center"
+            />
             <User />
           </div>
         </div>

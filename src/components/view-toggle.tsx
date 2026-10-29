@@ -3,6 +3,7 @@
 import { useLinkView } from "@/contexts/link-view-context";
 import type { LinkView } from "@/lib/link-view";
 import { Grid, List3 } from "reicon-react";
+import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 
 const OPTIONS = [
@@ -11,8 +12,8 @@ const OPTIONS = [
 ] as const;
 
 /**
- * The header's List / Grid buttons: two toggle buttons, the current view
- * filled (`aria-pressed`). On phones, where the header is short of room
+ * The header's List / Grid switch: two toggle buttons in one outlined
+ * segmented control, the current view filled (`aria-pressed`). On phones, where the header is short of room
  * (a folder's name would shrink to its emoji), one button instead, showing
  * and naming the other view ("Switch to grid view"). Both are rendered and
  * CSS picks one (the `phone:` variant), so the server's HTML is right on
@@ -38,10 +39,13 @@ export function ViewToggle({
       >
         <other.Icon />
       </Button>
+      {/* One segmented control, so the pair reads as a single switch
+          among the header's icons: 32px tall like them (1px border, 2px
+          in, 26px buttons), corners concentric (10px out, 7px in). */}
       <div
         role="group"
         aria-label="View"
-        className="flex shrink-0 items-center gap-1 phone:hidden"
+        className="flex shrink-0 items-center gap-0.5 rounded-[10px] border border-border p-0.5 phone:hidden"
       >
         {OPTIONS.map(({ value, label, Icon }) => {
           const active = view === value;
@@ -53,11 +57,10 @@ export function ViewToggle({
               aria-label={label}
               aria-pressed={active}
               data-cy={`link-view-${value}`}
-              className={
-                active
-                  ? "cursor-pointer"
-                  : "cursor-pointer text-muted-foreground"
-              }
+              className={cn(
+                "size-[26px] cursor-pointer rounded-[7px]",
+                !active && "text-muted-foreground",
+              )}
               onClick={() => onChange(value)}
             >
               <Icon />
