@@ -827,6 +827,8 @@ export async function updateLinkForUser(
       thumbnail: resolved.thumbnail,
       contentType: resolved.contentType,
       mimeType: resolved.mimeType,
+      // A new URL was never checked for framing: switching it live again re-checks.
+      embed: false,
     };
   } else {
     if (typeof data.title === "string") updatePayload.title = data.title;
@@ -837,7 +839,9 @@ export async function updateLinkForUser(
   if (data.folderId !== undefined) {
     updatePayload.folderId = data.folderId;
   }
-  if (typeof data.embed === "boolean") updatePayload.embed = data.embed;
+  if (typeof data.embed === "boolean" && !(urlChanged && data.embed)) {
+    updatePayload.embed = data.embed;
+  }
 
   if (Object.keys(updatePayload).length === 0) return existing;
 

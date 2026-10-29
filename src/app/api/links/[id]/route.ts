@@ -142,7 +142,7 @@ export async function PATCH(
     if (body.embed === true) {
       // Turning a pearl live frames a third-party page, so it is limited per
       // user and checked here, against what the database holds (never the
-      // request) unless this same PATCH changes the url.
+      // request) and a PATCH that changes the url can't also turn it on.
       const limiter = getLinkPreviewRateLimiter();
       if (limiter) {
         const { success, reset } = await limiter.limit(userId);
@@ -152,12 +152,20 @@ export async function PATCH(
       if (!stored) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
+      if (url !== undefined && url !== stored.url) {
+        // The type and framing checks below are for the stored page; a new
+        // url in the same request would sidestep them.
+        return embedError(
+          "Change the link and turn on Show live separately",
+          "INVALID_EMBED",
+        );
+      }
       if (!canEmbed(stored)) {
         return embedError("This page can't be shown live", "INVALID_EMBED");
       }
       // YouTube's pages refuse framing; its embed URL is what gets framed.
       if (stored.contentType !== "YOUTUBE") {
-        const verdict = await checkFrameable(url ?? stored.url);
+        const verdict = await checkFrameable(stored.url);
         if (verdict === "blocked") {
           return embedError(
             "This site doesn't allow being shown live",

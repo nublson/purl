@@ -820,15 +820,33 @@ describe("links/[id] API route", () => {
       expect(updateLinkForUser).not.toHaveBeenCalled();
     });
 
-    it("checks the stored url, not anything else the database row doesn't say", async () => {
-      await call({ embed: true });
+    it("checks the stored url when the request sends the same url back", async () => {
+      await call({ embed: true, url: "https://stored.example/page" });
       expect(readLinkForUser).toHaveBeenCalledWith("u1", ID);
       expect(checkFrameable).toHaveBeenCalledWith("https://stored.example/page");
     });
 
-    it("checks the new url when the same PATCH changes it", async () => {
-      await call({ embed: true, url: "https://new.example/x" });
-      expect(checkFrameable).toHaveBeenCalledWith("https://new.example/x");
+    it.each([
+      ["a WEB link", "WEB"],
+      ["a YouTube link", "YOUTUBE"],
+    ])("refuses %s with a changed url and embed:true", async (_n, contentType) => {
+      vi.mocked(readLinkForUser).mockResolvedValue(stored({ contentType }));
+      const res = await call({ embed: true, url: "https://other.example/x" });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "Change the link and turn on Show live separately",
+        code: "INVALID_EMBED",
+      });
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("answers 404 when the link is missing or not the user's", async () => {
+      vi.mocked(readLinkForUser).mockResolvedValue(null);
+      const res = await call({ embed: true });
+      expect(res.status).toBe(404);
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(updateLinkForUser).not.toHaveBeenCalled();
     });
 
     it("answers 429 when the per-user limit is hit, only for embed:true", async () => {

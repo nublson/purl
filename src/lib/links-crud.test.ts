@@ -1729,6 +1729,17 @@ describe("updateLinkForUser", () => {
     });
   });
 
+  it("writes embed:false when the url changes, so a live pearl is re-checked", async () => {
+    const row = { ...makeRow({ url: "https://example.com/a" }), embed: true };
+    vi.mocked(prisma.link.findFirst).mockResolvedValue(row as never);
+    vi.mocked(prisma.link.update).mockResolvedValue(row as never);
+
+    await updateLinkForUser("user-123", "link-1", { url: "https://example.com/b" });
+
+    const data = vi.mocked(prisma.link.update).mock.calls[0][0].data;
+    expect(data.embed).toBe(false);
+  });
+
   it("scopes the lookup to the given user and returns null for a link it doesn't own", async () => {
     vi.mocked(prisma.link.findFirst).mockResolvedValue(null);
 
