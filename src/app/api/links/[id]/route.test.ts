@@ -10,6 +10,7 @@ vi.mock("@/lib/links", () => {
 
   return {
     readLink: vi.fn(),
+    readLinkForUser: vi.fn(),
     updateLink: vi.fn(),
     updateLinkForUser: vi.fn(),
     deleteLink: vi.fn(),
@@ -33,6 +34,12 @@ vi.mock("@/lib/uploads", () => ({
   },
 }));
 
+vi.mock("@/lib/frameable", () => ({ checkFrameable: vi.fn() }));
+
+vi.mock("@/lib/upstash-rate-limit", () => ({
+  getLinkPreviewRateLimiter: vi.fn(),
+}));
+
 vi.mock("@/lib/realtime-broadcast", () => ({
   broadcastLinksChanged: vi.fn().mockResolvedValue(undefined),
 }));
@@ -52,6 +59,7 @@ vi.mock("next/headers", () => ({
 const links = await import("@/lib/links");
 const {
   readLink,
+  readLinkForUser,
   updateLink,
   updateLinkForUser,
   deleteLink,
@@ -63,6 +71,8 @@ const { FolderNotFoundError, assertFolderOwned } = await import("@/lib/folders")
 const { broadcastLinksChanged } = await import("@/lib/realtime-broadcast");
 const { auth } = await import("@/lib/auth");
 const { InvalidUploadError } = await import("@/lib/uploads");
+const { checkFrameable } = await import("@/lib/frameable");
+const { getLinkPreviewRateLimiter } = await import("@/lib/upstash-rate-limit");
 
 const { GET, PATCH, DELETE: DELETE_HANDLER } = await import("./route");
 
@@ -192,7 +202,8 @@ describe("links/[id] API route", () => {
 
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({
-        error: "At least one of url, title, description, or folderId is required",
+        error:
+          "At least one of url, title, description, folderId, or embed is required",
       });
     });
 
@@ -699,6 +710,143 @@ describe("links/[id] API route", () => {
 
       expect(res.status).toBe(401);
       expect(await res.json()).toEqual({ error: "Unauthorized" });
+    });
+  });
+
+  describe("PATCH embed", () => {
+    const stored = (over: Record<string, unknown> = {}) =>
+      ({
+        id: ID,
+        url: "https://stored.example/page",
+        title: "T",
+        contentType: "WEB",
+        upload: false,
+        embed: false,
+        ...over,
+      }) as never;
+    const row = (over: Record<string, unknown> = {}) =>
+      ({
+        id: ID,
+        userId: "u1",
+        url: "https://stored.example/page",
+        title: "T",
+        description: null,
+        favicon: null,
+        thumbnail: null,
+        domain: "stored.example",
+        contentType: "WEB",
+        createdAt: new Date("2025-06-20T12:00:00Z"),
+        folderId: null,
+        embed: true,
+        ...over,
+      }) as never;
+    const call = (body: unknown) =>
+      PATCH(patchRequest(body), { params: Promise.resolve({ id: ID }) });
+
+    beforeEach(() => {
+      vi.mocked(readLinkForUser).mockReset().mockResolvedValue(stored());
+      vi.mocked(checkFrameable).mockReset().mockResolvedValue("allowed");
+      vi.mocked(getLinkPreviewRateLimiter).mockReset().mockReturnValue(null);
+      vi.mocked(auth.api.getSession).mockResolvedValue({
+        user: { id: "u1" },
+      } as never);
+      vi.mocked(updateLinkForUser).mockReset().mockResolvedValue(row());
+    });
+
+    it("turns a WEB link live when the site allows framing", async () => {
+      const res = await call({ embed: true });
+      expect(res.status).toBe(200);
+      expect((await res.json()).embed).toBe(true);
+      expect(checkFrameable).toHaveBeenCalledWith("https://stored.example/page");
+      expect(updateLinkForUser).toHaveBeenCalledWith("u1", ID, { embed: true });
+    });
+
+    it("answers NOT_FRAMEABLE and writes nothing when blocked", async () => {
+      vi.mocked(checkFrameable).mockResolvedValue("blocked");
+      const res = await call({ embed: true });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "This site doesn't allow being shown live",
+        code: "NOT_FRAMEABLE",
+      });
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("answers UNREACHABLE when the site can't be reached", async () => {
+      vi.mocked(checkFrameable).mockResolvedValue("unreachable");
+      const res = await call({ embed: true });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "Couldn't reach this site",
+        code: "UNREACHABLE",
+      });
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["an upload", { upload: true }],
+      ["an image link", { contentType: "IMAGE" }],
+    ])("refuses %s with INVALID_EMBED without checking", async (_n, over) => {
+      vi.mocked(readLinkForUser).mockResolvedValue(stored(over));
+      const res = await call({ embed: true });
+      expect(res.status).toBe(400);
+      expect((await res.json()).code).toBe("INVALID_EMBED");
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("skips the framing check for YouTube", async () => {
+      vi.mocked(readLinkForUser).mockResolvedValue(
+        stored({ contentType: "YOUTUBE" }),
+      );
+      const res = await call({ embed: true });
+      expect(res.status).toBe(200);
+      expect(checkFrameable).not.toHaveBeenCalled();
+    });
+
+    it("turns off without checking or rate limiting", async () => {
+      const limit = vi.fn();
+      vi.mocked(getLinkPreviewRateLimiter).mockReturnValue({ limit } as never);
+      vi.mocked(updateLinkForUser).mockResolvedValue(row({ embed: false }));
+      const res = await call({ embed: false });
+      expect(res.status).toBe(200);
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(limit).not.toHaveBeenCalled();
+    });
+
+    it("rejects a non-boolean embed", async () => {
+      const res = await call({ embed: "yes" });
+      expect(res.status).toBe(400);
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("checks the stored url, not anything else the database row doesn't say", async () => {
+      await call({ embed: true });
+      expect(readLinkForUser).toHaveBeenCalledWith("u1", ID);
+      expect(checkFrameable).toHaveBeenCalledWith("https://stored.example/page");
+    });
+
+    it("checks the new url when the same PATCH changes it", async () => {
+      await call({ embed: true, url: "https://new.example/x" });
+      expect(checkFrameable).toHaveBeenCalledWith("https://new.example/x");
+    });
+
+    it("answers 429 when the per-user limit is hit, only for embed:true", async () => {
+      const limit = vi
+        .fn()
+        .mockResolvedValue({ success: false, reset: Date.now() + 30_000 });
+      vi.mocked(getLinkPreviewRateLimiter).mockReturnValue({ limit } as never);
+      const res = await call({ embed: true });
+      expect(res.status).toBe(429);
+      expect(limit).toHaveBeenCalledWith("u1");
+      expect(checkFrameable).not.toHaveBeenCalled();
+      expect(updateLinkForUser).not.toHaveBeenCalled();
+    });
+
+    it("401s without a session", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(null as never);
+      const res = await call({ embed: true });
+      expect(res.status).toBe(401);
     });
   });
 });

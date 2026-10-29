@@ -757,6 +757,8 @@ export type UpdateLinkData = {
   url?: string;
   title?: string;
   description?: string | null;
+  /** Show the page live in its card (the route has already checked it can be framed). */
+  embed?: boolean;
 };
 
 export type UpdateLinkResult = Awaited<ReturnType<typeof prisma.link.update>>;
@@ -835,6 +837,7 @@ export async function updateLinkForUser(
   if (data.folderId !== undefined) {
     updatePayload.folderId = data.folderId;
   }
+  if (typeof data.embed === "boolean") updatePayload.embed = data.embed;
 
   if (Object.keys(updatePayload).length === 0) return existing;
 
