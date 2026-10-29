@@ -15,10 +15,10 @@ const ViewContext = React.createContext<{
   /** The visitor has switched views on this page (not just the saved one). */
   switched: boolean;
   setView: (view: SharedFolderView) => void;
-}>({ view: "list", switched: false, setView: () => {} });
+}>({ view: "grid", switched: false, setView: () => {} });
 
 /**
- * The shared folder page's view (list, the default, or grid): set by the
+ * The shared folder page's view (grid, the default, or list): set by the
  * header's toggle, read by the list. Wraps both. `initialView` comes from
  * the visitor's cookie; changing it saves the cookie again.
  */

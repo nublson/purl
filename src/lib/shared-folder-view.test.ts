@@ -11,13 +11,13 @@ describe("shared folder view", () => {
     expect(SHARED_FOLDER_VIEW_COOKIE).toBe("purl-shared-view");
   });
 
-  it("parses grid from the cookie value and defaults everything else to list", () => {
-    expect(parseSharedFolderView("grid")).toBe("grid");
+  it("parses list from the cookie value and defaults everything else to grid", () => {
     expect(parseSharedFolderView("list")).toBe("list");
-    expect(parseSharedFolderView("GRID")).toBe("list");
-    expect(parseSharedFolderView("")).toBe("list");
-    expect(parseSharedFolderView(undefined)).toBe("list");
-    expect(parseSharedFolderView(null)).toBe("list");
+    expect(parseSharedFolderView("grid")).toBe("grid");
+    expect(parseSharedFolderView("LIST")).toBe("grid");
+    expect(parseSharedFolderView("")).toBe("grid");
+    expect(parseSharedFolderView(undefined)).toBe("grid");
+    expect(parseSharedFolderView(null)).toBe("grid");
   });
 
   it("reuses the owner's grid column template", () => {

@@ -51,7 +51,7 @@ test.describe("Shared folders, visited signed out", () => {
     );
   });
 
-  test("the view toggle switches between the list and a grid of cards", async ({
+  test("visitors start in the grid; the view toggle switches to the list, remembered", async ({
     page,
     seed,
     testUser,
@@ -68,12 +68,9 @@ test.describe("Shared folders, visited signed out", () => {
     await page.goto(`/@${testUser.username}/design`);
     await waitForHydration(page, 'button[aria-label="Grid view"]');
 
+    // A visitor starts in the grid.
     const list = page.getByRole("button", { name: "List view" });
     const grid = page.getByRole("button", { name: "Grid view" });
-    await expect(list).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
-
-    await grid.click();
     await expect(grid).toHaveAttribute("aria-pressed", "true");
     await expect(list).toHaveAttribute("aria-pressed", "false");
     await expect(page.locator('[data-cy="link-item"]')).toHaveCount(0);
@@ -88,19 +85,26 @@ test.describe("Shared folders, visited signed out", () => {
       await page.screenshot({ path: `${process.env.SHARE_SCREENSHOTS}/${testInfo.project.name}-grid.png` });
     }
 
-    // The choice is remembered: a reload opens straight in the grid.
+    await list.click();
+    await expect(list).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
+    await expect(cards).toHaveCount(0);
+
+    // The choice is remembered: a reload opens straight in the list.
     await page.reload();
-    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(5);
-    await expect(page.getByRole("button", { name: "Grid view" })).toHaveAttribute(
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
+    await expect(page.getByRole("button", { name: "List view" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
 
-    await waitForHydration(page, 'button[aria-label="Grid view"]');
-    await page.getByRole("button", { name: "List view" }).click();
-    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
+    // The list streams in after the header: switching before it has
+    // hydrated would make React redo it (a hydration mismatch).
+    await waitForHydration(page, '[data-cy="link-item"]');
+    await page.getByRole("button", { name: "Grid view" }).click();
+    await expect(cards).toHaveCount(5);
     await page.reload();
-    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(5);
+    await expect(cards).toHaveCount(5);
   });
 
   test("the list view's audio row is a row that plays: a Tab stop, read-only", async ({
@@ -123,6 +127,8 @@ test.describe("Shared folders, visited signed out", () => {
     await seed.link({ url: "https://alpha.example", title: "Alpha article", folderId: design });
     await page.goto(`/@${testUser.username}/design`);
     await waitForHydration(page, 'button[aria-label="Grid view"]');
+    // Visitors start in the grid.
+    await page.getByRole("button", { name: "List view" }).click();
     await expect(page.getByRole("button", { name: "List view" })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -216,7 +222,7 @@ test.describe("Shared folders, visited signed out", () => {
     for (let i = 0; i < 51; i++) {
       await seed.link({ url: `https://l${i}.example`, title: `Link ${i}`, folderId: design });
     }
-    // A returning visitor who chose the grid.
+    // The grid (the default), set explicitly as a returning visitor would.
     await page.context().addCookies([
       { name: "purl-shared-view", value: "grid", url: testInfo.project.use.baseURL! },
     ]);
@@ -306,8 +312,10 @@ test.describe("Shared folders, visited signed out", () => {
     });
 
     await page.goto(`/@${testUser.username}/design`);
-    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(50);
     await waitForHydration(page, 'button[aria-label="Grid view"]');
+    // Visitors start in the grid.
+    await page.getByRole("button", { name: "List view" }).click();
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(50);
     // The page scrolls inside <main>; off-screen rows skip rendering
     // (content-visibility), which WebKit's scrollIntoView won't reach.
     await page.evaluate(() => {

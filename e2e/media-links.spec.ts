@@ -1,5 +1,5 @@
 import type { Locator, Page, Route } from "@playwright/test";
-import { expect, test, waitForHydration } from "./fixtures";
+import { chooseView, expect, test, waitForHydration } from "./fixtures";
 import type { seedLink } from "./support/db";
 import { silentWav } from "./support/media";
 
@@ -26,15 +26,6 @@ async function openHome(page: Page) {
   await page.goto("/home");
   await waitForHydration(page, '[data-cy="link-item"], [data-cy="link-card"]');
   await page.waitForLoadState("networkidle");
-}
-
-/** The header's List / Grid switch, waiting for the choice to be saved. */
-async function chooseView(page: Page, view: "List" | "Grid") {
-  const saved = page.waitForResponse(
-    (res) => res.url().endsWith("/api/user/layout") && res.request().method() === "PATCH",
-  );
-  await page.getByRole("button", { name: `${view} view` }).click();
-  expect((await saved).ok()).toBe(true);
 }
 
 type Seed = { link: (link: Parameters<typeof seedLink>[1]) => Promise<string> };
