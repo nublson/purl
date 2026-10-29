@@ -24,6 +24,8 @@ export function buildContentSecurityPolicy(): string {
     // Video and audio pearls play their files from Vercel Blob or from any
     // host a media link points at (the same reach as img-src), and pending
     // uploads draw a video's local object URL (`blob:`).
+    // It also covers the static pages' video and audio, including Notion
+    // uploads, which /api/notion/file/[blockId] redirects to Notion's host.
     "media-src 'self' blob: https: http:",
     "font-src 'self'",
     [

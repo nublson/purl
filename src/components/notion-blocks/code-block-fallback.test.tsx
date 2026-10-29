@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildPageIdToPath } from "@/lib/notion-links";
-import { NotionBlocks, createRenderContext } from ".";
+import { NotionContent } from ".";
 import { block, renderToHtml, richText } from "./test-utils";
 
 vi.mock("@/lib/code-highlight", () => ({
@@ -12,10 +12,9 @@ describe("CodeBlock when highlighting throws", () => {
 
   it("renders plain text in the same frame", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const context = createRenderContext("api", buildPageIdToPath([]));
     const html = await renderToHtml(
-      <NotionBlocks
-        context={context}
+      <NotionContent
+        pageIdToPath={buildPageIdToPath([])}
         blocks={[
           block("code", {
             language: "json",

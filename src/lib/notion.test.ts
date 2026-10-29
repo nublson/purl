@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockQuery = vi.fn();
 const mockListChildren = vi.fn();
+const mockRetrieveBlock = vi.fn();
 
 vi.mock("@notionhq/client", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@notionhq/client")>();
@@ -10,7 +11,10 @@ vi.mock("@notionhq/client", async (importOriginal) => {
     Client: vi.fn(function Client() {
       return {
         dataSources: { query: mockQuery },
-        blocks: { children: { list: mockListChildren } },
+        blocks: {
+          children: { list: mockListChildren },
+          retrieve: mockRetrieveBlock,
+        },
       };
     }),
   };
@@ -20,7 +24,7 @@ vi.mock("next/cache", () => ({
   unstable_cache: <T>(fn: T) => fn,
 }));
 
-const { getPageBySlug, getPublishedPages, isNotionConfigured } = await import(
+const { getPageBySlug, getPublishedFile, getPublishedPages, isNotionConfigured } = await import(
   "./notion"
 );
 
@@ -130,5 +134,57 @@ describe("notion", () => {
 
     expect(await getPageBySlug("nope")).toBeNull();
     expect(mockListChildren).not.toHaveBeenCalled();
+  });
+
+  describe("getPublishedFile", () => {
+    const IMAGE_ID = "aaaaaaaabbbbccccddddeeeeeeeeeeee";
+
+    function imageBlock(url: string) {
+      return {
+        ...block(IMAGE_ID, "image"),
+        image: {
+          type: "file",
+          file: { url, expiry_time: "2026-10-29T18:00:00.000Z" },
+          caption: [],
+        },
+      };
+    }
+
+    beforeEach(() => {
+      mockQuery.mockResolvedValue(list([page("p1", "Privacy", "privacy")]));
+      // Nested in a toggle, as files often are.
+      mockListChildren.mockImplementation(({ block_id }: { block_id: string }) =>
+        Promise.resolve(
+          list(
+            block_id === "p1"
+              ? [block("t1", "toggle", true)]
+              : [imageBlock("https://old.example/x.png")],
+          ),
+        ),
+      );
+      mockRetrieveBlock.mockResolvedValue(imageBlock("https://fresh.example/x.png"));
+    });
+
+    it("returns a fresh URL for a file on a published page", async () => {
+      expect(await getPublishedFile(IMAGE_ID)).toEqual({
+        url: "https://fresh.example/x.png",
+        expiresAt: new Date("2026-10-29T18:00:00.000Z"),
+      });
+      expect(mockRetrieveBlock).toHaveBeenCalledWith({ block_id: IMAGE_ID });
+    });
+
+    it("refuses blocks that aren't on a published page, without asking Notion for them", async () => {
+      expect(await getPublishedFile("b".repeat(32))).toBeNull();
+      expect(await getPublishedFile("../not-an-id")).toBeNull();
+      expect(mockRetrieveBlock).not.toHaveBeenCalled();
+    });
+
+    it("returns null for a block with no uploaded file", async () => {
+      mockRetrieveBlock.mockResolvedValue({
+        ...block(IMAGE_ID, "image"),
+        image: { type: "external", external: { url: "https://a.example/x.png" }, caption: [] },
+      });
+      expect(await getPublishedFile(IMAGE_ID)).toBeNull();
+    });
   });
 });
