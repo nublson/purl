@@ -2,7 +2,11 @@
 
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
-import { AudioHeroIcon } from "@/components/audio-player";
+import {
+  AudioHeroIcon,
+  TRANSPORT_GAP,
+  TRANSPORT_SIDE_NARROW,
+} from "@/components/audio-player";
 import { cardAspectRatio } from "@/lib/link-kind";
 import { titleFromFileName } from "@/utils/media-title";
 import type { PendingUpload } from "@/lib/pending-upload";
@@ -236,21 +240,23 @@ function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
         <div className="absolute inset-x-0 bottom-0 flex min-w-0 flex-col p-4">
           <span
             title={item.name}
-            className="line-clamp-2 text-base leading-[22px] font-medium wrap-anywhere text-foreground"
+            className="line-clamp-2 text-base leading-[1.375] font-medium wrap-anywhere text-foreground"
           >
             {title}
           </span>
-          <span className="truncate text-[13px] leading-[18px] text-foreground/70">
+          <span className="truncate text-[13px] leading-[1.385] text-foreground/70">
             Uploading…
           </span>
         </div>
       </div>
       {/* The player's empty rail, times band and transport. */}
-      <div aria-hidden className="flex flex-col p-4">
-        <span className="h-[3px] rounded-full bg-foreground/12" />
-        <span className="mt-2 h-[10px]" />
-        <span className="mt-4 flex h-[46px] items-center justify-center gap-3.5">
-          <span className="size-[34px] rounded-full border border-border" />
+      <div aria-hidden className="@container flex flex-col p-4">
+        <span className="h-[3px] rounded-full bg-foreground/45" />
+        <span className="mt-2 h-3" />
+        <span className={cn("mt-4 flex h-[46px] items-center justify-center", TRANSPORT_GAP)}>
+          <span
+            className={cn("size-[34px] rounded-full border border-border", TRANSPORT_SIDE_NARROW)}
+          />
           <span className="size-[46px] rounded-full bg-foreground/12" />
           <span className="size-[34px] rounded-full border border-border" />
         </span>

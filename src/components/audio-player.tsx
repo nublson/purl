@@ -3,6 +3,7 @@
 import { useAudioPlayer, useAudioView } from "@/hooks/use-audio-player";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
+import { linkSecondLine } from "@/lib/upload-meta";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/utils/format-duration";
 import type { Link } from "@/utils/links";
@@ -14,7 +15,6 @@ import {
   type Ref,
 } from "react";
 import { Export5, MusicNote, Restart } from "reicon-react";
-import { AudioRowSecondLine } from "./audio-row";
 import { PlayMark } from "./play-mark";
 
 /**
@@ -29,6 +29,17 @@ export function keepAudioClick(event: MouseEvent<HTMLElement>) {
   event.stopPropagation();
 }
 
+/**
+ * The transport's gaps, in the controls' own width (`cqw`): 14px where its
+ * three buttons (114px) fit, closing to 4px on a narrow card; under 122px
+ * Restart is hidden and the two left keep 14px.
+ */
+export const TRANSPORT_GAP =
+  "gap-[clamp(4px,calc((100cqw_-_114px)/2),14px)] @max-[122px]:gap-3.5";
+
+/** Hidden where the transport doesn't fit three buttons (see `TRANSPORT_GAP`). */
+export const TRANSPORT_SIDE_NARROW = "@max-[122px]:hidden";
+
 /** The fade into each surface the player sits on (literal, for Tailwind). */
 const FADE = {
   card: "via-card/90 to-card",
@@ -41,11 +52,12 @@ const FADE = {
  * width, 180px tall) is the pearl's sleeve art (its page's image,
  * `object-cover`; without one, or if it fails, the music icon at 48px on
  * the muted tint), fading into the surface under it so the words sit on a
- * near-solid foot; over it, the title (two lines at most) and the second
- * line (`linkSecondLine`, or "0:22 / 2:36" while the pearl is loaded, as
- * rows read). Under it, 16px in: the track (a scrubber), the elapsed and
+ * near-solid foot; over it, the title (two lines at most, the whole of it
+ * on hover) and the second line (`linkSecondLine`: the times row below is
+ * the clock). Under it, 16px in: the track (a scrubber), the elapsed and
  * the length, and the transport centred (Restart, Play/Pause, Open file),
- * 16px under it.
+ * 16px under it. A size container: on a narrow card the transport's gaps
+ * close up, and under 122px Restart goes (the track seeks back to 0).
  *
  * A view of the page's one player: every view of a pearl (its card, its
  * row, its preview) shows and drives the same `<audio>`. The controls are
@@ -89,27 +101,30 @@ export function AudioPlayer({
           <span className="pointer-events-none absolute top-3 left-3 size-1">{badge}</span>
         ) : null}
         <div className="absolute inset-x-0 bottom-0 flex min-w-0 flex-col p-4">
-          <p className="line-clamp-2 text-base leading-[22px] font-medium wrap-anywhere text-foreground">
+          <p
+            title={link.title}
+            className="line-clamp-2 text-base leading-[1.375] font-medium wrap-anywhere text-foreground"
+          >
             {link.title}
           </p>
           {/* `text-foreground/70`: the muted pair is under 4.5:1 for small
               text. */}
-          <p className="truncate text-[13px] leading-[18px] text-foreground/70">
-            <AudioRowSecondLine link={link} />
+          <p className="truncate text-[13px] leading-[1.385] text-foreground/70">
+            {linkSecondLine(link)}
           </p>
         </div>
       </div>
       <div
         data-card-menu
         inert={inert}
-        className={cn("flex flex-col p-4", inert ? "pointer-events-none" : "pointer-events-auto")}
+        className={cn("@container flex flex-col p-4", inert ? "pointer-events-none" : "pointer-events-auto")}
       >
         {/* A press on the track stays in the player: never its host's. */}
         <div onClick={keepAudioClick}>
           <AudioTrack link={link} />
         </div>
-        <AudioTimes link={link} className="mt-2 h-[10px]" />
-        <AudioTransport link={link} playRef={playRef} className="mt-4 h-[46px] gap-3.5" />
+        <AudioTimes link={link} className="mt-2 h-3" />
+        <AudioTransport link={link} playRef={playRef} className={cn("mt-4 h-[46px]", TRANSPORT_GAP)} />
       </div>
     </div>
   );
@@ -155,7 +170,7 @@ export function AudioHeroIcon({ children }: { children?: ReactNode }) {
 
 /**
  * The times under the track: the elapsed at the left and the length at the
- * right, 11px tabular, `text-foreground/70`. Plain text, not a live region:
+ * right, 12px tabular, `text-foreground/70`. Plain text, not a live region:
  * the track's value says the same.
  */
 export function AudioTimes({
@@ -168,7 +183,7 @@ export function AudioTimes({
     <div
       data-times=""
       className={cn(
-        "flex items-center justify-between text-[11px] leading-none text-foreground/70 tabular-nums",
+        "flex items-center justify-between text-xs leading-none text-foreground/70 tabular-nums",
         className,
       )}
       {...rest}
@@ -208,7 +223,7 @@ export function AudioTransport({
         type="button"
         disabled={!src || (elapsed === 0 && !playing)}
         aria-label={`Restart ${link.title}`}
-        className={SIDE_BUTTON}
+        className={cn(SIDE_BUTTON, TRANSPORT_SIDE_NARROW)}
         onClick={(event) => {
           keepAudioClick(event);
           restart();
@@ -247,7 +262,8 @@ export function AudioTransport({
 }
 
 /**
- * The track: a 3px rail with the played run, and a transparent range over
+ * The track: a 3px rail (3:1 against the card in both themes) with the
+ * played run, and a transparent range over
  * it (16px tall, 44px to the touch) that seeks, keyboard-operable; its
  * focus rings the rail.
  */
@@ -260,7 +276,7 @@ export function AudioTrack({ link }: { link: Link }) {
   const played = length ? Math.min(1, Math.max(0, elapsed / length)) : 0;
 
   return (
-    <div className="relative h-[3px] rounded-full bg-foreground/12 has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring">
+    <div className="relative h-[3px] rounded-full bg-foreground/45 has-[input:focus-visible]:ring-3 has-[input:focus-visible]:ring-ring">
       <div
         data-run=""
         aria-hidden
