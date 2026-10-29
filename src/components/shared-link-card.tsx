@@ -5,7 +5,7 @@ import type { Link as LinkType } from "@/utils/links";
 import { isViewerKind, linkKind } from "@/lib/link-kind";
 import { linkSecondLine } from "@/lib/upload-meta";
 import { LinkIcon } from "./link-icon";
-import { AudioBar } from "./audio-bar";
+import { AudioPlayer } from "./audio-player";
 import { ImageFace, VideoFace } from "./media-card-face";
 import { MediaOpenButton } from "./media-open-button";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
@@ -13,24 +13,14 @@ import { Typography } from "./typography";
 
 /**
  * A link card's frame (the shared folder's and the owner's grid): rounded,
- * a hairline edge that firms up on hover. An audio card's close swell
- * scales it (`--audio-swell`, see `AudioBar`).
+ * a hairline edge that firms up on hover. An audio card's frame as is: it
+ * isn't pressed as a whole, its controls are.
  */
-const CARD_FRAME =
-  // `--audio-swell`: an audio card's close dips the whole card (set by its
-  // bar while it closes; unset, the transform is none).
-  "[transform:var(--audio-swell)] flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 outline-none transition-[box-shadow,scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring [@media(hover:hover)]:hover:ring-foreground/25";
+export const CARD_FRAME =
+  "flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 outline-none transition-[box-shadow,scale] duration-150 ease-out focus-visible:ring-3 focus-visible:ring-ring [@media(hover:hover)]:hover:ring-foreground/25";
 
 /** A link card's frame, pressed to 0.98 (the whole card is its opener). */
 export const LINK_CARD_FRAME = `${CARD_FRAME} active:scale-[0.98] motion-reduce:active:scale-100`;
-
-/**
- * An audio card's frame: pressed to 0.98 only through its bar's opener
- * (`data-expand`), or its surface while selecting (`data-select-surface`,
- * the owner's), never while a finger drags the track or presses the
- * transport, which have their own press.
- */
-export const AUDIO_CARD_FRAME = `${CARD_FRAME} has-[[data-expand]:active]:scale-[0.98] has-[[data-select-surface]:active]:scale-[0.98] motion-reduce:has-[[data-expand]:active]:scale-100 motion-reduce:has-[[data-select-surface]:active]:scale-100`;
 
 /**
  * A link in the shared folder's grid: the page's thumbnail full-bleed on
@@ -38,7 +28,7 @@ export const AUDIO_CARD_FRAME = `${CARD_FRAME} has-[[data-expand]:active]:scale-
  * lines at most) and domain. Cards keep their natural height. An image or
  * video pearl's card opens the media viewer (its face is the morph's
  * anchor, clipping itself, so the card doesn't crop the morph); an audio
- * pearl's card is its bar, which plays in place; a page's card is a link
+ * pearl's card is its player (`AudioPlayer`); a page's card is a link
  * to a new tab.
  */
 export function SharedLinkCard({
@@ -50,11 +40,11 @@ export function SharedLinkCard({
 }) {
   const kind = linkKind(link);
   if (kind === "audio") {
-    // A frame around the bar, whose controls are its own: an audio pearl
-    // never opens the media viewer.
+    // A frame around the player, whose controls are its own: an audio
+    // pearl never opens the media viewer.
     return (
-      <div data-cy="link-card" className={AUDIO_CARD_FRAME}>
-        <AudioBar link={link} />
+      <div data-cy="link-card" className={CARD_FRAME}>
+        <AudioPlayer link={link} surface="card" />
       </div>
     );
   }
@@ -91,7 +81,7 @@ export function SharedLinkCard({
  * or a video is the media alone, full-bleed at its ratio (the card's label
  * is the title); a page is the thumbnail (16:10, full-bleed), then the
  * favicon, the title (two lines) and the domain. An audio pearl's card is
- * its bar, which both grids draw themselves (`AudioBar`), never this.
+ * its player, which both grids draw themselves (`AudioPlayer`), never this.
  */
 export function LinkCardContent({
   link,

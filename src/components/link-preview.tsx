@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import { linkKind } from "@/lib/link-kind";
 import { FolderEmoji } from "./folder-emoji";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
-import { AudioPreview } from "./audio-preview";
+import { AudioPlayer } from "./audio-player";
 import { ImageFace, VideoFace } from "./media-card-face";
 import { PdfThumbnail } from "./pdf-thumbnail";
 
@@ -103,7 +103,7 @@ export function LinkPreviewBody({
     const more = Boolean(link.description) || folder !== null;
     return (
       <>
-        <AudioPreview link={link} />
+        <AudioPlayer link={link} surface="popover" />
         {more ? (
           <div className="flex flex-col gap-2 px-4 pb-4">
             {link.description ? <PreviewDescription text={link.description} /> : null}

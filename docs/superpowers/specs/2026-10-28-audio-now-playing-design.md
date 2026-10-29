@@ -101,3 +101,7 @@ The sections "The opened player (the viewer)" and "The morph: one object" above 
 ## Deviations from the reference
 
 The box keeps the grid's 10px corner, not sleeve + margin; the width is the host's (the grid's column), unchanged by the morph; the sleeve is the play control on the shut bar (the reference's play sits at the row's end); the track is a scrubber (the reference's isn't); no like, no skip.
+
+## Revision (2026-10-29): the grid card is the player card
+
+The user simplified the grid: an audio pearl's card is now exactly the hover preview's player card (`AudioPlayer` in `src/components/audio-player.tsx`: the 180px hero with the title over its fade, the track, the times and the transport), at the card's width. The now-playing bar, its in-place expansion (the tween, the late parts, the swell, Esc and the outside press, `audioExpansion`) and the masonry's growth handling are gone; the owner's card takes the checkbox and `⋯` in the hero's corners like every card, and the pending audio upload is the player's shape. List rows, the store and the drawn mark are unchanged.

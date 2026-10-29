@@ -12,7 +12,6 @@ import {
 import { ARRIVE } from "@/lib/motion";
 import { deleteLinkKeepingFocus } from "@/lib/delete-link-focus";
 import { haptic } from "@/lib/haptics";
-import { useAudioExpanded } from "@/lib/audio-expansion";
 import { isViewerKind, linkKind } from "@/lib/link-kind";
 import { usePendingLinkDeletes } from "@/lib/pending-link-deletes";
 import { cn } from "@/lib/utils";
@@ -27,11 +26,10 @@ import {
   useFolderTag,
   useLinkFolder,
 } from "./folder-tag";
-import { AUDIO_BAR, AudioBar, markAudioHostPress, useAudioBarMorph } from "./audio-bar";
-import { mix } from "./audio-player-tween";
+import { AudioPlayer } from "./audio-player";
 import { HapticTarget } from "./haptic-target";
 import { MediaOpenButton } from "./media-open-button";
-import { AUDIO_CARD_FRAME, LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
+import { CARD_FRAME, LINK_CARD_FRAME, LinkCardContent } from "./shared-link-card";
 import { Checkbox } from "./ui/checkbox";
 
 // Loaded on demand, like the rows' menu.
@@ -49,10 +47,8 @@ const OPENER_CLASS =
  * corner selects it (shown on hover or focus, and on every card while
  * selecting, when a click anywhere toggles the card); a long-press does
  * the same on touch. The row menu (`⋯`) sits in the other corner, on hover
- * or always on touch. An audio pearl's bar holds the checkbox itself (in
- * the sleeve's corner on hover, in its place while selecting); its menu
- * floats over the bar's top-right corner like every card's, on a backing
- * of the bar's surface. Deleted or moved-away cards fade out, and Undo
+ * or always on touch. An audio pearl's card is its player (`AudioPlayer`),
+ * with the same checkbox and menu in its hero's corners. Deleted or moved-away cards fade out, and Undo
  * brings them back.
  */
 export function LinkCard({
@@ -86,14 +82,9 @@ export function LinkCard({
   // The card's opener: a link to the page, or for an image or video pearl
   // the button that opens the media viewer (the demo has no viewer: its
   // cards are links). An audio pearl's card (the demo's too) has no
-  // opener: its bar plays and expands in place, and never opens the viewer.
+  // opener: its player plays in place, and never opens the viewer.
   const kind = linkKind(link);
   const audio = kind === "audio";
-  // Opened, the bar's words wrap short of the menu: no backing over them.
-  const barOpen = useAudioExpanded(link.id).open;
-  // The bar's own morph, run alongside it: the menu's backing follows the
-  // shape on screen, not the state, so nothing is cut while it moves.
-  const barMorph = useAudioBarMorph(audio && barOpen);
   const media = !demo && isViewerKind(kind);
   // An image or video face is the viewer's morph anchor: it rounds and
   // clips itself, so the card doesn't crop the morph back.
@@ -118,13 +109,6 @@ export function LinkCard({
     linkSelection.toggle(link.id, { shiftKey });
   };
 
-  // The checkbox's click (mouse, keyboard): no haptic, the touch tap is
-  // `tapToSelect`'s.
-  const clickToSelect = ({ shiftKey }: { shiftKey: boolean }) => {
-    if (consumeLongPress()) return;
-    linkSelection.toggle(link.id, { shiftKey });
-  };
-
   const badge = folderTag ? (
     <FolderBadge key={folderTag.id} folder={folderTag} inCard arrive={badgeArrives} />
   ) : null;
@@ -137,9 +121,9 @@ export function LinkCard({
         deleteLinkKeepingFocus({
           linkId: link.id,
           anchor: anchorRef.current,
-          // An audio card's is its bar's opener (`data-expand`).
+          // An audio card's is its player's Play.
           siblingsSelector:
-            '[data-cy="link-card"] > a[href], [data-cy="link-card"] > [data-pearl-button], [data-cy="link-card"] [data-expand]',
+            '[data-cy="link-card"] > a[href], [data-cy="link-card"] > [data-pearl-button], [data-cy="link-card"] [data-play]',
           byKeyboard,
           onDeleted: notifyLinksChanged,
         })
@@ -163,7 +147,7 @@ export function LinkCard({
       data-cy="link-card"
       data-selected={selected || undefined}
       className={cn(
-        audio ? AUDIO_CARD_FRAME : LINK_CARD_FRAME,
+        audio ? CARD_FRAME : LINK_CARD_FRAME,
         // The opener (below, a direct child) is the focus target: its ring
         // is the card's. Not any link inside: the audio transport's Open
         // file and the folder button ring themselves.
@@ -178,11 +162,6 @@ export function LinkCard({
           "animate-in fade-in-0 zoom-in-95 duration-200 ease-out-strong",
       )}
       {...longPress}
-      // An open audio bar takes a press in this card's menu (a portal) for
-      // one inside its card.
-      onPointerDownCapture={
-        audio ? (event) => markAudioHostPress(event.nativeEvent, link.id) : undefined
-      }
       onPointerDown={(event) => {
         // A press on the menu button, or inside a portal (the open menu,
         // whose React events bubble through here), isn't a long-press on
@@ -200,9 +179,9 @@ export function LinkCard({
       }}
     >
       {audio ? (
-        // A plain surface under the bar: while selecting, a click on it
-        // toggles the card (the bar's controls, its opener included, step
-        // aside then). The card's focus anchor is the bar's opener.
+        // A plain surface under the player: while selecting, a click on it
+        // toggles the card (the player's controls step aside then). The
+        // card's focus anchor is the player's Play.
         <div
           aria-hidden
           data-select-surface={selecting || undefined}
@@ -252,25 +231,12 @@ export function LinkCard({
       {/* The content is a picture of the link: clicks go to the link. */}
       <div className="pointer-events-none flex flex-col">
         {audio ? (
-          // The bar holds the owner's checkbox itself: in the sleeve's
-          // corner on hover, in its place while selecting. A press on the
-          // rest of it expands it in place into the player.
-          <AudioBar
+          <AudioPlayer
             link={link}
+            surface="card"
             badge={badge}
-            describedBy={describedBy}
-            expandRef={demo ? undefined : setAnchor}
-            owner={
-              demo
-                ? undefined
-                : {
-                    selected,
-                    onToggleSelect: clickToSelect,
-                    onTapSelect: tapToSelect,
-                    consumeLongPress,
-                    folderButton: Boolean(linkFolder),
-                  }
-            }
+            inert={selecting}
+            playRef={demo ? undefined : setAnchor}
           />
         ) : (
           <LinkCardContent
@@ -282,27 +248,7 @@ export function LinkCard({
         )}
       </div>
       {folderTag ? <FolderTagLabel id={folderLabelId} folder={folderTag} /> : null}
-      {demo ? null : audio ? (
-        // Over the bar's top-right corner, as on every card, the buttons
-        // 6px in. Shut, on a backing of the bar's surface from the top
-        // down through the words' band, fading in over 24px, so it covers
-        // the words' end (which run to the bar's margin) cleanly, never
-        // through a line. Opened, the words wrap short of it: no backing.
-        // Both follow the bar's morph (`barMorph`), not its state.
-        // The backing takes no presses (they open the bar); its buttons do.
-        <div
-          inert={selecting}
-          className={cn(
-            "pointer-events-none absolute top-0 right-0 z-10 flex items-start bg-card pt-1.5 pe-1.5 *:pointer-events-auto",
-            menuReveal,
-          )}
-          style={barMorph >= 1 ? undefined : audioMenuBacking(barMorph)}
-          data-card-menu
-        >
-          {linkFolder ? <FolderLinkButton folder={linkFolder} /> : null}
-          {menu}
-        </div>
-      ) : (
+      {demo ? null : (
         <>
           <Checkbox
             checked={selected}
@@ -346,22 +292,4 @@ export function LinkCard({
       ) : null}
     </div>
   );
-}
-
-/** The backing's own measures: its fade (`ps`) and the button row's height (6 + 32). */
-const BACKING_FADE = 24;
-const BACKING_OPEN = 38;
-
-/**
- * The audio card's menu backing at the bar's morph `p` (0 shut, 1 open):
- * shut, from the top down through the words' band, fading in over 24px;
- * the fade and the band give way as the bar opens and the words wrap short.
- */
-function audioMenuBacking(p: number): React.CSSProperties {
-  const fade = BACKING_FADE * (1 - p);
-  return {
-    height: mix(AUDIO_BAR.pad + AUDIO_BAR.sleeve, BACKING_OPEN, p),
-    paddingInlineStart: fade,
-    maskImage: `linear-gradient(to right, transparent, black ${fade}px)`,
-  };
 }

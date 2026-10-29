@@ -242,9 +242,8 @@ export function onCloseSettled(listener: (into: string | null) => void): () => v
 
 /**
  * Set by the viewer right before it hands focus back to a pearl's button
- * on close, and by an audio bar closed with Esc from inside before it
- * focuses its opener, so that focus isn't taken for keyboard navigation
- * (rows open their hover preview on keyboard focus). One focus consumes it; it lapses
+ * on close, so that focus isn't taken for keyboard navigation (rows open
+ * their hover preview on keyboard focus). One focus consumes it; it lapses
  * on its own shortly after, in case focus went nowhere.
  */
 let returningFocus = false;
@@ -259,7 +258,7 @@ export function markReturningFocus() {
   }, RETURNING_FOCUS_MS);
 }
 
-/** True once right after the viewer or an audio bar gave focus back (see above). */
+/** True once right after the viewer gave focus back (see above). */
 export function consumeReturningFocus(): boolean {
   if (!returningFocus) return false;
   returningFocus = false;

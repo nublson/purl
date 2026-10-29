@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Item, ItemContent, ItemMedia, ItemTitle } from "@/components/ui/item";
-import { AUDIO_BAR, AudioSleeve } from "@/components/audio-bar";
+import { AudioHeroIcon } from "@/components/audio-player";
 import { cardAspectRatio } from "@/lib/link-kind";
 import { titleFromFileName } from "@/utils/media-title";
 import type { PendingUpload } from "@/lib/pending-upload";
@@ -154,7 +154,7 @@ function FailedActions({
 
 /**
  * A file uploading, in the grid: its local preview at the pearl's ratio, a
- * progress ring in the top-right corner (an audio file: the bar's shape,
+ * progress ring in the top-right corner (an audio file: the player's shape,
  * `PendingAudioCard`). Failed: a scrim with Retry and Dismiss.
  */
 const FAILED_MESSAGE = "Couldn\u2019t upload";
@@ -211,10 +211,11 @@ export function PendingUploadCard({ item, onRetry, onDismiss }: Props) {
 }
 
 /**
- * An audio file uploading, in the grid: the shape of the bar it becomes
- * (`AudioBar`): the sleeve with the progress ring where the play mark
- * will be, its title over "Uploading…", and the empty rail. Failed: a scrim with the reason,
- * Retry and Dismiss.
+ * An audio file uploading, in the grid: the shape of the player it becomes
+ * (`AudioPlayer`): the hero's tint with the progress ring where the music
+ * icon will be, its title over "Uploading…", the empty rail and the
+ * transport's shape, so the pearl takes its slot without a jump. Failed: a
+ * scrim with the reason, Retry and Dismiss.
  */
 function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
   const failed = item.status === "failed";
@@ -225,46 +226,43 @@ function PendingAudioCard({ item, onRetry, onDismiss }: Props) {
       aria-busy={failed ? undefined : true}
       data-cy="pending-upload"
       data-status={item.status}
-      className="relative overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 animate-in fade-in-0 duration-300"
+      className="relative flex flex-col overflow-hidden rounded-lg bg-card ring-1 ring-foreground/10 animate-in fade-in-0 duration-300"
     >
-      <div aria-hidden className="flex h-[78px] items-center gap-2.5 p-[10px] pb-7">
-        {/* The ring where the mark will be: the sleeve is the bar's play. */}
-        <AudioSleeve
-          link={{ thumbnail: null }}
-          size={AUDIO_BAR.sleeve}
-          radius={AUDIO_BAR.sleeveRadius}
-          contentClassName="[&>svg]:hidden"
-        >
-          <span className="absolute inset-0 grid place-items-center">
-            <ProgressRing progress={item.progress} />
-          </span>
-        </AudioSleeve>
-        <div className="flex min-w-0 flex-1 flex-col">
+      <div aria-hidden className="relative h-[180px] w-full shrink-0">
+        <AudioHeroIcon>
+          <ProgressRing progress={item.progress} />
+        </AudioHeroIcon>
+        <div className="absolute inset-x-0 bottom-0 h-[120px] bg-linear-to-b from-transparent via-card/90 via-35% to-card" />
+        <div className="absolute inset-x-0 bottom-0 flex min-w-0 flex-col p-4">
           <span
             title={item.name}
-            className="truncate text-[13px] leading-4 font-medium text-foreground"
+            className="line-clamp-2 text-base leading-[22px] font-medium wrap-anywhere text-foreground"
           >
             {title}
           </span>
-          <span className="truncate text-[11px] leading-[14px] text-foreground/70">
+          <span className="truncate text-[13px] leading-[18px] text-foreground/70">
             Uploading…
           </span>
         </div>
       </div>
-      {/* The bar's empty rail along the foot. */}
-      <span
-        aria-hidden
-        className="absolute inset-x-[10px] bottom-[10px] h-[3px] rounded-full bg-foreground/12"
-      />
+      {/* The player's empty rail, times band and transport. */}
+      <div aria-hidden className="flex flex-col p-4">
+        <span className="h-[3px] rounded-full bg-foreground/12" />
+        <span className="mt-2 h-[10px]" />
+        <span className="mt-4 flex h-[46px] items-center justify-center gap-3.5">
+          <span className="size-[34px] rounded-full border border-border" />
+          <span className="size-[46px] rounded-full bg-foreground/12" />
+          <span className="size-[34px] rounded-full border border-border" />
+        </span>
+      </div>
       <span className="sr-only">{failed ? `${title}, ${message}` : title}</span>
       {failed ? (
-        // The bar is short: the reason on one line, the compact actions.
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-background/90 p-2 text-center backdrop-blur-sm">
-          <p aria-hidden title={message} className="max-w-full truncate text-xs text-foreground">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/90 p-3 text-center backdrop-blur-sm">
+          <p aria-hidden className="text-sm text-foreground">
             {message}
           </p>
-          <div className="flex items-center justify-center gap-1 pointer-coarse:gap-3">
-            <FailedActions item={item} onRetry={onRetry} onDismiss={onDismiss} compact />
+          <div className="flex flex-wrap items-center justify-center gap-1">
+            <FailedActions item={item} onRetry={onRetry} onDismiss={onDismiss} />
           </div>
         </div>
       ) : null}
