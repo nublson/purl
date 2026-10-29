@@ -276,3 +276,36 @@ test.describe("Live grid cards, visited signed out", () => {
     await expect(card.getByRole("button", { name: "Interact with Live demo" })).toBeVisible();
   });
 });
+
+test.describe("Live list rows", () => {
+  test("a Live mark, the viewer on click, and an image preview on hover", async ({
+    page,
+    seed,
+  }) => {
+    await serveLivePage(page);
+    await seed.link({ url: "https://live.example/", title: "Live demo", embed: true });
+    await seed.link({ url: "https://plain.example/", title: "Plain page" });
+    await page.goto("/home");
+    await waitForHydration(page, '[data-cy="link-item"]');
+
+    const row = page.locator('[data-cy="link-item"]', { hasText: "Live demo" });
+    await expect(row.getByText("Live", { exact: true })).toBeVisible();
+    await expect(
+      page.locator('[data-cy="link-item"]', { hasText: "Plain page" }).getByText("Live", {
+        exact: true,
+      }),
+    ).toHaveCount(0);
+
+    // Hover preview: the page's picture, never a frame.
+    await row.hover();
+    await page.waitForTimeout(900);
+    await expect(page.locator("iframe")).toHaveCount(0);
+
+    let popup = false;
+    page.on("popup", () => (popup = true));
+    await row.click();
+    await expect(page.getByRole("dialog", { name: "Live demo" })).toHaveCount(1);
+    await expect(page).toHaveURL(/[?&]pearl=/);
+    expect(popup).toBe(false);
+  });
+});

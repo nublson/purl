@@ -538,6 +538,15 @@ export const LinkItem = React.forwardRef<
           >
             {link.title}
           </Typography>
+          {kind === "embed" ? (
+            <Typography
+              component="span"
+              size="small"
+              className="shrink-0 text-xs font-normal text-muted-foreground"
+            >
+              Live
+            </Typography>
+          ) : null}
           <Typography
             component="span"
             size="small"
