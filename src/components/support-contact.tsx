@@ -1,4 +1,4 @@
-import { NotionAnchor } from "@/components/notion-blocks/rich-text";
+import { NotionLink } from "notionic";
 import { Typography } from "@/components/typography";
 
 const ISSUES_URL = "https://github.com/nublson/purl/issues";
@@ -30,22 +30,22 @@ export function SupportContact({ email }: { email: string | null }) {
             address of the page if it’s about a saved link.
           </Typography>
           <Typography className="text-foreground">
-            <NotionAnchor
+            <NotionLink
               link={{
                 href: `mailto:${email}?subject=${encodeURIComponent("Purl support")}`,
                 external: false,
               }}
             >
               {email}
-            </NotionAnchor>
+            </NotionLink>
           </Typography>
         </>
       ) : (
         <Typography className="text-foreground">
           Send <strong>Feedback</strong> from the account menu in Purl, or{" "}
-          <NotionAnchor link={{ href: ISSUES_URL, external: true }}>
+          <NotionLink link={{ href: ISSUES_URL, external: true }}>
             open an issue on GitHub
-          </NotionAnchor>
+          </NotionLink>
           .
         </Typography>
       )}

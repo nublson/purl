@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
 import { BrandMark } from "@/components/brand-mark";
 import { LandingFooter } from "@/components/landing/landing-footer";
-import { NotionBlocks, createRenderContext } from "@/components/notion-blocks";
+import { NotionContent } from "@/components/notion-blocks";
 import { renderSiteOgImage } from "@/components/site-og-image";
 import { Typography } from "@/components/typography";
 import { getPageBySlug, getPublishedPages } from "@/lib/notion";
@@ -99,8 +99,6 @@ export async function StaticPage({
   // Missing, unpublished (state isn't "published"), or Notion not configured.
   if (!page) notFound();
 
-  const context = createRenderContext(slug, buildPageIdToPath(published));
-
   return (
     <div className="wrapper-public flex w-full flex-1 flex-col px-4 md:px-6 lg:px-12">
       {/* Mark, title and content share one centered 68ch column (on the
@@ -133,7 +131,10 @@ export async function StaticPage({
         {intro ? <div className="mt-10">{intro}</div> : null}
         {page.blocks.length > 0 ? (
           <div className="mt-10">
-            <NotionBlocks blocks={page.blocks} context={context} />
+            <NotionContent
+              blocks={page.blocks}
+              pageIdToPath={buildPageIdToPath(published)}
+            />
           </div>
         ) : null}
       </main>

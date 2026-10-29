@@ -1,22 +1,15 @@
 import { Fragment, type ReactNode } from "react";
 import { jsx, jsxs } from "react/jsx-runtime";
 import { toJsxRuntime } from "hast-util-to-jsx-runtime";
+import { type BlockProps, RichText } from "notionic";
 import { Typography } from "@/components/typography";
 import { highlightCode } from "@/lib/code-highlight";
 import { codeLanguageLabel, normalizeLanguage } from "@/lib/code-languages";
-import type { NotionBlock } from "@/lib/notion";
 import { CopyCodeButton } from "./copy-code-button";
-import { RichText } from "./rich-text";
-import type { NotionRenderContext } from "./types";
 
-export async function CodeBlock({
-  block,
-  context,
-}: {
-  block: NotionBlock;
-  context: NotionRenderContext;
-}) {
-  const data = (block as unknown as { code: CodeData }).code;
+/** notionic's code block, highlighted on the server, with a copy button. */
+export async function CodeBlock({ block, context }: BlockProps<"code">) {
+  const data = block.code;
   const code = data.rich_text.map((item) => item.plain_text).join("");
   const label = codeLanguageLabel(data.language);
   const language = normalizeLanguage(data.language);
@@ -32,7 +25,7 @@ export async function CodeBlock({
       );
     } catch (error) {
       console.warn(
-        `Static page "${context.pageSlug}": could not highlight ${block.id}`,
+        `Static page: could not highlight code block ${block.id}`,
         error,
       );
     }
@@ -66,9 +59,3 @@ export async function CodeBlock({
     </figure>
   );
 }
-
-type CodeData = {
-  language?: string;
-  rich_text: { plain_text: string }[];
-  caption: Parameters<typeof RichText>[0]["text"];
-};

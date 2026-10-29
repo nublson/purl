@@ -1,7 +1,6 @@
 import "server-only";
 
 import {
-  type BlockObjectResponse,
   Client,
   collectPaginatedAPI,
   isFullBlock,
@@ -9,6 +8,8 @@ import {
   type PageObjectResponse,
 } from "@notionhq/client";
 import { unstable_cache } from "next/cache";
+import type { NotionBlock } from "notionic";
+import { fetchBlocks } from "notionic/fetch";
 import { cache } from "react";
 
 /**
@@ -19,7 +20,7 @@ import { cache } from "react";
  * - `slug` (text): its URL segment, e.g. `privacy`
  * - `description` (text, optional): the meta description
  * - `state` (select: planned, writing, published): only `published` rows show
- * The row's body is the page's content.
+ * The row's body is the page's content, fetched and rendered by notionic.
  *
  * Reads are cached under {@link NOTION_CACHE_TAG} for an hour, and
  * `POST /api/notion/revalidate` (the integration's webhook subscription)
@@ -35,13 +36,7 @@ const NOTION_REVALIDATE_SECONDS = 3600;
 
 export const PUBLISHED_STATE = "published";
 
-/** Max nesting depth when resolving block children (avoids huge trees). */
-const MAX_BLOCK_DEPTH = 5;
-
-/** Max concurrent child-block fetches per level (Notion allows ~3 req/s on average). */
-const BLOCK_FETCH_CONCURRENCY = 5;
-
-export type NotionBlock = BlockObjectResponse & { children?: NotionBlock[] };
+export type { NotionBlock };
 
 export type NotionPageSummary = {
   id: string;
@@ -113,48 +108,6 @@ async function queryPublishedPages(
   return rows.filter(isFullPage);
 }
 
-/** Maps items with at most `limit` mapper calls in flight. */
-async function mapPool<T, R>(
-  items: readonly T[],
-  limit: number,
-  mapper: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-  async function worker(): Promise<void> {
-    while (next < items.length) {
-      const i = next++;
-      results[i] = await mapper(items[i]!);
-    }
-  }
-  const workers = Math.min(Math.max(1, limit), items.length);
-  await Promise.all(Array.from({ length: workers }, worker));
-  return results;
-}
-
-export async function fetchBlocks(
-  api: Client,
-  blockId: string,
-  depth = MAX_BLOCK_DEPTH,
-): Promise<NotionBlock[]> {
-  const blocks = (
-    await collectPaginatedAPI(api.blocks.children.list, { block_id: blockId })
-  ).filter(isFullBlock);
-
-  return mapPool(blocks, BLOCK_FETCH_CONCURRENCY, async (block) => {
-    // Child pages and databases are separate documents, not this page's body.
-    if (
-      !block.has_children ||
-      depth <= 0 ||
-      block.type === "child_page" ||
-      block.type === "child_database"
-    ) {
-      return block;
-    }
-    return { ...block, children: await fetchBlocks(api, block.id, depth - 1) };
-  });
-}
-
 const getPublishedPagesCached = unstable_cache(
   async (): Promise<NotionPageSummary[]> => {
     const config = getNotionConfig();
@@ -196,3 +149,56 @@ export const getPageBySlug = cache(
     return getPageBySlugCached(normalized);
   },
 );
+
+function findBlock(
+  blocks: readonly NotionBlock[] | undefined,
+  id: string,
+): NotionBlock | null {
+  for (const block of blocks ?? []) {
+    if (block.id.replace(/-/g, "") === id) return block;
+    const nested = findBlock(block.children, id);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+type HostedFileObject = { url: string; expiry_time: string };
+
+/** The file uploaded to a block: an image, video, file, PDF or audio, or a callout's icon. */
+function hostedFile(block: unknown): HostedFileObject | null {
+  const { type } = block as { type: string };
+  const data = (block as Record<string, unknown>)[type] as
+    | { type?: string; file?: HostedFileObject; icon?: { type?: string; file?: HostedFileObject } }
+    | undefined;
+  if (data?.type === "file" && data.file) return data.file;
+  if (data?.icon?.type === "file" && data.icon.file) return data.icon.file;
+  return null;
+}
+
+/**
+ * A fresh signed URL for a file uploaded to Notion (they expire after an hour),
+ * with its expiry, for `/api/notion/file/[blockId]`. Only blocks on published
+ * pages answer, so drafts' files stay private; null otherwise.
+ */
+export async function getPublishedFile(
+  blockId: string,
+): Promise<{ url: string; expiresAt: Date } | null> {
+  const config = getNotionConfig();
+  const id = blockId.replace(/-/g, "").toLowerCase();
+  if (!config || !/^[0-9a-f]{32}$/.test(id)) return null;
+
+  const pages = await getPublishedPages();
+  let published = false;
+  for (const summary of pages) {
+    const page = await getPageBySlug(summary.slug);
+    if (findBlock(page?.blocks, id)) {
+      published = true;
+      break;
+    }
+  }
+  if (!published) return null;
+
+  const block = await getClient(config.token).blocks.retrieve({ block_id: id });
+  const file = isFullBlock(block) ? hostedFile(block) : null;
+  return file ? { url: file.url, expiresAt: new Date(file.expiry_time) } : null;
+}
