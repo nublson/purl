@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, test, waitForHydration } from "./fixtures";
+import { chooseView, expect, test, waitForHydration } from "./fixtures";
 import type { seedLink } from "./support/db";
 import { silentWav } from "./support/media";
 
@@ -18,12 +18,8 @@ async function openHome(page: Page) {
   await page.waitForLoadState("networkidle");
 }
 
-async function chooseGrid(page: Page) {
-  const saved = page.waitForResponse(
-    (res) => res.url().endsWith("/api/user/layout") && res.request().method() === "PATCH",
-  );
-  await page.getByRole("button", { name: "Grid view" }).click();
-  expect((await saved).ok()).toBe(true);
+function chooseGrid(page: Page) {
+  return chooseView(page, "Grid");
 }
 
 /** A page link, then two images (newest first: Shot A, Shot B, the page). */
@@ -278,7 +274,8 @@ test.describe("Media viewer", () => {
     // from the preview.
     await expect(dialog.locator('img[src$="?a=1"]')).toHaveAttribute("alt", "Shot A");
     await expect(dialog.locator('img[alt="Shot A"]')).toHaveCount(1);
-    await expect(dialog.getByRole("button", { name: "Close" })).toBeVisible();
+    // No close button: Esc, the backdrop, a swipe or Back close it.
+    expect(await dialog.getByRole("button", { name: "Close" }).count()).toBe(0);
     // App shortcuts (folder digits, selection keys) stand down while it's open.
     await expect(page.locator("[data-media-viewer][data-open]")).toHaveCount(1);
     await expect.poll(() => new URL(page.url()).searchParams.get("pearl")).toBe(shotA);
@@ -292,13 +289,12 @@ test.describe("Media viewer", () => {
         .evaluateAll((els) => els.length > 0 && els.every((el) => (el as HTMLElement).inert)),
     ).toBe(true);
     expect(await page.getByRole("dialog").count()).toBe(0);
-    expect(await page.getByRole("button", { name: "Close" }).count()).toBe(0);
     await expect(page.locator("[data-media-viewer]")).toHaveCount(0);
     await expect.poll(() => new URL(page.url()).searchParams.has("pearl")).toBe(false);
     await expect(openButton(page, "Shot A")).toBeFocused();
   });
 
-  test("a tiny image opens in a box big enough to keep the X and the arrows clear", async ({
+  test("a tiny image opens in a box big enough to keep the arrows clear", async ({
     page,
     seed,
     baseURL,
@@ -329,16 +325,16 @@ test.describe("Media viewer", () => {
       const image = rect(popup.querySelector('[data-viewer-media="image"]'));
       const centre = document.elementFromPoint((image.l + image.r) / 2, (image.t + image.b) / 2);
       return {
-        close: rect(popup.querySelector('[aria-label="Close"]')),
+        image,
         next: rect(popup.querySelector('[aria-label="Next pearl"]')),
         centreIsImage: Boolean(centre?.closest('[data-viewer-media="image"]')),
       };
     });
-    // The X sits in the image's corner, apart from the arrow, and the
-    // image's middle is the image, not a control.
-    const { close, next } = layout;
-    const overlap = close.l < next.r && next.l < close.r && close.t < next.b && next.t < close.b;
-    expect(overlap, JSON.stringify(layout)).toBe(false);
+    // The arrow sits inside the image's side, and the image's middle is the
+    // image, not a control.
+    const { image, next } = layout;
+    const inside = next.l >= image.l && next.r <= image.r && next.t >= image.t && next.b <= image.b;
+    expect(inside, JSON.stringify(layout)).toBe(true);
     expect(layout.centreIsImage).toBe(true);
   });
 
@@ -1147,7 +1143,7 @@ test.describe("Media viewer on phones", () => {
 
     // Shown without hover on touch screens, 40px plus 2px of invisible hit
     // area all round: 44px targets.
-    for (const name of ["Previous pearl", "Next pearl", "Close"]) {
+    for (const name of ["Previous pearl", "Next pearl"]) {
       const button = page.getByRole("button", { name });
       await expect(button).toBeVisible();
       await expect(button).toHaveCSS("opacity", "1");

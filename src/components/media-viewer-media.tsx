@@ -73,7 +73,7 @@ function ImageTile({ style }: { style?: CSSProperties }) {
 
 /**
  * A small image's box is scaled up to this on its shorter side (the image
- * fitted inside, at its ratio), so the X and the arrows never cover it.
+ * fitted inside, at its ratio), so the arrows never cover it.
  */
 export const MIN_IMAGE_SIDE = 240;
 

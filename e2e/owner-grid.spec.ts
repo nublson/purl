@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { expect, test, waitForHydration } from "./fixtures";
+import { chooseView, expect, test, waitForHydration } from "./fixtures";
 
 // The owner's grid: chosen in the user menu (View mode: List / Grid), saved on the
 // account, and the shared folder's cards and masonry with the owner's
@@ -15,14 +15,6 @@ async function openHome(page: Page) {
 }
 
 /** The header's List / Grid switch, waiting for the choice to be saved. */
-async function chooseView(page: Page, view: "List" | "Grid") {
-  const saved = page.waitForResponse(
-    (res) => res.url().endsWith("/api/user/layout") && res.request().method() === "PATCH",
-  );
-  await page.getByRole("button", { name: `${view} view` }).click();
-  expect((await saved).ok()).toBe(true);
-}
-
 test.describe("Owner grid view", () => {
   test("the user menu switches Home to a grid, remembered on the account", async ({ page, seed }, testInfo) => {
     for (const title of ["Alpha", "Bravo", "Charlie"]) {
@@ -45,10 +37,12 @@ test.describe("Owner grid view", () => {
     await page.reload();
     await waitForHydration(page, '[data-cy="link-card"]');
     await expect(cards(page)).toHaveCount(3);
-    await expect(page.getByRole("button", { name: "Grid view" })).toHaveAttribute(
-      "aria-pressed",
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await expect(page.getByRole("menuitemradio", { name: "Grid" })).toHaveAttribute(
+      "aria-checked",
       "true",
     );
+    await page.keyboard.press("Escape");
 
     await chooseView(page, "List");
     await expect(page.locator('[data-cy="link-item"]')).toHaveCount(3);
@@ -269,7 +263,7 @@ test.describe("Folder tags on phones", () => {
 
     // A card: the same badge on its favicon, no tag line; the name is the
     // link's description.
-    await page.getByRole("button", { name: "Grid view" }).tap();
+    await chooseView(page, "Grid", { tap: true });
     await waitForHydration(page, '[data-cy="link-card"]');
     const alphaCard = card(page, "Alpha");
     await expect(alphaCard.locator('[data-cy="folder-badge"]')).toBeVisible();
@@ -299,7 +293,7 @@ test.describe("Folder tags on phones", () => {
     await seed.link({ url: "https://alpha.example", title: "Alpha", folderId: folder });
     await page.goto("/home");
     await waitForHydration(page, '[data-cy="link-item"]');
-    await page.getByRole("button", { name: "Grid view" }).tap();
+    await chooseView(page, "Grid", { tap: true });
     await waitForHydration(page, '[data-cy="link-card"]');
 
     await card(page, "Alpha").getByRole("button", { name: "Open link menu" }).tap();

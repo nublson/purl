@@ -9,7 +9,6 @@ import { Logo } from "./logo";
 import { HeaderActionsFallback } from "./skeletons/header-actions-fallback";
 import { Separator } from "./ui/separator";
 import { User } from "./user";
-import { LinkViewToggle } from "./view-toggle";
 
 async function HeaderActions() {
   const user = await getSessionUser();
@@ -22,12 +21,6 @@ async function HeaderActions() {
       <div className="flex items-center justify-end gap-2">
         <FolderSharePopover />
         <HeaderAddMenu />
-        <LinkViewToggle />
-        {/* The folder's tools, then you: a hairline between them. */}
-        <Separator
-          orientation="vertical"
-          className="data-vertical:h-5 data-vertical:self-center"
-        />
         <User />
       </div>
     </UsageProvider>

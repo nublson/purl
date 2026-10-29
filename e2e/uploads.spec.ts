@@ -1,7 +1,7 @@
 import { del, list } from "@vercel/blob";
 import type { Page } from "@playwright/test";
 import sharp from "sharp";
-import { expect, test, waitForHydration } from "./fixtures";
+import { chooseView, expect, test, waitForHydration } from "./fixtures";
 
 // Uploads against a real Vercel Blob store: the file goes up, its card shows
 // the stored image, Settings → Usage counts it, and deleting the pearl
@@ -31,12 +31,8 @@ async function noisePng(): Promise<Buffer> {
     .toBuffer();
 }
 
-async function chooseGrid(page: Page) {
-  const saved = page.waitForResponse(
-    (res) => res.url().endsWith("/api/user/layout") && res.request().method() === "PATCH",
-  );
-  await page.getByRole("button", { name: "Grid view" }).click();
-  expect((await saved).ok()).toBe(true);
+function chooseGrid(page: Page) {
+  return chooseView(page, "Grid");
 }
 
 async function openHomeInGrid(page: Page) {

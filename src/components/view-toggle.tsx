@@ -1,6 +1,5 @@
 "use client";
 
-import { useLinkView } from "@/contexts/link-view-context";
 import type { LinkView } from "@/lib/link-view";
 import { Grid, List3 } from "reicon-react";
 import { cn } from "@/lib/utils";
@@ -12,13 +11,12 @@ const OPTIONS = [
 ] as const;
 
 /**
- * The header's List / Grid switch: two toggle buttons in one outlined
+ * The shared folder page's List / Grid switch: two toggle buttons in one outlined
  * segmented control, the current view filled (`aria-pressed`). On phones, where the header is short of room
  * (a folder's name would shrink to its emoji), one button instead, showing
  * and naming the other view ("Switch to grid view"). Both are rendered and
  * CSS picks one (the `phone:` variant), so the server's HTML is right on
- * first paint. The app header's (`LinkViewToggle`) and the shared folder
- * page's share it.
+ * first paint. (Owners switch in the user menu: `ViewMenuItems`.)
  */
 export function ViewToggle({
   view,
@@ -70,13 +68,4 @@ export function ViewToggle({
       </div>
     </>
   );
-}
-
-/**
- * The app header's view switch: how Home and folders show links, saved on
- * the account (`useLinkView`; the landing demo's is local state).
- */
-export function LinkViewToggle() {
-  const { view, setView } = useLinkView();
-  return <ViewToggle view={view} onChange={setView} />;
 }

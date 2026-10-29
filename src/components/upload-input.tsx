@@ -6,21 +6,25 @@ import { isOverlayOpen, isTypingTarget } from "@/lib/keyboard";
 import { requestUploadFiles } from "@/lib/save-uploads";
 import { isUploadShortcut, NO_UPLOAD_PAGE_MESSAGE } from "@/lib/upload-picker";
 import { UPLOAD_MIME_TYPES } from "@/lib/uploads/mime";
-import { useEffect, useRef } from "react";
+import { useEffect, type RefObject } from "react";
 import { toast } from "sonner";
 
 const ACCEPT = UPLOAD_MIME_TYPES.join(",");
 
 /**
  * The page's file picker (Home and folder pages): a hidden file input that
- * `U` opens (not while typing, or with a dialog or menu open, like `A`). The chosen files
- * go to the page's upload queue. Nothing when uploads are off or in the
- * landing demo.
+ * `U` opens (not while typing, or with a dialog or menu open, like `A`), and
+ * the search field's Add files button (through `inputRef`, which the page
+ * owns). The chosen files go to the page's upload queue. Nothing when
+ * uploads are off or in the landing demo.
  */
-export function UploadInput() {
+export function UploadInput({
+  inputRef,
+}: {
+  inputRef: RefObject<HTMLInputElement | null>;
+}) {
   const { uploadsEnabled } = useCurrentUser();
   const isDemo = useIsDemo();
-  const inputRef = useRef<HTMLInputElement>(null);
   const enabled = uploadsEnabled && !isDemo;
 
   useEffect(() => {
@@ -34,7 +38,7 @@ export function UploadInput() {
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [enabled]);
+  }, [enabled, inputRef]);
 
   if (!enabled) return null;
   return (

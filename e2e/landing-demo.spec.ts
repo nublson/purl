@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import type { PoolClient } from "pg";
-import { expect, test } from "./fixtures";
+import { chooseView, expect, test } from "./fixtures";
 import { createTestUser, deleteTestUser, pool, seedFolder, seedLink } from "./support/db";
 
 // The landing page's live demo: the `purl` account's public folders, shown in
@@ -252,7 +252,7 @@ test.describe("Landing demo", () => {
         );
       }
       await page.keyboard.press("Escape");
-      await page.getByRole("button", { name: "Grid view" }).click();
+      await chooseView(page, "Grid", { save: false });
 
       await expect(page.locator('[data-cy="link-card"]')).toHaveCount(4);
       expect(apiRequests.filter((url) => url.includes("/api/user/layout"))).toEqual([]);

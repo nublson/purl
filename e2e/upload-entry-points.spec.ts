@@ -3,7 +3,8 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, test, waitForHydration } from "./fixtures";
 
-// The three ways files get in (the + menu and `U`, a drop, a paste) and the
+// The three ways files get in (the picker: `U` or the search field's Add
+// files button; a drop; a paste) and the
 // drop overlay. No Blob store runs locally, so the token route is answered
 // in the browser with the storage limit: every upload starts (its pending
 // item shows), then fails with the server's message and Retry, and nothing
@@ -109,6 +110,19 @@ test.describe("Upload entry points", () => {
     await expectFailedUpload(page);
     // Reset, so choosing the same file again still fires a change.
     await expect(page.locator('[data-cy="upload-input"]')).toHaveValue("");
+  });
+
+  test("the search field's Add files opens the picker, and gives way to ✕ while typing", async ({ page }) => {
+    await openHome(page);
+    const addFiles = page.getByRole("button", { name: "Add files", includeHidden: true });
+    const chooser = page.waitForEvent("filechooser");
+    await addFiles.click();
+    await (await chooser).setFiles(PIXEL);
+    await expectFailedUpload(page);
+
+    await page.getByLabel("Search your links or paste a link to save").fill("al");
+    await expect(addFiles).toHaveAttribute("inert", "");
+    await expect(page.getByRole("button", { name: "Clear search" })).toBeVisible();
   });
 
   test("U does nothing while typing in the search field", async ({ page }) => {
@@ -251,9 +265,14 @@ test.describe("Upload entry points on a phone", () => {
     isMobile: true,
   });
 
-  test("the + menu is for pointers that hover: hidden on touch", async ({ page }) => {
+  test("the + menu is for pointers that hover; phones add files from the search field", async ({ page }) => {
     await page.goto("/home");
     await waitForHydration(page, 'button[aria-label^="Folder:"]');
     await expect(page.getByRole("button", { name: "Add", exact: true })).toBeHidden();
+    const addFiles = page.getByRole("button", { name: "Add files" });
+    await expect(addFiles).toBeVisible();
+    const chooser = page.waitForEvent("filechooser");
+    await addFiles.tap();
+    await chooser;
   });
 });

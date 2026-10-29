@@ -25,7 +25,7 @@ import { ChevronLeft, ChevronRight } from "reicon-react";
 export type ViewerMove = "prev" | "next" | "first" | "last";
 
 /**
- * The viewer's round buttons (Close, Previous, Next): 32px with a mouse;
+ * The viewer's round buttons (Previous, Next): 32px with a mouse;
  * on touch screens 40px plus 2px of invisible hit area all round (`after:`),
  * so each target is 44px, as in the selection bar.
  */
