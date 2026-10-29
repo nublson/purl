@@ -472,6 +472,35 @@ test.describe("Audio pearls: the grid card is the player card", () => {
     await expect(bars).toHaveCount(0);
   });
 
+  test("the whole of each transport button takes the pointer, not only its icon", async ({
+    page,
+    seed,
+  }) => {
+    await seedSong(seed);
+    await openHome(page);
+    await chooseView(page, "Grid");
+    const song = card(page, "Song");
+    // The owner's card lays a select surface over the whole card: every
+    // control must paint above it, across its full circle.
+    const misses = await song.evaluate((el) =>
+      Array.from(el.querySelectorAll<HTMLElement>("[data-transport] > *")).map((button) => {
+        const r = button.getBoundingClientRect();
+        let miss = 0;
+        for (let y = r.top + 2; y < r.bottom - 2; y += 3) {
+          for (let x = r.left + 2; x < r.right - 2; x += 3) {
+            const dx = x - (r.left + r.width / 2);
+            const dy = y - (r.top + r.height / 2);
+            if (dx * dx + dy * dy > (r.width / 2 - 2) ** 2) continue;
+            const hit = document.elementFromPoint(x, y);
+            if (!hit || !button.contains(hit)) miss++;
+          }
+        }
+        return miss;
+      }),
+    );
+    expect(misses).toEqual([0, 0, 0]);
+  });
+
   test("the hover preview and the card are one playback", async ({ page, seed }) => {
     await page.context().route("https://sounds.example/**", (route) =>
       route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),

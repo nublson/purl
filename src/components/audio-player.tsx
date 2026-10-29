@@ -154,10 +154,13 @@ export function AudioPlayer({
           )}
         </div>
       </div>
+      {/* Positioned (`relative`), so the controls paint above the owner's
+          card's select surface (`absolute inset-0 z-0`), which would
+          otherwise cover any of them that isn't positioned itself. */}
       <div
         data-card-menu
         inert={inert}
-        className={cn("@container flex flex-col p-4", inert ? "pointer-events-none" : "pointer-events-auto")}
+        className={cn("@container relative flex flex-col p-4", inert ? "pointer-events-none" : "pointer-events-auto")}
       >
         {/* A press on the track stays in the player: never its host's. */}
         <div onClick={keepAudioClick}>
