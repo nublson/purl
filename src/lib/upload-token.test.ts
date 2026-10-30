@@ -225,11 +225,29 @@ describe("issueUploadToken", () => {
       expect(assertCanStore).not.toHaveBeenCalled();
     });
 
-    it("must be WebP", async () => {
+    it("may be JPEG (Safari can't encode WebP)", async () => {
+      const options = await issue(`users/${USER}/c1/preview.jpg`, {
+        kind: "preview",
+        mimeType: "image/jpeg",
+        size: 10,
+      });
+      expect(options.allowedContentTypes).toEqual(["image/jpeg"]);
+    });
+
+    it("may be PNG (a transparent image on Safari)", async () => {
+      const options = await issue(`users/${USER}/c1/preview.png`, {
+        kind: "preview",
+        mimeType: "image/png",
+        size: 10,
+      });
+      expect(options.allowedContentTypes).toEqual(["image/png"]);
+    });
+
+    it("must be WebP, PNG or JPEG", async () => {
       expect(
         await rejection(`users/${USER}/c1/preview.webp`, {
           kind: "preview",
-          mimeType: "image/png",
+          mimeType: "image/gif",
           size: 10,
         }),
       ).toBe("UNSUPPORTED_TYPE");

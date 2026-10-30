@@ -283,7 +283,7 @@ test.describe("Media pearls", () => {
     await context.close();
   });
 
-  test("an uploaded image's row shows its preview; a saved image link its favicon", async ({
+  test("an image's row shows the image: an upload's preview, else the file", async ({
     page,
     seed,
     baseURL,
@@ -300,21 +300,40 @@ test.describe("Media pearls", () => {
       fileKey: "users/e2e/a/shot.png",
       fileSize: 1000,
     });
-    // A saved image link: its thumbnail is the file itself, too big for a
-    // 20px icon, so the row shows the site's favicon.
+    // An upload stored without a preview (an iPhone's, before Safari got a
+    // JPEG one): the file itself, never its favicon (Purl's own icon).
+    await seed.link({
+      url: `${icon}?c=1`,
+      title: "Shot C",
+      contentType: "IMAGE",
+      fileKey: "users/e2e/c/shot.png",
+      fileSize: 1000,
+    });
+    // A saved image link: the file itself, as the grid draws it.
     await seed.link({ url: `${icon}?b=1`, title: "Shot B", contentType: "IMAGE" });
+    // One that can't be drawn: the image icon, not a broken image or globe.
+    await seed.link({
+      url: `${baseURL}/missing-shot.png`,
+      title: "Shot D",
+      contentType: "IMAGE",
+    });
     await openHome(page);
 
     await expect(row(page, "Shot A").locator('[data-cy="row-favicon"] img')).toHaveAttribute(
       "src",
       icon,
     );
-    // (Its favicon here doesn't load, so the globe stands in; either way the
-    // file itself is never fetched for the row.)
-    await expect(row(page, "Shot B").locator('[data-cy="row-favicon"]')).toBeVisible();
-    await expect(
-      row(page, "Shot B").locator(`[data-cy="row-favicon"] img[src="${icon}?b=1"]`),
-    ).toHaveCount(0);
+    for (const [title, src] of [
+      ["Shot B", `${icon}?b=1`],
+      ["Shot C", `${icon}?c=1`],
+    ]) {
+      const img = row(page, title).locator('[data-cy="row-favicon"] img');
+      await expect(img).toHaveAttribute("src", src);
+      await expect(img).toHaveCSS("object-fit", "cover");
+    }
+    const broken = row(page, "Shot D").locator('[data-cy="row-favicon"]');
+    await expect(broken.locator("img")).toHaveCount(0);
+    await expect(broken.locator("svg.reicon")).toBeVisible();
   });
 });
 

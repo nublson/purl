@@ -5,7 +5,11 @@ import { toast } from "sonner";
 import { linksOriginHeaders } from "@/lib/links-origin";
 import { MAX_CONCURRENT_UPLOADS } from "@/lib/limits";
 import type { PendingUpload } from "@/lib/pending-upload";
-import { contentTypeForMime, sanitizeUploadName } from "@/lib/uploads/mime";
+import {
+  contentTypeForMime,
+  PREVIEW_MIME_EXTENSIONS,
+  sanitizeUploadName,
+} from "@/lib/uploads/mime";
 import { makePreview, roundDuration } from "@/lib/uploads/preview";
 import { validateUploadFile } from "@/lib/uploads/validate";
 import { parseJsonLinks, type Link } from "@/utils/links";
@@ -13,7 +17,6 @@ import { parseJsonLinks, type Link } from "@/utils/links";
 const TOKEN_ROUTE = "/api/uploads/token";
 /** Where a file in Blob becomes its pearl. */
 const ROW_ROUTE = "/api/uploads";
-const PREVIEW_MIME_TYPE = "image/webp";
 const UNAVAILABLE_MESSAGE = "Uploads aren't available here";
 /** Object URLs outlive their item a moment, until what replaced it is drawn. */
 const REVOKE_DELAY_MS = 1000;
@@ -295,16 +298,18 @@ async function uploadBytes(
   let remotePreviewUrl: string | null = null;
   if (preview.blob) {
     try {
-      const previewPath = `${folder}/preview.webp`;
+      // WebP, or JPEG where the browser can't encode WebP (`makePreview`).
+      const previewType = preview.blob.type;
+      const previewPath = `${folder}/preview.${PREVIEW_MIME_EXTENSIONS[previewType]}`;
       const previewToken = await requestClientToken(
         previewPath,
-        { kind: "preview", mimeType: PREVIEW_MIME_TYPE, size: preview.blob.size },
+        { kind: "preview", mimeType: previewType, size: preview.blob.size },
         false,
       );
       const stored = await put(previewPath, preview.blob, {
         access: "public",
         token: previewToken,
-        contentType: PREVIEW_MIME_TYPE,
+        contentType: previewType,
         abortSignal: signal,
       });
       remotePreviewUrl = stored.url;

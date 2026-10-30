@@ -25,6 +25,21 @@ export const UPLOAD_MIME_TYPES: readonly string[] = MIME_EXTENSIONS.map(
   ([mime]) => mime,
 );
 
+/**
+ * A preview's allowed types: WebP, else, from a browser that can't encode
+ * WebP (Safari's canvas can't), PNG for an image with transparency and JPEG
+ * for the rest; each with its file extension.
+ */
+export const PREVIEW_MIME_EXTENSIONS: Readonly<Record<string, string>> = {
+  "image/webp": "webp",
+  "image/png": "png",
+  "image/jpeg": "jpg",
+};
+
+export function isPreviewMimeType(mime: string): boolean {
+  return Object.hasOwn(PREVIEW_MIME_EXTENSIONS, mime);
+}
+
 const EXTENSION_TO_MIME = new Map<string, string>();
 for (const [mime, extensions] of MIME_EXTENSIONS) {
   for (const extension of extensions) {

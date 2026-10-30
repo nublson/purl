@@ -4,6 +4,8 @@
  * throws: every failure resolves to nulls.
  */
 
+import { MAX_UPLOAD_PREVIEW_BYTES } from "@/lib/limits";
+
 export const PREVIEW_MAX_PX = 1280;
 export const PREVIEW_QUALITY = 0.82;
 
@@ -52,19 +54,59 @@ export async function makePreview(
   return { ...EMPTY };
 }
 
-function toWebp(canvas: HTMLCanvasElement): Promise<Blob | null> {
+function encode(
+  canvas: HTMLCanvasElement,
+  type: "image/webp" | "image/png" | "image/jpeg",
+): Promise<Blob | null> {
   return new Promise((resolve) => {
     try {
       canvas.toBlob(
-        // A browser without WebP encoding hands back a PNG: not a preview.
-        (blob) => resolve(blob && blob.type === "image/webp" ? blob : null),
-        "image/webp",
+        // A browser that can't encode `type` hands back a PNG: not a preview.
+        (blob) => resolve(blob && blob.type === type ? blob : null),
+        type,
         PREVIEW_QUALITY,
       );
     } catch {
       resolve(null);
     }
   });
+}
+
+/**
+ * The preview: WebP, else JPEG. Safari's canvas can't encode WebP, so
+ * without the fallback every upload from an iPhone went without one (its
+ * row showed Purl's icon, and the viewer decoded the full photo to open).
+ * JPEG has no alpha (transparent pixels turn black), so an image with
+ * transparency falls back to PNG instead while it fits the preview cap.
+ */
+async function toPreviewBlob(
+  canvas: HTMLCanvasElement,
+  transparent = false,
+): Promise<Blob | null> {
+  const webp = await encode(canvas, "image/webp");
+  if (webp) return webp;
+  if (transparent) {
+    const png = await encode(canvas, "image/png");
+    if (png && png.size <= MAX_UPLOAD_PREVIEW_BYTES) return png;
+  }
+  return encode(canvas, "image/jpeg");
+}
+
+/** Whether any pixel the canvas holds is less than fully opaque. */
+function hasTransparency(
+  context: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+): boolean {
+  try {
+    const { data } = context.getImageData(0, 0, width, height);
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] < 255) return true;
+    }
+  } catch {
+    // unreadable: treat as opaque
+  }
+  return false;
 }
 
 async function imagePreview(
@@ -108,7 +150,11 @@ async function imagePreview(
     const context = canvas.getContext("2d");
     if (!context) return { blob: null, width, height, duration: null };
     context.drawImage(bitmap, 0, 0, target.width, target.height);
-    const blob = await toWebp(canvas);
+    const blob = await toPreviewBlob(
+      canvas,
+      mimeType !== "image/jpeg" &&
+        hasTransparency(context, target.width, target.height),
+    );
     return { blob, width, height, duration: null };
   } finally {
     bitmap.close?.();
@@ -213,7 +259,7 @@ async function videoPreview(file: File): Promise<PreviewResult> {
     const context = canvas.getContext("2d");
     if (!context) return { blob: null, width, height, duration };
     context.drawImage(video, 0, 0, target.width, target.height);
-    const blob = await toWebp(canvas);
+    const blob = await toPreviewBlob(canvas);
     return { blob, width, height, duration };
   } finally {
     video.removeAttribute("src");

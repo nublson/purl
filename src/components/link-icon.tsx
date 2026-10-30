@@ -3,7 +3,13 @@
 import { safeRemoteImgSrc } from "@/lib/safe-remote-img-url";
 import { cn } from "@/lib/utils";
 import type { Link } from "@/utils/links";
-import { FileText, Globe, MusicNote, Video } from "reicon-react";
+import {
+  FileText,
+  Globe,
+  Image as ImageIcon,
+  MusicNote,
+  Video,
+} from "reicon-react";
 import * as React from "react";
 
 interface LinkIconProps {
@@ -38,12 +44,12 @@ export function LinkIcon({
     case "VIDEO":
       return <Video className={icon} />;
     case "IMAGE": {
-      // An upload's own preview (a 1,280px WebP), as a rounded square. A
-      // saved image link has no smaller copy (its thumbnail is the file
-      // itself, megabytes for a 20px icon), nor does a GIF upload: those
-      // show their favicon, like any link.
-      const previewSrc =
-        link.upload && link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
+      // The image itself, as a rounded square: an upload's preview (a
+      // 1,280px WebP or JPEG) when it has one, else the file (a saved image
+      // link, a GIF, an upload stored without a preview), as the grid draws
+      // it. Never the favicon: an upload's is Purl's own icon. One that
+      // can't be drawn shows the image icon.
+      const previewSrc = safeRemoteImgSrc(link.thumbnail ?? link.url);
       if (previewSrc) {
         return (
           <RemoteFavicon
@@ -57,7 +63,7 @@ export function LinkIcon({
           />
         );
       }
-      return <Favicon link={link} px={px} box={box} icon={icon} eager={eagerFavicon} />;
+      return <ImageIcon className={cn(icon, "text-muted-foreground")} aria-hidden />;
     }
     default:
       return <Favicon link={link} px={px} box={box} icon={icon} eager={eagerFavicon} />;
@@ -97,7 +103,7 @@ function Favicon({
  * A favicon (or an image pearl's preview, `cover`) from another site, which
  * can take a moment: a muted square holds its place, then it fades in
  * (150ms, opacity only) instead of popping into an empty gap. One that
- * fails shows the globe.
+ * fails shows the globe (an image's preview: the image icon).
  */
 function RemoteFavicon({
   src,
@@ -129,7 +135,9 @@ function RemoteFavicon({
   }, []);
 
   if (state === "failed") {
-    return <Globe className={cn(icon, "text-muted-foreground")} aria-hidden />;
+    // An image pearl's own image: the image icon, not a site's globe.
+    const Fallback = cover ? ImageIcon : Globe;
+    return <Fallback className={cn(icon, "text-muted-foreground")} aria-hidden />;
   }
 
   return (

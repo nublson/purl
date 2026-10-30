@@ -495,8 +495,20 @@ describe("createUploadForUser", () => {
     expect(del).toHaveBeenCalledWith([FILE_URL, PREVIEW_URL]);
   });
 
-  it("rejects a preview that isn't WebP and deletes the blobs", async () => {
+  it("accepts a JPEG preview (Safari can't encode WebP)", async () => {
+    mockHeads("image/png", "image/jpeg");
+    await createUploadForUser("u1", INPUT);
+    expect(prisma.link.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("accepts a PNG preview (a transparent image on Safari)", async () => {
     mockHeads("image/png", "image/png");
+    await createUploadForUser("u1", INPUT);
+    expect(prisma.link.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a preview that isn't WebP, PNG or JPEG and deletes the blobs", async () => {
+    mockHeads("image/png", "image/gif");
     await expect(createUploadForUser("u1", INPUT)).rejects.toBeInstanceOf(
       InvalidUploadError,
     );
@@ -586,7 +598,7 @@ describe("createUploadForUser", () => {
   });
 
   it("leaves the blobs alone when a saved link already uses them (a retry with a bad preview)", async () => {
-    mockHeads("image/png", "image/png");
+    mockHeads("image/png", "image/gif");
     vi.mocked(prisma.link.findFirst).mockResolvedValue({ id: "link-0" } as never);
     await expect(createUploadForUser("u1", INPUT)).rejects.toBeInstanceOf(
       InvalidUploadError,
