@@ -311,6 +311,12 @@ test.describe("Media pearls", () => {
     });
     // A saved image link: the file itself, as the grid draws it.
     await seed.link({ url: `${icon}?b=1`, title: "Shot B", contentType: "IMAGE" });
+    // One that can't be drawn: the image icon, not a broken image or globe.
+    await seed.link({
+      url: `${baseURL}/missing-shot.png`,
+      title: "Shot D",
+      contentType: "IMAGE",
+    });
     await openHome(page);
 
     await expect(row(page, "Shot A").locator('[data-cy="row-favicon"] img')).toHaveAttribute(
@@ -325,6 +331,9 @@ test.describe("Media pearls", () => {
       await expect(img).toHaveAttribute("src", src);
       await expect(img).toHaveCSS("object-fit", "cover");
     }
+    const broken = row(page, "Shot D").locator('[data-cy="row-favicon"]');
+    await expect(broken.locator("img")).toHaveCount(0);
+    await expect(broken.locator("svg.reicon")).toBeVisible();
   });
 });
 
