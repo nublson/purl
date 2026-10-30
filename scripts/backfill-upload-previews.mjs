@@ -40,11 +40,18 @@ const FETCH_TIMEOUT_MS = 60_000;
 
 function parseArgs(argv) {
   const args = { apply: false, user: null, limit: null };
+  // An option's value: missing, empty or another option is refused, so a
+  // cut-off `--user` never widens the run to every account.
+  const value = (i, option) => {
+    const next = argv[i];
+    if (!next || next.startsWith("-")) throw new Error(`${option} takes a value`);
+    return next;
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--apply") args.apply = true;
-    else if (arg === "--user") args.user = argv[++i] ?? null;
-    else if (arg === "--limit") args.limit = Number(argv[++i]);
+    else if (arg === "--user") args.user = value(++i, arg);
+    else if (arg === "--limit") args.limit = Number(value(++i, arg));
     else throw new Error(`Unknown option: ${arg}`);
   }
   if (args.limit !== null && !(Number.isInteger(args.limit) && args.limit > 0)) {

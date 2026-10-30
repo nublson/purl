@@ -234,11 +234,20 @@ describe("issueUploadToken", () => {
       expect(options.allowedContentTypes).toEqual(["image/jpeg"]);
     });
 
-    it("must be WebP or JPEG", async () => {
+    it("may be PNG (a transparent image on Safari)", async () => {
+      const options = await issue(`users/${USER}/c1/preview.png`, {
+        kind: "preview",
+        mimeType: "image/png",
+        size: 10,
+      });
+      expect(options.allowedContentTypes).toEqual(["image/png"]);
+    });
+
+    it("must be WebP, PNG or JPEG", async () => {
       expect(
         await rejection(`users/${USER}/c1/preview.webp`, {
           kind: "preview",
-          mimeType: "image/png",
+          mimeType: "image/gif",
           size: 10,
         }),
       ).toBe("UNSUPPORTED_TYPE");
