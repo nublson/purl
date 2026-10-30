@@ -52,19 +52,31 @@ export async function makePreview(
   return { ...EMPTY };
 }
 
-function toWebp(canvas: HTMLCanvasElement): Promise<Blob | null> {
+function encode(
+  canvas: HTMLCanvasElement,
+  type: "image/webp" | "image/jpeg",
+): Promise<Blob | null> {
   return new Promise((resolve) => {
     try {
       canvas.toBlob(
-        // A browser without WebP encoding hands back a PNG: not a preview.
-        (blob) => resolve(blob && blob.type === "image/webp" ? blob : null),
-        "image/webp",
+        // A browser that can't encode `type` hands back a PNG: not a preview.
+        (blob) => resolve(blob && blob.type === type ? blob : null),
+        type,
         PREVIEW_QUALITY,
       );
     } catch {
       resolve(null);
     }
   });
+}
+
+/**
+ * The preview: WebP, else JPEG. Safari's canvas can't encode WebP, so
+ * without the fallback every upload from an iPhone went without one (its
+ * row showed Purl's icon, and the viewer decoded the full photo to open).
+ */
+async function toPreviewBlob(canvas: HTMLCanvasElement): Promise<Blob | null> {
+  return (await encode(canvas, "image/webp")) ?? (await encode(canvas, "image/jpeg"));
 }
 
 async function imagePreview(
@@ -108,7 +120,7 @@ async function imagePreview(
     const context = canvas.getContext("2d");
     if (!context) return { blob: null, width, height, duration: null };
     context.drawImage(bitmap, 0, 0, target.width, target.height);
-    const blob = await toWebp(canvas);
+    const blob = await toPreviewBlob(canvas);
     return { blob, width, height, duration: null };
   } finally {
     bitmap.close?.();
@@ -213,7 +225,7 @@ async function videoPreview(file: File): Promise<PreviewResult> {
     const context = canvas.getContext("2d");
     if (!context) return { blob: null, width, height, duration };
     context.drawImage(video, 0, 0, target.width, target.height);
-    const blob = await toWebp(canvas);
+    const blob = await toPreviewBlob(canvas);
     return { blob, width, height, duration };
   } finally {
     video.removeAttribute("src");

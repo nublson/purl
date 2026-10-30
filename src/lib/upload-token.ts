@@ -4,13 +4,10 @@ import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { assertCanSaveLink, assertCanStore } from "@/lib/entitlements";
 import { MAX_UPLOAD_FILE_BYTES, MAX_UPLOAD_PREVIEW_BYTES } from "@/lib/limits";
 import { isOwnBlobPathname } from "@/lib/uploads/blob-url";
-import { UPLOAD_MIME_TYPES } from "@/lib/uploads/mime";
+import { isPreviewMimeType, UPLOAD_MIME_TYPES } from "@/lib/uploads/mime";
 
 /** How long a client token may start an upload. */
 const TOKEN_VALIDITY_MS = 10 * 60_000;
-
-/** The preview's one allowed type (`makePreview` encodes WebP). */
-const PREVIEW_MIME_TYPE = "image/webp";
 
 export type UploadRejectedCode =
   | "INVALID_PAYLOAD"
@@ -101,7 +98,7 @@ export async function issueUploadToken(
         if (!name.startsWith("preview")) {
           throw new UploadRejectedError("INVALID_PATH");
         }
-        if (mimeType !== PREVIEW_MIME_TYPE) {
+        if (!isPreviewMimeType(mimeType)) {
           throw new UploadRejectedError("UNSUPPORTED_TYPE");
         }
       } else if (!UPLOAD_MIME_TYPES.includes(mimeType)) {

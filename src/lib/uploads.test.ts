@@ -495,7 +495,13 @@ describe("createUploadForUser", () => {
     expect(del).toHaveBeenCalledWith([FILE_URL, PREVIEW_URL]);
   });
 
-  it("rejects a preview that isn't WebP and deletes the blobs", async () => {
+  it("accepts a JPEG preview (Safari can't encode WebP)", async () => {
+    mockHeads("image/png", "image/jpeg");
+    await createUploadForUser("u1", INPUT);
+    expect(prisma.link.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a preview that isn't WebP or JPEG and deletes the blobs", async () => {
     mockHeads("image/png", "image/png");
     await expect(createUploadForUser("u1", INPUT)).rejects.toBeInstanceOf(
       InvalidUploadError,

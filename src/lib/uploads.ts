@@ -7,7 +7,11 @@ import { mapRowToLink } from "@/lib/links";
 import { MAX_UPLOAD_PREVIEW_BYTES, UPLOAD_ROW_WINDOW_MS } from "@/lib/limits";
 import prisma from "@/lib/prisma";
 import { blobPathnameOf, isBlobUrl, isOwnBlobPathname } from "@/lib/uploads/blob-url";
-import { contentTypeForMime, UPLOAD_MIME_TYPES } from "@/lib/uploads/mime";
+import {
+  contentTypeForMime,
+  isPreviewMimeType,
+  UPLOAD_MIME_TYPES,
+} from "@/lib/uploads/mime";
 import type { Link } from "@/utils/links";
 import { titleFromFileName } from "@/utils/media-title";
 
@@ -34,8 +38,6 @@ export class InvalidUploadError extends Error {
   readonly code = "INVALID_UPLOAD";
 }
 
-/** The preview's one allowed type (`makePreview` encodes WebP). */
-const PREVIEW_MIME_TYPE = "image/webp";
 const MAX_DIMENSION = 100_000;
 /** 100 days, in seconds: keeps nonsense out of the Int column. */
 const MAX_DURATION = 86_400 * 100;
@@ -240,7 +242,7 @@ export async function createUploadForUser(
     }
     if (
       preview !== null &&
-      (normalizeMime(preview.contentType) !== PREVIEW_MIME_TYPE ||
+      (!isPreviewMimeType(normalizeMime(preview.contentType)) ||
         !Number.isSafeInteger(preview.size) ||
         preview.size > MAX_UPLOAD_PREVIEW_BYTES)
     ) {

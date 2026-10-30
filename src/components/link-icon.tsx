@@ -38,12 +38,11 @@ export function LinkIcon({
     case "VIDEO":
       return <Video className={icon} />;
     case "IMAGE": {
-      // An upload's own preview (a 1,280px WebP), as a rounded square. A
-      // saved image link has no smaller copy (its thumbnail is the file
-      // itself, megabytes for a 20px icon), nor does a GIF upload: those
-      // show their favicon, like any link.
-      const previewSrc =
-        link.upload && link.thumbnail ? safeRemoteImgSrc(link.thumbnail) : null;
+      // The image itself, as a rounded square: an upload's preview (a
+      // 1,280px WebP or JPEG) when it has one, else the file (a saved image
+      // link, a GIF, an upload stored without a preview), as the grid draws
+      // it. Never the favicon: an upload's is Purl's own icon.
+      const previewSrc = safeRemoteImgSrc(link.thumbnail ?? link.url);
       if (previewSrc) {
         return (
           <RemoteFavicon
