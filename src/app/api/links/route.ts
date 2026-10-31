@@ -51,8 +51,8 @@ export async function OPTIONS(request: NextRequest) {
 /**
  * Session-authenticated list for the /home infinite scroll and reloads.
  * `limit` (1..MAX_SAVED_LINKS, default one page), `cursor` (ISO createdAt of
- * the last loaded link), `folderId`, and `q` (search: title, domain or URL,
- * case-insensitive). Returns date-grouped links plus the user's total count.
+ * the last loaded link), `folderId`, and `q` (search: title, domain, URL,
+ * description or notes, case-insensitive). Returns date-grouped links plus the user's total count.
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;

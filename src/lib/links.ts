@@ -1079,22 +1079,24 @@ export const MAX_LINK_SEARCH_RESULTS = 100;
 export const MAX_LINK_SEARCH_QUERY_LENGTH = 200;
 
 /**
- * Prisma condition matching `query` against a link's title, domain or URL
- * (case-insensitive), or null for a blank query. Cuts the query at
- * `MAX_LINK_SEARCH_QUERY_LENGTH`.
+ * Prisma condition matching `query` against a link's title, domain, URL,
+ * description or notes (case-insensitive), or null for a blank query. Cuts
+ * the query at `MAX_LINK_SEARCH_QUERY_LENGTH`.
  */
-function linkQueryWhere(query: string | undefined) {
+export function linkQueryWhere(
+  query: string | undefined,
+): { OR: Array<Record<string, { contains: string; mode: "insensitive" }>> } | null {
   const text = (query ?? "").trim().slice(0, MAX_LINK_SEARCH_QUERY_LENGTH);
   if (!text) return null;
   return {
-    OR: (["title", "domain", "url"] as const).map((field) => ({
+    OR: (["title", "domain", "url", "description", "notes"] as const).map((field) => ({
       [field]: { contains: text, mode: "insensitive" as const },
     })),
   };
 }
 
 export type SearchLinksOptions = {
-  /** Matched case-insensitively against title, domain and URL; blank lists everything. */
+  /** Matched case-insensitively against title, domain, URL, description and notes; blank lists everything. */
   query: string;
   /** Leave out links already in this folder (links in other folders or none stay). */
   notInFolderId?: string;
@@ -1142,7 +1144,7 @@ export type ListLinksOptions = {
   cursor: string | null;
   contentType: string | null;
   folderId?: string;
-  /** Only links whose title, domain or URL contains this (case-insensitive). */
+  /** Only links whose title, domain, URL, description or notes contains this (case-insensitive). */
   query?: string;
 };
 

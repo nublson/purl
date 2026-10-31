@@ -58,6 +58,7 @@ const {
   createLinkForUser,
   getLinksPageForCurrentUser,
   LinkNotesError,
+  linkQueryWhere,
   normalizeLinkNotes,
   UnauthorizedError,
   listLinks,
@@ -578,5 +579,29 @@ describe("writing a link's note", () => {
         "notes",
       );
     });
+  });
+});
+
+describe("linkQueryWhere", () => {
+  it("is null for a blank query", () => {
+    expect(linkQueryWhere("  ")).toBeNull();
+    expect(linkQueryWhere(undefined)).toBeNull();
+  });
+
+  it("matches title, domain, URL, description and notes, case-insensitively", () => {
+    expect(linkQueryWhere("Bird")!.OR.map((c) => Object.keys(c)[0])).toEqual([
+      "title",
+      "domain",
+      "url",
+      "description",
+      "notes",
+    ]);
+    expect(linkQueryWhere("Bird")!.OR[4]).toEqual({
+      notes: { contains: "Bird", mode: "insensitive" },
+    });
+  });
+
+  it("cuts the query at MAX_LINK_SEARCH_QUERY_LENGTH", () => {
+    expect(linkQueryWhere("x".repeat(300))!.OR[0].title.contains).toHaveLength(200);
   });
 });
