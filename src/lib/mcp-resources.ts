@@ -42,6 +42,14 @@ function escapeTitle(title: string): string {
     .replace(/\]/g, "\\]");
 }
 
+/** Cuts to `DESCRIPTION_MAX` code points (never splitting a surrogate pair), plus an ellipsis. */
+function cutText(text: string): string {
+  const chars = Array.from(text);
+  return chars.length > DESCRIPTION_MAX
+    ? `${chars.slice(0, DESCRIPTION_MAX).join("")}…`
+    : text;
+}
+
 function renderLinks(links: ResourceLink[], { withFolder }: { withFolder: boolean }): string {
   const lines: string[] = [];
   let currentDay: string | null = null;
@@ -62,14 +70,10 @@ function renderLinks(links: ResourceLink[], { withFolder }: { withFolder: boolea
     if (withFolder && link.folder) line += ` · ${formatFolderLabel(link.folder)}`;
     lines.push(line);
     const description = link.description?.replace(/\s+/g, " ").trim();
-    if (description) {
-      const chars = Array.from(description);
-      const cut =
-        chars.length > DESCRIPTION_MAX
-          ? `${chars.slice(0, DESCRIPTION_MAX).join("")}…`
-          : description;
-      lines.push(`  ${cut}`);
-    }
+    if (description) lines.push(`  ${cutText(description)}`);
+    const notes = link.notes?.replace(/\s+/g, " ").trim();
+    // Underscores are escaped so a note can't end the italics early.
+    if (notes) lines.push(`  _${cutText(notes).replace(/_/g, "\\_")}_`);
   }
   return lines.join("\n");
 }

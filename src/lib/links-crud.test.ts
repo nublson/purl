@@ -1991,6 +1991,7 @@ describe("listLinksForResource", () => {
         url: true,
         title: true,
         description: true,
+        notes: true,
         domain: true,
         contentType: true,
         createdAt: true,

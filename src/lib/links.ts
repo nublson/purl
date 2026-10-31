@@ -1182,6 +1182,7 @@ export type ResourceLink = {
   url: string;
   title: string;
   description: string | null;
+  notes: string | null;
   domain: string;
   contentType: ContentType;
   createdAt: Date;
@@ -1201,6 +1202,7 @@ export async function listLinksForResource(
       url: true,
       title: true,
       description: true,
+      notes: true,
       domain: true,
       contentType: true,
       createdAt: true,

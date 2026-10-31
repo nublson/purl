@@ -22,6 +22,7 @@ function link(overrides: Partial<ResourceLink> = {}): ResourceLink {
     url: "https://example.com/a",
     title: "Title",
     description: null,
+    notes: null,
     domain: "example.com",
     contentType: "WEB",
     createdAt: new Date("2026-10-20T10:00:00Z"),
@@ -146,6 +147,44 @@ describe("renderFolderResource", () => {
     expect(lineAfter("a\n\n  b")).toBe("  a b");
     expect(lineAfter(null)).toBe("");
     expect(lineAfter("  \n ")).toBe("");
+  });
+
+  it("renders a note after the description as an italic line", () => {
+    const lines = renderFolderResource(
+      folder(),
+      [link({ description: "desc", notes: "my note" })],
+      NOW,
+    ).split("\n");
+    const i = lines.findIndex((x) => x.startsWith("- "));
+    expect(lines[i + 1]).toBe("  desc");
+    expect(lines[i + 2]).toBe("  _my note_");
+  });
+
+  it("cuts a long note to 200 characters plus an ellipsis", () => {
+    const lines = renderFolderResource(
+      folder(),
+      [link({ notes: "n".repeat(250) })],
+      NOW,
+    ).split("\n");
+    expect(lines).toContain(`  _${"n".repeat(200)}…_`);
+  });
+
+  it("escapes underscores so a note cannot end the italics", () => {
+    const md = renderFolderResource(folder(), [link({ notes: "snake_case_ok" })], NOW);
+    expect(md).toContain("  _snake\\_case\\_ok_");
+  });
+
+  it("collapses whitespace in a note so it stays one line", () => {
+    const md = renderFolderResource(folder(), [link({ notes: "a\n\n## 2026-01-01\tb" })], NOW);
+    expect(md).toContain("  _a ## 2026-01-01 b_");
+  });
+
+  it("renders no line for a whitespace-only or null note", () => {
+    for (const notes of [" \n\t ", null]) {
+      const lines = renderFolderResource(folder(), [link({ notes })], NOW).split("\n");
+      const i = lines.findIndex((x) => x.startsWith("- "));
+      expect(lines[i + 1]).toBe("");
+    }
   });
 
   it("cuts descriptions by code point, never splitting a surrogate pair", () => {

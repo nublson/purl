@@ -20,7 +20,11 @@ const mockMoveLinksToFolder = vi.fn();
 const mockDeleteLinksForUser = vi.fn();
 const mockListLinksForResource = vi.fn();
 const mockCountLinksForUser = vi.fn();
+class MockLinkNotesError extends Error {
+  constructor() { super("Keep the note to 2,000 characters or fewer."); }
+}
 vi.mock("@/lib/links", () => ({
+  LinkNotesError: MockLinkNotesError,
   listLinksForResource: mockListLinksForResource,
   countLinksForUser: mockCountLinksForUser,
   deleteLinksForUser: mockDeleteLinksForUser,
@@ -140,6 +144,18 @@ describe("registerPurlTools", () => {
     ]);
   });
 
+  it("save_link takes an optional notes input", () => {
+    const calls: unknown[][] = [];
+    const mockServer = { tool: vi.fn((...args: unknown[]) => void calls.push(args)) };
+    registerPurlTools(mockServer as never);
+    const saveLink = calls.find((c) => c[0] === "save_link");
+    const schema = saveLink?.find(
+      (a) => typeof a === "object" && a !== null && "url" in a,
+    ) as Record<string, { isOptional(): boolean }>;
+    expect(Object.keys(schema)).toContain("notes");
+    expect(schema.notes.isOptional()).toBe(true);
+  });
+
   it("registered tool handlers reject requests without authInfo", async () => {
     const handlers: Array<
       (args: unknown, extra: unknown) => Promise<unknown>
@@ -188,6 +204,7 @@ describe("registerPurlResources", () => {
     url: "https://example.com/a",
     title: "A link",
     description: "About it",
+    notes: null,
     domain: "example.com",
     contentType: "WEB" as const,
     createdAt: new Date("2026-10-20T10:00:00Z"),
@@ -683,6 +700,40 @@ describe("saveLinkTool", () => {
       "user-1",
       "https://example.com",
     );
+  });
+
+  it("passes notes through to createLinkForUser", async () => {
+    mockCreateLinkForUser.mockResolvedValue({
+      id: "link-1",
+      userId: "user-1",
+    });
+    await saveLinkTool("user-1", "https://example.com", undefined, "a note");
+    expect(mockCreateLinkForUser).toHaveBeenCalledWith(
+      "user-1",
+      "https://example.com",
+      { folderId: undefined, notes: "a note" },
+    );
+    expect(mockCreateLinkForUser.mock.calls[0][2]).toHaveProperty("notes", "a note");
+  });
+
+  it("passes folderId and notes together", async () => {
+    mockCreateLinkForUser.mockResolvedValue({
+      id: "link-1",
+      userId: "user-1",
+    });
+    await saveLinkTool("user-1", "https://example.com", "folder-1", "a note");
+    expect(mockCreateLinkForUser).toHaveBeenCalledWith(
+      "user-1",
+      "https://example.com",
+      { folderId: "folder-1", notes: "a note" },
+    );
+  });
+
+  it("returns a tool error for an over-long note", async () => {
+    mockCreateLinkForUser.mockRejectedValue(new MockLinkNotesError());
+    const result = await saveLinkTool("user-1", "https://example.com", undefined, "x");
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe("Keep the note to 2,000 characters or fewer.");
   });
 
   it("includes moved in the result", async () => {
