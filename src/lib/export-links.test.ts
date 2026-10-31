@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBookmarksHtml, exportFileName } from "./export-links";
+import { buildBookmarksHtml, exportFileName, ROOT_FOLDER_NAME } from "./export-links";
 import { parseBookmarksHtml } from "./import/parse-bookmarks-html";
 
 const at = (iso: string) => new Date(iso);
@@ -54,6 +54,26 @@ describe("buildBookmarksHtml", () => {
     });
     expect(html).not.toContain("<DD>");
     expect(html).toContain("<H3 ADD_DATE=\"1767225600\">Empty</H3>");
+  });
+
+  it("wraps everything in one flagged root, so a folder named like a browser root survives the round trip", () => {
+    const html = buildBookmarksHtml({
+      folders: [
+        { id: "f1", name: "Favorites", createdAt: at("2026-01-01T00:00:00Z") },
+        { id: "f2", name: "Other bookmarks", createdAt: at("2026-01-01T00:00:00Z") },
+      ],
+      links: [
+        { url: "https://a.test/fav", title: "Fav", description: null, folderId: "f1", createdAt: at("2026-01-01T00:00:00Z") },
+        { url: "https://a.test/other", title: "Other", description: null, folderId: "f2", createdAt: at("2026-01-01T00:00:00Z") },
+        { url: "https://a.test/home", title: "Home", description: null, folderId: null, createdAt: at("2026-01-01T00:00:00Z") },
+      ],
+    });
+    expect(html).toContain(`<DT><H3 PERSONAL_TOOLBAR_FOLDER="true">${ROOT_FOLDER_NAME}</H3>`);
+    expect(parseBookmarksHtml(html).map(({ url, folder }) => ({ url, folder }))).toEqual([
+      { url: "https://a.test/fav", folder: "Favorites" },
+      { url: "https://a.test/other", folder: "Other bookmarks" },
+      { url: "https://a.test/home", folder: null },
+    ]);
   });
 
   it("files a link under no folder when its folder isn't in the list", () => {

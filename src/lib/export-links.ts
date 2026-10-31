@@ -5,6 +5,13 @@
  * folder's name and a link's URL, title, date and description, nothing
  * else: folder emoji and descriptions, upload sizes and content types stay
  * out. Uploads appear by their file URL like any link.
+ *
+ * Everything sits inside one root folder, "Purl", flagged
+ * `PERSONAL_TOOLBAR_FOLDER` the way Chrome's export wraps its bookmarks bar:
+ * importers that know the flag (Purl's own among them) drop the root, and
+ * a Purl folder is then never a top-level `<H3>`, so one named like a
+ * browser root ("Favorites", "Other bookmarks") keeps its links on the way
+ * back instead of being read as a root and emptied into Home.
  */
 
 export type ExportFolder = {
@@ -45,6 +52,9 @@ function oneLine(text: string): string {
 
 const addDate = (date: Date) => Math.floor(date.getTime() / 1000);
 
+/** The one root folder every export is wrapped in (see the module comment). */
+export const ROOT_FOLDER_NAME = "Purl";
+
 function linkLine(link: ExportLink, indent: string): string {
   const anchor = `${indent}<DT><A HREF="${escapeHtml(link.url)}" ADD_DATE="${addDate(link.createdAt)}">${escapeHtml(oneLine(link.title))}</A>`;
   const description = link.description ? oneLine(link.description) : "";
@@ -56,8 +66,8 @@ const newestFirst = (a: ExportLink, b: ExportLink) =>
 
 /**
  * Folders in the order given (the user's), each with its links newest first;
- * links in no folder (or in one that isn't listed) at the top level, which
- * Purl's importer reads as Home.
+ * links in no folder (or in one that isn't listed) directly in the root,
+ * which Purl's importer reads as Home.
  */
 export function buildBookmarksHtml({
   folders,
@@ -73,21 +83,26 @@ export function buildBookmarksHtml({
     (bucket ?? unfiled).push(link);
   }
 
-  const lines: string[] = [HEAD, "<DL><p>"];
+  const lines: string[] = [
+    HEAD,
+    "<DL><p>",
+    `    <DT><H3 PERSONAL_TOOLBAR_FOLDER="true">${ROOT_FOLDER_NAME}</H3>`,
+    "    <DL><p>",
+  ];
   for (const folder of folders) {
     lines.push(
-      `    <DT><H3 ADD_DATE="${addDate(folder.createdAt)}">${escapeHtml(oneLine(folder.name))}</H3>`,
-      "    <DL><p>",
+      `        <DT><H3 ADD_DATE="${addDate(folder.createdAt)}">${escapeHtml(oneLine(folder.name))}</H3>`,
+      "        <DL><p>",
     );
     for (const link of (byFolder.get(folder.id) ?? []).sort(newestFirst)) {
-      lines.push(linkLine(link, "        "));
+      lines.push(linkLine(link, "            "));
     }
-    lines.push("    </DL><p>");
+    lines.push("        </DL><p>");
   }
   for (const link of unfiled.sort(newestFirst)) {
-    lines.push(linkLine(link, "    "));
+    lines.push(linkLine(link, "        "));
   }
-  lines.push("</DL><p>", "");
+  lines.push("    </DL><p>", "</DL><p>", "");
   return lines.join("\n");
 }
 
