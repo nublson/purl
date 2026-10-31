@@ -247,6 +247,78 @@ test.describe("Shared folders, visited signed out", () => {
     await expect(page.locator('ul[aria-label="Links"] .animate-pulse')).toHaveCount(0);
   });
 
+  test("a card resizing in the grid keeps the page where it was scrolled", async ({
+    page,
+    seed,
+    testUser,
+  }, testInfo) => {
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    for (let i = 0; i < 40; i++) {
+      await seed.link({ url: `https://r${i}.example`, title: `Row ${i}`, folderId: design });
+    }
+    await page.context().addCookies([
+      { name: "purl-shared-view", value: "grid", url: testInfo.project.use.baseURL! },
+    ]);
+    await page.goto(`/@${testUser.username}/design`);
+    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(40);
+    await waitForHydration(page, '[data-cy="link-card"]');
+    // The page scrolls inside <main>.
+    const scrolled = await page.evaluate(() => {
+      const main = document.querySelector("main")!;
+      main.scrollTop = 1200;
+      return main.scrollTop;
+    });
+    expect(scrolled).toBe(1200);
+    // A card grows (a title rewrapping, an image arriving): the masonry
+    // re-places every card, which must not collapse the grid under the
+    // scroll position and throw the page back to the top.
+    await page.evaluate(() => {
+      document.querySelector<HTMLElement>('[data-cy="link-card"]')!.style.minHeight = "500px";
+    });
+    await expect
+      .poll(() => page.evaluate(() => document.querySelector<HTMLElement>('[data-cy="link-card"]')!.closest("li")!.style.gridRow))
+      .toMatch(/span 5\d\d/);
+    expect(await page.evaluate(() => document.querySelector("main")!.scrollTop)).toBe(1200);
+  });
+
+  test("a grid scrolled before hydration stays put when masonry turns on", async ({
+    page,
+    seed,
+    testUser,
+  }, testInfo) => {
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    for (let i = 0; i < 40; i++) {
+      await seed.link({ url: `https://h${i}.example`, title: `Early ${i}`, folderId: design });
+    }
+    await page.context().addCookies([
+      { name: "purl-shared-view", value: "grid", url: testInfo.project.use.baseURL! },
+    ]);
+    // Hold the page's scripts so the visitor scrolls the server's HTML.
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    await page.route(/\/_next\/static\/chunks\/.*\.js/, async (route) => {
+      await held;
+      await route.continue();
+    });
+    await page.goto(`/@${testUser.username}/design`, { waitUntil: "commit" });
+    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(40);
+    const scrolled = await page.evaluate(() => {
+      const main = document.querySelector("main")!;
+      main.scrollTop = 1200;
+      return main.scrollTop;
+    });
+    expect(scrolled).toBe(1200);
+    // Hydration switches the grid to masonry (1px rows, cards placed by
+    // measuring): neither the switch nor the placing may move the page
+    // (no collapse under the scroll position, no scroll anchoring).
+    release();
+    await waitForHydration(page, '[data-cy="link-card"]');
+    await expect
+      .poll(() => page.evaluate(() => document.querySelector<HTMLElement>('[data-cy="link-card"]')!.closest("li")!.style.gridRow))
+      .not.toBe("");
+    expect(await page.evaluate(() => document.querySelector("main")!.scrollTop)).toBe(1200);
+  });
+
   test("grid cards arrive on first load and with each new page, not on a view switch", async ({
     page,
     seed,

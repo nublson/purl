@@ -208,7 +208,8 @@ export function LinkGrid({
       ref={listRef}
       aria-label="Links"
       className={cn(
-        "grid w-full",
+        // No scroll anchoring on a masonry grid (see useMasonry).
+        "grid w-full [overflow-anchor:none]",
         masonry ? "auto-rows-[1px]" : "items-start",
         // Room for the first row's labels (16px, 8px above the card).
         "md:pt-6",

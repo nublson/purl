@@ -233,7 +233,8 @@ export function SharedFolderList({
             // short card sits right under the one above it. DOM order stays
             // newest first, left to right, for keyboard and screen readers.
             className={cn(
-              "grid w-full",
+              // No scroll anchoring on a masonry grid (see useMasonry).
+              "grid w-full [overflow-anchor:none]",
               masonry ? "auto-rows-[1px]" : "items-start",
               SHARED_GRID_COLUMNS,
             )}
