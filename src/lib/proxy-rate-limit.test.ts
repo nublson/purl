@@ -18,6 +18,7 @@ vi.mock("@/lib/upstash-rate-limit", () => ({
   getFeedbackPostRateLimiter: vi.fn(),
   getLinksPostRateLimiter: vi.fn(),
   getLinksImportRateLimiter: vi.fn(),
+  getLinksExportRateLimiter: vi.fn(),
   getUsernameCheckRateLimiter: vi.fn(),
   getLinkPreviewRateLimiter: vi.fn(),
   getPublicFolderRateLimiter: vi.fn(),
@@ -33,6 +34,7 @@ const {
   getFeedbackPostRateLimiter,
   getLinksPostRateLimiter,
   getLinksImportRateLimiter,
+  getLinksExportRateLimiter,
   getUsernameCheckRateLimiter,
   getLinkPreviewRateLimiter,
   getPublicFolderRateLimiter,
@@ -183,6 +185,40 @@ describe("rateLimitApiRequest", () => {
       );
       expect(result).toBeNull();
       expect(getLinksPostRateLimiter).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("GET /api/links/export", () => {
+    it("limits by client IP and returns 429 with Retry-After when exceeded", async () => {
+      vi.mocked(getLinksExportRateLimiter).mockReturnValue(
+        mockLimiter() as never,
+      );
+      limitMock.mockResolvedValue({
+        success: false,
+        reset: Date.now() + 30_000,
+      });
+
+      const result = await rateLimitApiRequest(
+        makeRequest("/api/links/export", "GET", {
+          "x-forwarded-for": "1.2.3.4",
+        }),
+      );
+
+      expect(limitMock).toHaveBeenCalledWith("1.2.3.4");
+      expect(result!.status).toBe(429);
+      expect(Number(result!.headers.get("Retry-After"))).toBeGreaterThan(0);
+    });
+
+    it("returns null when under the limit", async () => {
+      vi.mocked(getLinksExportRateLimiter).mockReturnValue(
+        mockLimiter() as never,
+      );
+      limitMock.mockResolvedValue({ success: true, reset: Date.now() + 60_000 });
+
+      const result = await rateLimitApiRequest(
+        makeRequest("/api/links/export", "GET"),
+      );
+      expect(result).toBeNull();
     });
   });
 

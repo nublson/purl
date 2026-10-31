@@ -51,6 +51,7 @@ const uploadsTokenUserLimiter = () =>
   makeLimiter("uploads_token_user", 240, "1 h");
 // A bookmarks import sends a chunk of up to 200 links per request.
 const linksImportLimiter = () => makeLimiter("links_import", 30, "1 m");
+const linksExportLimiter = () => makeLimiter("links_export", 10, "1 m");
 const feedbackPostLimiter = () => makeLimiter("feedback_post", 10, "1 m");
 // The availability check runs (debounced) as the user types a new username;
 // a change is rare, so it gets a much tighter budget.
@@ -71,6 +72,7 @@ let cachedUploadsToken: Ratelimit | null | undefined;
 let cachedUploadsRow: Ratelimit | null | undefined;
 let cachedUploadsTokenUser: Ratelimit | null | undefined;
 let cachedLinksImport: Ratelimit | null | undefined;
+let cachedLinksExport: Ratelimit | null | undefined;
 let cachedV1: Ratelimit | null | undefined;
 let cachedV1Post: Ratelimit | null | undefined;
 let cachedFeedbackPost: Ratelimit | null | undefined;
@@ -116,6 +118,13 @@ export function getLinksImportRateLimiter(): Ratelimit | null {
     cachedLinksImport = linksImportLimiter();
   }
   return cachedLinksImport;
+}
+
+export function getLinksExportRateLimiter(): Ratelimit | null {
+  if (cachedLinksExport === undefined) {
+    cachedLinksExport = linksExportLimiter();
+  }
+  return cachedLinksExport;
 }
 
 export function getV1RateLimiter(): Ratelimit | null {

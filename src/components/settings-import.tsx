@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import * as React from "react";
-import { ChevronDown, Upload } from "reicon-react";
+import { ChevronDown, Download, Upload } from "reicon-react";
 import { useFolders } from "@/hooks/use-folders";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { parseImportFile } from "@/lib/import";
@@ -15,6 +15,7 @@ import type {
 } from "@/lib/import/types";
 import { MAX_IMPORT_FILE_BYTES, MAX_SAVED_LINKS } from "@/lib/limits";
 import { cn } from "@/lib/utils";
+import { SettingsItem } from "./settings-item";
 import { Typography } from "./typography";
 import { Button } from "./ui/button";
 import {
@@ -22,6 +23,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "./ui/collapsible";
+import { Separator } from "./ui/separator";
 import type { UsageMeterData } from "./usage-item";
 
 const UNRECOGNIZED_MESSAGE =
@@ -490,6 +492,27 @@ export function SettingsImport({
       >
         {status}
       </Typography>
+      <Separator />
+      <section data-cy="export-section" className="flex flex-col gap-3">
+        <SettingsItem
+          title="Export"
+          description="Download all your links as a bookmarks file that browsers, Raindrop and Purl can read. Uploaded files are listed by their link."
+          fullDescription
+          actions={
+            <Button
+              asChild
+              variant="secondary"
+              size="sm"
+              className="cursor-pointer"
+            >
+              <a href="/api/links/export" download data-cy="export-download">
+                <Download />
+                Download
+              </a>
+            </Button>
+          }
+        />
+      </section>
     </div>
   );
 }
