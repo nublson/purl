@@ -26,6 +26,7 @@ import { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
 import { AudioRowIcon, AudioRowSecondLine, AudioRowToggle } from "./audio-row";
+import { NoteMark } from "./note-mark";
 import {
   FolderBadge,
   FolderLinkButton,
@@ -538,6 +539,7 @@ export const LinkItem = React.forwardRef<
           >
             {link.title}
           </Typography>
+          {link.notes ? <NoteMark /> : null}
           {kind === "embed" ? (
             <Typography
               component="span"

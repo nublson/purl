@@ -293,6 +293,7 @@ export function LinkCard({
             eagerThumbnail={eagerThumbnail}
             mediaAnchor={anchoredFace}
             badge={badge}
+            noteMark={Boolean(link.notes)}
           />
         )}
       </div>

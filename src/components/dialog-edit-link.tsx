@@ -14,6 +14,7 @@ import { useForm } from "@tanstack/react-form";
 import * as React from "react";
 import { toast } from "sonner";
 import { DialogWrapper } from "./dialog-wrapper";
+import { Typography } from "./typography";
 
 interface EditDialogProps {
   link: LinkType;
@@ -26,7 +27,7 @@ export function EditDialog({ link, children }: EditDialogProps) {
   return (
     <DialogWrapper
       title="Edit link"
-      description="Update the title and description for this link."
+      description="Update the title, description and notes for this link."
       open={open}
       onOpenChange={setOpen}
       content={<EditLinkForm link={link} onSuccess={() => setOpen(false)} />}
@@ -43,12 +44,17 @@ interface EditLinkFormProps {
 
 const EditLinkForm = ({ link, onSuccess }: EditLinkFormProps) => {
   const { notifyLinksChanged } = useLinksSyncActions();
+  // The server's note error (over the cap), shown in the Notes field's error
+  // slot until the note changes or the form is sent again.
+  const [notesError, setNotesError] = React.useState<string | null>(null);
   const form = useForm({
     defaultValues: {
       title: link.title,
       description: link.description ?? "",
+      notes: link.notes ?? "",
     },
     onSubmit: async ({ value }) => {
+      setNotesError(null);
       try {
         const res = await fetch(`/api/links/${link.id}`, {
           method: "PATCH",
@@ -57,10 +63,19 @@ const EditLinkForm = ({ link, onSuccess }: EditLinkFormProps) => {
             title: value.title,
             // Persist `null` instead of empty string to match API expectations.
             description: value.description?.trim() ? value.description : null,
+            notes: value.notes.trim() ? value.notes : null,
           }),
         });
 
         if (!res.ok) {
+          const body: { error?: string; code?: string } | null = await res
+            .json()
+            .catch(() => null);
+          if (body?.code === "INVALID_NOTES" && body.error) {
+            // Shown under the Notes field, not as a toast.
+            setNotesError(body.error);
+            return;
+          }
           toast.error("Unable to save changes. Try again.");
           return;
         }
@@ -136,6 +151,45 @@ const EditLinkForm = ({ link, onSuccess }: EditLinkFormProps) => {
               />
             </Field>
           )}
+        </form.Field>
+
+        <form.Field name="notes">
+          {(field) => {
+            const hintId = `${field.name}-hint`;
+            const errorId = `${field.name}-error`;
+            const invalid = notesError !== null;
+            return (
+              <Field>
+                <Label htmlFor={field.name}>Notes</Label>
+                <Typography id={hintId} size="mini">
+                  Only you see these.
+                </Typography>
+                <Textarea
+                  id={field.name}
+                  name={field.name}
+                  rows={4}
+                  // A note can run to 2,000 characters: past this the field
+                  // scrolls instead of pushing Save below the screen (the
+                  // dialog has no height limit of its own).
+                  className="max-h-48"
+                  value={field.state.value}
+                  onBlur={field.handleBlur}
+                  onChange={(e) => {
+                    setNotesError(null);
+                    field.handleChange(e.target.value);
+                  }}
+                  disabled={form.state.isSubmitting}
+                  aria-invalid={invalid ? true : undefined}
+                  aria-describedby={invalid ? `${hintId} ${errorId}` : hintId}
+                />
+                {invalid ? (
+                  <p id={errorId} className="text-sm text-destructive">
+                    {notesError}
+                  </p>
+                ) : null}
+              </Field>
+            );
+          }}
         </form.Field>
       </FieldGroup>
       <DialogFooter>

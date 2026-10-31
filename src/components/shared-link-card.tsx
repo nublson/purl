@@ -9,6 +9,7 @@ import { AudioOpenButton, AudioPlayer } from "./audio-player";
 import { EMBED_OPENER_CLASS, EmbedFace } from "./embed-face";
 import { ImageFace, VideoFace } from "./media-card-face";
 import { MediaOpenButton } from "./media-open-button";
+import { NoteMark } from "./note-mark";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
 import { Typography } from "./typography";
 
@@ -135,6 +136,7 @@ export function LinkCardContent({
   eagerThumbnail = false,
   badge,
   mediaAnchor = false,
+  noteMark = false,
 }: {
   link: LinkType;
   eagerThumbnail?: boolean;
@@ -142,6 +144,8 @@ export function LinkCardContent({
   badge?: ReactNode;
   /** The media viewer opens from this card: the face is its morph anchor. */
   mediaAnchor?: boolean;
+  /** The owner's grid: mark a link with a note beside its domain. */
+  noteMark?: boolean;
 }) {
   switch (linkKind(link)) {
     case "image":
@@ -155,7 +159,7 @@ export function LinkCardContent({
       return (
         <>
           <EmbedFace link={link} anchored={mediaAnchor} eager={eagerThumbnail} />
-          <LinkCardStrip link={link} badge={badge} />
+          <LinkCardStrip link={link} badge={badge} noteMark={noteMark} />
         </>
       );
     default: {
@@ -173,15 +177,26 @@ export function LinkCardContent({
             // own 1px outline so the edge isn't doubled.
             className="aspect-[16/10] rounded-none [&_img]:outline-0"
           />
-          <LinkCardStrip link={link} badge={badge} />
+          <LinkCardStrip link={link} badge={badge} noteMark={noteMark} />
         </>
       );
     }
   }
 }
 
-/** A card's text: the favicon (with the badge), the title and the domain. */
-function LinkCardStrip({ link, badge }: { link: LinkType; badge?: ReactNode }) {
+/**
+ * A card's text: the favicon (with the badge), the title and the domain
+ * (with the note mark beside it on the owner's grid).
+ */
+function LinkCardStrip({
+  link,
+  badge,
+  noteMark = false,
+}: {
+  link: LinkType;
+  badge?: ReactNode;
+  noteMark?: boolean;
+}) {
   return (
     <span className="grid grid-cols-[16px_minmax(0,1fr)] gap-x-2 gap-y-1 p-3 md:gap-x-3 md:p-4">
       {/* Centered on the title's first line: a box one title line tall
@@ -205,13 +220,12 @@ function LinkCardStrip({ link, badge }: { link: LinkType; badge?: ReactNode }) {
       >
         {link.title}
       </Typography>
-      <Typography
-        component="span"
-        size="small"
-        className="col-start-2 truncate"
-      >
-        {linkSecondLine(link)}
-      </Typography>
+      <span className="col-start-2 flex min-w-0 items-center gap-1.5">
+        <Typography component="span" size="small" className="truncate">
+          {linkSecondLine(link)}
+        </Typography>
+        {noteMark ? <NoteMark /> : null}
+      </span>
     </span>
   );
 }
