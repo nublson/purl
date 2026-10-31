@@ -54,6 +54,7 @@ function toLink(link: PublicLink): Link {
     ...link,
     createdAt: new Date(link.createdAt),
     folderId: null,
+    notes: null,
     frameable: null,
   };
 }

@@ -3,7 +3,7 @@ import type { MoveLinksResult } from "@/lib/bulk-links";
 import { assertCanSaveLink, insertWithinSaveLimit } from "@/lib/entitlements";
 import { DEFAULT_FOLDER_EMOJI } from "@/lib/folder-display";
 import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
-import { MAX_SAVED_LINKS } from "@/lib/limits";
+import { MAX_LINK_NOTES_LENGTH, MAX_SAVED_LINKS } from "@/lib/limits";
 import {
   OG_HTML_READ_MAX_BYTES,
   readHtmlForOpenGraph,
@@ -112,6 +112,16 @@ export class LinkChangedError extends Error {
   }
 }
 
+/** Thrown by `normalizeLinkNotes` when a note is over the cap (routes answer 400). */
+export class LinkNotesError extends Error {
+  readonly name = "LinkNotesError";
+  constructor() {
+    super(
+      `Keep the note to ${MAX_LINK_NOTES_LENGTH.toLocaleString("en-US")} characters or fewer.`,
+    );
+  }
+}
+
 function formatFileSize(bytes: number | null): string | null {
   if (bytes === null || !Number.isFinite(bytes) || bytes <= 0) return null;
   if (bytes < 1024) return `${bytes} B`;
@@ -217,6 +227,7 @@ type LinkRow = {
   domain: string;
   contentType: ContentType;
   description: string | null;
+  notes?: string | null;
   thumbnail: string | null;
   createdAt: Date;
   folderId?: string | null;
@@ -229,6 +240,22 @@ type LinkRow = {
   embed?: boolean;
 };
 
+/**
+ * Validates an optional private note. Drops control characters (tabs and
+ * newlines stay), trims the ends, and treats empty/undefined/null as no note
+ * (`null`). Longer than `MAX_LINK_NOTES_LENGTH` characters → `LinkNotesError`.
+ */
+export function normalizeLinkNotes(
+  notes: string | null | undefined,
+): string | null {
+  const cleaned = (notes ?? "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .trim();
+  if (cleaned.length === 0) return null;
+  if (cleaned.length > MAX_LINK_NOTES_LENGTH) throw new LinkNotesError();
+  return cleaned;
+}
+
 export function mapRowToLink(row: LinkRow): Link {
   return {
     id: row.id,
@@ -236,6 +263,7 @@ export function mapRowToLink(row: LinkRow): Link {
     title: row.title,
     favicon: row.favicon,
     description: row.description,
+    notes: row.notes ?? null,
     thumbnail: row.thumbnail,
     domain: row.domain,
     contentType: row.contentType,

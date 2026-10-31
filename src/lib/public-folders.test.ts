@@ -23,6 +23,7 @@ const {
   listPublicFolderLinks,
   publicFolderPath,
   PUBLIC_FOLDER_PAGE_SIZE,
+  PUBLIC_LINK_SELECT,
   resolvePublicFolder,
 } = await import("./public-folders");
 
@@ -211,5 +212,11 @@ describe("listPublicFolderLinks", () => {
 describe("publicFolderPath", () => {
   it("is /@username/slug", () => {
     expect(publicFolderPath("nublson", "design")).toBe("/@nublson/design");
+  });
+});
+
+describe("PUBLIC_LINK_SELECT", () => {
+  it("never selects the owner's private note", () => {
+    expect(PUBLIC_LINK_SELECT).not.toHaveProperty("notes");
   });
 });

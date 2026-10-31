@@ -52,8 +52,14 @@ vi.mock("@/lib/folders", () => ({
 const { auth } = await import("@/lib/auth");
 const prisma = (await import("@/lib/prisma")).default;
 const { assertFolderOwned, FolderNotFoundError } = await import("@/lib/folders");
-const { getLinksPageForCurrentUser, UnauthorizedError, listLinks, resolveLinkFromUrl } =
-  await import("./links");
+const {
+  getLinksPageForCurrentUser,
+  LinkNotesError,
+  normalizeLinkNotes,
+  UnauthorizedError,
+  listLinks,
+  resolveLinkFromUrl,
+} = await import("./links");
 
 const MOCK_SESSION = { user: { id: "user-123", username: "user-123" }, session: {} };
 
@@ -414,5 +420,31 @@ describe("resolveLinkFromUrl – media links", () => {
       mimeType: "text/html",
       title: "A page",
     });
+  });
+});
+
+describe("normalizeLinkNotes", () => {
+  it("returns null for missing or blank notes", () => {
+    expect(normalizeLinkNotes(undefined)).toBeNull();
+    expect(normalizeLinkNotes(null)).toBeNull();
+    expect(normalizeLinkNotes("   \n ")).toBeNull();
+  });
+
+  it("trims the ends but keeps inner lines and spacing", () => {
+    expect(normalizeLinkNotes("  keep\n\nthese  lines  ")).toBe(
+      "keep\n\nthese  lines",
+    );
+  });
+
+  it("drops control characters but keeps tabs", () => {
+    expect(normalizeLinkNotes("a\u0000b\u0007c\td")).toBe("abc\td");
+  });
+
+  it("accepts 2,000 characters and refuses 2,001", () => {
+    expect(normalizeLinkNotes("x".repeat(2000))).toHaveLength(2000);
+    expect(() => normalizeLinkNotes("x".repeat(2001))).toThrow(LinkNotesError);
+    expect(() => normalizeLinkNotes("x".repeat(2001))).toThrow(
+      "Keep the note to 2,000 characters or fewer.",
+    );
   });
 });

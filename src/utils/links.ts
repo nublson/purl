@@ -7,6 +7,8 @@ export type Link = {
   favicon: string;
   title: string;
   description: string | null;
+  /** The owner's private note; never public. */
+  notes: string | null;
   thumbnail: string | null;
   url: string;
   domain: string;

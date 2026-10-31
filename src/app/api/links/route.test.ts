@@ -305,6 +305,7 @@ describe("POST /api/links", () => {
         url: "https://example.com",
         title: "Example Domain",
         description: null,
+        notes: null,
         favicon: "https://www.google.com/s2/favicons?domain=example.com&sz=64",
         thumbnail: null,
         domain: "example.com",
