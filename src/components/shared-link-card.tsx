@@ -220,12 +220,24 @@ function LinkCardStrip({
       >
         {link.title}
       </Typography>
-      <span className="col-start-2 flex min-w-0 items-center gap-1.5">
-        <Typography component="span" size="small" className="truncate">
+      {noteMark ? (
+        <span className="col-start-2 flex min-w-0 items-center gap-1.5">
+          <Typography component="span" size="small" className="truncate">
+            {linkSecondLine(link)}
+          </Typography>
+          <NoteMark />
+        </span>
+      ) : (
+        // Without a mark (the shared page, the demo, links with no note)
+        // the line is a single span, exactly as before notes.
+        <Typography
+          component="span"
+          size="small"
+          className="col-start-2 truncate"
+        >
           {linkSecondLine(link)}
         </Typography>
-        {noteMark ? <NoteMark /> : null}
-      </span>
+      )}
     </span>
   );
 }
