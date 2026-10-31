@@ -62,6 +62,14 @@ import {
   uploadFiles,
   type UploadHandlers,
 } from "@/lib/save-uploads";
+import {
+  NOTHING_SHARED_MESSAGE,
+  readShareParams,
+  SHARE_PARAM,
+  SHARED_FILES_LOST_MESSAGE,
+  takeSharedFiles,
+} from "@/lib/share-target";
+import { UPLOADS_UNAVAILABLE_MESSAGE } from "@/lib/upload-picker";
 import { requestUsageRefresh } from "@/lib/usage-events";
 import {
   countGroupedLinks,
@@ -757,6 +765,40 @@ export function HomeShell({
     window.addEventListener(UPLOAD_FILES_EVENT, onUploadFiles);
     return () => window.removeEventListener(UPLOAD_FILES_EVENT, onUploadFiles);
   }, [startUploads, uploadHandlers]);
+
+  // A share from another app (the Web Share Target, src/lib/share-target.ts)
+  // lands here with `?share=` params: its URLs save through the paste flow
+  // (PasteHandler's listener is registered by now: a child's effect runs
+  // first), its files come from the worker's stash and upload like dropped
+  // ones. Read once (the ref: StrictMode runs effects twice) and dropped
+  // from the URL, like `?q=`, so a reload doesn't share again.
+  const shareTaken = useRef(false);
+  useEffect(() => {
+    if (shareTaken.current || !searchParams.has(SHARE_PARAM)) return;
+    shareTaken.current = true;
+    const share = readShareParams(searchParams.getAll(SHARE_PARAM));
+    const url = new URL(window.location.href);
+    url.searchParams.delete(SHARE_PARAM);
+    window.history.replaceState(window.history.state, "", url);
+
+    if (share.urls.length > 0 && !requestSaveUrl(share.urls.join("\n"))) {
+      toast.error("Unable to save the link yet. Try again in a moment.");
+    }
+    if (share.files) {
+      void takeSharedFiles().then((files) => {
+        if (!uploadsEnabled) {
+          toast.error(UPLOADS_UNAVAILABLE_MESSAGE);
+        } else if (files.length === 0) {
+          toast.error(SHARED_FILES_LOST_MESSAGE);
+        } else {
+          startUploads(files);
+        }
+      });
+    } else if (share.urls.length === 0) {
+      toast.error(NOTHING_SHARED_MESSAGE);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const uploadActions = useMemo(
     () => ({

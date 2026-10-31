@@ -1,6 +1,12 @@
+import {
+  parseShareForm,
+  SHARE_PATH,
+  shareLandingPath,
+  stashSharedFiles,
+} from "@/lib/share-target";
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, RouteMatchCallbackOptions } from "serwist";
-import { NetworkOnly, Serwist } from "serwist";
+import { NetworkOnly, Route, Serwist } from "serwist";
 
 declare const self: ServiceWorkerGlobalScope & {
   __SW_MANIFEST: (PrecacheEntry | string)[] | undefined;
@@ -57,5 +63,31 @@ const serwist = new Serwist({
     ],
   },
 });
+
+/**
+ * The Web Share Target (`share_target` in public/manifest.json): another
+ * app's share is a multipart POST to /share. Answered here, before the
+ * network, so the shared files can be kept for the page (the Cache API
+ * stash in src/lib/share-target.ts), then a 303 to Home with the URLs as
+ * `share` params, which Home saves through its paste flow. The /share
+ * route answers the same way (without files) when no worker is running.
+ */
+serwist.registerRoute(
+  new Route(
+    ({ sameOrigin, url }) => sameOrigin && url.pathname === SHARE_PATH,
+    async ({ request }) => {
+      const share = parseShareForm(await request.formData());
+      await stashSharedFiles(share.files);
+      return Response.redirect(
+        new URL(
+          shareLandingPath({ urls: share.urls, hasFiles: share.files.length > 0 }),
+          self.location.href,
+        ),
+        303,
+      );
+    },
+    "POST",
+  ),
+);
 
 serwist.addEventListeners();

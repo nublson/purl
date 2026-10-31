@@ -44,6 +44,10 @@ const publicRoutes: PublicRoute[] = [
   { path: "/api/public", match: "prefix", whenAuthenticated: "next" },
   // The browser extension's OAuth callback: the extension closes it.
   { path: "/extension/connected", whenAuthenticated: "next" },
+  // The Web Share Target (public/manifest.json): another app's share is a
+  // POST here, and a 307 would re-post it to the landing page. The route
+  // checks the session itself and sends a signed-out share to "/".
+  { path: "/share", whenAuthenticated: "next" },
   // The Notion-backed static pages (Privacy, Terms, API and MCP docs).
   ...STATIC_PAGES.map(
     ({ path }): PublicRoute => ({ path, whenAuthenticated: "next" }),
