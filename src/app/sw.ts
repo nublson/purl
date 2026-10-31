@@ -1,9 +1,4 @@
-import {
-  parseShareForm,
-  SHARE_PATH,
-  shareLandingPath,
-  stashSharedFiles,
-} from "@/lib/share-target";
+import { parseShareForm, SHARE_LANDING, SHARE_PATH, stashShare } from "@/lib/share-target";
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, RouteMatchCallbackOptions } from "serwist";
 import { NetworkOnly, Route, Serwist } from "serwist";
@@ -67,24 +62,25 @@ const serwist = new Serwist({
 /**
  * The Web Share Target (`share_target` in public/manifest.json): another
  * app's share is a multipart POST to /share. Answered here, before the
- * network, so the shared files can be kept for the page (the Cache API
- * stash in src/lib/share-target.ts), then a 303 to Home with the URLs as
- * `share` params, which Home saves through its paste flow. The /share
- * route answers the same way (without files) when no worker is running.
+ * network, so the shared files can be kept for the page: the share goes
+ * into the Cache API stash (src/lib/share-target.ts) and the browser to
+ * Home, which takes it from there. If the stash can't be written (storage
+ * full), the request goes on to the /share route, which hands the links
+ * over in a cookie; the files are then reported as not received.
  */
 serwist.registerRoute(
   new Route(
     ({ sameOrigin, url }) => sameOrigin && url.pathname === SHARE_PATH,
     async ({ request }) => {
-      const share = parseShareForm(await request.formData());
-      await stashSharedFiles(share.files);
-      return Response.redirect(
-        new URL(
-          shareLandingPath({ urls: share.urls, hasFiles: share.files.length > 0 }),
-          self.location.href,
-        ),
-        303,
-      );
+      // A clone, so the request can still go to the network whole.
+      const share = parseShareForm(await request.clone().formData());
+      try {
+        await stashShare(share);
+      } catch (error) {
+        console.warn("[share] couldn't keep the share, letting the server answer", error);
+        return fetch(request);
+      }
+      return Response.redirect(new URL(SHARE_LANDING, self.location.href), 303);
     },
     "POST",
   ),

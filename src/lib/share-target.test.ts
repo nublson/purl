@@ -3,11 +3,12 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   parseShareForm,
-  readShareParams,
+  parseSharePayload,
+  SHARE_LANDING,
   SHARE_PATH,
-  shareLandingPath,
-  stashSharedFiles,
-  takeSharedFiles,
+  shareCookie,
+  stashShare,
+  takeShare,
 } from "./share-target";
 import { UPLOAD_MIME_TYPES } from "./uploads/mime";
 
@@ -38,6 +39,15 @@ describe("parseShareForm", () => {
     expect(urls).toEqual(["https://example.com/post", "https://example.org/x"]);
   });
 
+  it("keeps a closing parenthesis that belongs to the URL", () => {
+    const wiki = "https://en.wikipedia.org/wiki/Clojure_(programming_language)";
+    expect(parseShareForm(form({ text: `Read ${wiki}.` })).urls).toEqual([wiki]);
+    expect(parseShareForm(form({ text: `(see ${wiki})` })).urls).toEqual([wiki]);
+    expect(parseShareForm(form({ text: "(and https://example.com/a)." })).urls).toEqual([
+      "https://example.com/a",
+    ]);
+  });
+
   it("falls back to the title, and to nothing", () => {
     expect(parseShareForm(form({ title: "A page https://example.com" })).urls).toEqual([
       "https://example.com/",
@@ -54,25 +64,55 @@ describe("parseShareForm", () => {
   });
 });
 
-describe("shareLandingPath / readShareParams", () => {
-  it("round-trips URLs and the files marker", () => {
-    const urls = ["https://example.com/a?x=1&y=2", "https://example.org/"];
-    const path = shareLandingPath({ urls, hasFiles: true });
-    expect(path.startsWith("/home?")).toBe(true);
-    const values = new URL(path, "http://localhost").searchParams.getAll("share");
-    expect(readShareParams(values)).toEqual({ urls, files: true });
+describe("the landing and the payload", () => {
+  it("lands on Home with a flag only, never the links", () => {
+    expect(SHARE_LANDING).toBe("/home?share=1");
   });
 
-  it("lands with an empty share when nothing usable was shared", () => {
-    expect(shareLandingPath({ urls: [], hasFiles: false })).toBe("/home?share=");
-    expect(readShareParams([""])).toEqual({ urls: [], files: false });
+  it("reads a payload back, checked", () => {
+    expect(
+      parseSharePayload(
+        JSON.stringify({ urls: ["https://example.com/a", "javascript:x", 3], fileCount: 2 }),
+      ),
+    ).toEqual({ urls: ["https://example.com/a"], fileCount: 2 });
+    expect(parseSharePayload("not json")).toBeNull();
+    expect(parseSharePayload(JSON.stringify({ urls: "x", fileCount: 0 }))).toBeNull();
+    expect(parseSharePayload(JSON.stringify({ urls: [], fileCount: -1 }))).toBeNull();
+    expect(parseSharePayload(null)).toBeNull();
+  });
+});
+
+describe("the cookie", () => {
+  afterEach(() => {
+    delete (globalThis as { document?: unknown }).document;
   });
 
-  it("ignores values that are neither a URL nor the marker", () => {
-    expect(readShareParams(["javascript:alert(1)", "files", "example.com"])).toEqual({
-      urls: [],
-      files: true,
+  it("hands the share to the page once, same-origin and short-lived", async () => {
+    const cookie = shareCookie(
+      { urls: ["https://example.com/a?x=1&y=2"], files: [new File(["f"], "f.png")] },
+      { secure: true },
+    );
+    expect(cookie).toMatch(/^purl-share=[^;]+; Path=\/; Max-Age=60; SameSite=Lax; Secure$/);
+    // The value is one encoded token: no raw separators or quotes.
+    expect(cookie.split(";")[0].slice("purl-share=".length)).toMatch(/^[A-Za-z0-9%._~-]+$/);
+
+    // The browser's cookie jar, as far as the page reads and clears it.
+    const jar = { value: cookie.split(";")[0] };
+    (globalThis as { document?: unknown }).document = {
+      get cookie() {
+        return jar.value;
+      },
+      set cookie(update: string) {
+        if (update.includes("Max-Age=0")) jar.value = "";
+      },
+    };
+
+    expect(await takeShare()).toEqual({
+      urls: ["https://example.com/a?x=1&y=2"],
+      fileCount: 1,
+      files: [],
     });
+    expect(await takeShare()).toBeNull();
   });
 });
 
@@ -99,23 +139,31 @@ describe("the stash", () => {
     delete (globalThis as { caches?: unknown }).caches;
   });
 
-  it("gives the files back once, in order, with their names and types", async () => {
+  it("gives the share back once, files in order with their names and types", async () => {
     (globalThis as { caches?: unknown }).caches = fakeCaches;
     const photo = new File(["img"], "photo.jpg", { type: "image/jpeg", lastModified: 5 });
     const clip = new File(["mov"], "clip.mov", { type: "video/quicktime", lastModified: 6 });
-    await stashSharedFiles([photo, clip]);
+    await stashShare({ urls: ["https://example.com/"], files: [photo, clip] });
 
-    const taken = await takeSharedFiles();
-    expect(taken.map((file) => [file.name, file.type, file.lastModified])).toEqual([
+    const taken = await takeShare();
+    expect(taken?.urls).toEqual(["https://example.com/"]);
+    expect(taken?.fileCount).toBe(2);
+    expect(taken?.files.map((file) => [file.name, file.type, file.lastModified])).toEqual([
       ["photo.jpg", "image/jpeg", 5],
       ["clip.mov", "video/quicktime", 6],
     ]);
-    expect(await taken[1].text()).toBe("mov");
-    expect(await takeSharedFiles()).toEqual([]);
+    expect(await taken!.files[1].text()).toBe("mov");
+    expect(await takeShare()).toBeNull();
   });
 
-  it("is empty without the Cache API", async () => {
-    expect(await takeSharedFiles()).toEqual([]);
+  it("is nothing without the Cache API, or when reading it fails", async () => {
+    expect(await takeShare()).toBeNull();
+    (globalThis as { caches?: unknown }).caches = {
+      open: async () => {
+        throw new Error("storage");
+      },
+    };
+    expect(await takeShare()).toBeNull();
   });
 });
 
