@@ -72,8 +72,13 @@ function renderLinks(links: ResourceLink[], { withFolder }: { withFolder: boolea
     const description = link.description?.replace(/\s+/g, " ").trim();
     if (description) lines.push(`  ${cutText(description)}`);
     const notes = link.notes?.replace(/\s+/g, " ").trim();
-    // Underscores are escaped so a note can't end the italics early.
-    if (notes) lines.push(`  _${cutText(notes).replace(/_/g, "\\_")}_`);
+    // Backslashes, then underscores, are escaped (after the cut, so an escape
+    // pair is never split) so a note can't end the italics early or lose its
+    // closing underscore.
+    if (notes) {
+      const escaped = cutText(notes).replace(/\\/g, "\\\\").replace(/_/g, "\\_");
+      lines.push(`  _${escaped}_`);
+    }
   }
   return lines.join("\n");
 }

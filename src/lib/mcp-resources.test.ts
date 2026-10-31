@@ -174,6 +174,16 @@ describe("renderFolderResource", () => {
     expect(md).toContain("  _snake\\_case\\_ok_");
   });
 
+  it("escapes backslashes in a note so they cannot swallow the closing underscore", () => {
+    const md = renderFolderResource(folder(), [link({ notes: "C:\\dir\\" })], NOW);
+    expect(md).toContain("  _C:\\\\dir\\\\_");
+  });
+
+  it("escapes a backslash before an underscore so the underscore stays escaped", () => {
+    const md = renderFolderResource(folder(), [link({ notes: "a\\_ **b**" })], NOW);
+    expect(md).toContain("  _a\\\\\\_ **b**_");
+  });
+
   it("collapses whitespace in a note so it stays one line", () => {
     const md = renderFolderResource(folder(), [link({ notes: "a\n\n## 2026-01-01\tb" })], NOW);
     expect(md).toContain("  _a ## 2026-01-01 b_");
