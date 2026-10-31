@@ -73,9 +73,11 @@ vi.mock("@/lib/realtime-broadcast", () => ({
   broadcastLinksChanged: mockBroadcast,
 }));
 
-// serializeLink is the identity-ish passthrough so we can assert on raw fields.
+// serializeLink is the identity-ish passthrough so we can assert on raw
+// fields; a test can swap in the real one with mockImplementationOnce.
+const mockSerializeLink = vi.fn((link: unknown) => link);
 vi.mock("@/lib/serialize-link", () => ({
-  serializeLink: (link: unknown) => link,
+  serializeLink: (link: unknown) => mockSerializeLink(link),
 }));
 
 class MockLimitError extends Error {}
@@ -772,6 +774,34 @@ describe("listSavedItemsTool", () => {
       data: [{ id: "link-1" }],
       nextCursor: "2025-01-01T00:00:00.000Z",
     });
+  });
+
+  it("returns each link's private note to its owner", async () => {
+    const { serializeLink } = await vi.importActual<
+      typeof import("@/lib/serialize-link")
+    >("@/lib/serialize-link");
+    mockSerializeLink.mockImplementationOnce((link) =>
+      serializeLink(link as Parameters<typeof serializeLink>[0]),
+    );
+    mockListLinksForUser.mockResolvedValue({
+      links: [
+        {
+          id: "link-1",
+          url: "https://a.example",
+          title: "A",
+          description: null,
+          notes: "n",
+          favicon: "https://a.example/favicon.ico",
+          thumbnail: null,
+          domain: "a.example",
+          contentType: "WEB",
+          createdAt: new Date("2026-10-31T00:00:00Z"),
+        },
+      ],
+      nextCursor: null,
+    });
+    const result = await listSavedItemsTool("user-1", {});
+    expect(parse(result).data[0]).toMatchObject({ id: "link-1", notes: "n" });
   });
 
   it("passes folderId through when provided", async () => {
