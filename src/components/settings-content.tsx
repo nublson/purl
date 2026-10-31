@@ -31,7 +31,7 @@ export default function SettingsContent({
           content: <SettingsIntegrations />,
         },
         {
-          label: "Import",
+          label: "Import & export",
           value: "import",
           content: (
             <SettingsImport usage={usageSummary} closeDialog={closeDialog} />
