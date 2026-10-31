@@ -41,6 +41,9 @@ vi.mock("@/lib/uploads", () => ({
 class MockUnauthorizedError extends Error {
   constructor() { super("Unauthorized"); }
 }
+class MockLinkNotesError extends Error {
+  constructor() { super("Keep the note to 2,000 characters or fewer."); }
+}
 
 vi.mock("@/lib/links", () => ({
   readLink: mockReadLink,
@@ -49,6 +52,7 @@ vi.mock("@/lib/links", () => ({
   moveLinkToFolder: mockMoveLinkToFolder,
   updateLinkForUser: mockUpdateLinkForUser,
   UnauthorizedError: MockUnauthorizedError,
+  LinkNotesError: MockLinkNotesError,
 }));
 
 const MOCK_LINK = {
@@ -321,6 +325,67 @@ describe("OPTIONS /api/v1/links/:id", () => {
       new NextRequest("http://localhost/api/v1/links/link-1", { method: "OPTIONS" })
     );
     expect(res.status).toBe(204);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  });
+});
+
+describe("PATCH /api/v1/links/:id notes", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function patch(body: unknown) {
+    return new NextRequest("http://localhost/api/v1/links/link-1", {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("accepts notes alone and passes them to the library", async () => {
+    mockUpdateLink.mockResolvedValue({ ...MOCK_LINK, notes: "n" });
+    const { PATCH } = await import("./route");
+    const res = await PATCH(patch({ notes: "n" }), { params });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(mockUpdateLink).toHaveBeenCalledWith("link-1", { notes: "n" });
+  });
+
+  it("passes notes: null through to clear the note", async () => {
+    mockUpdateLink.mockResolvedValue({ ...MOCK_LINK, notes: null });
+    const { PATCH } = await import("./route");
+    const res = await PATCH(patch({ notes: null }), { params });
+    expect(res.status).toBe(200);
+    expect(mockUpdateLink).toHaveBeenCalledWith("link-1", { notes: null });
+  });
+
+  it("carries notes along with a move in one write", async () => {
+    mockUpdateLinkForUser.mockResolvedValue({ ...MOCK_LINK, notes: "n" });
+    const { PATCH } = await import("./route");
+    const res = await PATCH(patch({ notes: "n", folderId: "f1" }), { params });
+    expect(res.status).toBe(200);
+    expect(mockUpdateLinkForUser).toHaveBeenCalledWith("user-1", "link-1", {
+      notes: "n",
+      folderId: "f1",
+    });
+    expect(mockMoveLinkToFolder).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 Invalid notes for a non-string, non-null value", async () => {
+    const { PATCH } = await import("./route");
+    const res = await PATCH(patch({ notes: 5 }), { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid notes" });
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(mockUpdateLink).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 INVALID_NOTES when the library rejects the note", async () => {
+    mockUpdateLink.mockRejectedValue(new MockLinkNotesError());
+    const { PATCH } = await import("./route");
+    const res = await PATCH(patch({ notes: "x" }), { params });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Keep the note to 2,000 characters or fewer.",
+      code: "INVALID_NOTES",
+    });
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   });
 });

@@ -15,6 +15,9 @@ const mockCreateLink = vi.fn();
 class MockUnauthorizedError extends Error {
   constructor() { super("Unauthorized"); }
 }
+class MockLinkNotesError extends Error {
+  constructor() { super("Keep the note to 2,000 characters or fewer."); }
+}
 class MockSaveLimitError extends Error {
   readonly feature = "SAVE_LIMIT";
 }
@@ -23,6 +26,7 @@ vi.mock("@/lib/links", () => ({
   listLinks: mockListLinks,
   createLink: mockCreateLink,
   UnauthorizedError: MockUnauthorizedError,
+  LinkNotesError: MockLinkNotesError,
 }));
 vi.mock("@/lib/entitlements", () => ({
   SaveLimitError: MockSaveLimitError,
@@ -297,6 +301,66 @@ describe("OPTIONS /api/v1/links", () => {
       new NextRequest("http://localhost/api/v1/links", { method: "OPTIONS" })
     );
     expect(res.status).toBe(204);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  });
+});
+
+describe("POST /api/v1/links notes", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function post(body: unknown) {
+    return new NextRequest("http://localhost/api/v1/links", {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  it("passes notes in the options", async () => {
+    mockCreateLink.mockResolvedValue(MOCK_LINK);
+    const { POST } = await import("./route");
+    const res = await POST(post({ url: "https://example.com", notes: "n" }));
+    expect(res.status).toBe(201);
+    expect(mockCreateLink).toHaveBeenCalledWith("https://example.com", {
+      notes: "n",
+    });
+  });
+
+  it("passes notes next to a folder", async () => {
+    mockCreateLink.mockResolvedValue(MOCK_LINK);
+    const { POST } = await import("./route");
+    await POST(post({ url: "https://example.com", folderId: "f1", notes: "n" }));
+    expect(mockCreateLink).toHaveBeenCalledWith("https://example.com", {
+      folderId: "f1",
+      notes: "n",
+    });
+  });
+
+  it("calls createLink with the url alone when no option is set", async () => {
+    mockCreateLink.mockResolvedValue(MOCK_LINK);
+    const { POST } = await import("./route");
+    await POST(post({ url: "https://example.com" }));
+    expect(mockCreateLink).toHaveBeenCalledWith("https://example.com");
+  });
+
+  it("returns 400 Invalid notes for a non-string, non-null value", async () => {
+    const { POST } = await import("./route");
+    const res = await POST(post({ url: "https://example.com", notes: 5 }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid notes" });
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(mockCreateLink).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 INVALID_NOTES when the library rejects the note", async () => {
+    mockCreateLink.mockRejectedValue(new MockLinkNotesError());
+    const { POST } = await import("./route");
+    const res = await POST(post({ url: "https://example.com", notes: "x" }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Keep the note to 2,000 characters or fewer.",
+      code: "INVALID_NOTES",
+    });
     expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
   });
 });

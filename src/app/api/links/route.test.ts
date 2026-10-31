@@ -281,6 +281,50 @@ describe("POST /api/links", () => {
       expect(res.status).toBe(404);
       expect(await res.json()).toEqual({ error: "Folder not found" });
     });
+
+    it("returns 400 when notes is not a string or null", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      const res = await POST(
+        postRequest({ url: "https://example.com", notes: 5 }),
+      );
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "Invalid notes" });
+      expect(prisma.link.create).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 INVALID_NOTES when the note is over the limit", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      const res = await POST(
+        postRequest({ url: "https://example.com", notes: "a".repeat(2001) }),
+      );
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({
+        error: "Keep the note to 2,000 characters or fewer.",
+        code: "INVALID_NOTES",
+      });
+      expect(prisma.link.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("notes", () => {
+    it("saves the note with the link", async () => {
+      vi.mocked(auth.api.getSession).mockResolvedValue(MOCK_SESSION as never);
+      vi.mocked(prisma.link.create).mockResolvedValue({
+        ...MOCK_LINK,
+        notes: "n",
+      } as never);
+
+      const res = await POST(
+        postRequest({ url: "https://example.com", notes: "n" }),
+      );
+
+      expect(res.status).toBe(201);
+      expect(vi.mocked(prisma.link.create)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ notes: "n" }),
+        }),
+      );
+    });
   });
 
   describe("successful link creation", () => {
