@@ -621,7 +621,8 @@ async function resaveUploadRow(
 async function insertResolvedLink(
   userId: string,
   resolved: ResolvedLinkFields,
-  folderId?: string,
+  folderId: string | undefined,
+  notes: string | null,
 ): Promise<CreateLinkResult & { moved: boolean }> {
   try {
     return await insertWithinSaveLimit(
@@ -639,6 +640,7 @@ async function insertResolvedLink(
             mimeType: resolved.mimeType,
             userId,
             ...(folderId !== undefined ? { folderId } : {}),
+            ...(notes !== null ? { notes } : {}),
           },
         })),
         moved: false,
@@ -681,6 +683,8 @@ async function insertResolvedLink(
 
 export type CreateLinkOptions = {
   folderId?: string;
+  /** Present to set the new link's private note; ignored when the URL is already saved. */
+  notes?: string | null;
 };
 
 /** Creates a link for the current user after scraping metadata. If a link with the same URL already exists, updates its createdAt and returns it. Throws UnauthorizedError if not authenticated. */
@@ -710,6 +714,9 @@ export async function createLinkForUser(
   url: string,
   opts?: CreateLinkOptions,
 ): Promise<CreateLinkResult & { moved: boolean }> {
+  // First, so a note over the cap fails before any lookup or scraping.
+  const notes = normalizeLinkNotes(opts?.notes);
+
   if (opts?.folderId !== undefined) {
     await assertFolderOwned(userId, opts.folderId);
   }
@@ -765,7 +772,7 @@ export async function createLinkForUser(
       // does a delete from another device. The user asked for the link, so
       // save it fresh, with the metadata already in hand.
     }
-    return insertResolvedLink(userId, resolved, opts?.folderId);
+    return insertResolvedLink(userId, resolved, opts?.folderId, notes);
   }
 
   // Fails fast before scraping; insertResolvedLink re-checks the cap
@@ -773,7 +780,7 @@ export async function createLinkForUser(
   await assertCanSaveLink(userId);
 
   const resolved = await resolveLinkFromUrl(url);
-  return insertResolvedLink(userId, resolved, opts?.folderId);
+  return insertResolvedLink(userId, resolved, opts?.folderId, notes);
 }
 
 /** Fetches a single link if it belongs to the current user; otherwise null. Throws UnauthorizedError if not authenticated. */
@@ -797,6 +804,8 @@ export type UpdateLinkData = {
   url?: string;
   title?: string;
   description?: string | null;
+  /** Present to set or clear (`null`) the private note; omitted leaves it. */
+  notes?: string | null;
   /** Show the page live in its card (the route has already checked it can be framed). */
   embed?: boolean;
 };
@@ -844,6 +853,9 @@ export async function updateLinkForUser(
     where: { id, userId },
   });
   if (!existing) return null;
+  // Before any re-scrape, so a note over the cap writes (and fetches) nothing.
+  const notes =
+    data.notes !== undefined ? normalizeLinkNotes(data.notes) : undefined;
   if (data.expectedUrl !== undefined && existing.url !== data.expectedUrl) {
     throw new LinkChangedError();
   }
@@ -888,6 +900,9 @@ export async function updateLinkForUser(
 
   if (data.folderId !== undefined) {
     updatePayload.folderId = data.folderId;
+  }
+  if (notes !== undefined) {
+    updatePayload.notes = notes;
   }
   if (typeof data.embed === "boolean" && !(urlChanged && data.embed)) {
     updatePayload.embed = data.embed;
