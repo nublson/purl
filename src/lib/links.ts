@@ -227,7 +227,7 @@ type LinkRow = {
   domain: string;
   contentType: ContentType;
   description: string | null;
-  notes?: string | null;
+  notes: string | null;
   thumbnail: string | null;
   createdAt: Date;
   folderId?: string | null;
@@ -263,7 +263,7 @@ export function mapRowToLink(row: LinkRow): Link {
     title: row.title,
     favicon: row.favicon,
     description: row.description,
-    notes: row.notes ?? null,
+    notes: row.notes,
     thumbnail: row.thumbnail,
     domain: row.domain,
     contentType: row.contentType,
