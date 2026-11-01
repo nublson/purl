@@ -3,13 +3,18 @@ import type { MoveLinksResult } from "@/lib/bulk-links";
 import { assertCanSaveLink, insertWithinSaveLimit } from "@/lib/entitlements";
 import { DEFAULT_FOLDER_EMOJI } from "@/lib/folder-display";
 import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
-import { MAX_LINK_NOTES_LENGTH, MAX_SAVED_LINKS } from "@/lib/limits";
+import {
+  MAX_LINK_NOTES_LENGTH,
+  MAX_LINK_SEARCH_QUERY_LENGTH,
+  MAX_SAVED_LINKS,
+} from "@/lib/limits";
 import {
   OG_HTML_READ_MAX_BYTES,
   readHtmlForOpenGraph,
 } from "@/lib/og-html";
 import { validateOgThumbnailUrl } from "@/lib/og-thumbnail-probe";
 import prisma, { type Prisma } from "@/lib/prisma";
+import { readerLinkIdsMatching } from "@/lib/reader-views";
 import { safeFetch } from "@/lib/safe-outbound-fetch";
 import { getSessionUser } from "@/lib/session";
 import { detectContentType } from "@/lib/server-detect-content-type";
@@ -1102,8 +1107,7 @@ export async function deleteLink(id: string): Promise<boolean> {
 
 /** Most results one link search returns. */
 export const MAX_LINK_SEARCH_RESULTS = 100;
-/** Longest search query accepted (longer input is cut). */
-export const MAX_LINK_SEARCH_QUERY_LENGTH = 200;
+export { MAX_LINK_SEARCH_QUERY_LENGTH };
 
 /**
  * Prisma condition matching `query` against a link's title, domain, URL,
@@ -1112,14 +1116,21 @@ export const MAX_LINK_SEARCH_QUERY_LENGTH = 200;
  */
 export function linkQueryWhere(
   query: string | undefined,
-): { OR: Array<Record<string, { contains: string; mode: "insensitive" }>> } | null {
+  readerLinkIds?: string[],
+): {
+  OR: Array<
+    Record<string, { contains: string; mode: "insensitive" }> | { id: { in: string[] } }
+  >;
+} | null {
   const text = (query ?? "").trim().slice(0, MAX_LINK_SEARCH_QUERY_LENGTH);
   if (!text) return null;
-  return {
-    OR: (["title", "domain", "url", "description", "notes"] as const).map((field) => ({
-      [field]: { contains: text, mode: "insensitive" as const },
-    })),
-  };
+  const OR: Array<
+    Record<string, { contains: string; mode: "insensitive" }> | { id: { in: string[] } }
+  > = (["title", "domain", "url", "description", "notes"] as const).map((field) => ({
+    [field]: { contains: text, mode: "insensitive" as const },
+  }));
+  if (readerLinkIds && readerLinkIds.length > 0) OR.push({ id: { in: readerLinkIds } });
+  return { OR };
 }
 
 export type SearchLinksOptions = {
@@ -1152,7 +1163,8 @@ export async function searchLinksForUser(
     // `not` alone would also drop unfiled links (SQL NULL comparison).
     and.push({ OR: [{ folderId: null }, { folderId: { not: notInFolderId } }] });
   }
-  const matches = linkQueryWhere(opts.query);
+  const readerIds = opts.query?.trim() ? await readerLinkIdsMatching(userId, opts.query) : [];
+  const matches = linkQueryWhere(opts.query, readerIds);
   if (matches) and.push(matches);
 
   const rows = await prisma.link.findMany({
@@ -1275,7 +1287,8 @@ export async function listLinksForUser(
   const where: WhereInput = { userId };
 
   // In AND: the cursor below already uses the top-level OR.
-  const matches = linkQueryWhere(query);
+  const readerIds = query?.trim() ? await readerLinkIdsMatching(userId, query) : [];
+  const matches = linkQueryWhere(query, readerIds);
   if (matches) where.AND = [matches];
 
   if (contentType) {

@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  MAX_LINK_SEARCH_QUERY_LENGTH,
   READER_ABORT_GRACE_MS,
   READER_BATCH_SIZE,
   READER_CONCURRENCY,
@@ -235,4 +236,35 @@ export async function buildPendingReaderViews(): Promise<ReaderRunResult> {
 
   for (const userId of updatedUsers) broadcastLinksChanged(userId);
   return result;
+}
+
+/**
+ * A `to_tsquery('simple', …)` string for the user's search: each word a quoted
+ * prefix lexeme joined with `&`, so no input is a tsquery syntax error. Null
+ * when nothing searchable is left.
+ */
+export function buildReaderTsQuery(q: string): string | null {
+  const words = q
+    .slice(0, MAX_LINK_SEARCH_QUERY_LENGTH)
+    .split(/\s+/)
+    .map((w) => w.toLowerCase().replace(/[\\:]/g, ""))
+    .filter(Boolean)
+    .map((w) => `'${w.replace(/'/g, "''")}':*`);
+  return words.length > 0 ? words.join(" & ") : null;
+}
+
+/** Ids of the user's links whose ready reader view matches `q` (at most 1,000). */
+export async function readerLinkIdsMatching(
+  userId: string,
+  q: string,
+): Promise<string[]> {
+  const tsq = buildReaderTsQuery(q);
+  if (!tsq) return [];
+  const rows = await prisma.$queryRaw<{ linkId: string }[]>`
+    SELECT "linkId" FROM reader_views
+    WHERE "userId" = ${userId}
+      AND status = 'READY'::"ReaderViewStatus"
+      AND tsv @@ to_tsquery('simple', ${tsq})
+    LIMIT 1000`;
+  return rows.map((r) => r.linkId);
 }

@@ -68,3 +68,6 @@ export const READER_HTML_MAX_BYTES = 5 * 1024 * 1024;
 export const READER_MARKDOWN_MAX_BYTES = 300 * 1024;
 /** Reader views: a PENDING row older than this is claimed again. */
 export const READER_PENDING_RETRY_MS = 10 * 60 * 1000;
+
+/** Longest search query accepted (longer input is cut). */
+export const MAX_LINK_SEARCH_QUERY_LENGTH = 200;

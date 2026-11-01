@@ -41,6 +41,9 @@ vi.mock("@/lib/entitlements", () => ({
     feature = "SAVE_LIMIT";
   },
 }));
+vi.mock("@/lib/reader-views", () => ({
+  readerLinkIdsMatching: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("@/lib/realtime-broadcast", () => ({
   broadcastLinksChanged: vi.fn(),
 }));
@@ -55,6 +58,7 @@ vi.mock("@/lib/folders", () => ({
 const { auth } = await import("@/lib/auth");
 const { insertWithinSaveLimit } = await import("@/lib/entitlements");
 const prisma = (await import("@/lib/prisma")).default;
+const { readerLinkIdsMatching } = await import("@/lib/reader-views");
 const { assertFolderOwned, FolderNotFoundError } = await import("@/lib/folders");
 const {
   createLinkForUser,
@@ -594,6 +598,46 @@ describe("writing a link's note", () => {
   });
 });
 
+describe("linkQueryWhere with reader ids", () => {
+  it("adds an id clause for reader matches", () => {
+    const where = linkQueryWhere("x", ["a", "b"])!;
+    expect(where.OR).toHaveLength(6);
+    expect(where.OR[5]).toEqual({ id: { in: ["a", "b"] } });
+  });
+  it("adds nothing for none", () => {
+    expect(linkQueryWhere("x", [])!.OR).toHaveLength(5);
+    expect(linkQueryWhere("x")!.OR).toHaveLength(5);
+  });
+});
+
+describe("reader search wiring", () => {
+  beforeEach(() => {
+    vi.mocked(readerLinkIdsMatching).mockReset().mockResolvedValue(["r1"]);
+    vi.mocked(prisma.link.findMany).mockReset().mockResolvedValue([]);
+  });
+  it("searchLinksForUser passes reader ids", async () => {
+    await searchLinksForUser("u1", { query: "bird", limit: 5 });
+    expect(readerLinkIdsMatching).toHaveBeenCalledWith("u1", "bird");
+    const where = vi.mocked(prisma.link.findMany).mock.calls[0][0]!.where as never as {
+      AND: { OR: unknown[] }[];
+    };
+    expect(where.AND[0].OR).toContainEqual({ id: { in: ["r1"] } });
+  });
+  it("listLinksForUser passes reader ids", async () => {
+    await listLinksForUser("u1", { limit: 5, cursor: null, contentType: null, query: "bird" });
+    expect(readerLinkIdsMatching).toHaveBeenCalledWith("u1", "bird");
+    const where = vi.mocked(prisma.link.findMany).mock.calls[0][0]!.where as never as {
+      AND: { OR: unknown[] }[];
+    };
+    expect(where.AND[0].OR).toContainEqual({ id: { in: ["r1"] } });
+  });
+  it("skips the reader search without a query", async () => {
+    await searchLinksForUser("u1", { query: "  ", limit: 5 });
+    await listLinksForUser("u1", { limit: 5, cursor: null, contentType: null });
+    expect(readerLinkIdsMatching).not.toHaveBeenCalled();
+  });
+});
+
 describe("linkQueryWhere", () => {
   it("is null for a blank query", () => {
     expect(linkQueryWhere("  ")).toBeNull();
@@ -614,7 +658,9 @@ describe("linkQueryWhere", () => {
   });
 
   it("cuts the query at MAX_LINK_SEARCH_QUERY_LENGTH", () => {
-    expect(linkQueryWhere("x".repeat(300))!.OR[0].title.contains).toHaveLength(200);
+    expect(
+      (linkQueryWhere("x".repeat(300))!.OR[0] as unknown as { title: { contains: string } }).title.contains,
+    ).toHaveLength(200);
   });
 });
 

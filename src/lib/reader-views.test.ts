@@ -27,7 +27,12 @@ const {
   READER_HTML_MAX_BYTES,
 } = await import("@/lib/limits");
 const readerMarkdown = await import("@/lib/reader-markdown");
-const { buildPendingReaderViews, makeReaderView } = await import(
+const {
+  buildPendingReaderViews,
+  buildReaderTsQuery,
+  makeReaderView,
+  readerLinkIdsMatching,
+} = await import(
   "./reader-views"
 );
 
@@ -279,5 +284,46 @@ describe("buildPendingReaderViews", () => {
     });
     expect(err).toHaveBeenCalledWith("[reader] run failed", expect.any(Error));
     err.mockRestore();
+  });
+});
+
+describe("buildReaderTsQuery", () => {
+  it("makes a prefix lexeme", () => {
+    expect(buildReaderTsQuery("Swal")).toBe("'swal':*");
+  });
+  it("joins words with &", () => {
+    expect(buildReaderTsQuery("swallow  migration")).toBe(
+      "'swallow':* & 'migration':*",
+    );
+  });
+  it("doubles quotes", () => {
+    expect(buildReaderTsQuery("it's")).toBe("'it''s':*");
+  });
+  it("quotes operators", () => {
+    expect(buildReaderTsQuery("a & b:c \\x")).toBe(
+      "'a':* & '&':* & 'bc':* & 'x':*",
+    );
+  });
+  it("builds no query from punctuation only", () => {
+    expect(buildReaderTsQuery("\\ :")).toBeNull();
+    expect(buildReaderTsQuery("   ")).toBeNull();
+  });
+});
+
+describe("readerLinkIdsMatching", () => {
+  beforeEach(() => queryRaw.mockReset());
+  it("does not query without a tsquery", async () => {
+    expect(await readerLinkIdsMatching("u1", " : ")).toEqual([]);
+    expect(queryRaw).not.toHaveBeenCalled();
+  });
+  it("queries ready views and maps ids", async () => {
+    queryRaw.mockResolvedValueOnce([{ linkId: "a" }, { linkId: "b" }] as never);
+    expect(await readerLinkIdsMatching("u1", "bird")).toEqual(["a", "b"]);
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    const sql = (queryRaw.mock.calls[0][0] as unknown as string[]).join("?");
+    expect(sql).toContain("status = 'READY'");
+    expect(sql).toContain("to_tsquery('simple'");
+    expect(sql).toContain("LIMIT 1000");
+    expect(queryRaw.mock.calls[0].slice(1)).toEqual(["u1", "'bird':*"]);
   });
 });

@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const realSafeFetch = safeOutbound.safeFetch;
 
+vi.mock("@/lib/reader-views", () => ({
+  readerLinkIdsMatching: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("next/headers", () => ({
   headers: vi.fn().mockResolvedValue(new Headers()),
 }));
