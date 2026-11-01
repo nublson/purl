@@ -303,22 +303,38 @@ export async function readReaderViewForUser(
     url: string;
     contentType: ContentType;
     fileKey: string | null;
+    favicon: string;
+    domain: string;
   };
   view: {
     status: ReaderViewStatus;
     reason: string | null;
     markdown: string | null;
+    truncated: boolean;
     fetchedAt: Date | null;
   } | null;
 } | null> {
   const link = await prisma.link.findFirst({
     where: { id: linkId, userId },
-    select: { title: true, url: true, contentType: true, fileKey: true },
+    select: {
+      title: true,
+      url: true,
+      contentType: true,
+      fileKey: true,
+      favicon: true,
+      domain: true,
+    },
   });
   if (!link) return null;
   const view = await prisma.readerView.findUnique({
     where: { linkId },
-    select: { status: true, reason: true, markdown: true, fetchedAt: true },
+    select: {
+      status: true,
+      reason: true,
+      markdown: true,
+      truncated: true,
+      fetchedAt: true,
+    },
   });
   return { link, view };
 }

@@ -32,9 +32,9 @@ const readStaticPage = (slug: StaticPageSlug) =>
   readAtBuild(() => getPageBySlug(slug), null, `Static page "${slug}"`);
 
 /** The page's one column: every block shares its edge. */
-const COLUMN = "mx-auto w-full max-w-[68ch]";
+export const STATIC_PAGE_COLUMN = "mx-auto w-full max-w-[68ch]";
 
-const MARK_LINK =
+export const STATIC_PAGE_MARK_LINK =
   "inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11";
 
 export async function staticPageMetadata(
@@ -104,17 +104,17 @@ export async function StaticPage({
       {/* Mark, title and content share one centered 68ch column (on the
           landing demo's axis), text left-aligned; the footer keeps the
           landing layout. */}
-      <header className={`${COLUMN} pt-12 sm:pt-16 md:pt-20`}>
+      <header className={`${STATIC_PAGE_COLUMN} pt-12 sm:pt-16 md:pt-20`}>
         <Typography
           component="a"
           href="/"
           aria-label="Purl, home"
-          className={MARK_LINK}
+          className={STATIC_PAGE_MARK_LINK}
         >
           <BrandMark />
         </Typography>
       </header>
-      <main className={`${COLUMN} flex flex-1 flex-col`}>
+      <main className={`${STATIC_PAGE_COLUMN} flex flex-1 flex-col`}>
         <Typography variant="h1" component="h1" className="mt-8 md:mt-10">
           {page.title}
         </Typography>

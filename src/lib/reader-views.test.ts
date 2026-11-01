@@ -386,7 +386,14 @@ describe("readReaderViewForUser", () => {
     expect(await readReaderViewForUser("u1", "l1")).toEqual({ link, view: null });
     expect(findFirst).toHaveBeenCalledWith({
       where: { id: "l1", userId: "u1" },
-      select: { title: true, url: true, contentType: true, fileKey: true },
+      select: {
+        title: true,
+        url: true,
+        contentType: true,
+        fileKey: true,
+        favicon: true,
+        domain: true,
+      },
     });
     const view = { status: "READY", reason: null, markdown: "m", fetchedAt: new Date() };
     findUnique.mockResolvedValue(view as never);
