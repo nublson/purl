@@ -26,6 +26,7 @@ const {
   READER_FETCH_TIMEOUT_MS,
   READER_HTML_MAX_BYTES,
 } = await import("@/lib/limits");
+const readerMarkdown = await import("@/lib/reader-markdown");
 const { buildPendingReaderViews, makeReaderView } = await import(
   "./reader-views"
 );
@@ -128,17 +129,32 @@ describe("makeReaderView", () => {
     );
   });
 
-  it("resolves relative links against the final URL after redirects", async () => {
-    const page = fixture("article.html").replace(
-      "</body>",
-      '<p><a href="/rel">rel</a></p></body>',
+  it("uses the final URL after redirects as the base", async () => {
+    fetchMock.mockResolvedValue(
+      html(fixture("article.html"), { url: "https://final.test/dir/x" }),
     );
-    fetchMock.mockResolvedValue(html(page, { url: "https://final.test/dir/x" }));
+    const spy = vi.spyOn(readerMarkdown, "extractArticle");
     const out = await makeReaderView("https://example.com/a", signal);
-    if (out.status === "READY" && out.markdown.includes("rel]")) {
-      expect(out.markdown).toContain("https://final.test/rel");
-    }
     expect(out.status).toBe("READY");
+    expect(spy).toHaveBeenCalledWith(
+      expect.any(String),
+      "https://final.test/dir/x",
+    );
+    spy.mockRestore();
+  });
+});
+
+describe("makeReaderView extraction failures", () => {
+  it("is NONE/no_article when the extractor throws", async () => {
+    fetchMock.mockResolvedValue(html(fixture("article.html")));
+    const spy = vi.spyOn(readerMarkdown, "extractArticle").mockImplementation(() => {
+      throw new Error("bad markup");
+    });
+    expect(await makeReaderView("https://example.com/a", signal)).toEqual({
+      status: "NONE",
+      reason: "no_article",
+    });
+    spy.mockRestore();
   });
 });
 
@@ -158,7 +174,7 @@ describe("buildPendingReaderViews", () => {
   });
 
   it("combines new and stale claims, writes results and broadcasts per user", async () => {
-    queryRaw.mockResolvedValueOnce([row(1, "u1")]).mockResolvedValueOnce([row(2, "u2")]);
+    queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([row(1, "u1")]).mockResolvedValueOnce([row(2, "u2")]);
     fetchMock.mockImplementation(async (u) =>
       String(u).endsWith("/1")
         ? html(fixture("article.html"))
@@ -166,7 +182,7 @@ describe("buildPendingReaderViews", () => {
     );
     const out = await buildPendingReaderViews();
     expect(out).toEqual({ claimed: 2, ready: 1, none: 1, failed: 0 });
-    expect(queryRaw).toHaveBeenCalledTimes(2);
+    expect(queryRaw).toHaveBeenCalledTimes(3);
     expect(updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { linkId: "l1", claimedAt },
@@ -185,19 +201,19 @@ describe("buildPendingReaderViews", () => {
   });
 
   it("skips the stale claim when the new one fills the batch", async () => {
-    queryRaw.mockResolvedValueOnce(
+    queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce(
       Array.from({ length: READER_BATCH_SIZE }, (_, i) => row(i)),
     );
     fetchMock.mockImplementation(async () => html(fixture("no-article.html")));
     const out = await buildPendingReaderViews();
     expect(out.claimed).toBe(READER_BATCH_SIZE);
-    expect(queryRaw).toHaveBeenCalledTimes(1);
+    expect(queryRaw).toHaveBeenCalledTimes(2);
     expect(broadcast).toHaveBeenCalledTimes(1);
   });
 
   it("aborts a fetch that never settles and writes FAILED/timeout", async () => {
     vi.useFakeTimers();
-    queryRaw.mockResolvedValueOnce([row(1)]).mockResolvedValueOnce([]);
+    queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([row(1)]).mockResolvedValueOnce([]);
     let aborted = false;
     fetchMock.mockImplementation((_u, init) => {
       init?.signal?.addEventListener("abort", () => {
@@ -218,7 +234,7 @@ describe("buildPendingReaderViews", () => {
   });
 
   it("drops the result when the row was reset meanwhile", async () => {
-    queryRaw.mockResolvedValueOnce([row(1)]).mockResolvedValueOnce([]);
+    queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([row(1)]).mockResolvedValueOnce([]);
     fetchMock.mockResolvedValue(html(fixture("article.html")));
     updateMany.mockResolvedValue({ count: 0 });
     const out = await buildPendingReaderViews();
@@ -226,9 +242,35 @@ describe("buildPendingReaderViews", () => {
     expect(broadcast).not.toHaveBeenCalled();
   });
 
+  it("gives up on rows whose second attempt never finished, and broadcasts", async () => {
+    queryRaw
+      .mockResolvedValueOnce([{ userId: "u9" }, { userId: "u9" }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    const out = await buildPendingReaderViews();
+    expect(out.claimed).toBe(0);
+    const sql = (queryRaw.mock.calls[0][0] as unknown as string[]).join("?");
+    expect(sql).toContain("'FAILED'");
+    expect(sql).toContain("'timeout'");
+    expect(sql).toContain('"attempts" >= 2');
+    expect(broadcast).toHaveBeenCalledTimes(1);
+    expect(broadcast).toHaveBeenCalledWith("u9");
+  });
+
+  it("re-claims stale rows only below two attempts and counts the attempt", async () => {
+    queryRaw
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    await buildPendingReaderViews();
+    const sql = (queryRaw.mock.calls[2][0] as unknown as string[]).join("?");
+    expect(sql).toContain('"attempts" < 2');
+    expect(sql).toContain('"attempts" = "attempts" + 1');
+  });
+
   it("logs and ends the run when a claim fails", async () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    queryRaw.mockRejectedValueOnce(new Error("db down"));
+    queryRaw.mockResolvedValueOnce([]).mockRejectedValueOnce(new Error("db down"));
     expect(await buildPendingReaderViews()).toEqual({
       claimed: 0,
       ready: 0,

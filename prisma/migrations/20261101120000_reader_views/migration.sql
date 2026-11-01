@@ -12,6 +12,7 @@ CREATE TABLE "reader_views" (
     "bytes" INTEGER,
     "claimedAt" TIMESTAMP(3) NOT NULL,
     "fetchedAt" TIMESTAMP(3),
+    "attempts" INTEGER NOT NULL DEFAULT 1,
     "tsv" tsvector GENERATED ALWAYS AS (to_tsvector('simple', coalesce("markdown", ''))) STORED,
 
     CONSTRAINT "reader_views_pkey" PRIMARY KEY ("linkId")

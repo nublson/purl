@@ -12,8 +12,8 @@ function safeEqual(given: string, expected: string): boolean {
 }
 
 /**
- * Vercel cron (every minute, `vercel.json`): makes reader views of saved pages
- * . Vercel sends `Authorization: Bearer $CRON_SECRET`; without the
+ * Vercel cron (every minute, `vercel.json`): makes reader views of saved pages.
+ * Vercel sends `Authorization: Bearer $CRON_SECRET`; without the
  * secret configured nothing runs. Never cached, no user session.
  */
 export async function GET(request: NextRequest) {

@@ -81,17 +81,22 @@ export async function makeReaderView(
   }
 
   const baseUrl = res.url || url;
-  const article = extractArticle(html, baseUrl);
-  if (!article) return { status: "NONE", reason: "no_article" };
-  const markdown = extractReaderMarkdown(article.content, baseUrl);
-  if (!markdown) return { status: "NONE", reason: "no_article" };
-  const cut = cutMarkdown(markdown, READER_MARKDOWN_MAX_BYTES);
-  return {
-    status: "READY",
-    markdown: cut.markdown,
-    truncated: cut.truncated,
-    bytes: cut.bytes,
-  };
+  try {
+    const article = extractArticle(html, baseUrl);
+    if (!article) return { status: "NONE", reason: "no_article" };
+    const markdown = extractReaderMarkdown(article.content, baseUrl);
+    if (!markdown) return { status: "NONE", reason: "no_article" };
+    const cut = cutMarkdown(markdown, READER_MARKDOWN_MAX_BYTES);
+    return {
+      status: "READY",
+      markdown: cut.markdown,
+      truncated: cut.truncated,
+      bytes: cut.bytes,
+    };
+  } catch {
+    // Markup the extractor can't handle: a page with no article, not a retry.
+    return { status: "NONE", reason: "no_article" };
+  }
 }
 
 /**
@@ -141,10 +146,10 @@ async function claimStale(limit: number): Promise<Claimed[]> {
   const retrySecs = READER_PENDING_RETRY_MS / 1000;
   return prisma.$queryRaw<Claimed[]>`
     WITH claimed AS (
-      UPDATE "reader_views" SET "claimedAt" = now()
+      UPDATE "reader_views" SET "claimedAt" = now(), "attempts" = "attempts" + 1
       WHERE "linkId" IN (
         SELECT "linkId" FROM "reader_views"
-        WHERE "status" = 'PENDING'::"ReaderViewStatus"
+        WHERE "status" = 'PENDING'::"ReaderViewStatus" AND "attempts" < 2
           AND "claimedAt" < now() - make_interval(secs => ${retrySecs})
         ORDER BY "claimedAt" LIMIT ${limit} FOR UPDATE SKIP LOCKED
       )
@@ -152,6 +157,18 @@ async function claimStale(limit: number): Promise<Claimed[]> {
     )
     SELECT c."linkId", c."userId", c."claimedAt", l."url"
     FROM claimed c JOIN "links" l ON l."id" = c."linkId"`;
+}
+
+/** Rows whose second attempt never finished are given up on: FAILED/timeout. */
+async function giveUpStale(): Promise<string[]> {
+  const retrySecs = READER_PENDING_RETRY_MS / 1000;
+  const rows = await prisma.$queryRaw<{ userId: string }[]>`
+    UPDATE "reader_views"
+    SET "status" = 'FAILED'::"ReaderViewStatus", "reason" = 'timeout', "fetchedAt" = now()
+    WHERE "status" = 'PENDING'::"ReaderViewStatus" AND "attempts" >= 2
+      AND "claimedAt" < now() - make_interval(secs => ${retrySecs})
+    RETURNING "userId"`;
+  return rows.map((r) => r.userId);
 }
 
 /**
@@ -162,7 +179,9 @@ async function claimStale(limit: number): Promise<Claimed[]> {
 export async function buildPendingReaderViews(): Promise<ReaderRunResult> {
   const result: ReaderRunResult = { claimed: 0, ready: 0, none: 0, failed: 0 };
   let claimed: Claimed[];
+  const gaveUp = new Set<string>();
   try {
+    for (const userId of await giveUpStale()) gaveUp.add(userId);
     claimed = await claimNew(READER_BATCH_SIZE);
     if (claimed.length < READER_BATCH_SIZE) {
       claimed = [
@@ -172,10 +191,11 @@ export async function buildPendingReaderViews(): Promise<ReaderRunResult> {
     }
   } catch (error) {
     console.error("[reader] run failed", error);
+    for (const userId of gaveUp) broadcastLinksChanged(userId);
     return result;
   }
   result.claimed = claimed.length;
-  const updatedUsers = new Set<string>();
+  const updatedUsers = new Set<string>(gaveUp);
 
   await runPool(claimed, READER_CONCURRENCY, async (link) => {
     try {
