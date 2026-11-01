@@ -55,7 +55,7 @@ import { McpError } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 const contentTypeSchema = z
-  .enum(["WEB", "YOUTUBE", "PDF", "AUDIO"])
+  .enum(["WEB", "YOUTUBE", "PDF", "AUDIO", "IMAGE", "VIDEO"])
   .describe("Filter by content type");
 
 export type ToolResult = {
@@ -326,7 +326,7 @@ export async function deleteLinkTool(
 export function registerPurlTools(server: McpServer): void {
   server.tool(
     "save_link",
-    "Save a URL (web page, PDF, YouTube video, or audio) to the user's library.",
+    "Save a URL (web page, PDF, YouTube video, audio, image or video file) to the user's library.",
     {
       url: z.string().describe("The URL to save"),
       folderId: z
