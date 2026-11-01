@@ -8,8 +8,8 @@ import { type NextRequest, NextResponse } from "next/server";
 const DEFAULT_LIMIT = 50;
 
 /**
- * Searches the signed-in user's links: `q` (title, domain, URL, description
- * or notes, case-insensitive; blank lists everything), `notInFolderId` (leave out that
+ * Searches the signed-in user's links: `q` (title, domain, URL or
+ * description, case-insensitive; blank lists everything), `notInFolderId` (leave out that
  * folder's links), `limit`. Newest first. Responds `{ links, hasMore }`.
  */
 export async function GET(request: NextRequest) {

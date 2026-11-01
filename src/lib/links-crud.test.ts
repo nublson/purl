@@ -1331,7 +1331,7 @@ describe("searchLinksForUser", () => {
     vi.mocked(prisma.link.findMany).mockResolvedValue([]);
   });
 
-  it("matches title, domain, URL, description or notes case-insensitively, leaving out the folder's links", async () => {
+  it("matches title, domain, URL or description case-insensitively, leaving out the folder's links", async () => {
     await searchLinksForUser("user-123", { query: "  React ", notInFolderId: "f1", limit: 20 });
     expect(assertFolderOwned).toHaveBeenCalledWith("user-123", "f1");
     expect(prisma.link.findMany).toHaveBeenCalledWith({
@@ -1345,7 +1345,6 @@ describe("searchLinksForUser", () => {
               { domain: { contains: "React", mode: "insensitive" } },
               { url: { contains: "React", mode: "insensitive" } },
               { description: { contains: "React", mode: "insensitive" } },
-              { notes: { contains: "React", mode: "insensitive" } },
             ],
           },
         ],
@@ -1403,7 +1402,6 @@ describe("listLinksForUser – search", () => {
           { domain: { contains: "Blog", mode: "insensitive" } },
           { url: { contains: "Blog", mode: "insensitive" } },
           { description: { contains: "Blog", mode: "insensitive" } },
-          { notes: { contains: "Blog", mode: "insensitive" } },
         ],
       },
     ]);
@@ -1995,7 +1993,6 @@ describe("listLinksForResource", () => {
         url: true,
         title: true,
         description: true,
-        notes: true,
         domain: true,
         contentType: true,
         createdAt: true,

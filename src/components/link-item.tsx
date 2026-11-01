@@ -26,7 +26,6 @@ import { Link as LinkType } from "@/utils/links";
 import dynamic from "next/dynamic";
 import * as React from "react";
 import { AudioRowIcon, AudioRowSecondLine, AudioRowToggle } from "./audio-row";
-import { NoteMark } from "./note-mark";
 import {
   FolderBadge,
   FolderLinkButton,
@@ -145,8 +144,6 @@ export const LinkItem = React.forwardRef<
   }, []);
   const hoveringActionsRef = React.useRef(false);
   const hoveringPreviewRef = React.useRef(false);
-  // The note mark's popover is open: no preview under it.
-  const noteOpenRef = React.useRef(false);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -167,7 +164,7 @@ export const LinkItem = React.forwardRef<
     clearOpenTimer();
 
     openTimerRef.current = setTimeout(() => {
-      if (hoveringActionsRef.current || noteOpenRef.current) return;
+      if (hoveringActionsRef.current) return;
       // No previews while selecting: the pointer is busy picking rows.
       if (linkSelection.selectedIds().length > 0) return;
       // Nor over the media viewer this row (or another) just opened.
@@ -265,15 +262,14 @@ export const LinkItem = React.forwardRef<
   const hostHandlers = {
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
       if (demo || event.pointerType !== "touch") return;
-      // A press on the row's actions or the note mark (`data-card-menu`:
-      // a control with a press of its own), or inside a portal (the open
-      // menu, whose React events bubble through here), isn't a long-press
-      // on the row: opening the menu takes the lift away from the row, so
+      // A press on the row's actions, or inside a portal (the open menu,
+      // whose React events bubble through here), isn't a long-press on
+      // the row: opening the menu takes the lift away from the row, so
       // the press would select it behind the menu.
       const target = event.target as Element;
       if (
         !event.currentTarget.contains(target) ||
-        target.closest("[data-row-actions], [data-card-menu]")
+        target.closest("[data-row-actions]")
       ) {
         return;
       }
@@ -525,19 +521,7 @@ export const LinkItem = React.forwardRef<
             the domain and tag stay in view. */}
         {/* overflow-visible: the folder tag sits on the text's baseline, a
             hair below the line box (line-clamp's overflow would clip it). */}
-        <ItemTitle
-          className={cn(
-            "max-w-full overflow-visible",
-            // With a note, the line ends in the mark, a control: it keeps
-            // clear of the actions floating over the row's end (their box,
-            // fade included: 64px for the ⋯, 104px with the folder button,
-            // which pointers that hover get on Home), so a long title
-            // never puts it under them.
-            link.notes &&
-              !demo &&
-              (linkFolder ? "pe-16 [@media(hover:hover)]:pe-26" : "pe-16"),
-          )}
-        >
+        <ItemTitle className="max-w-full overflow-visible">
           <Typography
             size="small"
             className={cn(
@@ -573,34 +557,6 @@ export const LinkItem = React.forwardRef<
           >
             {audio ? <AudioRowSecondLine link={link} /> : linkSecondLine(link)}
           </Typography>
-          {/* The last thing on the line: after the domain, or after the
-              title on phones, where the domain is hidden. Its box is the
-              line's height, so the row doesn't grow. A hovered mark holds
-              the row's preview like the actions do, and while the note is
-              open the preview stays shut: one overlay at a time. */}
-          {link.notes && !demo ? (
-            <NoteMark
-              notes={link.notes}
-              inert={selecting}
-              className="max-md:h-6"
-              onHoverChange={(hovering) => {
-                hoveringActionsRef.current = hovering;
-                if (hovering) {
-                  clearOpenTimer();
-                  clearCloseTimer();
-                } else {
-                  scheduleOpen();
-                }
-              }}
-              onOpenChange={(open) => {
-                noteOpenRef.current = open;
-                if (open) {
-                  clearOpenTimer();
-                  setPreviewOpen(false);
-                }
-              }}
-            />
-          ) : null}
           {/* The favicon's folder badge, named for screen readers (and the
               link's description). */}
           {folderTag ? (

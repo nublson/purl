@@ -58,7 +58,6 @@ describe("POST /api/uploads", () => {
     title: "My Shot",
     favicon: "https://purl.live/icon.png",
     description: null,
-    notes: null,
     thumbnail: UPLOAD.previewUrl,
     domain: "purl.live",
     contentType: "IMAGE" as const,

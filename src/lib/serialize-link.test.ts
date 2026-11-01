@@ -146,12 +146,4 @@ describe("serializeLink", () => {
       embed: false,
     });
   });
-
-  it("serializes the owner's note", () => {
-    expect(serializeLink(makeLink({ notes: "mine" })).notes).toBe("mine");
-  });
-
-  it("serializes a missing note as null", () => {
-    expect(serializeLink(makeLink()).notes).toBeNull();
-  });
 });

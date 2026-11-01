@@ -135,7 +135,6 @@ export function LinkCardContent({
   eagerThumbnail = false,
   badge,
   mediaAnchor = false,
-  noteMark,
 }: {
   link: LinkType;
   eagerThumbnail?: boolean;
@@ -143,8 +142,6 @@ export function LinkCardContent({
   badge?: ReactNode;
   /** The media viewer opens from this card: the face is its morph anchor. */
   mediaAnchor?: boolean;
-  /** The owner's grid: the link's `NoteMark`, beside its domain. */
-  noteMark?: ReactNode;
 }) {
   switch (linkKind(link)) {
     case "image":
@@ -158,7 +155,7 @@ export function LinkCardContent({
       return (
         <>
           <EmbedFace link={link} anchored={mediaAnchor} eager={eagerThumbnail} />
-          <LinkCardStrip link={link} badge={badge} noteMark={noteMark} />
+          <LinkCardStrip link={link} badge={badge} />
         </>
       );
     default: {
@@ -176,26 +173,15 @@ export function LinkCardContent({
             // own 1px outline so the edge isn't doubled.
             className="aspect-[16/10] rounded-none [&_img]:outline-0"
           />
-          <LinkCardStrip link={link} badge={badge} noteMark={noteMark} />
+          <LinkCardStrip link={link} badge={badge} />
         </>
       );
     }
   }
 }
 
-/**
- * A card's text: the favicon (with the badge), the title and the domain
- * (with the note mark beside it on the owner's grid).
- */
-function LinkCardStrip({
-  link,
-  badge,
-  noteMark,
-}: {
-  link: LinkType;
-  badge?: ReactNode;
-  noteMark?: ReactNode;
-}) {
+/** A card's text: the favicon (with the badge), the title and the domain. */
+function LinkCardStrip({ link, badge }: { link: LinkType; badge?: ReactNode }) {
   return (
     <span className="grid grid-cols-[16px_minmax(0,1fr)] gap-x-2 gap-y-1 p-3 md:gap-x-3 md:p-4">
       {/* Centered on the title's first line: a box one title line tall
@@ -219,24 +205,13 @@ function LinkCardStrip({
       >
         {link.title}
       </Typography>
-      {noteMark ? (
-        <span className="col-start-2 flex min-w-0 items-center gap-1.5">
-          <Typography component="span" size="small" className="truncate">
-            {linkSecondLine(link)}
-          </Typography>
-          {noteMark}
-        </span>
-      ) : (
-        // Without a mark (the shared page, the demo, links with no note)
-        // the line is a single span, exactly as before notes.
-        <Typography
-          component="span"
-          size="small"
-          className="col-start-2 truncate"
-        >
-          {linkSecondLine(link)}
-        </Typography>
-      )}
+      <Typography
+        component="span"
+        size="small"
+        className="col-start-2 truncate"
+      >
+        {linkSecondLine(link)}
+      </Typography>
     </span>
   );
 }

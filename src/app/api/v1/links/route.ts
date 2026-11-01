@@ -1,11 +1,6 @@
 import { SaveLimitError } from "@/lib/entitlements";
 import { FolderNotFoundError } from "@/lib/folders";
-import {
-  createLink,
-  LinkNotesError,
-  listLinks,
-  UnauthorizedError,
-} from "@/lib/links";
+import { createLink, listLinks, UnauthorizedError } from "@/lib/links";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { serializeLink } from "@/lib/serialize-link";
 import { isValidUrl } from "@/utils/url";
@@ -49,7 +44,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  let body: { url?: string; folderId?: string; notes?: unknown };
+  let body: { url?: string; folderId?: string };
   try {
     body = await request.json();
   } catch {
@@ -69,21 +64,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       ? body.folderId
       : undefined;
 
-  const hasNotes = body?.notes !== undefined;
-  if (hasNotes && body.notes !== null && typeof body.notes !== "string") {
-    return addCors(NextResponse.json({ error: "Invalid notes" }, { status: 400 }));
-  }
-  const notes = hasNotes ? (body.notes as string | null) : undefined;
-
   try {
-    const options = {
-      ...(folderId ? { folderId } : {}),
-      ...(notes !== undefined ? { notes } : {}),
-    };
-    const link =
-      Object.keys(options).length > 0
-        ? await createLink(url, options)
-        : await createLink(url);
+    const link = folderId
+      ? await createLink(url, { folderId })
+      : await createLink(url);
     broadcastLinksChanged(link.userId);
     return addCors(
       NextResponse.json(
@@ -105,14 +89,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
     if (e instanceof FolderNotFoundError) {
       return addCors(NextResponse.json({ error: "Folder not found" }, { status: 404 }));
-    }
-    if (e instanceof LinkNotesError) {
-      return addCors(
-        NextResponse.json(
-          { error: e.message, code: "INVALID_NOTES" },
-          { status: 400 }
-        )
-      );
     }
     throw e;
   }

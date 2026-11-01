@@ -22,7 +22,6 @@ import {
   countLinksForUser,
   createLinkForUser,
   deleteLinksForUser,
-  LinkNotesError,
   listLinksForResource,
   listLinksForUser,
   moveLinkToFolder,
@@ -89,7 +88,6 @@ export async function saveLinkTool(
   userId: string,
   url: string,
   folderId?: string,
-  notes?: string,
 ): Promise<ToolResult> {
   const trimmed = url.trim();
   if (!trimmed || !isValidUrl(trimmed)) {
@@ -97,13 +95,9 @@ export async function saveLinkTool(
   }
   try {
     // A falsy `folderId` (omitted or "") means "no folder".
-    const link =
-      folderId || notes !== undefined
-        ? await createLinkForUser(userId, trimmed, {
-            folderId: folderId || undefined,
-            notes,
-          })
-        : await createLinkForUser(userId, trimmed);
+    const link = folderId
+      ? await createLinkForUser(userId, trimmed, { folderId })
+      : await createLinkForUser(userId, trimmed);
     broadcastLinksChanged(link.userId);
     return jsonContent({ ...serializeLink(link), moved: link.moved });
   } catch (e) {
@@ -112,9 +106,6 @@ export async function saveLinkTool(
     }
     if (e instanceof FolderNotFoundError) {
       return errorContent("Folder not found");
-    }
-    if (e instanceof LinkNotesError) {
-      return errorContent(e.message);
     }
     throw e;
   }
@@ -333,13 +324,8 @@ export function registerPurlTools(server: McpServer): void {
         .string()
         .optional()
         .describe("Folder id from list_folders to save into"),
-      notes: z
-        .string()
-        .optional()
-        .describe("A private note to keep with the link, up to 2,000 characters"),
     },
-    async ({ url, folderId, notes }, extra) =>
-      saveLinkTool(getUserId(extra), url, folderId, notes),
+    async ({ url, folderId }, extra) => saveLinkTool(getUserId(extra), url, folderId),
   );
 
   server.tool(

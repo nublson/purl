@@ -146,7 +146,6 @@ export function OmniboxSaveRow({
         id: "preview",
         createdAt: new Date(0),
         folderId: null,
-        notes: null,
         mimeType: null,
         width: null,
         height: null,

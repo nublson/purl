@@ -53,12 +53,7 @@ export type PublicFolderPage =
   /** An old username or slug: send visitors to the current URL. */
   | { kind: "redirect"; username: string; slug: string };
 
-/**
- * The landing demo's link select (`getDemoFolders`): only the columns
- * visitors may see. The shared folder page, its load-more API, the Atom
- * feed and the preview image go through `listPublicFolderLinks`, which
- * copies only `PublicLink`'s fields.
- */
+/** The only link columns visitors may see (one source for every public read). */
 export const PUBLIC_LINK_SELECT = {
   id: true,
   url: true,

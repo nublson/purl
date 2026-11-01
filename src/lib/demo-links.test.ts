@@ -40,7 +40,7 @@ describe("demo constants", () => {
 describe("toDemoLinks", () => {
   it("maps public links to app links, filed in the folder", () => {
     expect(toDemoLinks(FOLDER)).toEqual([
-      { ...FOLDER.links[0], folderId: "f1", notes: null, frameable: null },
+      { ...FOLDER.links[0], folderId: "f1", frameable: null },
     ]);
   });
 

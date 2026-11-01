@@ -34,7 +34,6 @@ vi.mock("@/lib/prisma", () => ({
 
 vi.mock("@/lib/entitlements", () => ({
   assertCanSaveLink: vi.fn(),
-  insertWithinSaveLimit: vi.fn(),
   BillingLimitError: class BillingLimitError extends Error {
     feature = "SAVE_LIMIT";
   },
@@ -51,20 +50,10 @@ vi.mock("@/lib/folders", () => ({
 }));
 
 const { auth } = await import("@/lib/auth");
-const { insertWithinSaveLimit } = await import("@/lib/entitlements");
 const prisma = (await import("@/lib/prisma")).default;
 const { assertFolderOwned, FolderNotFoundError } = await import("@/lib/folders");
-const {
-  createLinkForUser,
-  getLinksPageForCurrentUser,
-  LinkNotesError,
-  linkQueryWhere,
-  normalizeLinkNotes,
-  UnauthorizedError,
-  listLinks,
-  resolveLinkFromUrl,
-  updateLinkForUser,
-} = await import("./links");
+const { getLinksPageForCurrentUser, UnauthorizedError, listLinks, resolveLinkFromUrl } =
+  await import("./links");
 
 const MOCK_SESSION = { user: { id: "user-123", username: "user-123" }, session: {} };
 
@@ -425,183 +414,5 @@ describe("resolveLinkFromUrl – media links", () => {
       mimeType: "text/html",
       title: "A page",
     });
-  });
-});
-
-describe("normalizeLinkNotes", () => {
-  it("returns null for missing or blank notes", () => {
-    expect(normalizeLinkNotes(undefined)).toBeNull();
-    expect(normalizeLinkNotes(null)).toBeNull();
-    expect(normalizeLinkNotes("   \n ")).toBeNull();
-  });
-
-  it("trims the ends but keeps inner lines and spacing", () => {
-    expect(normalizeLinkNotes("  keep\n\nthese  lines  ")).toBe(
-      "keep\n\nthese  lines",
-    );
-  });
-
-  it("drops control characters but keeps tabs", () => {
-    expect(normalizeLinkNotes("a\u0000b\u0007c\td")).toBe("abc\td");
-  });
-
-  it("accepts 2,000 characters and refuses 2,001", () => {
-    expect(normalizeLinkNotes("x".repeat(2000))).toHaveLength(2000);
-    expect(() => normalizeLinkNotes("x".repeat(2001))).toThrow(LinkNotesError);
-    expect(() => normalizeLinkNotes("x".repeat(2001))).toThrow(
-      "Keep the note to 2,000 characters or fewer.",
-    );
-  });
-});
-
-describe("writing a link's note", () => {
-  const EXISTING = {
-    id: "link-1",
-    userId: "user-123",
-    url: "https://example.com/",
-    folderId: null,
-    fileKey: null,
-  };
-
-  describe("updateLinkForUser", () => {
-    beforeEach(() => {
-      vi.mocked(prisma.link.findFirst).mockReset().mockResolvedValue(EXISTING as never);
-      vi.mocked(prisma.link.update).mockReset().mockResolvedValue(EXISTING as never);
-    });
-
-    function writtenData() {
-      return vi.mocked(prisma.link.update).mock.calls[0][0].data;
-    }
-
-    it("writes a trimmed note", async () => {
-      await updateLinkForUser("user-123", "link-1", { notes: "  a note " });
-      expect(writtenData()).toMatchObject({ notes: "a note" });
-    });
-
-    it("clears the note with an empty string", async () => {
-      await updateLinkForUser("user-123", "link-1", { notes: "" });
-      expect(writtenData()).toMatchObject({ notes: null });
-    });
-
-    it("clears the note with null", async () => {
-      await updateLinkForUser("user-123", "link-1", { notes: null });
-      expect(writtenData()).toMatchObject({ notes: null });
-    });
-
-    it("refuses a note over the cap and writes nothing", async () => {
-      await expect(
-        updateLinkForUser("user-123", "link-1", { notes: "x".repeat(2001) }),
-      ).rejects.toThrow(LinkNotesError);
-      expect(prisma.link.update).not.toHaveBeenCalled();
-    });
-
-    it("writes the note together with a re-scraped url", async () => {
-      await updateLinkForUser("user-123", "link-1", {
-        url: "https://cdn.test/clip.mov",
-        notes: "kept",
-      });
-      expect(writtenData()).toMatchObject({
-        url: "https://cdn.test/clip.mov",
-        domain: "cdn.test",
-        contentType: "VIDEO",
-        notes: "kept",
-      });
-    });
-
-    it("writes no notes key when notes is omitted", async () => {
-      await updateLinkForUser("user-123", "link-1", { title: "t" });
-      expect(writtenData()).toEqual({ title: "t" });
-      expect(writtenData()).not.toHaveProperty("notes");
-    });
-  });
-
-  describe("createLinkForUser", () => {
-    const create = vi.fn();
-    const txFindFirst = vi.fn();
-
-    beforeEach(() => {
-      create.mockReset().mockImplementation(async ({ data }) => ({
-        id: "new",
-        ...data,
-      }));
-      txFindFirst.mockReset().mockResolvedValue(null);
-      vi.mocked(prisma.link.findFirst).mockReset().mockResolvedValue(null);
-      vi.mocked(prisma.link.update).mockReset();
-      vi.mocked(insertWithinSaveLimit)
-        .mockReset()
-        .mockImplementation((async (
-          _userId: string,
-          insert: (tx: unknown) => Promise<unknown>,
-          options: { reuse?: (tx: unknown) => Promise<unknown> },
-        ) => {
-          const tx = { link: { create, findFirst: txFindFirst, update: prisma.link.update } };
-          const reused = options.reuse ? await options.reuse(tx) : null;
-          return reused ?? insert(tx);
-        }) as never);
-    });
-
-    it("saves the note on a fresh url", async () => {
-      await createLinkForUser("user-123", "https://cdn.test/clip.mov", {
-        notes: "first",
-      });
-      expect(create.mock.calls[0][0].data).toMatchObject({ notes: "first" });
-    });
-
-    it("writes no notes key when there is no note", async () => {
-      await createLinkForUser("user-123", "https://cdn.test/clip.mov", {
-        notes: "   ",
-      });
-      expect(create.mock.calls[0][0].data).not.toHaveProperty("notes");
-    });
-
-    it("refuses a note over the cap before any work", async () => {
-      await expect(
-        createLinkForUser("user-123", "https://cdn.test/clip.mov", {
-          notes: "x".repeat(2001),
-        }),
-      ).rejects.toThrow(LinkNotesError);
-      expect(prisma.link.findFirst).not.toHaveBeenCalled();
-      expect(create).not.toHaveBeenCalled();
-    });
-
-    it("leaves the note alone when the url is already saved", async () => {
-      const row = { ...EXISTING, url: "https://cdn.test/clip.mov", notes: "old" };
-      txFindFirst.mockResolvedValue(row);
-      vi.mocked(prisma.link.update).mockResolvedValue(row as never);
-
-      await createLinkForUser("user-123", "https://cdn.test/clip.mov", {
-        notes: "second",
-      });
-
-      expect(create).not.toHaveBeenCalled();
-      expect(prisma.link.update).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(prisma.link.update).mock.calls[0][0].data).not.toHaveProperty(
-        "notes",
-      );
-    });
-  });
-});
-
-describe("linkQueryWhere", () => {
-  it("is null for a blank query", () => {
-    expect(linkQueryWhere("  ")).toBeNull();
-    expect(linkQueryWhere(undefined)).toBeNull();
-  });
-
-  it("matches title, domain, URL, description and notes, case-insensitively", () => {
-    expect(linkQueryWhere("Bird")!.OR.map((c) => Object.keys(c)[0])).toEqual([
-      "title",
-      "domain",
-      "url",
-      "description",
-      "notes",
-    ]);
-    expect(linkQueryWhere("Bird")!.OR[4]).toEqual({
-      notes: { contains: "Bird", mode: "insensitive" },
-    });
-  });
-
-  it("cuts the query at MAX_LINK_SEARCH_QUERY_LENGTH", () => {
-    expect(linkQueryWhere("x".repeat(300))!.OR[0].title.contains).toHaveLength(200);
   });
 });

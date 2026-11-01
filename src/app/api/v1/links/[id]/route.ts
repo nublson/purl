@@ -4,7 +4,6 @@ import {
   deleteLink,
   moveLinkToFolder,
   readLink,
-  LinkNotesError,
   UnauthorizedError,
   updateLink,
   updateLinkForUser,
@@ -48,7 +47,7 @@ const UPLOAD_URL_ERROR = {
 };
 
 /**
- * Updates a link: `{ url?, title?, description?, notes?, folderId? }`. `folderId`
+ * Updates a link: `{ url?, title?, description?, folderId? }`. `folderId`
  * files the link into that folder; `null` takes it out of its folder.
  */
 export async function PATCH(
@@ -65,7 +64,6 @@ export async function PATCH(
   const hasUrl = typeof body?.url === "string";
   const hasTitle = typeof body?.title === "string";
   const hasDescription = body?.description !== undefined;
-  const hasNotes = body?.notes !== undefined;
   const hasFolderId =
     body !== null && typeof body === "object" && "folderId" in body;
 
@@ -73,17 +71,10 @@ export async function PATCH(
     return addCors(NextResponse.json({ error: "Invalid folder" }, { status: 400 }));
   }
 
-  if (hasNotes && body.notes !== null && typeof body.notes !== "string") {
-    return addCors(NextResponse.json({ error: "Invalid notes" }, { status: 400 }));
-  }
-
-  if (!hasUrl && !hasTitle && !hasDescription && !hasNotes && !hasFolderId) {
+  if (!hasUrl && !hasTitle && !hasDescription && !hasFolderId) {
     return addCors(
       NextResponse.json(
-        {
-          error:
-            "At least one of url, title, description, notes, or folderId is required",
-        },
+        { error: "At least one of url, title, description, or folderId is required" },
         { status: 400 },
       ),
     );
@@ -98,8 +89,7 @@ export async function PATCH(
   if (url !== undefined) data.url = url;
   if (hasTitle) data.title = body.title as string;
   if (hasDescription) data.description = body.description;
-  if (hasNotes) data.notes = body.notes;
-  const hasOtherFields = hasUrl || hasTitle || hasDescription || hasNotes;
+  const hasOtherFields = hasUrl || hasTitle || hasDescription;
 
   try {
     const { id } = await context.params;
@@ -141,14 +131,6 @@ export async function PATCH(
     }
     if (e instanceof FolderNotFoundError) {
       return addCors(NextResponse.json({ error: "Folder not found" }, { status: 404 }));
-    }
-    if (e instanceof LinkNotesError) {
-      return addCors(
-        NextResponse.json(
-          { error: e.message, code: "INVALID_NOTES" },
-          { status: 400 },
-        ),
-      );
     }
     if (e instanceof InvalidUploadError) {
       return addCors(NextResponse.json(UPLOAD_URL_ERROR, { status: 400 }));

@@ -16,7 +16,6 @@ function link(createdAt: Date, title: string, folderId: string | null = null): L
     domain: "example.com",
     contentType: "WEB",
     description: null,
-    notes: null,
     thumbnail: null,
     createdAt,
     folderId,
