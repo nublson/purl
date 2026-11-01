@@ -8,6 +8,9 @@ const td = new TurndownService({
   codeBlockStyle: "fenced",
   bulletListMarker: "-",
 });
+// Entity-escaped text must not turn into live HTML in the Markdown.
+const defaultEscape = td.escape.bind(td);
+td.escape = (text: string) => defaultEscape(text).replace(/</g, "\\<");
 td.remove([
   "script",
   "style",
@@ -55,7 +58,7 @@ export function extractReaderMarkdown(html: string, baseUrl: string): string {
   for (const a of Array.from(document.querySelectorAll("a"))) {
     const href = resolveHttp(a.getAttribute("href"), baseUrl);
     if (href) a.setAttribute("href", href);
-    else a.replaceWith(document.createTextNode(a.textContent ?? ""));
+    else a.replaceWith(...Array.from(a.childNodes));
   }
   for (const img of Array.from(document.querySelectorAll("img"))) {
     const src = resolveHttp(img.getAttribute("src"), baseUrl);
@@ -68,15 +71,31 @@ export function extractReaderMarkdown(html: string, baseUrl: string): string {
     .trim();
 }
 
+function cutAt(buf: Buffer, limit: number): string {
+  if (buf[limit] === 0x0a) return buf.subarray(0, limit).toString("utf8");
+  let end = limit;
+  // Back off to a character start so no multibyte character is split.
+  while (end > 0 && (buf[end] & 0xc0) === 0x80) end--;
+  const head = buf.subarray(0, end).toString("utf8");
+  const nl = head.lastIndexOf("\n");
+  return nl >= 0 ? head.slice(0, nl) : head;
+}
+
+const fenceCount = (text: string) => (text.match(/^```/gm) ?? []).length;
+
 export function cutMarkdown(
   markdown: string,
   maxBytes: number,
 ): { markdown: string; truncated: boolean; bytes: number } {
-  const bytes = Buffer.byteLength(markdown);
-  if (bytes <= maxBytes) return { markdown, truncated: false, bytes };
-  // Slicing bytes may split a character; the lossy tail is dropped by the cut.
-  const head = Buffer.from(markdown).subarray(0, maxBytes).toString("utf8");
-  const nl = head.lastIndexOf("\n");
-  const cut = nl >= 0 ? head.slice(0, nl) : "";
+  const buf = Buffer.from(markdown);
+  if (buf.length <= maxBytes) {
+    return { markdown, truncated: false, bytes: buf.length };
+  }
+  let cut = cutAt(buf, maxBytes);
+  if (fenceCount(cut) % 2 === 1) {
+    // Close the fence the cut left open, within the cap.
+    cut = cutAt(buf, maxBytes - 4);
+    if (fenceCount(cut) % 2 === 1) cut += "\n```";
+  }
   return { markdown: cut, truncated: true, bytes: Buffer.byteLength(cut) };
 }

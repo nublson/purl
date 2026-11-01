@@ -54,4 +54,47 @@ describe("reader markdown", () => {
     const short = cutMarkdown("héllo", max);
     expect(short).toEqual({ markdown: "héllo", truncated: false, bytes: 6 });
   });
+
+  it("returns the article's title", () => {
+    expect(extractArticle(fixture("article.html"), BASE)?.title).toBeTruthy();
+  });
+
+  it("escapes entity-encoded HTML in text but not in code", () => {
+    const md = extractReaderMarkdown(
+      "<p>&lt;script&gt;alert(1)&lt;/script&gt; &lt;img src=x onerror=alert(1)&gt;</p><p><code>a &lt; b</code></p>",
+      BASE,
+    );
+    expect(md).toContain("\\<script>");
+    expect(md).not.toMatch(/(^|[^\\])<script/);
+    expect(md).not.toMatch(/(^|[^\\])<img/);
+    expect(md).toContain("`a < b`");
+  });
+
+  it("keeps images inside a dropped link", () => {
+    const md = extractReaderMarkdown(
+      '<a href="javascript:x"><img src="/a.png" alt="A"></a>',
+      "https://example.com/",
+    );
+    expect(md).toBe("![A](https://example.com/a.png)");
+  });
+
+  it("cuts one huge line at a whole character", () => {
+    const cut = cutMarkdown("é".repeat(100), 51);
+    expect(cut.truncated).toBe(true);
+    expect(cut.markdown).toBe("é".repeat(25));
+    expect(cut.markdown).not.toContain("\uFFFD");
+  });
+
+  it("keeps the last line when the cap lands on a newline", () => {
+    const cut = cutMarkdown("aa\nbb\ncc", 5);
+    expect(cut.markdown).toBe("aa\nbb");
+  });
+
+  it("closes a fence the cut left open", () => {
+    const text = "intro\n```\n" + "code line\n".repeat(50);
+    const cut = cutMarkdown(text, 100);
+    expect(cut.markdown.endsWith("\n```")).toBe(true);
+    expect(Buffer.byteLength(cut.markdown)).toBeLessThanOrEqual(100);
+    expect((cut.markdown.match(/^```/gm) ?? []).length % 2).toBe(0);
+  });
 });
