@@ -268,3 +268,22 @@ export async function readerLinkIdsMatching(
     LIMIT 1000`;
   return rows.map((r) => r.linkId);
 }
+
+/**
+ * Clears a failed reader view so the cron builds it again. `not_found` when the
+ * link isn't the user's; `not_failed` when there's no row or it isn't FAILED.
+ */
+export async function resetFailedReaderView(
+  userId: string,
+  linkId: string,
+): Promise<"reset" | "not_found" | "not_failed"> {
+  const link = await prisma.link.findFirst({
+    where: { id: linkId, userId },
+    select: { id: true },
+  });
+  if (!link) return "not_found";
+  const { count } = await prisma.readerView.deleteMany({
+    where: { linkId, userId, status: "FAILED" },
+  });
+  return count === 0 ? "not_failed" : "reset";
+}

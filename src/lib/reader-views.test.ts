@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/prisma", () => {
   const client = {
     $queryRaw: vi.fn(),
-    readerView: { updateMany: vi.fn() },
+    readerView: { updateMany: vi.fn(), deleteMany: vi.fn() },
+    link: { findFirst: vi.fn() },
   };
   return { default: client, prisma: client };
 });
@@ -32,6 +33,7 @@ const {
   buildReaderTsQuery,
   makeReaderView,
   readerLinkIdsMatching,
+  resetFailedReaderView,
 } = await import(
   "./reader-views"
 );
@@ -325,5 +327,39 @@ describe("readerLinkIdsMatching", () => {
     expect(sql).toContain("to_tsquery('simple'");
     expect(sql).toContain("LIMIT 1000");
     expect(queryRaw.mock.calls[0].slice(1)).toEqual(["u1", "'bird':*"]);
+  });
+});
+
+describe("resetFailedReaderView", () => {
+  const findFirst = vi.mocked(prisma.link.findFirst);
+  const deleteMany = vi.mocked(prisma.readerView.deleteMany);
+  beforeEach(() => {
+    findFirst.mockReset();
+    deleteMany.mockReset();
+  });
+
+  it("is not_found when the link isn't the user's", async () => {
+    findFirst.mockResolvedValue(null as never);
+    expect(await resetFailedReaderView("u1", "l1")).toBe("not_found");
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: "l1", userId: "u1" },
+      select: { id: true },
+    });
+    expect(deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("is not_failed when no failed row was deleted", async () => {
+    findFirst.mockResolvedValue({ id: "l1" } as never);
+    deleteMany.mockResolvedValue({ count: 0 } as never);
+    expect(await resetFailedReaderView("u1", "l1")).toBe("not_failed");
+  });
+
+  it("deletes the failed row and answers reset", async () => {
+    findFirst.mockResolvedValue({ id: "l1" } as never);
+    deleteMany.mockResolvedValue({ count: 1 } as never);
+    expect(await resetFailedReaderView("u1", "l1")).toBe("reset");
+    expect(deleteMany).toHaveBeenCalledWith({
+      where: { linkId: "l1", userId: "u1", status: "FAILED" },
+    });
   });
 });
