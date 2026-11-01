@@ -12,7 +12,7 @@ import { isValidUrl } from "@/utils/url";
 import { type NextRequest, NextResponse } from "next/server";
 import { addCors, corsPreflightResponse } from "../cors";
 
-const VALID_CONTENT_TYPES = new Set(["WEB", "YOUTUBE", "PDF", "AUDIO"]);
+const VALID_CONTENT_TYPES = new Set(["WEB", "YOUTUBE", "PDF", "AUDIO", "IMAGE", "VIDEO"]);
 
 export async function OPTIONS(_request: NextRequest): Promise<Response> {
   return corsPreflightResponse();

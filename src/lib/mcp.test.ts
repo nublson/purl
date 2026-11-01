@@ -146,6 +146,20 @@ describe("registerPurlTools", () => {
     ]);
   });
 
+  it("list_saved_items filters by every content type, media included", () => {
+    const calls: unknown[][] = [];
+    const mockServer = { tool: vi.fn((...args: unknown[]) => void calls.push(args)) };
+    registerPurlTools(mockServer as never);
+    const list = calls.find((c) => c[0] === "list_saved_items");
+    const schema = list?.find(
+      (a) => typeof a === "object" && a !== null && "contentType" in a,
+    ) as Record<string, { safeParse(v: unknown): { success: boolean } }>;
+    for (const type of ["WEB", "YOUTUBE", "PDF", "AUDIO", "IMAGE", "VIDEO"]) {
+      expect(schema.contentType.safeParse(type).success).toBe(true);
+    }
+    expect(schema.contentType.safeParse("GIF").success).toBe(false);
+  });
+
   it("save_link takes an optional notes input", () => {
     const calls: unknown[][] = [];
     const mockServer = { tool: vi.fn((...args: unknown[]) => void calls.push(args)) };

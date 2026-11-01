@@ -98,6 +98,15 @@ describe("GET /api/v1/links", () => {
     );
   });
 
+  it.each(["IMAGE", "VIDEO"])("filters by the media type %s", async (type) => {
+    mockListLinks.mockResolvedValue({ links: [], nextCursor: null });
+    const { GET } = await import("./route");
+    await GET(new NextRequest(`http://localhost/api/v1/links?contentType=${type}`));
+    expect(mockListLinks).toHaveBeenCalledWith(
+      expect.objectContaining({ contentType: type })
+    );
+  });
+
   it("ignores unknown contentType values", async () => {
     mockListLinks.mockResolvedValue({ links: [], nextCursor: null });
     const { GET } = await import("./route");
