@@ -22,6 +22,8 @@ import { FolderEmoji } from "./folder-emoji";
 import { useLinkFolder } from "./folder-tag";
 import { HapticTarget } from "./haptic-target";
 import { LinkFolderSubmenu } from "./link-folder-submenu";
+import { qualifiesForReader } from "@/lib/reader-view";
+import { ReaderViewMenuState } from "./reader-view-menu-state";
 import { ShowLiveMenuItem } from "./show-live-menu-item";
 import { Typography } from "./typography";
 import { Button } from "./ui/button";
@@ -154,6 +156,12 @@ export function LinkMenu({ link, onDelete, onOpenChange }: LinkMenuProps) {
           <Trash2 /> Delete
           <HapticTarget />
         </DropdownMenuItem>
+        {qualifiesForReader(link) && !isDemo ? (
+          <>
+            <DropdownMenuSeparator />
+            <ReaderViewMenuState link={link} />
+          </>
+        ) : null}
       </DropdownMenuGroup>
     </DropdownWrapper>
   );
