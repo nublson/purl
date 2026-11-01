@@ -1,5 +1,7 @@
 "use client";
 
+import NextLink from "next/link";
+import { linkOpensReader, readerViewPath } from "@/lib/reader-view";
 import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { useLeavingLinks } from "@/lib/leaving-links";
@@ -100,6 +102,7 @@ export const LinkItem = React.forwardRef<
   // The landing page's demo is read-only: no selecting, no menu. The
   // actions slot stays (empty) so the row keeps its height.
   const demo = useIsDemo();
+  const opensReader = !demo && linkOpensReader(link);
   const selecting = useIsSelectionActive() && !demo;
   const selected = useIsLinkSelected(link.id);
   const folderTag = useFolderTag(link);
@@ -394,6 +397,31 @@ export const LinkItem = React.forwardRef<
           onClick={(event) =>
             linkSelection.toggle(link.id, { shiftKey: event.shiftKey })
           }
+          onFocus={openPreviewOnFocus}
+          onBlur={closePreviewOnBlur}
+        />
+      ) : opensReader ? (
+        <NextLink
+          ref={setAnchor}
+          href={readerViewPath(link.id)}
+          prefetch={false}
+          aria-label={link.title}
+          aria-describedby={describedBy}
+          // While selecting, the row's checkbox is the keyboard and screen
+          // reader control; a click anywhere on the row toggles it.
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={OPENER_CLASS}
+          onClick={(event) => {
+            if (longPressedRef.current) {
+              longPressedRef.current = false;
+              event.preventDefault();
+              return;
+            }
+            if (!selecting) return;
+            event.preventDefault();
+            linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+          }}
           onFocus={openPreviewOnFocus}
           onBlur={closePreviewOnBlur}
         />

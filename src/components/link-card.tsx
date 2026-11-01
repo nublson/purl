@@ -1,5 +1,7 @@
 "use client";
 
+import NextLink from "next/link";
+import { linkOpensReader, readerViewPath } from "@/lib/reader-view";
 import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { useIsAudioPlaying } from "@/hooks/use-audio-player";
@@ -79,6 +81,7 @@ export function LinkCard({
   const leaving = useLeavingLinks().get(link.id)?.phase === "fading";
   // The landing page's demo is read-only: no selecting or menu.
   const demo = useIsDemo();
+  const opensReader = !demo && linkOpensReader(link);
   const selecting = useIsSelectionActive() && !demo;
   const selected = useIsLinkSelected(link.id);
   const folderTag = useFolderTag(link);
@@ -245,6 +248,27 @@ export function LinkCard({
           tabIndex={selecting ? -1 : undefined}
           className={cn(OPENER_CLASS, kind === "embed" && EMBED_OPENER_CLASS)}
           onClick={(event) => linkSelection.toggle(link.id, { shiftKey: event.shiftKey })}
+        />
+      ) : opensReader ? (
+        <NextLink
+          ref={setAnchor}
+          href={readerViewPath(link.id)}
+          prefetch={false}
+          aria-label={link.title}
+          aria-describedby={describedBy}
+          aria-hidden={selecting || undefined}
+          tabIndex={selecting ? -1 : undefined}
+          className={OPENER_CLASS}
+          onClick={(event) => {
+            if (consumeLongPress()) {
+              event.preventDefault();
+              return;
+            }
+            if (selecting) {
+              event.preventDefault();
+              linkSelection.toggle(link.id, { shiftKey: event.shiftKey });
+            }
+          }}
         />
       ) : (
         <a
