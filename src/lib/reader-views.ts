@@ -10,6 +10,7 @@ import {
   READER_MARKDOWN_MAX_BYTES,
   READER_PENDING_RETRY_MS,
 } from "@/lib/limits";
+import type { ContentType } from "@/generated/prisma/enums";
 import prisma from "@/lib/prisma";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import {
@@ -22,6 +23,7 @@ import {
   safeFetch,
   UnsafeOutboundUrlError,
 } from "@/lib/safe-outbound-fetch";
+import type { ReaderViewStatus } from "@/utils/links";
 import { runPool, settledOrAfter } from "@/lib/task-pool";
 
 export type ReaderRunResult = {
@@ -286,4 +288,37 @@ export async function resetFailedReaderView(
     where: { linkId, userId, status: "FAILED" },
   });
   return count === 0 ? "not_failed" : "reset";
+}
+
+/**
+ * A link and its reader view row for the MCP `read_link` tool; null when the
+ * link isn't the user's. `view` is null when no row exists yet.
+ */
+export async function readReaderViewForUser(
+  userId: string,
+  linkId: string,
+): Promise<{
+  link: {
+    title: string;
+    url: string;
+    contentType: ContentType;
+    fileKey: string | null;
+  };
+  view: {
+    status: ReaderViewStatus;
+    reason: string | null;
+    markdown: string | null;
+    fetchedAt: Date | null;
+  } | null;
+} | null> {
+  const link = await prisma.link.findFirst({
+    where: { id: linkId, userId },
+    select: { title: true, url: true, contentType: true, fileKey: true },
+  });
+  if (!link) return null;
+  const view = await prisma.readerView.findUnique({
+    where: { linkId },
+    select: { status: true, reason: true, markdown: true, fetchedAt: true },
+  });
+  return { link, view };
 }

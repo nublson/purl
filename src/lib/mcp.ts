@@ -32,6 +32,7 @@ import {
 import { MAX_BULK_LINK_IDS } from "@/lib/limits";
 import { SAVE_SCOPE } from "@/lib/oauth-scopes";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
+import { readReaderViewForUser } from "@/lib/reader-views";
 import { serializeLink } from "@/lib/serialize-link";
 import { isValidUrl } from "@/utils/url";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
@@ -311,6 +312,42 @@ export async function getLinkTool(
   return jsonContent(serializeLink(link));
 }
 
+/** A saved web page's reader view as Markdown. A missing row means it is queued. */
+export async function readLinkTool(
+  userId: string,
+  id: string,
+): Promise<ToolResult> {
+  const found = await readReaderViewForUser(userId, id);
+  if (!found) return errorContent("Not found.");
+  const { link, view } = found;
+  const { title, url } = link;
+  if (link.contentType !== "WEB" || link.fileKey !== null) {
+    return jsonContent({
+      status: "NONE",
+      reason: "not_a_page",
+      title,
+      url,
+      markdown: null,
+    });
+  }
+  if (!view) {
+    return jsonContent({
+      status: "PENDING",
+      reason: null,
+      title,
+      url,
+      markdown: null,
+    });
+  }
+  return jsonContent({
+    status: view.status,
+    reason: view.reason,
+    title,
+    url,
+    markdown: view.status === "READY" ? view.markdown : null,
+  });
+}
+
 /** Permanently deletes one of the user's links. Someone else's id is "not found". */
 export async function deleteLinkTool(
   userId: string,
@@ -375,6 +412,16 @@ export function registerPurlTools(server: McpServer): void {
       id: z.string().describe("The link id"),
     },
     async ({ id }, extra) => getLinkTool(getUserId(extra), id),
+  );
+
+  server.tool(
+    "read_link",
+    "Read a saved web page's reader view: its article as Markdown, kept by Purl even if the page changes or disappears. markdown is null until the reader view is ready.",
+    {
+      id: z.string().describe("The link id"),
+    },
+    { readOnlyHint: true },
+    async ({ id }, extra) => readLinkTool(getUserId(extra), id),
   );
 
   server.tool(

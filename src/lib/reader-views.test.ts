@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/prisma", () => {
   const client = {
     $queryRaw: vi.fn(),
-    readerView: { updateMany: vi.fn(), deleteMany: vi.fn() },
+    readerView: { updateMany: vi.fn(), deleteMany: vi.fn(), findUnique: vi.fn() },
     link: { findFirst: vi.fn() },
   };
   return { default: client, prisma: client };
@@ -32,6 +32,7 @@ const {
   buildPendingReaderViews,
   buildReaderTsQuery,
   makeReaderView,
+  readReaderViewForUser,
   readerLinkIdsMatching,
   resetFailedReaderView,
 } = await import(
@@ -361,5 +362,34 @@ describe("resetFailedReaderView", () => {
     expect(deleteMany).toHaveBeenCalledWith({
       where: { linkId: "l1", userId: "u1", status: "FAILED" },
     });
+  });
+});
+
+describe("readReaderViewForUser", () => {
+  const findFirst = vi.mocked(prisma.link.findFirst);
+  const findUnique = vi.mocked(prisma.readerView.findUnique);
+  beforeEach(() => {
+    findFirst.mockReset();
+    findUnique.mockReset();
+  });
+
+  it("is null when the link isn't the user's", async () => {
+    findFirst.mockResolvedValue(null as never);
+    expect(await readReaderViewForUser("u1", "l1")).toBeNull();
+    expect(findUnique).not.toHaveBeenCalled();
+  });
+
+  it("returns the link and its view (null without a row)", async () => {
+    const link = { title: "T", url: "https://a.example", contentType: "WEB", fileKey: null };
+    findFirst.mockResolvedValue(link as never);
+    findUnique.mockResolvedValue(null as never);
+    expect(await readReaderViewForUser("u1", "l1")).toEqual({ link, view: null });
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: "l1", userId: "u1" },
+      select: { title: true, url: true, contentType: true, fileKey: true },
+    });
+    const view = { status: "READY", reason: null, markdown: "m", fetchedAt: new Date() };
+    findUnique.mockResolvedValue(view as never);
+    expect(await readReaderViewForUser("u1", "l1")).toEqual({ link, view });
   });
 });

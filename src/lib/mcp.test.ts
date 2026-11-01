@@ -35,6 +35,11 @@ vi.mock("@/lib/links", () => ({
   moveLinkToFolder: mockMoveLinkToFolder,
 }));
 
+const mockReadReaderViewForUser = vi.fn();
+vi.mock("@/lib/reader-views", () => ({
+  readReaderViewForUser: mockReadReaderViewForUser,
+}));
+
 const mockListFoldersForUser = vi.fn();
 const mockGetFolderById = vi.fn();
 const mockCreateFolder = vi.fn();
@@ -100,6 +105,7 @@ const {
   saveLinkTool,
   listSavedItemsTool,
   getLinkTool,
+  readLinkTool,
   deleteLinkTool,
   listFoldersTool,
   createFolderTool,
@@ -135,6 +141,7 @@ describe("registerPurlTools", () => {
       "save_link",
       "list_saved_items",
       "get_link",
+      "read_link",
       "delete_link",
       "list_folders",
       "create_folder",
@@ -804,6 +811,35 @@ describe("listSavedItemsTool", () => {
     expect(parse(result).data[0]).toMatchObject({ id: "link-1", notes: "n" });
   });
 
+  it("includes each link's readerView", async () => {
+    const { serializeLink } = await vi.importActual<
+      typeof import("@/lib/serialize-link")
+    >("@/lib/serialize-link");
+    mockSerializeLink.mockImplementationOnce((link) =>
+      serializeLink(link as Parameters<typeof serializeLink>[0]),
+    );
+    mockListLinksForUser.mockResolvedValue({
+      links: [
+        {
+          id: "link-1",
+          url: "https://a.example",
+          title: "A",
+          description: null,
+          notes: null,
+          favicon: "https://a.example/favicon.ico",
+          thumbnail: null,
+          domain: "a.example",
+          contentType: "WEB",
+          createdAt: new Date("2026-10-31T00:00:00Z"),
+          readerView: { status: "READY", reason: null },
+        },
+      ],
+      nextCursor: null,
+    });
+    const result = await listSavedItemsTool("user-1", {});
+    expect(parse(result).data[0].readerView).toMatchObject({ status: "READY" });
+  });
+
   it("passes folderId through when provided", async () => {
     mockListLinksForUser.mockResolvedValue({ links: [], nextCursor: null });
     await listSavedItemsTool("user-1", { folderId: "folder-1" });
@@ -1089,5 +1125,81 @@ describe("getLinkTool", () => {
     mockReadLinkForUser.mockResolvedValue({ id: "link-1" });
     const result = await getLinkTool("user-1", "link-1");
     expect(parse(result)).toMatchObject({ id: "link-1" });
+  });
+});
+
+describe("readLinkTool", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const page = {
+    title: "A post",
+    url: "https://a.example/post",
+    contentType: "WEB",
+    fileKey: null,
+  };
+
+  it("returns the markdown of a ready reader view", async () => {
+    mockReadReaderViewForUser.mockResolvedValue({
+      link: page,
+      view: { status: "READY", reason: null, markdown: "# Hi", fetchedAt: new Date() },
+    });
+    const result = await readLinkTool("user-1", "link-1");
+    expect(mockReadReaderViewForUser).toHaveBeenCalledWith("user-1", "link-1");
+    expect(parse(result)).toEqual({
+      status: "READY",
+      reason: null,
+      title: "A post",
+      url: "https://a.example/post",
+      markdown: "# Hi",
+    });
+  });
+
+  it("answers PENDING when there is no row yet", async () => {
+    mockReadReaderViewForUser.mockResolvedValue({ link: page, view: null });
+    expect(parse(await readLinkTool("user-1", "link-1"))).toEqual({
+      status: "PENDING",
+      reason: null,
+      title: "A post",
+      url: "https://a.example/post",
+      markdown: null,
+    });
+  });
+
+  it("gives a failed view's reason and no markdown", async () => {
+    mockReadReaderViewForUser.mockResolvedValue({
+      link: page,
+      view: { status: "FAILED", reason: "timeout", markdown: null, fetchedAt: null },
+    });
+    expect(parse(await readLinkTool("user-1", "link-1"))).toMatchObject({
+      status: "FAILED",
+      reason: "timeout",
+      markdown: null,
+    });
+  });
+
+  it("answers NONE / not_a_page for an upload or a PDF", async () => {
+    for (const link of [
+      { ...page, fileKey: "users/u/x/a.png" },
+      { ...page, contentType: "PDF" },
+    ]) {
+      mockReadReaderViewForUser.mockResolvedValue({
+        link,
+        view: { status: "READY", reason: null, markdown: "x", fetchedAt: new Date() },
+      });
+      expect(parse(await readLinkTool("user-1", "link-1"))).toEqual({
+        status: "NONE",
+        reason: "not_a_page",
+        title: "A post",
+        url: "https://a.example/post",
+        markdown: null,
+      });
+    }
+  });
+
+  it("returns Not found for a link that isn't the user's", async () => {
+    mockReadReaderViewForUser.mockResolvedValue(null);
+    const result = await readLinkTool("user-1", "x");
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe("Not found.");
   });
 });
