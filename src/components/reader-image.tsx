@@ -15,7 +15,7 @@ export function ReaderImage({ src, alt }: { src: string; alt: string }) {
       alt={alt}
       loading="lazy"
       onError={() => setFailed(true)}
-      className="my-6 h-auto max-w-full rounded-lg"
+      className="my-6 h-auto max-w-full rounded-lg outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10"
     />
   );
 }

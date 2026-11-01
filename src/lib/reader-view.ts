@@ -21,6 +21,26 @@ export function readerViewPath(id: string): string {
   return `/read/${id}`;
 }
 
+/**
+ * Whether a link in a reader view points into the saved page itself (a
+ * footnote mark, its ↩): the same page plus a fragment, which the reader
+ * view can't take you to.
+ */
+export function isOriginalPageFragment(href: string, pageUrl: string): boolean {
+  try {
+    const target = new URL(href);
+    const page = new URL(pageUrl);
+    return (
+      target.hash.length > 1 &&
+      target.origin === page.origin &&
+      target.pathname === page.pathname &&
+      target.search === page.search
+    );
+  } catch {
+    return false;
+  }
+}
+
 /** The reader view's state in words: short for the menu, long for the page. */
 export function readerStateMessage(
   state: ReaderViewState | null,
@@ -30,7 +50,7 @@ export function readerStateMessage(
   if (!state || state.status === "PENDING") {
     return short
       ? "Making the reader view…"
-      : "Purl is making the reader view. It takes a minute or two.";
+      : "Purl is making the reader view. Reload this page in a minute or two.";
   }
   if (state.status === "READY") {
     if (!state.fetchedAt) return "Reader view ready";

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Link, ReaderViewState } from "@/utils/links";
 import {
+  isOriginalPageFragment,
   linkOpensReader,
   qualifiesForReader,
   readerStateMessage,
@@ -74,7 +75,7 @@ describe("readerStateMessage", () => {
       "Making the reader view…",
     );
     expect(readerStateMessage(null, { short: false })).toBe(
-      "Purl is making the reader view. It takes a minute or two.",
+      "Purl is making the reader view. Reload this page in a minute or two.",
     );
   });
   it("none", () => {
@@ -98,5 +99,26 @@ describe("readerStateMessage", () => {
     expect(readerStateMessage(state("FAILED", "weird"))).toBe(
       "Couldn't make a reader view: the page didn't answer.",
     );
+  });
+});
+
+describe("isOriginalPageFragment", () => {
+  const page = "https://nublson.com/writings/refining-taste";
+
+  it("matches a fragment on the saved page itself", () => {
+    expect(isOriginalPageFragment(`${page}#fnref-2`, page)).toBe(true);
+    expect(isOriginalPageFragment(`${page}#fn-1`, `${page}#top`)).toBe(true);
+  });
+
+  it("leaves other pages, the page itself and other sites alone", () => {
+    expect(isOriginalPageFragment(page, page)).toBe(false);
+    expect(isOriginalPageFragment(`${page}/more#a`, page)).toBe(false);
+    expect(isOriginalPageFragment("https://jakub.kr/less-is-more#a", page)).toBe(false);
+    expect(isOriginalPageFragment(`${page}?v=2#a`, page)).toBe(false);
+  });
+
+  it("is false for anything that isn't a URL", () => {
+    expect(isOriginalPageFragment("#fn-1", "not a url")).toBe(false);
+    expect(isOriginalPageFragment("not a url", page)).toBe(false);
   });
 });

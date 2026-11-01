@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { ReaderContent } from "@/components/reader-content";
+import { ReaderRetryButton } from "@/components/reader-retry-button";
 import { Typography } from "@/components/typography";
 import { qualifiesForReader, readerStateMessage } from "@/lib/reader-view";
 import { readReaderViewForUser } from "@/lib/reader-views";
@@ -76,22 +77,31 @@ export default async function ReadPage({
         {link.title}
       </Typography>
       {ready ? (
-        <ReaderContent markdown={view.markdown!} truncated={view.truncated} />
+        <ReaderContent
+          markdown={view.markdown!}
+          truncated={view.truncated}
+          pageUrl={link.url}
+        />
       ) : (
-        <Typography className="mt-8">
-          {qualifies
-            ? readerStateMessage(
-                view
-                  ? {
-                      status: view.status,
-                      reason: view.reason,
-                      fetchedAt: view.fetchedAt?.toISOString() ?? null,
-                    }
-                  : null,
-                { short: false },
-              )
-            : "This pearl has no reader view."}
-        </Typography>
+        <>
+          <Typography className="mt-8">
+            {qualifies
+              ? readerStateMessage(
+                  view
+                    ? {
+                        status: view.status,
+                        reason: view.reason,
+                        fetchedAt: view.fetchedAt?.toISOString() ?? null,
+                      }
+                    : null,
+                  { short: false },
+                )
+              : "This pearl has no reader view."}
+          </Typography>
+          {qualifies && view?.status === "FAILED" ? (
+            <ReaderRetryButton linkId={id} />
+          ) : null}
+        </>
       )}
     </>
   );
