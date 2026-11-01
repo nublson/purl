@@ -1,3 +1,7 @@
+import {
+  STATIC_PAGE_COLUMN,
+  STATIC_PAGE_MARK_LINK,
+} from "@/components/static-page-layout";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
@@ -30,12 +34,6 @@ async function readAtBuild<T>(
 
 const readStaticPage = (slug: StaticPageSlug) =>
   readAtBuild(() => getPageBySlug(slug), null, `Static page "${slug}"`);
-
-/** The page's one column: every block shares its edge. */
-export const STATIC_PAGE_COLUMN = "mx-auto w-full max-w-[68ch]";
-
-export const STATIC_PAGE_MARK_LINK =
-  "inline-flex rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring pointer-coarse:min-h-11";
 
 export async function staticPageMetadata(
   slug: StaticPageSlug,

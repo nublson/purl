@@ -3,7 +3,7 @@ import { BrandMark } from "@/components/brand-mark";
 import {
   STATIC_PAGE_COLUMN,
   STATIC_PAGE_MARK_LINK,
-} from "@/components/static-page";
+} from "@/components/static-page-layout";
 import { Typography } from "@/components/typography";
 
 /** The read page's frame: the static pages' mark and column, no app chrome. */

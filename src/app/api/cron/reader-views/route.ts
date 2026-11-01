@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
-import { buildPendingReaderViews } from "@/lib/reader-views";
+import { buildPendingReaderViews } from "@/lib/reader-views-cron";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;

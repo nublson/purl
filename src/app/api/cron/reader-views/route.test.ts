@@ -3,9 +3,9 @@ import { join } from "node:path";
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/reader-views", () => ({ buildPendingReaderViews: vi.fn() }));
+vi.mock("@/lib/reader-views-cron", () => ({ buildPendingReaderViews: vi.fn() }));
 
-const { buildPendingReaderViews } = await import("@/lib/reader-views");
+const { buildPendingReaderViews } = await import("@/lib/reader-views-cron");
 const { GET, runtime, maxDuration } = await import("./route");
 
 const enrich = vi.mocked(buildPendingReaderViews);
