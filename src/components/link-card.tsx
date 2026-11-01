@@ -4,6 +4,7 @@ import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useLinksSyncActions } from "@/hooks/use-links-sync";
 import { useIsAudioPlaying } from "@/hooks/use-audio-player";
 import { useLongPress } from "@/hooks/use-long-press";
+import { NoteMark } from "./note-mark";
 import { useLeavingLinks } from "@/lib/leaving-links";
 import {
   linkSelection,
@@ -293,7 +294,17 @@ export function LinkCard({
             eagerThumbnail={eagerThumbnail}
             mediaAnchor={anchoredFace}
             badge={badge}
-            noteMark={Boolean(link.notes)}
+            // The card's content is a picture (pointer-events-none): the
+            // mark takes its own presses, above the opener.
+            noteMark={
+              link.notes && !demo ? (
+                <NoteMark
+                  notes={link.notes}
+                  inert={selecting}
+                  className="pointer-events-auto"
+                />
+              ) : undefined
+            }
           />
         )}
       </div>

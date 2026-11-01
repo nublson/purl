@@ -9,7 +9,6 @@ import { AudioOpenButton, AudioPlayer } from "./audio-player";
 import { EMBED_OPENER_CLASS, EmbedFace } from "./embed-face";
 import { ImageFace, VideoFace } from "./media-card-face";
 import { MediaOpenButton } from "./media-open-button";
-import { NoteMark } from "./note-mark";
 import { LinkPreviewThumbnail } from "./link-preview-thumbnail";
 import { Typography } from "./typography";
 
@@ -136,7 +135,7 @@ export function LinkCardContent({
   eagerThumbnail = false,
   badge,
   mediaAnchor = false,
-  noteMark = false,
+  noteMark,
 }: {
   link: LinkType;
   eagerThumbnail?: boolean;
@@ -144,8 +143,8 @@ export function LinkCardContent({
   badge?: ReactNode;
   /** The media viewer opens from this card: the face is its morph anchor. */
   mediaAnchor?: boolean;
-  /** The owner's grid: mark a link with a note beside its domain. */
-  noteMark?: boolean;
+  /** The owner's grid: the link's `NoteMark`, beside its domain. */
+  noteMark?: ReactNode;
 }) {
   switch (linkKind(link)) {
     case "image":
@@ -191,11 +190,11 @@ export function LinkCardContent({
 function LinkCardStrip({
   link,
   badge,
-  noteMark = false,
+  noteMark,
 }: {
   link: LinkType;
   badge?: ReactNode;
-  noteMark?: boolean;
+  noteMark?: ReactNode;
 }) {
   return (
     <span className="grid grid-cols-[16px_minmax(0,1fr)] gap-x-2 gap-y-1 p-3 md:gap-x-3 md:p-4">
@@ -225,7 +224,7 @@ function LinkCardStrip({
           <Typography component="span" size="small" className="truncate">
             {linkSecondLine(link)}
           </Typography>
-          <NoteMark />
+          {noteMark}
         </span>
       ) : (
         // Without a mark (the shared page, the demo, links with no note)

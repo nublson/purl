@@ -145,6 +145,8 @@ export const LinkItem = React.forwardRef<
   }, []);
   const hoveringActionsRef = React.useRef(false);
   const hoveringPreviewRef = React.useRef(false);
+  // The note mark's popover is open: no preview under it.
+  const noteOpenRef = React.useRef(false);
   const openTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
     null,
@@ -165,7 +167,7 @@ export const LinkItem = React.forwardRef<
     clearOpenTimer();
 
     openTimerRef.current = setTimeout(() => {
-      if (hoveringActionsRef.current) return;
+      if (hoveringActionsRef.current || noteOpenRef.current) return;
       // No previews while selecting: the pointer is busy picking rows.
       if (linkSelection.selectedIds().length > 0) return;
       // Nor over the media viewer this row (or another) just opened.
@@ -263,14 +265,15 @@ export const LinkItem = React.forwardRef<
   const hostHandlers = {
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
       if (demo || event.pointerType !== "touch") return;
-      // A press on the row's actions, or inside a portal (the open menu,
-      // whose React events bubble through here), isn't a long-press on
-      // the row: opening the menu takes the lift away from the row, so
+      // A press on the row's actions or the note mark (`data-card-menu`:
+      // a control with a press of its own), or inside a portal (the open
+      // menu, whose React events bubble through here), isn't a long-press
+      // on the row: opening the menu takes the lift away from the row, so
       // the press would select it behind the menu.
       const target = event.target as Element;
       if (
         !event.currentTarget.contains(target) ||
-        target.closest("[data-row-actions]")
+        target.closest("[data-row-actions], [data-card-menu]")
       ) {
         return;
       }
@@ -539,7 +542,6 @@ export const LinkItem = React.forwardRef<
           >
             {link.title}
           </Typography>
-          {link.notes ? <NoteMark /> : null}
           {kind === "embed" ? (
             <Typography
               component="span"
@@ -559,6 +561,34 @@ export const LinkItem = React.forwardRef<
           >
             {audio ? <AudioRowSecondLine link={link} /> : linkSecondLine(link)}
           </Typography>
+          {/* The last thing on the line: after the domain, or after the
+              title on phones, where the domain is hidden. Its box is the
+              line's height, so the row doesn't grow. A hovered mark holds
+              the row's preview like the actions do, and while the note is
+              open the preview stays shut: one overlay at a time. */}
+          {link.notes && !demo ? (
+            <NoteMark
+              notes={link.notes}
+              inert={selecting}
+              className="max-md:h-6"
+              onHoverChange={(hovering) => {
+                hoveringActionsRef.current = hovering;
+                if (hovering) {
+                  clearOpenTimer();
+                  clearCloseTimer();
+                } else {
+                  scheduleOpen();
+                }
+              }}
+              onOpenChange={(open) => {
+                noteOpenRef.current = open;
+                if (open) {
+                  clearOpenTimer();
+                  setPreviewOpen(false);
+                }
+              }}
+            />
+          ) : null}
           {/* The favicon's folder badge, named for screen readers (and the
               link's description). */}
           {folderTag ? (
