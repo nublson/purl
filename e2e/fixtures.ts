@@ -7,6 +7,7 @@ import {
   resetTestUserData,
   seedFolder,
   seedLink,
+  seedReaderView,
   type TestUser,
 } from "./support/db";
 
@@ -32,6 +33,10 @@ type TestFixtures = {
       description?: string;
       isPublic?: boolean;
     }) => Promise<string>;
+    readerView: (
+      linkId: string,
+      view: Parameters<typeof seedReaderView>[2],
+    ) => Promise<void>;
   };
 };
 
@@ -72,6 +77,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     await provide({
       link: (link) => seedLink(testUser.id, link),
       folder: (folder) => seedFolder(testUser.id, folder),
+      readerView: (linkId, view) => seedReaderView(testUser.id, linkId, view),
     });
   },
 });

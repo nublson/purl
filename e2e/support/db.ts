@@ -142,3 +142,32 @@ export async function seedFolder(
 export async function setFolderPublic(folderId: string, isPublic: boolean): Promise<void> {
   await pool.query(`UPDATE "folders" SET "isPublic" = $2 WHERE "id" = $1`, [folderId, isPublic]);
 }
+
+/** Inserts a reader view row for a link (the cron would make it in production). */
+export async function seedReaderView(
+  userId: string,
+  linkId: string,
+  view: {
+    status: "PENDING" | "READY" | "NONE" | "FAILED";
+    reason?: string;
+    markdown?: string;
+    truncated?: boolean;
+    fetchedAt?: Date;
+  },
+): Promise<void> {
+  const markdown = view.markdown ?? null;
+  await pool.query(
+    `INSERT INTO "reader_views" ("linkId", "userId", "status", "reason", "markdown", "truncated", "bytes", "claimedAt", "fetchedAt")
+     VALUES ($1, $2, $3::"ReaderViewStatus", $4, $5, $6, $7, now(), $8)`,
+    [
+      linkId,
+      userId,
+      view.status,
+      view.reason ?? null,
+      markdown,
+      view.truncated ?? false,
+      markdown ? Buffer.byteLength(markdown) : null,
+      view.fetchedAt ?? (view.status === "PENDING" ? null : new Date()),
+    ],
+  );
+}
