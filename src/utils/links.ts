@@ -21,6 +21,8 @@ export type Link = {
   duration: number | null;
   frameable: boolean | null;
   embed: boolean;
+  /** The reader view's state (never its Markdown); null until one is claimed. */
+  readerView: ReaderViewState | null;
   /** An uploaded file (derived from `fileKey`, which is never sent to clients). */
   upload: boolean;
 };
@@ -101,3 +103,11 @@ export function parseJsonLinkGroups(
     links: parseJsonLinks(group.links),
   }));
 }
+
+export type ReaderViewStatus = "PENDING" | "READY" | "NONE" | "FAILED";
+
+export type ReaderViewState = {
+  status: ReaderViewStatus;
+  reason: string | null;
+  fetchedAt: string | null;
+};

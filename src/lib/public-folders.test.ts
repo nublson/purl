@@ -221,3 +221,20 @@ describe("PUBLIC_LINK_SELECT", () => {
     expect(PUBLIC_LINK_SELECT).not.toHaveProperty("notes");
   });
 });
+
+describe("public folder links carry no readerView", () => {
+  it("drops readerView from the links and the select", async () => {
+    mockListLinks.mockResolvedValue({
+      links: [
+        {
+          ...LINK_ROW,
+          readerView: { status: "READY", reason: null, fetchedAt: "2026-10-31T10:00:00.000Z" },
+        },
+      ],
+      nextCursor: null,
+    });
+    const { links } = await listPublicFolderLinks({ userId: "u1", folderId: "f1" });
+    expect(links[0]).not.toHaveProperty("readerView");
+    expect("readerView" in PUBLIC_LINK_SELECT).toBe(false);
+  });
+});

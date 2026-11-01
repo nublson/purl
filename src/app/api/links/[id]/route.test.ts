@@ -162,6 +162,7 @@ describe("links/[id] API route", () => {
         duration: null,
         frameable: null,
         embed: false,
+        readerView: null,
         upload: false,
       });
 
@@ -189,6 +190,7 @@ describe("links/[id] API route", () => {
         duration: null,
         frameable: null,
         embed: false,
+        readerView: null,
         upload: false,
       });
     });

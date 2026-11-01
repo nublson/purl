@@ -53,3 +53,18 @@ export const SWEEP_MIN_AGE_MS = 2 * UPLOAD_ROW_WINDOW_MS;
 
 /** The longest private note a link can carry, in characters. */
 export const MAX_LINK_NOTES_LENGTH = 2000;
+
+/** Reader views: links claimed per cron run. */
+export const READER_BATCH_SIZE = 20;
+/** Reader views: pages extracted at once. */
+export const READER_CONCURRENCY = 5;
+/** Reader views: how long one page gets before its requests are aborted. */
+export const READER_FETCH_TIMEOUT_MS = 20_000;
+/** Reader views: how long a pool slot waits for an aborted lookup to unwind. */
+export const READER_ABORT_GRACE_MS = 2_000;
+/** Reader views: the most HTML read from one page. */
+export const READER_HTML_MAX_BYTES = 5 * 1024 * 1024;
+/** Reader views: the most Markdown stored for one page. */
+export const READER_MARKDOWN_MAX_BYTES = 300 * 1024;
+/** Reader views: a PENDING row older than this is claimed again. */
+export const READER_PENDING_RETRY_MS = 10 * 60 * 1000;

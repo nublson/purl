@@ -27,5 +27,6 @@ export function toDemoLinks(folder: DemoFolder): Link[] {
     folderId: folder.id,
     notes: null,
     frameable: null,
+    readerView: null,
   }));
 }

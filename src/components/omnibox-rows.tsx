@@ -153,6 +153,7 @@ export function OmniboxSaveRow({
         duration: null,
         frameable: null,
         embed: false,
+        readerView: null,
         upload: false,
       }
     : null;

@@ -1,4 +1,5 @@
 import type { ContentType } from "@/lib/prisma";
+import type { ReaderViewState } from "@/utils/links";
 
 type LinkLike = {
   id: string;
@@ -22,6 +23,14 @@ type LinkLike = {
   duration?: number | null;
   frameable?: boolean | null;
   embed?: boolean;
+  readerView?:
+    | ReaderViewState
+    | {
+        status: ReaderViewState["status"];
+        reason: string | null;
+        fetchedAt: Date | null;
+      }
+    | null;
 };
 
 export function serializeLink(link: LinkLike) {
@@ -43,6 +52,16 @@ export function serializeLink(link: LinkLike) {
     duration: link.duration ?? null,
     frameable: link.frameable ?? null,
     embed: link.embed ?? false,
+    readerView: link.readerView
+      ? {
+          status: link.readerView.status,
+          reason: link.readerView.reason,
+          fetchedAt:
+            link.readerView.fetchedAt instanceof Date
+              ? link.readerView.fetchedAt.toISOString()
+              : (link.readerView.fetchedAt ?? null),
+        }
+      : null,
     upload: link.upload ?? link.fileKey != null,
   };
 }

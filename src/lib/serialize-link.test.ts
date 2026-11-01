@@ -155,3 +155,22 @@ describe("serializeLink", () => {
     expect(serializeLink(makeLink()).notes).toBeNull();
   });
 });
+
+describe("serializeLink reader view", () => {
+  it("serializes readerView", () => {
+    const state = { status: "READY" as const, reason: null, fetchedAt: "2026-10-31T10:00:00.000Z" };
+    expect(serializeLink(makeLink({ readerView: state })).readerView).toEqual(state);
+    expect(
+      serializeLink(
+        makeLink({
+          readerView: {
+            status: "READY",
+            reason: null,
+            fetchedAt: new Date("2026-10-31T10:00:00Z"),
+          },
+        }),
+      ).readerView,
+    ).toEqual(state);
+    expect(serializeLink(makeLink()).readerView).toBeNull();
+  });
+});

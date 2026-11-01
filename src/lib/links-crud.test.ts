@@ -27,6 +27,7 @@ vi.mock("@/lib/prisma", () => {
       deleteMany: vi.fn(),
       count: vi.fn(),
     },
+    readerView: { deleteMany: vi.fn() },
     $executeRaw: vi.fn(),
     $queryRaw: vi.fn(),
     $transaction: vi.fn(),
@@ -68,6 +69,7 @@ const {
   createLink,
   createLinkForUser,
   readLink,
+  READER_VIEW_STATE_INCLUDE,
   updateLink,
   updateLinkForUser,
   deleteLink,
@@ -1352,6 +1354,7 @@ describe("searchLinksForUser", () => {
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 21,
+      include: READER_VIEW_STATE_INCLUDE,
     });
   });
 
@@ -1506,6 +1509,7 @@ describe("readLink", () => {
 
     expect(vi.mocked(prisma.link.findFirst)).toHaveBeenCalledWith({
       where: { id: "link-1", userId: "user-123" },
+      include: READER_VIEW_STATE_INCLUDE,
     });
   });
 
@@ -1587,6 +1591,7 @@ describe("updateLink", () => {
     expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
       where: { id: "link-1" },
       data: { title: "New title" },
+      include: READER_VIEW_STATE_INCLUDE,
     });
   });
 
@@ -1604,6 +1609,7 @@ describe("updateLink", () => {
     expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
       where: { id: "link-1" },
       data: { description: null },
+      include: READER_VIEW_STATE_INCLUDE,
     });
   });
 
@@ -1661,6 +1667,7 @@ describe("updateLink", () => {
     expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
       where: { id: "link-1" },
       data: { title: "Updated" },
+      include: READER_VIEW_STATE_INCLUDE,
     });
   });
 });
@@ -1714,6 +1721,7 @@ describe("updateLinkForUser", () => {
     expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
       where: { id: "link-1" },
       data: { title: "New" },
+      include: READER_VIEW_STATE_INCLUDE,
     });
     expect(vi.mocked(ogs)).not.toHaveBeenCalled();
   });
@@ -1731,6 +1739,7 @@ describe("updateLinkForUser", () => {
     expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
       where: { id: "link-1" },
       data: { title: "New" },
+      include: READER_VIEW_STATE_INCLUDE,
     });
   });
 
@@ -1758,6 +1767,7 @@ describe("updateLinkForUser", () => {
     expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
       where: { id: "link-1", url: "https://example.com/a" },
       data: { embed: true },
+      include: READER_VIEW_STATE_INCLUDE,
     });
   });
 
@@ -1824,6 +1834,7 @@ describe("updateLinkForUser", () => {
     expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
       where: { id: "link-1" },
       data: { title: "New title", folderId: "folder-1" },
+      include: READER_VIEW_STATE_INCLUDE,
     });
     expect(result?.folderId).toBe("folder-1");
   });
@@ -1845,6 +1856,7 @@ describe("updateLinkForUser", () => {
     expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
       where: { id: "link-1" },
       data: { description: null, folderId: null },
+      include: READER_VIEW_STATE_INCLUDE,
     });
   });
 
@@ -1880,6 +1892,7 @@ describe("updateLinkForUser", () => {
     expect(vi.mocked(prisma.link.update)).toHaveBeenCalledWith({
       where: { id: "link-1" },
       data: { title: "T" },
+      include: READER_VIEW_STATE_INCLUDE,
     });
   });
 

@@ -70,6 +70,7 @@ describe("POST /api/uploads", () => {
     duration: null,
     frameable: null,
     embed: false,
+    readerView: null,
     upload: true,
   };
 

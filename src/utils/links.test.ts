@@ -26,6 +26,7 @@ function link(createdAt: Date, title: string, folderId: string | null = null): L
     duration: null,
     frameable: null,
     embed: false,
+    readerView: null,
     upload: false,
   };
 }

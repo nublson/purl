@@ -18,7 +18,7 @@ import { getDefaultFaviconUrl } from "@/utils/default-favicon";
 import { timeoutSignal } from "@/utils/abort-signal";
 import { getUrlDomain } from "@/utils/formatter";
 import { detectContentTypeFromUrlRules } from "@/utils/link-content-type-shared";
-import type { Link } from "@/utils/links";
+import type { Link, ReaderViewState } from "@/utils/links";
 import { mediaTitleFromUrl } from "@/utils/media-title";
 import { isPdfUrl } from "@/utils/pdf";
 import { derivePdfTitleFromUrl } from "@/utils/pdf-title";
@@ -219,6 +219,11 @@ async function scrapeYouTubeMetadata(
   }
 }
 
+/** What an owner read selects of the reader view: its state, never the Markdown. */
+export const READER_VIEW_STATE_INCLUDE = {
+  readerView: { select: { status: true, reason: true, fetchedAt: true } },
+} as const;
+
 type LinkRow = {
   id: string;
   url: string;
@@ -238,6 +243,11 @@ type LinkRow = {
   duration?: number | null;
   frameable?: boolean | null;
   embed?: boolean;
+  readerView?: {
+    status: ReaderViewState["status"];
+    reason: string | null;
+    fetchedAt: Date | null;
+  } | null;
 };
 
 /**
@@ -275,6 +285,13 @@ export function mapRowToLink(row: LinkRow): Link {
     duration: row.duration ?? null,
     frameable: row.frameable ?? null,
     embed: row.embed ?? false,
+    readerView: row.readerView
+      ? {
+          status: row.readerView.status,
+          reason: row.readerView.reason,
+          fetchedAt: row.readerView.fetchedAt?.toISOString() ?? null,
+        }
+      : null,
     upload: row.fileKey != null,
   };
 }
@@ -796,6 +813,7 @@ export async function readLinkForUser(
 ): Promise<Link | null> {
   const row = await prisma.link.findFirst({
     where: { id, userId },
+    include: READER_VIEW_STATE_INCLUDE,
   });
   return row ? mapRowToLink(row) : null;
 }
@@ -910,14 +928,23 @@ export async function updateLinkForUser(
 
   if (Object.keys(updatePayload).length === 0) return existing;
 
+  const updateArgs = {
+    where:
+      data.expectedUrl !== undefined ? { id, url: data.expectedUrl } : { id },
+    data: updatePayload,
+    include: READER_VIEW_STATE_INCLUDE,
+  };
+
   try {
-    return await prisma.link.update({
-      where:
-        data.expectedUrl !== undefined
-          ? { id, url: data.expectedUrl }
-          : { id },
-      data: updatePayload,
-    });
+    if (urlChanged) {
+      // The extracted article belongs to the old URL: drop it with the edit.
+      return await prisma.$transaction(async (tx) => {
+        const updated = await tx.link.update(updateArgs);
+        await tx.readerView.deleteMany({ where: { linkId: id } });
+        return updated;
+      });
+    }
+    return await prisma.link.update(updateArgs);
   } catch (error) {
     if (isForeignKeyConstraintError(error)) {
       throw new FolderNotFoundError();
@@ -1132,6 +1159,7 @@ export async function searchLinksForUser(
     where: { userId, ...(and.length ? { AND: and } : {}) },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit + 1,
+    include: READER_VIEW_STATE_INCLUDE,
   });
   return {
     links: rows.slice(0, limit).map(mapRowToLink),
@@ -1275,6 +1303,7 @@ export async function listLinksForUser(
     where,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit + 1,
+    include: READER_VIEW_STATE_INCLUDE,
   });
 
   const hasMore = rows.length > limit;

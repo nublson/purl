@@ -56,6 +56,7 @@ function toLink(link: PublicLink): Link {
     folderId: null,
     notes: null,
     frameable: null,
+    readerView: null,
   };
 }
 

@@ -29,6 +29,8 @@ vi.mock("@/lib/prisma", () => ({
       delete: vi.fn(),
       findFirst: vi.fn(),
     },
+    readerView: { deleteMany: vi.fn() },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -62,6 +64,11 @@ const {
   normalizeLinkNotes,
   UnauthorizedError,
   listLinks,
+  listLinksForUser,
+  mapRowToLink,
+  READER_VIEW_STATE_INCLUDE,
+  readLinkForUser,
+  searchLinksForUser,
   resolveLinkFromUrl,
   updateLinkForUser,
 } = await import("./links");
@@ -116,6 +123,7 @@ describe("getLinksPageForCurrentUser", () => {
       where: { userId: "user-123" },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: 51,
+      include: READER_VIEW_STATE_INCLUDE,
     });
   });
 
@@ -467,6 +475,10 @@ describe("writing a link's note", () => {
     beforeEach(() => {
       vi.mocked(prisma.link.findFirst).mockReset().mockResolvedValue(EXISTING as never);
       vi.mocked(prisma.link.update).mockReset().mockResolvedValue(EXISTING as never);
+      vi.mocked(prisma.readerView.deleteMany).mockReset();
+      vi.mocked(prisma.$transaction)
+        .mockReset()
+        .mockImplementation((async (cb: (tx: unknown) => unknown) => cb(prisma)) as never);
     });
 
     function writtenData() {
@@ -603,5 +615,88 @@ describe("linkQueryWhere", () => {
 
   it("cuts the query at MAX_LINK_SEARCH_QUERY_LENGTH", () => {
     expect(linkQueryWhere("x".repeat(300))!.OR[0].title.contains).toHaveLength(200);
+  });
+});
+
+describe("the reader view state on owner reads", () => {
+  const ROW = {
+    id: "l1",
+    url: "https://example.com",
+    title: "Example",
+    favicon: "f",
+    domain: "example.com",
+    contentType: "WEB" as const,
+    description: null,
+    notes: null,
+    thumbnail: null,
+    createdAt: new Date("2026-10-31T09:00:00Z"),
+  };
+
+  it("mapRowToLink carries the reader view state", () => {
+    const ready = mapRowToLink({
+      ...ROW,
+      readerView: {
+        status: "READY",
+        reason: null,
+        fetchedAt: new Date("2026-10-31T10:00:00Z"),
+      },
+    });
+    expect(ready.readerView).toEqual({
+      status: "READY",
+      reason: null,
+      fetchedAt: "2026-10-31T10:00:00.000Z",
+    });
+    expect(mapRowToLink({ ...ROW, readerView: null }).readerView).toBeNull();
+    expect(mapRowToLink(ROW).readerView).toBeNull();
+  });
+
+  it("listLinksForUser, searchLinksForUser and readLinkForUser include the reader view state", async () => {
+    vi.mocked(prisma.link.findMany).mockReset().mockResolvedValue([]);
+    vi.mocked(prisma.link.findFirst).mockReset().mockResolvedValue(null);
+
+    await listLinksForUser("user-123", { limit: 10, cursor: null, contentType: null });
+    expect(vi.mocked(prisma.link.findMany).mock.calls[0][0]).toMatchObject({
+      include: READER_VIEW_STATE_INCLUDE,
+    });
+
+    await searchLinksForUser("user-123", { query: "x" } as never);
+    expect(vi.mocked(prisma.link.findMany).mock.calls[1][0]).toMatchObject({
+      include: READER_VIEW_STATE_INCLUDE,
+    });
+
+    await readLinkForUser("user-123", "l1");
+    expect(vi.mocked(prisma.link.findFirst)).toHaveBeenCalledWith({
+      where: { id: "l1", userId: "user-123" },
+      include: READER_VIEW_STATE_INCLUDE,
+    });
+  });
+
+  describe("updateLinkForUser", () => {
+    const EXISTING = { ...ROW, userId: "user-123", folderId: null, fileKey: null };
+
+    beforeEach(() => {
+      vi.mocked(prisma.link.findFirst).mockReset().mockResolvedValue(EXISTING as never);
+      vi.mocked(prisma.link.update).mockReset().mockResolvedValue(EXISTING as never);
+      vi.mocked(prisma.readerView.deleteMany).mockReset().mockResolvedValue({ count: 1 } as never);
+      vi.mocked(prisma.$transaction)
+        .mockReset()
+        .mockImplementation((async (cb: (tx: unknown) => unknown) => cb(prisma)) as never);
+    });
+
+    it("a URL change deletes the reader view in the same transaction", async () => {
+      await updateLinkForUser("user-123", "l1", { url: "https://cdn.test/pic.png" });
+      expect(prisma.readerView.deleteMany).toHaveBeenCalledWith({ where: { linkId: "l1" } });
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(prisma.link.update).mock.calls[0][0]).toMatchObject({
+        include: READER_VIEW_STATE_INCLUDE,
+      });
+    });
+
+    it("a title-only edit leaves the reader view alone", async () => {
+      await updateLinkForUser("user-123", "l1", { title: "New" });
+      expect(prisma.readerView.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.link.update).toHaveBeenCalledTimes(1);
+    });
   });
 });

@@ -362,6 +362,7 @@ describe("POST /api/links", () => {
         duration: null,
         frameable: null,
         embed: false,
+        readerView: null,
         upload: false,
         moved: false,
       });
