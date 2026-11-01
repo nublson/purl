@@ -125,6 +125,45 @@ test.describe("Link notes", () => {
     await expect(cardMark).toBeFocused();
   });
 
+  test("a long title never puts the mark under the row's floating actions", async ({
+    page,
+    seed,
+  }) => {
+    const long = "A title long enough to run past the end of the row ".repeat(6);
+    const folder = await seed.folder({ name: "Reading", slug: "reading" });
+    const unfiled = await seed.link({ url: "https://example.com/notes", title: long });
+    await setNotes(unfiled, "Remember the swallow");
+    const filed = await seed.link({
+      url: "https://example.org/notes",
+      title: `Filed ${long}`,
+      folderId: folder,
+    });
+    await setNotes(filed, "Remember the heron");
+    await page.goto("/home");
+    await waitForHydration(page, 'button[aria-label="Open link menu"]');
+
+    for (const [row, text] of [
+      [rows(page).filter({ hasText: "Filed" }), "heron"],
+      [rows(page).filter({ hasNotText: "Filed" }), "swallow"],
+    ] as const) {
+      // Hovering the row floats its actions over its end (the folder button
+      // and ⋯ for the filed one); the mark stays clear and takes the click.
+      await row.hover();
+      await expect(row.getByRole("button", { name: "Open link menu" })).toBeVisible();
+      const mark = noteMark(row);
+      const [markBox, menuBox] = await Promise.all([
+        mark.boundingBox(),
+        row.getByRole("button", { name: "Open link menu" }).boundingBox(),
+      ]);
+      expect(markBox!.x + markBox!.width).toBeLessThan(menuBox!.x - 24);
+      await mark.click({ trial: true });
+      await mark.click();
+      await expect(notePopover(page)).toContainText(text);
+      await page.keyboard.press("Escape");
+      await expect(notePopover(page)).toHaveCount(0);
+    }
+  });
+
   test("search finds a link by a word only in its note", async ({ page, seed }) => {
     const id = await seed.link({ url: "https://example.com/notes", title: "Noted" });
     await setNotes(id, "Remember the swallow\nSecond line");
@@ -169,6 +208,38 @@ test.describe("Link notes on a shared folder", () => {
   });
 });
 
+test.describe("The Edit dialog on a short screen", () => {
+  test.use({ viewport: { width: 390, height: 520 } });
+
+  test("a long note scrolls inside the dialog and Save stays reachable", async ({
+    page,
+    seed,
+  }) => {
+    const id = await seed.link({ url: "https://example.com/notes", title: "Noted" });
+    await setNotes(id, "A line of the note\n".repeat(60));
+    await page.goto("/home");
+    await waitForHydration(page, 'button[aria-label="Open link menu"]');
+
+    await rows(page).first().hover();
+    await page.getByRole("button", { name: "Open link menu" }).click();
+    await page.getByRole("menuitem", { name: "Edit" }).click();
+    const dialog = page.getByRole("dialog", { name: "Edit link" });
+    await expect(dialog).toBeVisible();
+    // Capped at the screen less its 16px margins: the form scrolls inside.
+    const box = (await dialog.boundingBox())!;
+    expect(box.height).toBeLessThanOrEqual(520 - 32 + 1);
+    expect(box.y).toBeGreaterThanOrEqual(15);
+
+    const save = dialog.getByRole("button", { name: "Save changes" });
+    await save.scrollIntoViewIfNeeded();
+    await expect(save).toBeInViewport();
+    await dialog.getByRole("textbox", { name: "Title" }).fill("Noted again");
+    await save.click();
+    await expect(dialog).toBeHidden();
+    await expect(rows(page).first()).toContainText("Noted again");
+  });
+});
+
 test.describe("Link notes on a phone", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -176,7 +247,12 @@ test.describe("Link notes on a phone", () => {
     page,
     seed,
   }) => {
-    const id = await seed.link({ url: "https://example.com/notes", title: "Noted" });
+    // A long title: on touch the ⋯ always floats over the row's end, and
+    // the mark must stay clear of it.
+    const id = await seed.link({
+      url: "https://example.com/notes",
+      title: "A title long enough to run past the end of the row ".repeat(6),
+    });
     await setNotes(id, "Remember the swallow\nSecond line");
     await page.goto("/home");
     await waitForHydration(page, '[data-cy="link-item"]');

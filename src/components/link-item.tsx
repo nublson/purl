@@ -525,7 +525,19 @@ export const LinkItem = React.forwardRef<
             the domain and tag stay in view. */}
         {/* overflow-visible: the folder tag sits on the text's baseline, a
             hair below the line box (line-clamp's overflow would clip it). */}
-        <ItemTitle className="max-w-full overflow-visible">
+        <ItemTitle
+          className={cn(
+            "max-w-full overflow-visible",
+            // With a note, the line ends in the mark, a control: it keeps
+            // clear of the actions floating over the row's end (their box,
+            // fade included: 64px for the ⋯, 104px with the folder button,
+            // which pointers that hover get on Home), so a long title
+            // never puts it under them.
+            link.notes &&
+              !demo &&
+              (linkFolder ? "pe-16 [@media(hover:hover)]:pe-26" : "pe-16"),
+          )}
+        >
           <Typography
             size="small"
             className={cn(
