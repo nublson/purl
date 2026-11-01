@@ -119,3 +119,35 @@ test.describe("Link management, focus after delete", () => {
     expect(await last.evaluate((el) => getComputedStyle(el).boxShadow)).toContain("inset");
   });
 });
+
+test.describe("The Edit dialog on a short screen", () => {
+  test.use({ viewport: { width: 390, height: 520 } });
+
+  test("a long description scrolls inside the dialog and Save stays reachable", async ({
+    page,
+    seed,
+  }) => {
+    await seed.link({
+      url: "https://example.com/long",
+      title: "Long",
+      description: "A line of the description\n".repeat(60),
+    });
+    await page.goto("/home");
+    await openLinkMenu(page);
+    await page.getByRole("menuitem", { name: "Edit" }).click();
+    const dialog = page.getByRole("dialog", { name: "Edit link" });
+    await expect(dialog).toBeVisible();
+    // Capped at the screen less its 16px margins: the form scrolls inside.
+    const box = (await dialog.boundingBox())!;
+    expect(box.height).toBeLessThanOrEqual(520 - 32 + 1);
+    expect(box.y).toBeGreaterThanOrEqual(15);
+
+    const save = dialog.getByRole("button", { name: "Save changes" });
+    await save.scrollIntoViewIfNeeded();
+    await expect(save).toBeInViewport();
+    await dialog.getByRole("textbox", { name: "Title" }).fill("Long again");
+    await save.click();
+    await expect(dialog).toBeHidden();
+    await expect(linkItems(page).first()).toContainText("Long again");
+  });
+});
