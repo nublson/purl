@@ -23,6 +23,7 @@ const {
   listPublicFolderLinks,
   publicFolderPath,
   PUBLIC_FOLDER_PAGE_SIZE,
+  PUBLIC_LINK_SELECT,
   resolvePublicFolder,
 } = await import("./public-folders");
 
@@ -55,6 +56,7 @@ const LINK_ROW = {
   folderId: "f1",
   fileKey: "users/u1/c1/a.png",
   fileSize: 1234,
+  notes: "private",
 };
 
 /** What visitors get for LINK_ROW: `upload` instead of the file key and size. */
@@ -211,5 +213,11 @@ describe("listPublicFolderLinks", () => {
 describe("publicFolderPath", () => {
   it("is /@username/slug", () => {
     expect(publicFolderPath("nublson", "design")).toBe("/@nublson/design");
+  });
+});
+
+describe("PUBLIC_LINK_SELECT", () => {
+  it("never selects the owner's private note for the landing demo", () => {
+    expect(PUBLIC_LINK_SELECT).not.toHaveProperty("notes");
   });
 });

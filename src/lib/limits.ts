@@ -50,3 +50,6 @@ export const UPLOAD_ROW_WINDOW_MS = 30 * 60 * 1000;
  * row can never be created for a blob the sweep has already judged orphaned.
  */
 export const SWEEP_MIN_AGE_MS = 2 * UPLOAD_ROW_WINDOW_MS;
+
+/** The longest private note a link can carry, in characters. */
+export const MAX_LINK_NOTES_LENGTH = 2000;

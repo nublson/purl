@@ -3,6 +3,7 @@ import { FolderNotFoundError } from "@/lib/folders";
 import {
   createLink,
   getLinksPageForCurrentUser,
+  LinkNotesError,
   UnauthorizedError,
 } from "@/lib/links";
 import { HOME_LINKS_PAGE_SIZE, MAX_SAVED_LINKS } from "@/lib/limits";
@@ -50,8 +51,8 @@ export async function OPTIONS(request: NextRequest) {
 /**
  * Session-authenticated list for the /home infinite scroll and reloads.
  * `limit` (1..MAX_SAVED_LINKS, default one page), `cursor` (ISO createdAt of
- * the last loaded link), `folderId`, and `q` (search: title, domain or URL,
- * case-insensitive). Returns date-grouped links plus the user's total count.
+ * the last loaded link), `folderId`, and `q` (search: title, domain, URL,
+ * description or notes, case-insensitive). Returns date-grouped links plus the user's total count.
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -94,7 +95,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let body: { url?: string; folderId?: unknown };
+  let body: { url?: string; folderId?: unknown; notes?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -121,11 +122,24 @@ export async function POST(request: NextRequest) {
   }
   const folderId = hasFolderId ? (body.folderId as string) : undefined;
 
-  try {
-    const link = await createLink(
-      url,
-      folderId !== undefined ? { folderId } : undefined,
+  const hasNotes = body?.notes !== undefined;
+  if (hasNotes && body.notes !== null && typeof body.notes !== "string") {
+    return withCors(
+      request,
+      NextResponse.json({ error: "Invalid notes" }, { status: 400 }),
     );
+  }
+  const notes = hasNotes ? (body.notes as string | null) : undefined;
+  const options =
+    folderId !== undefined || notes !== undefined
+      ? {
+          ...(folderId !== undefined ? { folderId } : {}),
+          ...(notes !== undefined ? { notes } : {}),
+        }
+      : undefined;
+
+  try {
+    const link = await createLink(url, options);
     broadcastLinksChanged(
       link.userId,
       parseLinksOrigin(request.headers.get(LINKS_ORIGIN_HEADER)),
@@ -157,6 +171,15 @@ export async function POST(request: NextRequest) {
       return withCors(
         request,
         NextResponse.json({ error: "Folder not found" }, { status: 404 }),
+      );
+    }
+    if (e instanceof LinkNotesError) {
+      return withCors(
+        request,
+        NextResponse.json(
+          { error: e.message, code: "INVALID_NOTES" },
+          { status: 400 },
+        ),
       );
     }
     throw e;

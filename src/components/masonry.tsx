@@ -26,11 +26,14 @@ const LEVEL_TOLERANCE_PX = 32;
 
 /**
  * Masonry for a grid of cards (`LINK_GRID_COLUMNS`): give the grid
- * `auto-rows-[1px]` and `ref={listRef}` once `masonry` is on, and wrap each
- * card in a `MasonryItem`. Each card is placed in order, in the leftmost
- * column that's level with the shortest, continuing the previous card's
- * row (`chooseMasonryColumn`), spanning
- * as many 1px rows as it is tall. Cards need measuring, which only happens
+ * `[overflow-anchor:none]` always, `auto-rows-[1px]` and `ref={listRef}`
+ * once `masonry` is on, and wrap each card in a `MasonryItem`. (Placing
+ * moves every card, so a card the browser picked as its scroll anchor
+ * would drag the page with it: on the switch to masonry, the cards stack
+ * at the top for a moment and a scrolled page jumps up.) Each card is
+ * placed in order, in the leftmost column that's level with the shortest,
+ * continuing the previous card's row (`chooseMasonryColumn`), spanning as
+ * many 1px rows as it is tall. Cards need measuring, which only happens
  * in the browser: the server's HTML (and the first paint before hydration)
  * shows plain rows, and this turns masonry on before the next paint.
  * Re-placed whenever a card resizes (fonts, a title rewrapping), the grid
@@ -43,10 +46,17 @@ export function useMasonry(active: boolean): {
   const [masonry, setMasonry] = useState(false);
   const listRef = useRef<HTMLUListElement>(null);
   useLayoutEffect(() => {
+    if (!active) return;
+    // Hold the plain rows' height across the switch to 1px rows: until the
+    // effect below places the cards, the grid would collapse to a few
+    // pixels and a page scrolled before hydration would be clamped back to
+    // the top. The effect below lets go once the cards are placed.
+    const list = listRef.current;
+    if (list) list.style.minHeight = `${list.offsetHeight}px`;
     // Deliberate: the switch has to land before the first paint, once the
     // cards exist to be measured (a layout effect, so no flash of rows).
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (active) setMasonry(true);
+    setMasonry(true);
   }, [active]);
 
   useLayoutEffect(() => {
@@ -74,6 +84,8 @@ export function useMasonry(active: boolean): {
     mutations.observe(list, { childList: true });
     watch();
     placeCards(list);
+    // The cards are placed: let go of the height held for the switch.
+    list.style.minHeight = "";
     return () => {
       resizes.disconnect();
       mutations.disconnect();
@@ -119,6 +131,20 @@ export function placeMasonry(
 }
 
 function placeCards(list: HTMLElement) {
+  // Hold the grid's height while its cards are unplaced: cleared, they sit
+  // in 1px rows, so the measuring layout below collapses the grid to a few
+  // pixels and the scroller clamps its scroll position to fit, throwing a
+  // scrolled page back to the top whenever a card resizes.
+  const heldMinHeight = list.style.minHeight;
+  list.style.minHeight = `${list.offsetHeight}px`;
+  try {
+    placeUnheld(list);
+  } finally {
+    list.style.minHeight = heldMinHeight;
+  }
+}
+
+function placeUnheld(list: HTMLElement) {
   const items = Array.from(list.children) as HTMLElement[];
   // Count the template's columns with no card placed: a card left in
   // column 4 after the grid narrows to 2 makes implicit columns, which the

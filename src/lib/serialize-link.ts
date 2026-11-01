@@ -5,6 +5,7 @@ type LinkLike = {
   url: string;
   title: string;
   description: string | null;
+  notes?: string | null;
   favicon: string;
   thumbnail: string | null;
   domain: string;
@@ -29,6 +30,7 @@ export function serializeLink(link: LinkLike) {
     url: link.url,
     title: link.title,
     description: link.description,
+    notes: link.notes ?? null,
     favicon: link.favicon,
     thumbnail: link.thumbnail,
     domain: link.domain,

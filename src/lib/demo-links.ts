@@ -25,6 +25,7 @@ export function toDemoLinks(folder: DemoFolder): Link[] {
   return folder.links.map((link) => ({
     ...link,
     folderId: folder.id,
+    notes: null,
     frameable: null,
   }));
 }

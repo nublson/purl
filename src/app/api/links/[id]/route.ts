@@ -15,6 +15,7 @@ import {
   type UpdateLinkForUserData,
   UnauthorizedError,
   LinkChangedError,
+  LinkNotesError,
 } from "@/lib/links";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { LINKS_ORIGIN_HEADER, parseLinksOrigin } from "@/lib/realtime-constants";
@@ -69,6 +70,7 @@ export async function PATCH(
   const hasUrl = typeof body?.url === "string";
   const hasTitle = typeof body?.title === "string";
   const hasDescription = body?.description !== undefined;
+  const hasNotes = body?.notes !== undefined;
   const hasFolderId =
     body !== null && typeof body === "object" && "folderId" in body;
 
@@ -82,11 +84,22 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid embed" }, { status: 400 });
   }
 
-  if (!hasUrl && !hasTitle && !hasDescription && !hasFolderId && !hasEmbed) {
+  if (hasNotes && body.notes !== null && typeof body.notes !== "string") {
+    return NextResponse.json({ error: "Invalid notes" }, { status: 400 });
+  }
+
+  if (
+    !hasUrl &&
+    !hasTitle &&
+    !hasDescription &&
+    !hasNotes &&
+    !hasFolderId &&
+    !hasEmbed
+  ) {
     return NextResponse.json(
       {
         error:
-          "At least one of url, title, description, folderId, or embed is required",
+          "At least one of url, title, description, notes, folderId, or embed is required",
       },
       { status: 400 },
     );
@@ -104,10 +117,12 @@ export async function PATCH(
   if (url !== undefined) data.url = url;
   if (hasTitle) data.title = body.title as string;
   if (hasDescription) data.description = body.description;
+  if (hasNotes) data.notes = body.notes;
 
   if (hasEmbed) data.embed = body.embed;
 
-  const hasOtherFields = hasUrl || hasTitle || hasDescription || hasEmbed;
+  const hasOtherFields =
+    hasUrl || hasTitle || hasDescription || hasNotes || hasEmbed;
 
   try {
     const { id } = await context.params;
@@ -221,6 +236,12 @@ export async function PATCH(
     }
     if (e instanceof InvalidUploadError) {
       return NextResponse.json(UPLOAD_URL_ERROR, { status: 400 });
+    }
+    if (e instanceof LinkNotesError) {
+      return NextResponse.json(
+        { error: e.message, code: "INVALID_NOTES" },
+        { status: 400 },
+      );
     }
     if (e instanceof LinkChangedError) {
       return NextResponse.json(

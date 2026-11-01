@@ -60,6 +60,8 @@ model Link {
   domain      String
   contentType ContentType @default(WEB)
   description String?
+  /// The owner's private note on this link; never public.
+  notes       String?
   thumbnail   String?
   createdAt   DateTime    @default(now())
   userId      String

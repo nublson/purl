@@ -3,7 +3,7 @@ import type { MoveLinksResult } from "@/lib/bulk-links";
 import { assertCanSaveLink, insertWithinSaveLimit } from "@/lib/entitlements";
 import { DEFAULT_FOLDER_EMOJI } from "@/lib/folder-display";
 import { assertFolderOwned, FolderNotFoundError } from "@/lib/folders";
-import { MAX_SAVED_LINKS } from "@/lib/limits";
+import { MAX_LINK_NOTES_LENGTH, MAX_SAVED_LINKS } from "@/lib/limits";
 import {
   OG_HTML_READ_MAX_BYTES,
   readHtmlForOpenGraph,
@@ -112,6 +112,16 @@ export class LinkChangedError extends Error {
   }
 }
 
+/** Thrown by `normalizeLinkNotes` when a note is over the cap (routes answer 400). */
+export class LinkNotesError extends Error {
+  readonly name = "LinkNotesError";
+  constructor() {
+    super(
+      `Keep the note to ${MAX_LINK_NOTES_LENGTH.toLocaleString("en-US")} characters or fewer.`,
+    );
+  }
+}
+
 function formatFileSize(bytes: number | null): string | null {
   if (bytes === null || !Number.isFinite(bytes) || bytes <= 0) return null;
   if (bytes < 1024) return `${bytes} B`;
@@ -217,6 +227,7 @@ type LinkRow = {
   domain: string;
   contentType: ContentType;
   description: string | null;
+  notes: string | null;
   thumbnail: string | null;
   createdAt: Date;
   folderId?: string | null;
@@ -229,6 +240,22 @@ type LinkRow = {
   embed?: boolean;
 };
 
+/**
+ * Validates an optional private note. Drops control characters (tabs and
+ * newlines stay), trims the ends, and treats empty/undefined/null as no note
+ * (`null`). Longer than `MAX_LINK_NOTES_LENGTH` characters → `LinkNotesError`.
+ */
+export function normalizeLinkNotes(
+  notes: string | null | undefined,
+): string | null {
+  const cleaned = (notes ?? "")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
+    .trim();
+  if (cleaned.length === 0) return null;
+  if (cleaned.length > MAX_LINK_NOTES_LENGTH) throw new LinkNotesError();
+  return cleaned;
+}
+
 export function mapRowToLink(row: LinkRow): Link {
   return {
     id: row.id,
@@ -236,6 +263,7 @@ export function mapRowToLink(row: LinkRow): Link {
     title: row.title,
     favicon: row.favicon,
     description: row.description,
+    notes: row.notes,
     thumbnail: row.thumbnail,
     domain: row.domain,
     contentType: row.contentType,
@@ -593,7 +621,8 @@ async function resaveUploadRow(
 async function insertResolvedLink(
   userId: string,
   resolved: ResolvedLinkFields,
-  folderId?: string,
+  folderId: string | undefined,
+  notes: string | null,
 ): Promise<CreateLinkResult & { moved: boolean }> {
   try {
     return await insertWithinSaveLimit(
@@ -611,6 +640,7 @@ async function insertResolvedLink(
             mimeType: resolved.mimeType,
             userId,
             ...(folderId !== undefined ? { folderId } : {}),
+            ...(notes !== null ? { notes } : {}),
           },
         })),
         moved: false,
@@ -653,6 +683,8 @@ async function insertResolvedLink(
 
 export type CreateLinkOptions = {
   folderId?: string;
+  /** Present to set the new link's private note; ignored when the URL is already saved. */
+  notes?: string | null;
 };
 
 /** Creates a link for the current user after scraping metadata. If a link with the same URL already exists, updates its createdAt and returns it. Throws UnauthorizedError if not authenticated. */
@@ -682,6 +714,9 @@ export async function createLinkForUser(
   url: string,
   opts?: CreateLinkOptions,
 ): Promise<CreateLinkResult & { moved: boolean }> {
+  // First, so a note over the cap fails before any lookup or scraping.
+  const notes = normalizeLinkNotes(opts?.notes);
+
   if (opts?.folderId !== undefined) {
     await assertFolderOwned(userId, opts.folderId);
   }
@@ -737,7 +772,7 @@ export async function createLinkForUser(
       // does a delete from another device. The user asked for the link, so
       // save it fresh, with the metadata already in hand.
     }
-    return insertResolvedLink(userId, resolved, opts?.folderId);
+    return insertResolvedLink(userId, resolved, opts?.folderId, notes);
   }
 
   // Fails fast before scraping; insertResolvedLink re-checks the cap
@@ -745,7 +780,7 @@ export async function createLinkForUser(
   await assertCanSaveLink(userId);
 
   const resolved = await resolveLinkFromUrl(url);
-  return insertResolvedLink(userId, resolved, opts?.folderId);
+  return insertResolvedLink(userId, resolved, opts?.folderId, notes);
 }
 
 /** Fetches a single link if it belongs to the current user; otherwise null. Throws UnauthorizedError if not authenticated. */
@@ -769,6 +804,8 @@ export type UpdateLinkData = {
   url?: string;
   title?: string;
   description?: string | null;
+  /** Present to set or clear (`null`) the private note; omitted leaves it. */
+  notes?: string | null;
   /** Show the page live in its card (the route has already checked it can be framed). */
   embed?: boolean;
 };
@@ -816,6 +853,9 @@ export async function updateLinkForUser(
     where: { id, userId },
   });
   if (!existing) return null;
+  // Before any re-scrape, so a note over the cap writes (and fetches) nothing.
+  const notes =
+    data.notes !== undefined ? normalizeLinkNotes(data.notes) : undefined;
   if (data.expectedUrl !== undefined && existing.url !== data.expectedUrl) {
     throw new LinkChangedError();
   }
@@ -860,6 +900,9 @@ export async function updateLinkForUser(
 
   if (data.folderId !== undefined) {
     updatePayload.folderId = data.folderId;
+  }
+  if (notes !== undefined) {
+    updatePayload.notes = notes;
   }
   if (typeof data.embed === "boolean" && !(urlChanged && data.embed)) {
     updatePayload.embed = data.embed;
@@ -1036,22 +1079,24 @@ export const MAX_LINK_SEARCH_RESULTS = 100;
 export const MAX_LINK_SEARCH_QUERY_LENGTH = 200;
 
 /**
- * Prisma condition matching `query` against a link's title, domain or URL
- * (case-insensitive), or null for a blank query. Cuts the query at
- * `MAX_LINK_SEARCH_QUERY_LENGTH`.
+ * Prisma condition matching `query` against a link's title, domain, URL,
+ * description or notes (case-insensitive), or null for a blank query. Cuts
+ * the query at `MAX_LINK_SEARCH_QUERY_LENGTH`.
  */
-function linkQueryWhere(query: string | undefined) {
+export function linkQueryWhere(
+  query: string | undefined,
+): { OR: Array<Record<string, { contains: string; mode: "insensitive" }>> } | null {
   const text = (query ?? "").trim().slice(0, MAX_LINK_SEARCH_QUERY_LENGTH);
   if (!text) return null;
   return {
-    OR: (["title", "domain", "url"] as const).map((field) => ({
+    OR: (["title", "domain", "url", "description", "notes"] as const).map((field) => ({
       [field]: { contains: text, mode: "insensitive" as const },
     })),
   };
 }
 
 export type SearchLinksOptions = {
-  /** Matched case-insensitively against title, domain and URL; blank lists everything. */
+  /** Matched case-insensitively against title, domain, URL, description and notes; blank lists everything. */
   query: string;
   /** Leave out links already in this folder (links in other folders or none stay). */
   notInFolderId?: string;
@@ -1099,7 +1144,7 @@ export type ListLinksOptions = {
   cursor: string | null;
   contentType: string | null;
   folderId?: string;
-  /** Only links whose title, domain or URL contains this (case-insensitive). */
+  /** Only links whose title, domain, URL, description or notes contains this (case-insensitive). */
   query?: string;
 };
 
@@ -1139,6 +1184,7 @@ export type ResourceLink = {
   url: string;
   title: string;
   description: string | null;
+  notes: string | null;
   domain: string;
   contentType: ContentType;
   createdAt: Date;
@@ -1158,6 +1204,7 @@ export async function listLinksForResource(
       url: true,
       title: true,
       description: true,
+      notes: true,
       domain: true,
       contentType: true,
       createdAt: true,

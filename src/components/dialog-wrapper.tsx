@@ -50,7 +50,11 @@ export function DialogWrapper({
         className={cn(
           "gap-4 px-0 z-51",
           // pb-5 + the scroll area's pb-1 keep the 24px bottom inset.
-          content && "flex min-h-0 flex-col overflow-hidden pb-5",
+          // Capped at the screen (less the 16px margins, the safe area and
+          // the on-screen keyboard), or the scroll area would never scroll
+          // and a tall form's footer would fall below a short phone screen.
+          content &&
+            "flex max-h-[calc(100dvh-2rem-var(--bottom-inset))] min-h-0 flex-col overflow-hidden pb-5",
           className,
         )}
       >
