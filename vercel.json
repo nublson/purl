@@ -3,6 +3,7 @@
   "ignoreCommand": "node scripts/vercel-wait-github-ci.mjs",
   "crons": [
     { "path": "/api/cron/enrich-links", "schedule": "* * * * *" },
+    { "path": "/api/cron/reader-views", "schedule": "* * * * *" },
     { "path": "/api/cron/sweep-uploads", "schedule": "0 * * * *" }
   ]
 }

@@ -3,6 +3,7 @@ import "server-only";
 import { canEmbed } from "@/lib/embeds";
 import { resolveLinkFromUrl, type ResolvedLinkFields } from "@/lib/links";
 import prisma from "@/lib/prisma";
+import { runPool, settledOrAfter } from "@/lib/task-pool";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { getUrlDomain } from "@/utils/formatter";
 
@@ -51,21 +52,6 @@ class EnrichTimeoutError extends Error {
   }
 }
 
-/** Resolves when `promise` settles, or after `ms`, whichever comes first. */
-async function settledOrAfter(promise: Promise<unknown>, ms: number): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const grace = new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, ms);
-  });
-  try {
-    await Promise.race([promise.then(noop, noop), grace]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function noop(): void {}
-
 /**
  * Looks a link up, giving the whole lookup `ENRICH_LINK_TIMEOUT_MS`. When
  * that runs out the lookup's requests are ABORTED (not just abandoned, which
@@ -97,24 +83,6 @@ async function lookUp(url: string): Promise<ResolvedLinkFields> {
   }
   await settledOrAfter(lookup, ENRICH_ABORT_GRACE_MS);
   throw new EnrichTimeoutError();
-}
-
-/** Runs `task` over `items`, at most `limit` at a time. */
-async function runPool<T>(
-  items: T[],
-  limit: number,
-  task: (item: T) => Promise<void>,
-): Promise<void> {
-  let next = 0;
-  const worker = async () => {
-    while (next < items.length) {
-      const item = items[next++];
-      await task(item);
-    }
-  };
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, worker),
-  );
 }
 
 /**
