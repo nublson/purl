@@ -498,6 +498,26 @@ describe("scrapeLinkMetadata – web/OGS branch", () => {
     expect(result.thumbnail).toBeNull();
   });
 
+  it("logs why a scrape fell back without naming the site", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    safeFetchSpy.mockRejectedValueOnce(
+      new TypeError("fetch failed", {
+        cause: Object.assign(
+          new Error("getaddrinfo ENOTFOUND www.secret-site.example"),
+          { code: "ENOTFOUND" },
+        ),
+      }),
+    );
+    const result = await scrapeLinkMetadata(
+      "https://www.secret-site.example/private",
+    );
+    expect(result.title).toBe("secret-site.example");
+    const logged = warn.mock.calls.flat().join(" ");
+    expect(logged).toContain("ENOTFOUND <host>");
+    expect(logged).not.toContain("secret-site");
+    warn.mockRestore();
+  });
+
   it("uses twitter:title / description / image when og:* tags are absent", async () => {
     mockOgsSuccess({
       ogTitle: undefined,

@@ -30,6 +30,7 @@
 import dns from "node:dns/promises";
 import dnsSync from "node:dns";
 import net from "node:net";
+import { suppressTracing } from "@sentry/nextjs";
 import {
   Agent,
   Pool,
@@ -509,10 +510,21 @@ async function safeFetchWithDispatcher(
  * the proxy unreachable (connect timeout, refused, not in DNS) — retries once
  * via direct pinned egress, so metadata scrapes are not wedged by a dead or
  * misconfigured proxy (see {@link describeHttpProxyHopFailure}).
+ *
+ * Runs under Sentry's `suppressTracing`: these are the URLs users save, and
+ * Sentry would otherwise record each request (redirects and the proxy retry
+ * included) as a span and a breadcrumb carrying its full URL.
  */
-export async function safeFetch(
+export function safeFetch(
   input: string | URL,
   init: SafeFetchInit = {},
+): Promise<Response> {
+  return suppressTracing(() => safeFetchUntraced(input, init));
+}
+
+async function safeFetchUntraced(
+  input: string | URL,
+  init: SafeFetchInit,
 ): Promise<Response> {
   try {
     return await safeFetchWithDispatcher(input, init, safeFetchDispatcher);
