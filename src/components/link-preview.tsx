@@ -81,7 +81,7 @@ const MEDIA_FACE = "max-h-80 rounded-t-lg";
  * What a preview card shows: the thumbnail (or favicon), or for an image
  * or video pearl the media itself, then the title and description (an
  * audio pearl: its player card, which holds the title, then the description),
- * then the owner's note, then the folder when given. `pdfThumbnail: false` skips the PDF render (it needs the
+ * then the folder when given. `pdfThumbnail: false` skips the PDF render (it needs the
  * signed-in PDF proxy) for the regular thumbnail.
  */
 export function LinkPreviewBody({
@@ -100,15 +100,13 @@ export function LinkPreviewBody({
   if (kind === "audio") {
     // The player card holds the title: then the description and the
     // folder, if any, under its transport.
-    const more =
-      Boolean(link.description) || Boolean(link.notes) || folder !== null;
+    const more = Boolean(link.description) || folder !== null;
     return (
       <>
         <AudioPlayer link={link} surface="popover" />
         {more ? (
           <div className="flex flex-col gap-2 px-4 pb-4">
             {link.description ? <PreviewDescription text={link.description} /> : null}
-            {link.notes ? <PreviewNote text={link.notes} /> : null}
             {folder ? <PreviewFolder folder={folder} /> : null}
           </div>
         ) : null}
@@ -135,7 +133,6 @@ export function LinkPreviewBody({
           {link.title}
         </p>
         {link.description && <PreviewDescription text={link.description} />}
-        {link.notes ? <PreviewNote text={link.notes} /> : null}
         {folder ? <PreviewFolder folder={folder} /> : null}
       </div>
     </>
@@ -145,15 +142,6 @@ export function LinkPreviewBody({
 function PreviewDescription({ text }: { text: string }) {
   return (
     <p className="text-muted-foreground text-xs font-normal line-clamp-3 wrap-anywhere">
-      {text}
-    </p>
-  );
-}
-
-/** The owner's private note: its own line breaks kept. */
-function PreviewNote({ text }: { text: string }) {
-  return (
-    <p className="text-muted-foreground text-xs font-normal line-clamp-3 wrap-anywhere whitespace-pre-line">
       {text}
     </p>
   );

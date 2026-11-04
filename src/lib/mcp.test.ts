@@ -20,11 +20,7 @@ const mockMoveLinksToFolder = vi.fn();
 const mockDeleteLinksForUser = vi.fn();
 const mockListLinksForResource = vi.fn();
 const mockCountLinksForUser = vi.fn();
-class MockLinkNotesError extends Error {
-  constructor() { super("Keep the note to 2,000 characters or fewer."); }
-}
 vi.mock("@/lib/links", () => ({
-  LinkNotesError: MockLinkNotesError,
   listLinksForResource: mockListLinksForResource,
   countLinksForUser: mockCountLinksForUser,
   deleteLinksForUser: mockDeleteLinksForUser,
@@ -73,11 +69,9 @@ vi.mock("@/lib/realtime-broadcast", () => ({
   broadcastLinksChanged: mockBroadcast,
 }));
 
-// serializeLink is the identity-ish passthrough so we can assert on raw
-// fields; a test can swap in the real one with mockImplementationOnce.
-const mockSerializeLink = vi.fn((link: unknown) => link);
+// serializeLink is the identity-ish passthrough so we can assert on raw fields.
 vi.mock("@/lib/serialize-link", () => ({
-  serializeLink: (link: unknown) => mockSerializeLink(link),
+  serializeLink: (link: unknown) => link,
 }));
 
 class MockLimitError extends Error {}
@@ -160,18 +154,6 @@ describe("registerPurlTools", () => {
     expect(schema.contentType.safeParse("GIF").success).toBe(false);
   });
 
-  it("save_link takes an optional notes input", () => {
-    const calls: unknown[][] = [];
-    const mockServer = { tool: vi.fn((...args: unknown[]) => void calls.push(args)) };
-    registerPurlTools(mockServer as never);
-    const saveLink = calls.find((c) => c[0] === "save_link");
-    const schema = saveLink?.find(
-      (a) => typeof a === "object" && a !== null && "url" in a,
-    ) as Record<string, { isOptional(): boolean }>;
-    expect(Object.keys(schema)).toContain("notes");
-    expect(schema.notes.isOptional()).toBe(true);
-  });
-
   it("registered tool handlers reject requests without authInfo", async () => {
     const handlers: Array<
       (args: unknown, extra: unknown) => Promise<unknown>
@@ -220,7 +202,6 @@ describe("registerPurlResources", () => {
     url: "https://example.com/a",
     title: "A link",
     description: "About it",
-    notes: null,
     domain: "example.com",
     contentType: "WEB" as const,
     createdAt: new Date("2026-10-20T10:00:00Z"),
@@ -718,40 +699,6 @@ describe("saveLinkTool", () => {
     );
   });
 
-  it("passes notes through to createLinkForUser", async () => {
-    mockCreateLinkForUser.mockResolvedValue({
-      id: "link-1",
-      userId: "user-1",
-    });
-    await saveLinkTool("user-1", "https://example.com", undefined, "a note");
-    expect(mockCreateLinkForUser).toHaveBeenCalledWith(
-      "user-1",
-      "https://example.com",
-      { folderId: undefined, notes: "a note" },
-    );
-    expect(mockCreateLinkForUser.mock.calls[0][2]).toHaveProperty("notes", "a note");
-  });
-
-  it("passes folderId and notes together", async () => {
-    mockCreateLinkForUser.mockResolvedValue({
-      id: "link-1",
-      userId: "user-1",
-    });
-    await saveLinkTool("user-1", "https://example.com", "folder-1", "a note");
-    expect(mockCreateLinkForUser).toHaveBeenCalledWith(
-      "user-1",
-      "https://example.com",
-      { folderId: "folder-1", notes: "a note" },
-    );
-  });
-
-  it("returns a tool error for an over-long note", async () => {
-    mockCreateLinkForUser.mockRejectedValue(new MockLinkNotesError());
-    const result = await saveLinkTool("user-1", "https://example.com", undefined, "x");
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toBe("Keep the note to 2,000 characters or fewer.");
-  });
-
   it("includes moved in the result", async () => {
     mockCreateLinkForUser.mockResolvedValue({
       id: "link-1",
@@ -788,34 +735,6 @@ describe("listSavedItemsTool", () => {
       data: [{ id: "link-1" }],
       nextCursor: "2025-01-01T00:00:00.000Z",
     });
-  });
-
-  it("returns each link's private note to its owner", async () => {
-    const { serializeLink } = await vi.importActual<
-      typeof import("@/lib/serialize-link")
-    >("@/lib/serialize-link");
-    mockSerializeLink.mockImplementationOnce((link) =>
-      serializeLink(link as Parameters<typeof serializeLink>[0]),
-    );
-    mockListLinksForUser.mockResolvedValue({
-      links: [
-        {
-          id: "link-1",
-          url: "https://a.example",
-          title: "A",
-          description: null,
-          notes: "n",
-          favicon: "https://a.example/favicon.ico",
-          thumbnail: null,
-          domain: "a.example",
-          contentType: "WEB",
-          createdAt: new Date("2026-10-31T00:00:00Z"),
-        },
-      ],
-      nextCursor: null,
-    });
-    const result = await listSavedItemsTool("user-1", {});
-    expect(parse(result).data[0]).toMatchObject({ id: "link-1", notes: "n" });
   });
 
   it("passes folderId through when provided", async () => {

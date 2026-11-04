@@ -10,12 +10,6 @@ vi.mock("@/lib/links", () => {
   class LinkChangedError extends Error {
     readonly name = "LinkChangedError";
   }
-  class LinkNotesError extends Error {
-    readonly name = "LinkNotesError";
-    constructor() {
-      super("Keep the note to 2,000 characters or fewer.");
-    }
-  }
 
   return {
     readLink: vi.fn(),
@@ -26,7 +20,6 @@ vi.mock("@/lib/links", () => {
     moveLinkToFolder: vi.fn(),
     UnauthorizedError,
     LinkChangedError,
-    LinkNotesError,
   };
 });
 
@@ -77,7 +70,6 @@ const {
   moveLinkToFolder,
   UnauthorizedError,
   LinkChangedError,
-  LinkNotesError,
 } = links;
 
 const { FolderNotFoundError, assertFolderOwned } = await import("@/lib/folders");
@@ -149,7 +141,6 @@ describe("links/[id] API route", () => {
         url: "https://example.com",
         title: "Example Domain",
         description: null,
-        notes: null,
         favicon: "https://example.com/favicon.ico",
         thumbnail: null,
         domain: "example.com",
@@ -176,7 +167,6 @@ describe("links/[id] API route", () => {
         url: "https://example.com",
         title: "Example Domain",
         description: null,
-        notes: null,
         favicon: "https://example.com/favicon.ico",
         thumbnail: null,
         domain: "example.com",
@@ -218,7 +208,7 @@ describe("links/[id] API route", () => {
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({
         error:
-          "At least one of url, title, description, notes, folderId, or embed is required",
+          "At least one of url, title, description, folderId, or embed is required",
       });
     });
 
@@ -238,7 +228,6 @@ describe("links/[id] API route", () => {
         url: "https://example.com",
         title: "Example Domain",
         description: null,
-        notes: null,
         favicon: "https://example.com/favicon.ico",
         thumbnail: null,
         domain: "example.com",
@@ -278,7 +267,6 @@ describe("links/[id] API route", () => {
         url: "https://example.com",
         title: "Example Domain",
         description: null,
-        notes: null,
         favicon: "https://example.com/favicon.ico",
         thumbnail: null,
         domain: "example.com",
@@ -328,88 +316,6 @@ describe("links/[id] API route", () => {
 
       expect(res.status).toBe(401);
       expect(await res.json()).toEqual({ error: "Unauthorized" });
-    });
-
-    describe("notes", () => {
-      const noteRow = (notes: string | null) =>
-        ({
-          id: ID,
-          url: "https://example.com",
-          title: "Example",
-          description: null,
-          favicon: "",
-          thumbnail: null,
-          domain: "example.com",
-          contentType: "WEB",
-          createdAt: new Date("2025-01-01T12:00:00.000Z"),
-          userId: "user-123",
-          notes,
-        }) as never;
-
-      it("accepts notes alone and passes them to the library", async () => {
-        vi.mocked(updateLink).mockResolvedValue(noteRow("n"));
-
-        const res = await PATCH(patchRequest({ notes: "n" }), {
-          params: Promise.resolve({ id: ID }),
-        });
-
-        expect(res.status).toBe(200);
-        expect(vi.mocked(updateLink)).toHaveBeenCalledWith(ID, { notes: "n" });
-      });
-
-      it("passes notes: null through to clear the note", async () => {
-        vi.mocked(updateLink).mockResolvedValue(noteRow(null));
-
-        const res = await PATCH(patchRequest({ notes: null }), {
-          params: Promise.resolve({ id: ID }),
-        });
-
-        expect(res.status).toBe(200);
-        expect(vi.mocked(updateLink)).toHaveBeenCalledWith(ID, { notes: null });
-      });
-
-      it("carries notes along with a move in one write", async () => {
-        vi.mocked(auth.api.getSession).mockResolvedValue({
-          user: { id: "user-1" },
-        } as never);
-        vi.mocked(updateLinkForUser).mockResolvedValue(noteRow("n"));
-
-        const res = await PATCH(patchRequest({ notes: "n", folderId: "f1" }), {
-          params: Promise.resolve({ id: ID }),
-        });
-
-        expect(res.status).toBe(200);
-        expect(vi.mocked(updateLinkForUser)).toHaveBeenCalledWith("user-1", ID, {
-          notes: "n",
-          folderId: "f1",
-        });
-        expect(vi.mocked(moveLinkToFolder)).not.toHaveBeenCalled();
-      });
-
-      it("returns 400 Invalid notes for a non-string, non-null value", async () => {
-        const res = await PATCH(patchRequest({ notes: 5 }), {
-          params: Promise.resolve({ id: ID }),
-        });
-
-        expect(res.status).toBe(400);
-        expect(await res.json()).toEqual({ error: "Invalid notes" });
-        expect(vi.mocked(updateLink)).not.toHaveBeenCalled();
-      });
-
-      it("returns 400 INVALID_NOTES when the library rejects the note", async () => {
-        vi.mocked(updateLink).mockRejectedValue(new LinkNotesError());
-
-        const res = await PATCH(patchRequest({ notes: "x" }), {
-          params: Promise.resolve({ id: ID }),
-        });
-
-        expect(res.status).toBe(400);
-        expect(await res.json()).toEqual({
-          error: "Keep the note to 2,000 characters or fewer.",
-          code: "INVALID_NOTES",
-        });
-        expect(vi.mocked(broadcastLinksChanged)).not.toHaveBeenCalled();
-      });
     });
 
     it("returns 400 INVALID_UPLOAD when the url of an upload is changed", async () => {
@@ -626,7 +532,6 @@ describe("links/[id] API route", () => {
           url: "https://example.com",
           title: "New title",
           description: null,
-          notes: null,
           favicon: "https://example.com/favicon.ico",
           thumbnail: null,
           domain: "example.com",
@@ -684,7 +589,6 @@ describe("links/[id] API route", () => {
           url: "https://example.com",
           title: "Example Domain",
           description: null,
-          notes: null,
           favicon: "https://example.com/favicon.ico",
           thumbnail: null,
           domain: "example.com",
