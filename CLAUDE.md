@@ -152,6 +152,19 @@ The pages: `STATIC_PAGES` (`src/lib/static-pages.ts`, plain data) maps each Noti
 - `animate-ui/` — Motion animations
 - `skeletons/` — Loading states
 
+### Monitoring (Sentry)
+
+`@sentry/nextjs` (v11) reports errors, traces, logs, replays and cron check-ins to the `nublson-7c/purl` Sentry project. Init: `src/instrumentation-client.ts` (browser), `src/sentry.server.config.ts` / `src/sentry.edge.config.ts` (loaded by `src/instrumentation.ts`, which also exports `onRequestError`), all spreading `sharedSentryOptions` from `src/sentry.shared.ts`; `global-error.tsx` captures what reaches it. Without `NEXT_PUBLIC_SENTRY_DSN` nothing is sent (local dev and e2e). `environment` is `VERCEL_ENV` / `NEXT_PUBLIC_VERCEL_ENV`, so production and dev.purl.live (`preview`) stay apart.
+
+- **Vercel:** the Sentry Marketplace integration links the project and sets `SENTRY_AUTH_TOKEN` (plus org/project) in Vercel, so every Vercel build uploads source maps (then deletes them: `deleteSourcemapsAfterUpload`) and creates a release named after `VERCEL_GIT_COMMIT_SHA`. GitHub CI has no token and skips the upload, which is fine. Browser events go through the `/monitoring` tunnel (`tunnelRoute`), a public route in `src/proxy.ts`; same-origin, so the CSP needs nothing.
+- **Privacy (don't loosen):** v11's `dataCollection` collects everything by default, so `sharedSentryOptions` turns off request/response bodies (saves and note edits carry URLs and notes), cookies, query strings (`?q=` is a search), automatic user fields (IP, email) and all but `user-agent`/`accept`/`content-type` request headers. (`sendDefaultPii` no longer exists in v11.) Users are tagged by **id only** with `setSentryUser` (`src/lib/sentry-user.ts`): on the server from `getSessionUser` and `getBrowserSessionUserId` (scopes are per request), in the browser by `SentryUser` in the `(app)` layout (never the landing demo, whose `@purl` user isn't the visitor). Replay keeps its defaults (all text masked, media blocked): 10% of sessions, 100% with an error.
+- **Sampling:** 10% of traces in production, 100% in dev; the server's `serverTracesSampler` keeps every `/api/cron/` request, since the cron monitors are built from those spans.
+- **Cron monitors:** `_experimental.vercelCronsMonitoring` in `withSentryConfig` (`next.config.ts`) creates a monitor per cron in `vercel.json` (enrich-links, sweep-uploads), so a missed or failed run alerts.
+- **Logs:** `consoleLoggingIntegration({ levels: ["warn", "error"] })` on server and edge sends the app's `console.warn` / `console.error` (`[uploads] del failed`, `[scrapeLinkMetadata] … falling back`, proxy-hop failures) as Sentry logs, linked to their traces. Keep log lines free of notes, titles and URLs a user saved. (v11 has no `enableLogs`; the integration is what turns logs on.)
+- **Alerts (in Sentry, not code):** only Sentry's default "high priority issues" alert, covering every environment. To scope an alert to production before Sentry has seen a production event, filter on the `environment` tag (`tagged_event`): the alert's environment field only accepts environments Sentry already knows.
+- **Vercel log drain:** "Sentry logs (production)" (Vercel team settings → Drains) sends the production deployments' build, function (`lambda`), edge and firewall logs to the project's Vercel logs endpoint (`…/integration/vercel/logs/`, the public key in `x-sentry-auth`). It catches what the SDK can't (function timeouts, out-of-memory crashes, build failures, firewall blocks); function warnings and errors arrive twice (also through `consoleLoggingIntegration`). Drains are billed by volume on Vercel. No trace drain: the SDK sends traces.
+- **Noise:** `ignoreErrors: ["AbortError"]` (upload aborts, the enrich cron's timeouts, navigation); the browser ignores extension URLs (`denyUrls`).
+
 ### Database (Prisma)
 
 Key enum: `ContentType` (WEB, YOUTUBE, PDF, AUDIO, IMAGE, VIDEO).

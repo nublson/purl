@@ -1,6 +1,7 @@
 import "server-only";
 
 import { auth } from "@/lib/auth";
+import { setSentryUser } from "@/lib/sentry-user";
 import { headers } from "next/headers";
 import { cache } from "react";
 
@@ -21,6 +22,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const session = await auth.api.getSession({ headers: await headers() });
   const user = session?.user;
   if (!user?.id) return null;
+  setSentryUser(user.id);
   // `username` is `required: false` in auth.ts (see the comment there) so
   // Better Auth's inferred type allows it to be missing, but the Prisma
   // column is NOT NULL and `databaseHooks.user.create.before` always

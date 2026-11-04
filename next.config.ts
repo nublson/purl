@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import bundleAnalyzer from "@next/bundle-analyzer";
+import { withSentryConfig } from "@sentry/nextjs/config";
 import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
 import { HOME_LINK_HEADER } from "./src/lib/agent-discovery";
@@ -111,4 +112,31 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withBundleAnalyzer(withSerwist(nextConfig));
+export default withSentryConfig(withBundleAnalyzer(withSerwist(nextConfig)), {
+  org: "nublson-7c",
+  project: "purl",
+
+  // Only print logs for uploading source maps in CI.
+  silent: !process.env.CI,
+
+  // Auth token for source map uploads (set SENTRY_AUTH_TOKEN in CI / Vercel).
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Upload a larger set of source maps for prettier stack traces.
+  widenClientFileUpload: true,
+
+  // Route browser requests to Sentry through Next.js to avoid ad blockers.
+  tunnelRoute: "/monitoring",
+
+  // Delete generated source maps after upload so they aren't publicly served.
+  sourcemaps: {
+    deleteSourcemapsAfterUpload: true,
+  },
+
+  // Cron Monitors for the crons in vercel.json (enrich-links, sweep-uploads),
+  // built from their spans: a missed or failed run alerts in Sentry. The
+  // server's tracesSampler keeps every /api/cron/ request (src/sentry.shared.ts).
+  _experimental: {
+    vercelCronsMonitoring: true,
+  },
+});

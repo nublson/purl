@@ -1,6 +1,7 @@
 import "server-only";
 
 import { auth } from "@/lib/auth";
+import { setSentryUser } from "@/lib/sentry-user";
 import { headers } from "next/headers";
 
 /**
@@ -27,5 +28,7 @@ export async function getBrowserSession(): Promise<
 
 export async function getBrowserSessionUserId(): Promise<string | null> {
   const session = await getBrowserSession();
-  return session?.user?.id ?? null;
+  const userId = session?.user?.id ?? null;
+  if (userId) setSentryUser(userId);
+  return userId;
 }

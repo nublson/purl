@@ -1,4 +1,5 @@
 import Header from "@/components/header";
+import { SentryUser } from "@/components/sentry-user";
 import { CurrentUserProvider } from "@/contexts/current-user-context";
 import { FoldersProvider } from "@/contexts/folders-context";
 import { LinkViewProvider } from "@/contexts/link-view-context";
@@ -44,6 +45,7 @@ export default async function AppShellLayout({
       enabledProviders={getEnabledProviders()}
       uploadsEnabled={uploadsEnabled()}
     >
+      <SentryUser userId={user.id} />
       <LinksSyncProvider>
         <FoldersProvider
           initialFolders={initialFolders}

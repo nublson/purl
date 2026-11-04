@@ -48,6 +48,10 @@ const publicRoutes: PublicRoute[] = [
   // POST here, and a 307 would re-post it to the landing page. The route
   // checks the session itself and sends a signed-out share to "/".
   { path: "/share", whenAuthenticated: "next" },
+  // Sentry tunnel (withSentryConfig tunnelRoute): browser events proxy
+  // through the app so ad blockers don't drop them. Must stay public —
+  // signed-out pages report errors too.
+  { path: "/monitoring", whenAuthenticated: "next" },
   // The Notion-backed static pages (Privacy, Terms, API and MCP docs).
   ...STATIC_PAGES.map(
     ({ path }): PublicRoute => ({ path, whenAuthenticated: "next" }),
