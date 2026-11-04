@@ -387,8 +387,9 @@ export async function scrapeLinkMetadata(
   } catch (error) {
     // A save still succeeds on a failed scrape (the domain stands in for the
     // title), so say why here, or production shows nothing but bare domains.
+    // Without the site: warnings reach Sentry, and what a user saved is private.
     console.warn(
-      `[scrapeLinkMetadata] ${domain}: falling back to the domain (${describeFetchError(error)})`,
+      `[scrapeLinkMetadata] falling back to the domain (${redactHost(describeFetchError(error), url, domain)})`,
     );
     return {
       title: domain,
@@ -415,6 +416,21 @@ function describeFetchError(error: unknown): string {
     current = current.cause;
   }
   return parts.join(" <- ");
+}
+
+/** `text` with the link's host (Undici names it in DNS and connect errors) replaced by `<host>`. */
+function redactHost(text: string, url: string, domain: string): string {
+  let hostname = "";
+  try {
+    hostname = new URL(url).hostname;
+  } catch {
+    // An unparsable URL never reached the network.
+  }
+  // Longest first, so `www.example.com` goes whole before `example.com`.
+  return [hostname, domain]
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length)
+    .reduce((out, host) => out.split(host).join("<host>"), text);
 }
 
 export type ResolvedLinkFields = {
