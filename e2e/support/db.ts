@@ -119,21 +119,24 @@ export async function seedFolder(
     emoji,
     description,
     isPublic = false,
+    view = null,
   }: {
     name: string;
     slug: string;
     emoji?: string;
     description?: string;
     isPublic?: boolean;
+    /** The folder's own view; null (the default) follows the account's. */
+    view?: "LIST" | "GRID" | null;
   },
 ): Promise<string> {
   const id = randomUUID();
   await pool.query(
     // Last in the user's order, like a folder created in the app.
-    `INSERT INTO "folders" ("id", "name", "slug", "emoji", "description", "isPublic", "userId", "position", "updatedAt")
+    `INSERT INTO "folders" ("id", "name", "slug", "emoji", "description", "isPublic", "userId", "position", "linkView", "updatedAt")
      VALUES ($1, $2, $3, $4, $5, $6, $7,
-       (SELECT COALESCE(MAX("position"), 0) + 1 FROM "folders" WHERE "userId" = $7), now())`,
-    [id, name, slug, emoji ?? null, description ?? null, isPublic, userId],
+       (SELECT COALESCE(MAX("position"), 0) + 1 FROM "folders" WHERE "userId" = $7), $8, now())`,
+    [id, name, slug, emoji ?? null, description ?? null, isPublic, userId, view],
   );
   return id;
 }
@@ -141,4 +144,9 @@ export async function seedFolder(
 /** Shares or unshares a folder directly (for signed-out tests). */
 export async function setFolderPublic(folderId: string, isPublic: boolean): Promise<void> {
   await pool.query(`UPDATE "folders" SET "isPublic" = $2 WHERE "id" = $1`, [folderId, isPublic]);
+}
+
+/** Sets an account's view directly (`User.linkView`). */
+export async function setAccountView(userId: string, view: "LIST" | "GRID"): Promise<void> {
+  await pool.query(`UPDATE "users" SET "linkView" = $2 WHERE "id" = $1`, [userId, view]);
 }

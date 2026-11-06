@@ -1,5 +1,5 @@
 import { expect, test, waitForHydration } from "./fixtures";
-import { pool, setFolderPublic } from "./support/db";
+import { pool, setAccountView, setFolderPublic } from "./support/db";
 import { silentWav } from "./support/media";
 
 // Public folders at /@username/slug: readable by anyone (no session),
@@ -51,12 +51,12 @@ test.describe("Shared folders, visited signed out", () => {
     );
   });
 
-  test("visitors start in the grid; the view toggle switches to the list, remembered", async ({
+  test("visitors start in the folder's grid; the view toggle switches to the list, remembered", async ({
     page,
     seed,
     testUser,
   }, testInfo) => {
-    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true, view: "GRID" });
     for (const [i, title] of ["Alpha", "Bravo", "Charlie", "Delta", "Echo"].entries()) {
       await seed.link({
         url: `https://${title.toLowerCase()}.example`,
@@ -116,7 +116,7 @@ test.describe("Shared folders, visited signed out", () => {
     await page.context().route("https://sounds.example/**", (route) =>
       route.fulfill({ status: 200, contentType: "audio/wav", body: silentWav(10) }),
     );
-    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true, view: "GRID" });
     await seed.link({
       url: "https://sounds.example/song.mp3",
       title: "Song",
@@ -179,7 +179,7 @@ test.describe("Shared folders, visited signed out", () => {
     seed,
     testUser,
   }) => {
-    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true, view: "GRID" });
     for (const title of ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot"]) {
       await seed.link({ url: `https://${title.toLowerCase()}.example`, title, folderId: design });
     }
@@ -217,15 +217,11 @@ test.describe("Shared folders, visited signed out", () => {
     seed,
     testUser,
   }, testInfo) => {
-    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true, view: "GRID" });
     // One more than a page (PUBLIC_FOLDER_PAGE_SIZE = 50).
     for (let i = 0; i < 51; i++) {
       await seed.link({ url: `https://l${i}.example`, title: `Link ${i}`, folderId: design });
     }
-    // The grid (the default), set explicitly as a returning visitor would.
-    await page.context().addCookies([
-      { name: "purl-shared-view", value: "grid", url: testInfo.project.use.baseURL! },
-    ]);
     // Hold the next page until the placeholders have been seen.
     let release!: () => void;
     const held = new Promise<void>((resolve) => (release = resolve));
@@ -251,14 +247,11 @@ test.describe("Shared folders, visited signed out", () => {
     page,
     seed,
     testUser,
-  }, testInfo) => {
-    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+  }) => {
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true, view: "GRID" });
     for (let i = 0; i < 40; i++) {
       await seed.link({ url: `https://r${i}.example`, title: `Row ${i}`, folderId: design });
     }
-    await page.context().addCookies([
-      { name: "purl-shared-view", value: "grid", url: testInfo.project.use.baseURL! },
-    ]);
     await page.goto(`/@${testUser.username}/design`);
     await expect(page.locator('[data-cy="link-card"]')).toHaveCount(40);
     await waitForHydration(page, '[data-cy="link-card"]');
@@ -285,14 +278,11 @@ test.describe("Shared folders, visited signed out", () => {
     page,
     seed,
     testUser,
-  }, testInfo) => {
-    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+  }) => {
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true, view: "GRID" });
     for (let i = 0; i < 40; i++) {
       await seed.link({ url: `https://h${i}.example`, title: `Early ${i}`, folderId: design });
     }
-    await page.context().addCookies([
-      { name: "purl-shared-view", value: "grid", url: testInfo.project.use.baseURL! },
-    ]);
     // Hold the page's scripts so the visitor scrolls the server's HTML.
     let release!: () => void;
     const held = new Promise<void>((resolve) => (release = resolve));
@@ -323,14 +313,11 @@ test.describe("Shared folders, visited signed out", () => {
     page,
     seed,
     testUser,
-  }, testInfo) => {
-    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+  }) => {
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true, view: "GRID" });
     for (let i = 0; i < 51; i++) {
       await seed.link({ url: `https://m${i}.example`, title: `Card ${i}`, folderId: design });
     }
-    await page.context().addCookies([
-      { name: "purl-shared-view", value: "grid", url: testInfo.project.use.baseURL! },
-    ]);
     // Count card arrivals in the page (200ms animations are too short to
     // catch from outside): animations that start on a grid cell's box.
     await page.addInitScript(() => {
@@ -371,7 +358,7 @@ test.describe("Shared folders, visited signed out", () => {
   });
 
   test("a failed page stops loading more until Try again", async ({ page, seed, testUser }) => {
-    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true, view: "GRID" });
     for (let i = 0; i < 51; i++) {
       await seed.link({ url: `https://f${i}.example`, title: `Fail ${i}`, folderId: design });
     }
@@ -451,7 +438,7 @@ test.describe("Shared folders, visited signed out", () => {
     seed,
     testUser,
   }) => {
-    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true, view: "GRID" });
     await seed.link({ url: "https://a.example/one", title: "Tom & Jerry <3", folderId: design });
     await seed.link({ url: "https://b.example/two", title: "Second", folderId: design });
 
@@ -513,7 +500,7 @@ test.describe("Shared folders, visited signed out", () => {
   });
 
   test("the feed path is case-insensitive", async ({ page, seed, testUser }) => {
-    await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    await seed.folder({ name: "Design", slug: "design", isPublic: true, view: "GRID" });
     const response = await page.request.get(
       `/@${testUser.username.toUpperCase()}/Design/feed.xml`,
     );
@@ -580,6 +567,45 @@ test.describe("Shared folders, visited signed out", () => {
     expect(body.links[0]).not.toHaveProperty("fileKey");
     expect(body.links[0]).not.toHaveProperty("fileSize");
   });
+
+  test("a visitor's switch is remembered for that folder only", async ({ page, seed, testUser }) => {
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true, view: "GRID" });
+    const notes = await seed.folder({ name: "Notes", slug: "notes", isPublic: true, view: "GRID" });
+    await seed.link({ url: "https://d.example", title: "Design link", folderId: design });
+    await seed.link({ url: "https://n.example", title: "Notes link", folderId: notes });
+    const cards = page.locator('[data-cy="link-card"]');
+    const rows = page.locator('[data-cy="link-item"]');
+
+    await page.goto(`/@${testUser.username}/design`);
+    await waitForHydration(page, '[data-cy="link-card"]');
+    await page.getByRole("button", { name: "List view" }).click();
+    await expect(rows).toHaveCount(1);
+
+    // Notes still opens in the owner's grid.
+    await page.goto(`/@${testUser.username}/notes`);
+    await expect(cards).toHaveCount(1);
+    // Design opens in the visitor's list, straight from the server.
+    await page.goto(`/@${testUser.username}/design`);
+    await expect(rows).toHaveCount(1);
+
+    // Back to the owner's view: the choice is forgotten.
+    await waitForHydration(page, '[data-cy="link-item"]');
+    await page.getByRole("button", { name: "Grid view" }).click();
+    await expect(cards).toHaveCount(1);
+    const cookie = (await page.context().cookies()).find((c) => c.name === "purl-shared-views");
+    expect(cookie?.value ?? "").not.toContain(design);
+  });
+
+  test("a folder that follows Home opens in the owner's account view", async ({ page, seed, testUser }) => {
+    const design = await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    await seed.link({ url: "https://d.example", title: "Design link", folderId: design });
+    // The fixtures reset the account to list.
+    await page.goto(`/@${testUser.username}/design`);
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(1);
+    await setAccountView(testUser.id, "GRID");
+    await page.reload();
+    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(1);
+  });
 });
 
 test.describe("Shared folders, managed by the owner", () => {
@@ -629,7 +655,7 @@ test.describe("Shared folders, managed by the owner", () => {
   });
 
   test("changing your username keeps old shared URLs working", async ({ page, seed, testUser }) => {
-    await seed.folder({ name: "Design", slug: "design", isPublic: true });
+    await seed.folder({ name: "Design", slug: "design", isPublic: true, view: "GRID" });
     const original = testUser.username;
     const renamed = `${original}-new`;
     const visitor = await page.context().browser()!.newContext();
@@ -707,6 +733,42 @@ test.describe("Share popover", () => {
       await expect
         .poll(async () => (await visitor.request.get(`/@${testUser.username}/design`)).status())
         .toBe(404);
+    } finally {
+      await visitor.close();
+    }
+  });
+  test("the View row sets the folder's view, for the owner and for visitors", async ({ page, seed, testUser }) => {
+    const design = await seed.folder({ name: "Design", slug: "design" });
+    await seed.link({ url: "https://d.example", title: "Design link", folderId: design });
+    await page.goto("/folders/design");
+    await waitForHydration(page, 'button[aria-label^="Folder:"]');
+    await page.getByRole("button", { name: "Share" }).click();
+    const row = page.getByRole("dialog").locator('[data-cy="share-view"]');
+    await expect(row).toContainText("Visitors see it this way, unless they switch. (same as Home)");
+
+    const saved = page.waitForResponse(
+      (res) => res.url().endsWith(`/api/folders/${design}`) && res.request().method() === "PATCH",
+    );
+    await row.getByRole("button", { name: "Grid view" }).click();
+    expect((await saved).ok()).toBe(true);
+    await expect(row.getByRole("button", { name: "Grid view" })).toHaveAttribute("aria-pressed", "true");
+    await expect(row).not.toContainText("(same as Home)");
+    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(1);
+    await page.keyboard.press("Escape");
+
+    // The user menu shows the same setting.
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await expect(page.getByRole("menuitemradio", { name: "Grid" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("menuitemcheckbox", { name: "Same as Home" })).toHaveAttribute("aria-checked", "false");
+    await page.keyboard.press("Escape");
+
+    // A visitor gets the grid in the server's HTML once it's shared.
+    await setFolderPublic(design, true);
+    const visitor = await page.context().browser()!.newContext();
+    try {
+      const html = await (await visitor.request.get(`/@${testUser.username}/design`)).text();
+      expect(html).toContain('data-cy="link-card"');
+      expect(html).not.toContain('data-cy="link-item"');
     } finally {
       await visitor.close();
     }

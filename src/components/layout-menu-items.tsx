@@ -31,10 +31,12 @@ const VIEW_OPTIONS = [
  */
 export function ViewMenuItems() {
   const { view, setView, folderView, followHome } = useLinkView();
+  // The demo has no Home to follow (its Home item is disabled).
+  const isDemo = useIsDemo();
   return (
     <>
       <ViewRadioItems view={view} setView={setView} />
-      {folderView !== undefined && (
+      {folderView !== undefined && !isDemo && (
         <DropdownMenuCheckboxItem
           checked={folderView === null}
           data-cy="link-view-home"

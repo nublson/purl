@@ -31,6 +31,7 @@ type TestFixtures = {
       emoji?: string;
       description?: string;
       isPublic?: boolean;
+      view?: "LIST" | "GRID" | null;
     }) => Promise<string>;
   };
 };
@@ -142,7 +143,10 @@ export async function chooseView(
   await press(page.getByRole("button", { name: "Account menu" }));
   const saved = save
     ? page.waitForResponse(
-        (res) => res.url().endsWith("/api/user/layout") && res.request().method() === "PATCH",
+        // Home saves the account's view; a folder page saves that folder's.
+        (res) =>
+          res.request().method() === "PATCH" &&
+          (res.url().endsWith("/api/user/layout") || /\/api\/folders\/[^/]+$/.test(res.url())),
       )
     : null;
   await press(page.getByRole("menuitemradio", { name: view }));
