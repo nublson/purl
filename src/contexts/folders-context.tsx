@@ -2,7 +2,9 @@
 
 import { fetchFolders } from "@/lib/folder-client";
 import { byPosition } from "@/lib/folder-order";
+import { withFolderView } from "@/lib/folder-view-savers";
 import type { FolderSummary } from "@/lib/folders";
+import type { LinkView } from "@/lib/link-view";
 import { useLinksSyncState } from "@/hooks/use-links-sync";
 import {
   createContext,
@@ -32,6 +34,11 @@ export interface FoldersContextValue {
   /** Replaces the whole list as given (a reorder, or its rollback). */
   replaceFolders: (folders: FolderSummary[]) => void;
   /**
+   * Changes one folder's view locally and nothing else (`withFolderView`):
+   * never adds back a folder that's gone.
+   */
+  setFolderViewLocally: (id: string, view: LinkView | null) => void;
+  /**
    * Drops background fetch results until the returned release runs (a save
    * in flight), so a fetch that read the old order can't land over the new
    * one. Releasing also drops fetches that started during the hold.
@@ -47,6 +54,7 @@ const FoldersContext = createContext<FoldersContextValue>({
   upsertFolder: () => {},
   removeFolderLocally: () => {},
   replaceFolders: () => {},
+  setFolderViewLocally: () => {},
   holdFetches: () => () => {},
 });
 
@@ -155,6 +163,11 @@ export function FoldersProvider({
     setFolders(next);
   }, []);
 
+  const setFolderViewLocally = useCallback((id: string, view: LinkView | null) => {
+    mutationCountRef.current += 1;
+    setFolders((current) => withFolderView(current, id, view));
+  }, []);
+
   const holdFetches = useCallback(() => {
     heldRef.current += 1;
     let released = false;
@@ -178,6 +191,7 @@ export function FoldersProvider({
       upsertFolder,
       removeFolderLocally,
       replaceFolders,
+      setFolderViewLocally,
       holdFetches,
     }),
     [
@@ -188,6 +202,7 @@ export function FoldersProvider({
       upsertFolder,
       removeFolderLocally,
       replaceFolders,
+      setFolderViewLocally,
       holdFetches,
     ],
   );

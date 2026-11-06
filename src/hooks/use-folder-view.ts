@@ -1,7 +1,7 @@
 "use client";
 
 import { useFoldersContext } from "@/contexts/folders-context";
-import { patchFolder } from "@/lib/folder-client";
+import { patchFolderView } from "@/lib/folder-client";
 import type { FolderSummary } from "@/lib/folders";
 import { folderViewSaver } from "@/lib/folder-view-savers";
 import { createLatestSaver } from "@/lib/latest-saver";
@@ -11,14 +11,14 @@ import { toast } from "sonner";
 
 const VIEW_FAILED = "Unable to change the view. Try again.";
 
-/** Each folder as last shown, for putting the stored view back on failure. */
-const shown = new Map<string, FolderSummary>();
 
 /**
  * Sets a folder's own view (`null`: follow the account view again). Shown at
- * once (the folder list is patched locally) and saved in the background,
- * latest choice wins; a failed save puts the stored view back and toasts. In
- * the landing demo (`persist` off) it only patches the local list.
+ * once (only the view is patched in the local list) and saved in the
+ * background, latest choice wins, each request time-limited
+ * (`patchFolderView`, so a stalled one can't hold folder refreshes); a failed
+ * save puts the stored view back and toasts. In the landing demo (`persist`
+ * off) it only patches the local list.
  */
 export function useSetFolderView(
   /** False in the landing demo (the link-view context's `persist`). */
@@ -27,14 +27,12 @@ export function useSetFolderView(
   folder: FolderSummary,
   view: LinkView | null,
 ) => void {
-  const { upsertFolder, holdFetches } = useFoldersContext();
+  const { setFolderViewLocally, holdFetches } = useFoldersContext();
 
   return useCallback(
     (folder: FolderSummary, view: LinkView | null) => {
       if (folder.view === view) return;
-      const next = { ...folder, view };
-      shown.set(folder.id, next);
-      upsertFolder(next);
+      setFolderViewLocally(folder.id, view);
       if (!persist) return;
 
       // Shared by every caller (`folderViewSaver`); a saver at rest may hold
@@ -47,21 +45,22 @@ export function useSetFolderView(
             // A background refetch mid-save would show the old view again.
             const release = holdFetches();
             try {
-              const result = await patchFolder(folder.id, { view: value });
+              const result = await patchFolderView(folder.id, value);
               if (!result.ok) throw new Error(result.error);
             } finally {
               release();
             }
           },
           onRevert: (confirmed) => {
-            const current = shown.get(folder.id) ?? folder;
-            upsertFolder({ ...current, view: confirmed });
+            // Only the view goes back: a rename or sharing change made
+            // meanwhile stays, and a folder deleted meanwhile stays gone.
+            setFolderViewLocally(folder.id, confirmed);
             toast.error(VIEW_FAILED);
           },
         }),
       );
       saver.set(view);
     },
-    [upsertFolder, holdFetches, persist],
+    [setFolderViewLocally, holdFetches, persist],
   );
 }

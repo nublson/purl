@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { folderViewSaver } from "./folder-view-savers";
+import { folderViewSaver, withFolderView } from "./folder-view-savers";
+import type { FolderSummary } from "./folders";
 import { createLatestSaver } from "./latest-saver";
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
@@ -34,5 +35,33 @@ describe("folderViewSaver", () => {
     first.set("grid");
     await flush();
     expect(folderViewSaver("folder-idle", makeSaver(save))).not.toBe(first);
+  });
+});
+
+describe("withFolderView", () => {
+  const folder = (id: string, over: Partial<FolderSummary> = {}): FolderSummary => ({
+    id,
+    name: id,
+    slug: id,
+    emoji: "🦪",
+    description: null,
+    isPublic: false,
+    position: 1,
+    view: null,
+    linkCount: 0,
+    ...over,
+  });
+
+  it("changes only the view, keeping newer changes to the folder", () => {
+    // Shared meanwhile: reverting the view must not unshare it on screen.
+    const current = [folder("a", { isPublic: true, view: "grid" }), folder("b")];
+    const next = withFolderView(current, "a", null);
+    expect(next[0]).toEqual({ ...current[0], view: null });
+    expect(next[1]).toBe(current[1]);
+  });
+
+  it("never adds back a folder that's gone", () => {
+    const current = [folder("b")];
+    expect(withFolderView(current, "a", "grid")).toBe(current);
   });
 });

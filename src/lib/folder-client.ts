@@ -136,6 +136,21 @@ export function patchFolder(
   }, "save the folder");
 }
 
+const FOLDER_VIEW_TIMEOUT_MS = 15_000;
+
+/** Sets a folder's own view (`null`: follow the account view again). */
+export function patchFolderView(
+  id: string,
+  view: LinkView | null,
+): Promise<ActionResult<FolderSummary>> {
+  return mutate<FolderSummary>(`/api/folders/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ view }),
+    // A save holds folder refreshes and queues the next one: never for long.
+    signal: AbortSignal.timeout(FOLDER_VIEW_TIMEOUT_MS),
+  }, "change the view");
+}
+
 export function removeFolder(
   id: string,
   withLinks: boolean,
