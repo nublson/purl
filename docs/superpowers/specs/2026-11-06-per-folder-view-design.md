@@ -18,6 +18,19 @@ Success: a folder set to grid opens as grid for the owner (Home and other
 folders unaffected), opens as grid for a first-time visitor of its shared
 page, and nothing changes for folders the owner never touches.
 
+## Revision (2026-11-06, after trying it)
+
+- The user menu's group and the Share popover's row are titled **"Default
+  view"**; the menu's List / Grid set Home's view on Home and the current
+  folder's on a folder page.
+- **"Same as Home" is dropped.** A folder follows Home until its own view is
+  picked; the UI has no way back (`view: null` stays on the API).
+- The Share popover's row sits **at the top**, above Visibility, with **no
+  note** under it.
+
+The sections below are the original design; where they differ, this
+revision wins.
+
 ## Decisions
 
 - **The account view becomes the default.** Home keeps the account view. A

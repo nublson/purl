@@ -737,14 +737,15 @@ test.describe("Share popover", () => {
       await visitor.close();
     }
   });
-  test("the View row sets the folder's view, for the owner and for visitors", async ({ page, seed, testUser }) => {
+  test("the Default view row sets the folder's view, for the owner and for visitors", async ({ page, seed, testUser }) => {
     const design = await seed.folder({ name: "Design", slug: "design" });
     await seed.link({ url: "https://d.example", title: "Design link", folderId: design });
     await page.goto("/folders/design");
     await waitForHydration(page, 'button[aria-label^="Folder:"]');
     await page.getByRole("button", { name: "Share" }).click();
     const row = page.getByRole("dialog").locator('[data-cy="share-view"]');
-    await expect(row).toContainText("Visitors see it this way, unless they switch. (same as Home)");
+    await expect(row).toContainText("Default view");
+    await expect(row.getByRole("button", { name: "List view" })).toHaveAttribute("aria-pressed", "true");
 
     const saved = page.waitForResponse(
       (res) => res.url().endsWith(`/api/folders/${design}`) && res.request().method() === "PATCH",
@@ -752,14 +753,12 @@ test.describe("Share popover", () => {
     await row.getByRole("button", { name: "Grid view" }).click();
     expect((await saved).ok()).toBe(true);
     await expect(row.getByRole("button", { name: "Grid view" })).toHaveAttribute("aria-pressed", "true");
-    await expect(row).not.toContainText("(same as Home)");
     await expect(page.locator('[data-cy="link-card"]')).toHaveCount(1);
     await page.keyboard.press("Escape");
 
     // The user menu shows the same setting.
     await page.getByRole("button", { name: "Account menu" }).click();
     await expect(page.getByRole("menuitemradio", { name: "Grid" })).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByRole("menuitemcheckbox", { name: "Same as Home" })).toHaveAttribute("aria-checked", "false");
     await page.keyboard.press("Escape");
 
     // A visitor gets the grid in the server's HTML once it's shared.

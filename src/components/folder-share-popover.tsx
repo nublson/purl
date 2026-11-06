@@ -124,6 +124,10 @@ export function FolderSharePopover() {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-80 gap-0 p-0">
+        <FolderViewRow />
+        <div className="px-4">
+          <Separator />
+        </div>
         <PopoverHeader className="gap-1 p-4 pb-3">
           <PopoverTitle>Visibility</PopoverTitle>
           <PopoverDescription>
@@ -191,46 +195,35 @@ export function FolderSharePopover() {
             {copied ? "Link copied" : ""}
           </span>
         </div>
-        <div className="px-4">
-          <Separator />
-        </div>
-        <FolderViewRow />
+
       </PopoverContent>
     </Popover>
   );
 }
 
 /**
- * The folder's view (list or grid), the same setting as the user menu's View
- * on this folder page: what visitors of the shared page first see. While the
- * folder follows Home, Home's view shows as current.
+ * The folder's default view (list or grid): the same setting as the user
+ * menu's on this folder page, and what visitors of the shared page first see.
+ * While the folder has no view of its own, Home's shows as current.
  */
 function FolderViewRow() {
-  const { view, folderView, setView } = useLinkView();
+  const { view, setView } = useLinkView();
   const isDemo = useIsDemo();
   const labelId = React.useId();
-  const noteId = React.useId();
   return (
-    <div className="flex flex-col gap-2 p-4" data-cy="share-view">
-      <div className="flex items-center justify-between gap-4">
-        <Typography component="span" size="small" className="text-foreground">
-          <span id={labelId}>View</span>
-        </Typography>
-        <ViewToggle
-          view={view}
-          compact={false}
-          disabled={isDemo}
-          labelledBy={labelId}
-          describedBy={noteId}
-          onChange={(next) => {
-            if (next !== view) setView(next);
-          }}
-        />
-      </div>
-      <Typography component="p" size="small" id={noteId} className="text-muted-foreground">
-        Visitors see it this way, unless they switch.
-        {folderView === null && " (same as Home)"}
+    <div className="flex items-center justify-between gap-4 p-4" data-cy="share-view">
+      <Typography component="span" size="small" className="text-foreground">
+        <span id={labelId}>Default view</span>
       </Typography>
+      <ViewToggle
+        view={view}
+        compact={false}
+        disabled={isDemo}
+        labelledBy={labelId}
+        onChange={(next) => {
+          if (next !== view) setView(next);
+        }}
+      />
     </div>
   );
 }

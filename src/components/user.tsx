@@ -119,7 +119,7 @@ export function User() {
             from the account's actions below). */}
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-            View
+            Default view
           </DropdownMenuLabel>
           <ViewMenuItems />
         </DropdownMenuGroup>

@@ -19,55 +19,22 @@ const VIEW_OPTIONS = [
 ] as const;
 
 /**
- * The view (list or grid) in the user menu, under its "View" title: two
+ * The view (list or grid) in the user menu, under its "Default view" title: two
  * radio items side by side, each its icon and name, drawn as the menu's
  * own rows (same padding, so List's icon lines up with the icons below);
  * the current one keeps the highlight's fill, the other is muted and
- * fills half as much on hover. How Home and folders show links, saved on
- * the account (`useLinkView`; the landing demo's is local state). On a
- * folder page they set that folder's view instead, and "Same as Home" makes
- * it follow the account's again. The menu stays open, so the list can be
- * seen changing.
+ * fills half as much on hover. How the page shows links: Home's view
+ * (the account's, also every folder's that has none of its own) on Home, the
+ * current folder's on a folder page (`useLinkView`; the landing demo's is
+ * local state). The menu stays open,
+ * so the list can be seen changing.
  */
 export function ViewMenuItems() {
-  const { view, setView, folderView, followHome } = useLinkView();
-  // The demo has no Home to follow (its Home item is disabled).
-  const isDemo = useIsDemo();
-  return (
-    <>
-      <ViewRadioItems view={view} setView={setView} />
-      {folderView !== undefined && !isDemo && (
-        <DropdownMenuCheckboxItem
-          checked={folderView === null}
-          data-cy="link-view-home"
-          className="in-data-[input=keyboard]:focus:ring-2 in-data-[input=keyboard]:focus:ring-ring in-data-[input=keyboard]:focus:ring-inset"
-          onSelect={(event) => event.preventDefault()}
-          onCheckedChange={(checked) => {
-            haptic("selection");
-            // Unchecking keeps what's shown, now as the folder's own view.
-            if (checked) followHome();
-            else setView(view);
-          }}
-        >
-          Same as Home
-          <HapticTarget />
-        </DropdownMenuCheckboxItem>
-      )}
-    </>
-  );
-}
-
-function ViewRadioItems({
-  view,
-  setView,
-}: {
-  view: LinkView;
-  setView: (view: LinkView) => void;
-}) {
+  const { view, setView } = useLinkView();
   return (
     <DropdownMenuRadioGroup
       value={view}
-      aria-label="View"
+      aria-label="Default view"
       onValueChange={(value) => {
         haptic("selection");
         setView(value as LinkView);

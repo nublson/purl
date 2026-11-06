@@ -35,8 +35,6 @@ export type LinkViewState = Omit<LinkViewContextValue, "markSwitched"> & {
    * `undefined` everywhere else.
    */
   folderView: LinkView | null | undefined;
-  /** On a folder page, makes it follow the account view again; else nothing. */
-  followHome: () => void;
 };
 
 const LinkViewContext = React.createContext<LinkViewContextValue | null>(null);
@@ -224,11 +222,6 @@ export function useLinkView(): LinkViewState {
     [target, folder, view, setAccountView, setFolderView, markSwitched],
   );
 
-  const followHome = React.useCallback(() => {
-    if (!folder || folder.view === null) return;
-    if (accountView !== view) markSwitched();
-    setFolderView(folder, null);
-  }, [folder, accountView, view, setFolderView, markSwitched]);
 
   return React.useMemo(
     () => ({
@@ -236,7 +229,6 @@ export function useLinkView(): LinkViewState {
       accountView,
       folderView,
       setView,
-      followHome,
       switched,
       folderTags,
       setFolderTags,
@@ -249,7 +241,6 @@ export function useLinkView(): LinkViewState {
       accountView,
       folderView,
       setView,
-      followHome,
       switched,
       folderTags,
       setFolderTags,

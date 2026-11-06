@@ -359,23 +359,14 @@ test.describe("Per-folder view", () => {
     await expect(cards(page)).toHaveCount(1);
     await page.getByRole("button", { name: "Account menu" }).click();
     await expect(page.getByRole("menuitemradio", { name: "Grid" })).toHaveAttribute("aria-checked", "true");
-    await expect(page.getByRole("menuitemcheckbox", { name: "Same as Home" })).toHaveAttribute("aria-checked", "false");
   });
 
-  test("Same as Home follows the account view; a folder's own view doesn't", async ({ page, seed, testUser }) => {
+  test("a folder without its own view follows Home's; one with its own doesn't", async ({ page, seed, testUser }) => {
     await seedTwoFolders(seed);
-    await openFolder(page, "alpha");
-    await page.getByRole("button", { name: "Account menu" }).click();
-    const home = page.getByRole("menuitemcheckbox", { name: "Same as Home" });
-    await expect(home).toHaveAttribute("aria-checked", "true");
-    await page.keyboard.press("Escape");
-
-    // Bravo gets its own list; Alpha follows Home.
+    // Bravo gets its own list (via grid, since it already shows Home's list).
     await openFolder(page, "bravo");
+    await chooseView(page, "Grid");
     await chooseView(page, "List");
-    await page.getByRole("button", { name: "Account menu" }).click();
-    await expect(home).toHaveAttribute("aria-checked", "false");
-    await page.keyboard.press("Escape");
 
     await openHome(page);
     await chooseView(page, "Grid");
@@ -383,16 +374,6 @@ test.describe("Per-folder view", () => {
     await expect(cards(page)).toHaveCount(1);
     await openFolder(page, "bravo");
     await expect(cards(page)).toHaveCount(0);
-
-    // Back to following: Bravo shows Home's grid.
-    const saved = page.waitForResponse(
-      (res) => /\/api\/folders\/[^/]+$/.test(res.url()) && res.request().method() === "PATCH",
-    );
-    await page.getByRole("button", { name: "Account menu" }).click();
-    await home.click();
-    expect((await saved).ok()).toBe(true);
-    await page.keyboard.press("Escape");
-    await expect(cards(page)).toHaveCount(1);
     await setAccountView(testUser.id, "LIST");
   });
 });
