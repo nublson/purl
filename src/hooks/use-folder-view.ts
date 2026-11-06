@@ -1,6 +1,5 @@
 "use client";
 
-import { usePersistLayout } from "@/contexts/link-view-context";
 import { useFoldersContext } from "@/contexts/folders-context";
 import { patchFolder } from "@/lib/folder-client";
 import type { FolderSummary } from "@/lib/folders";
@@ -19,12 +18,14 @@ const VIEW_FAILED = "Unable to change the view. Try again.";
  * latest choice wins; a failed save puts the stored view back and toasts. In
  * the landing demo (`persist` off) it only patches the local list.
  */
-export function useSetFolderView(): (
+export function useSetFolderView(
+  /** False in the landing demo (the link-view context's `persist`). */
+  persist: boolean,
+): (
   folder: FolderSummary,
   view: LinkView | null,
 ) => void {
   const { upsertFolder, holdFetches } = useFoldersContext();
-  const persist = usePersistLayout();
   const savers = useRef(new Map<string, FolderViewSaver>());
   // The folder as last shown, for putting the stored view back on failure.
   const shown = useRef(new Map<string, FolderSummary>());

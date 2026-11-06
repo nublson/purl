@@ -24,11 +24,44 @@ const VIEW_OPTIONS = [
  * own rows (same padding, so List's icon lines up with the icons below);
  * the current one keeps the highlight's fill, the other is muted and
  * fills half as much on hover. How Home and folders show links, saved on
- * the account (`useLinkView`; the landing demo's is local state). The menu
- * stays open, so the list can be seen changing.
+ * the account (`useLinkView`; the landing demo's is local state). On a
+ * folder page they set that folder's view instead, and "Same as Home" makes
+ * it follow the account's again. The menu stays open, so the list can be
+ * seen changing.
  */
 export function ViewMenuItems() {
-  const { view, setView } = useLinkView();
+  const { view, setView, folderView, followHome } = useLinkView();
+  return (
+    <>
+      <ViewRadioItems view={view} setView={setView} />
+      {folderView !== undefined && (
+        <DropdownMenuCheckboxItem
+          checked={folderView === null}
+          data-cy="link-view-home"
+          className="in-data-[input=keyboard]:focus:ring-2 in-data-[input=keyboard]:focus:ring-ring in-data-[input=keyboard]:focus:ring-inset"
+          onSelect={(event) => event.preventDefault()}
+          onCheckedChange={(checked) => {
+            haptic("selection");
+            // Unchecking keeps what's shown, now as the folder's own view.
+            if (checked) followHome();
+            else setView(view);
+          }}
+        >
+          Same as Home
+          <HapticTarget />
+        </DropdownMenuCheckboxItem>
+      )}
+    </>
+  );
+}
+
+function ViewRadioItems({
+  view,
+  setView,
+}: {
+  view: LinkView;
+  setView: (view: LinkView) => void;
+}) {
   return (
     <DropdownMenuRadioGroup
       value={view}

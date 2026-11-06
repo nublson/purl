@@ -1,6 +1,8 @@
 "use client";
 
-import type { LayoutPrefs, LinkView } from "@/lib/link-view";
+import { useSetFolderView } from "@/hooks/use-folder-view";
+import { useCurrentFolder } from "@/hooks/use-folders";
+import { effectiveView, type LayoutPrefs, type LinkView } from "@/lib/link-view";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -19,6 +21,21 @@ type LinkViewContextValue = {
   setPlayVideos: (on: boolean) => void;
   /** False in the landing demo: changes show at once and are never saved. */
   persist: boolean;
+  /** Marks a switch made on this page, so the new layout fades in. */
+  markSwitched: () => void;
+};
+
+/** What `useLinkView()` returns: the account settings, resolved for the page. */
+export type LinkViewState = Omit<LinkViewContextValue, "markSwitched"> & {
+  /** The account's view: Home's, and every folder's that follows it. */
+  accountView: LinkView;
+  /**
+   * On a folder page, its own view (`null`: follows the account view);
+   * `undefined` everywhere else.
+   */
+  folderView: LinkView | null | undefined;
+  /** On a folder page, makes it follow the account view again; else nothing. */
+  followHome: () => void;
 };
 
 const LinkViewContext = React.createContext<LinkViewContextValue | null>(null);
@@ -133,8 +150,11 @@ export function LinkViewProvider({
     [saveView],
   );
 
+  const markSwitched = React.useCallback(() => setSwitched(true), []);
+
   const value = React.useMemo(
     () => ({
+      markSwitched,
       view,
       setView,
       switched,
@@ -144,7 +164,7 @@ export function LinkViewProvider({
       setPlayVideos,
       persist,
     }),
-    [view, setView, switched, folderTags, setFolderTags, playVideos, setPlayVideos, persist],
+    [markSwitched, view, setView, switched, folderTags, setFolderTags, playVideos, setPlayVideos, persist],
   );
   return (
     <LinkViewContext.Provider value={value}>{children}</LinkViewContext.Provider>
@@ -164,8 +184,75 @@ export function usePersistLayout(): boolean {
   return React.useContext(LinkViewContext)?.persist ?? true;
 }
 
-export function useLinkView(): LinkViewContextValue {
+/**
+ * The layout for the page it's called from: on Home the account's view; on a
+ * folder page that folder's own view, else the account's (`effectiveView`).
+ * `setView` changes the account's view on Home and the folder's on a folder
+ * page.
+ */
+export function useLinkView(): LinkViewState {
   const value = React.useContext(LinkViewContext);
   if (!value) throw new Error("useLinkView needs a LinkViewProvider");
-  return value;
+  const {
+    markSwitched,
+    view: accountView,
+    setView: setAccountView,
+    switched,
+    folderTags,
+    setFolderTags,
+    playVideos,
+    setPlayVideos,
+    persist,
+  } = value;
+  const folder = useCurrentFolder();
+  const setFolderView = useSetFolderView(persist);
+  const folderView = folder ? folder.view : undefined;
+  const view = effectiveView(folderView, accountView);
+
+  const setView = React.useCallback(
+    (next: LinkView) => {
+      if (!folder) {
+        setAccountView(next);
+        return;
+      }
+      if (next !== view) markSwitched();
+      setFolderView(folder, next);
+    },
+    [folder, view, setAccountView, setFolderView, markSwitched],
+  );
+
+  const followHome = React.useCallback(() => {
+    if (!folder || folder.view === null) return;
+    if (accountView !== view) markSwitched();
+    setFolderView(folder, null);
+  }, [folder, accountView, view, setFolderView, markSwitched]);
+
+  return React.useMemo(
+    () => ({
+      view,
+      accountView,
+      folderView,
+      setView,
+      followHome,
+      switched,
+      folderTags,
+      setFolderTags,
+      playVideos,
+      setPlayVideos,
+      persist,
+    }),
+    [
+      view,
+      accountView,
+      folderView,
+      setView,
+      followHome,
+      switched,
+      folderTags,
+      setFolderTags,
+      playVideos,
+      setPlayVideos,
+      persist,
+    ],
+  );
 }
