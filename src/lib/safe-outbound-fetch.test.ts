@@ -1,5 +1,13 @@
 import dns from "node:dns/promises";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { mockSuppressTracing } = vi.hoisted(() => ({
+  mockSuppressTracing: vi.fn((fn: () => unknown) => fn()),
+}));
+
+vi.mock("@sentry/nextjs", () => ({
+  suppressTracing: (fn: () => unknown) => mockSuppressTracing(fn),
+}));
 import { OG_REMOTE_IMAGE_TIMEOUT_MS } from "./og-images";
 import { OG_THUMBNAIL_PROBE_TIMEOUT_MS } from "./og-thumbnail-probe";
 import { SNIFF_TIMEOUT_MS } from "@/utils/link-content-type-shared";
@@ -174,6 +182,16 @@ describe("safeFetch", () => {
     const res = await safeFetch("https://example.com/");
     expect(res.status).toBe(200);
     expect(await res.text()).toBe("ok");
+  });
+
+  it("wraps the fetch in Sentry suppressTracing so saved URLs are not recorded", async () => {
+    mockSuppressTracing.mockClear();
+    const final = new Response("ok", { status: 200 });
+    fetchSpy.mockResolvedValueOnce(final);
+
+    await safeFetch("https://example.com/");
+
+    expect(mockSuppressTracing).toHaveBeenCalledTimes(1);
   });
 
   it("rejects when Content-Length exceeds maxResponseBytes", async () => {

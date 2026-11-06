@@ -119,6 +119,12 @@ describe("proxy", () => {
     expect(auth.auth.api.getSession).not.toHaveBeenCalled();
   });
 
+  it("lets the Sentry tunnel pass without a session lookup", async () => {
+    const res = await proxy(createRequest("/monitoring"));
+    expect(res.status).toBe(200);
+    expect(auth.auth.api.getSession).not.toHaveBeenCalled();
+  });
+
   it.each(["/@nublson/design", "/u/nublson/design", "/api/public/folders/nublson/design"])(
     "lets anyone read shared folders: %s passes without a session lookup",
     async (path) => {
