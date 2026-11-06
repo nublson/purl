@@ -89,7 +89,7 @@ setting the owner sees on the folder page).
 
 **Saving.** `useFolderActions().updateFolder({ view })` updates
 `FoldersProvider` at once and saves; on failure it reverts and toasts
-"Couldn't change the view" (the `useLinkView` pattern). The menu and the
+"Unable to change the view. Try again." (the `useLinkView` wording). The menu and the
 popover read the same folder state, so they stay in step.
 
 **Landing demo.** Each `@purl` folder opens in its stored view (through
