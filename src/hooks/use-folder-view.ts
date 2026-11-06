@@ -3,14 +3,16 @@
 import { useFoldersContext } from "@/contexts/folders-context";
 import { patchFolder } from "@/lib/folder-client";
 import type { FolderSummary } from "@/lib/folders";
+import { folderViewSaver } from "@/lib/folder-view-savers";
 import { createLatestSaver } from "@/lib/latest-saver";
 import type { LinkView } from "@/lib/link-view";
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { toast } from "sonner";
 
-type FolderViewSaver = ReturnType<typeof createLatestSaver<LinkView | null>>;
-
 const VIEW_FAILED = "Unable to change the view. Try again.";
+
+/** Each folder as last shown, for putting the stored view back on failure. */
+const shown = new Map<string, FolderSummary>();
 
 /**
  * Sets a folder's own view (`null`: follow the account view again). Shown at
@@ -26,23 +28,20 @@ export function useSetFolderView(
   view: LinkView | null,
 ) => void {
   const { upsertFolder, holdFetches } = useFoldersContext();
-  const savers = useRef(new Map<string, FolderViewSaver>());
-  // The folder as last shown, for putting the stored view back on failure.
-  const shown = useRef(new Map<string, FolderSummary>());
 
   return useCallback(
     (folder: FolderSummary, view: LinkView | null) => {
       if (folder.view === view) return;
       const next = { ...folder, view };
-      shown.current.set(folder.id, next);
+      shown.set(folder.id, next);
       upsertFolder(next);
       if (!persist) return;
 
-      let saver = savers.current.get(folder.id);
-      // A saver at rest may hold a view the server no longer has (changed
-      // on another device): start from the folder's current one instead.
-      if (!saver || saver.idle()) {
-        saver = createLatestSaver<LinkView | null>({
+      // Shared by every caller (`folderViewSaver`); a saver at rest may hold
+      // a view the server no longer has, so a new one starts from the
+      // folder's current view.
+      const saver = folderViewSaver(folder.id, () =>
+        createLatestSaver<LinkView | null>({
           confirmed: folder.view,
           save: async (value) => {
             // A background refetch mid-save would show the old view again.
@@ -55,13 +54,12 @@ export function useSetFolderView(
             }
           },
           onRevert: (confirmed) => {
-            const current = shown.current.get(folder.id) ?? folder;
+            const current = shown.get(folder.id) ?? folder;
             upsertFolder({ ...current, view: confirmed });
             toast.error(VIEW_FAILED);
           },
-        });
-        savers.current.set(folder.id, saver);
-      }
+        }),
+      );
       saver.set(view);
     },
     [upsertFolder, holdFetches, persist],
