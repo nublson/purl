@@ -34,6 +34,7 @@ export function DemoProvider({
         description: f.description,
         isPublic: true,
         position: i + 1,
+        view: null,
         linkCount: f.linkCount,
       })),
     [data.folders],

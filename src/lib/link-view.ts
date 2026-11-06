@@ -54,6 +54,24 @@ export function linkViewFromDb(value: "LIST" | "GRID"): LinkView {
   return value === "GRID" ? "grid" : "list";
 }
 
+/** A folder's stored view: `null` (follows the account view) stays null. */
+export function linkViewFromDbOrNull(
+  value: "LIST" | "GRID" | null | undefined,
+): LinkView | null {
+  return value ? linkViewFromDb(value) : null;
+}
+
+/**
+ * The view a folder shows: its own when set, else the account's. Shared by
+ * the owner's folder pages, the shared page and the landing demo.
+ */
+export function effectiveView(
+  folderView: LinkView | null | undefined,
+  accountView: LinkView,
+): LinkView {
+  return folderView ?? accountView;
+}
+
 export function linkViewToDb(view: LinkView): "LIST" | "GRID" {
   return view === "grid" ? "GRID" : "LIST";
 }

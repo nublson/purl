@@ -4,6 +4,11 @@ import {
   DEFAULT_FOLDER_EMOJI,
   MAX_FOLDER_DESCRIPTION_LENGTH,
 } from "@/lib/folder-display";
+import {
+  linkViewFromDbOrNull,
+  linkViewToDb,
+  type LinkView,
+} from "@/lib/link-view";
 import { MAX_FOLDERS, MAX_FOLDER_NAME_LENGTH } from "@/lib/limits";
 import prisma, { type Prisma } from "@/lib/prisma";
 import { type BlobOwningRow, deleteBlobsFor } from "@/lib/uploads";
@@ -45,6 +50,11 @@ export type FolderSummary = {
   isPublic: boolean;
   /** The user's manual order (ascending; ties break by name). */
   position: number;
+  /**
+   * The folder's own view; `null` follows the account view (`effectiveView`).
+   * Not part of the v1/MCP shape (`toApiFolder`).
+   */
+  view: LinkView | null;
   linkCount: number;
 };
 
@@ -110,6 +120,7 @@ type FolderRowWithCount = {
   description?: string | null;
   isPublic?: boolean;
   position?: number;
+  linkView?: "LIST" | "GRID" | null;
   _count: { links: number };
 };
 
@@ -122,6 +133,7 @@ function toSummary(row: FolderRowWithCount): FolderSummary {
     description: row.description || null,
     isPublic: row.isPublic ?? false,
     position: row.position ?? 0,
+    view: linkViewFromDbOrNull(row.linkView),
     linkCount: row._count.links,
   };
 }
@@ -446,6 +458,8 @@ export type FolderUpdate = {
   description?: string | null;
   /** Share it at `/@username/slug` (`true`) or make it private again. */
   isPublic?: boolean;
+  /** The folder's own view, or `null` to follow the account view again. */
+  view?: LinkView | null;
 };
 
 /** Thrown when `updateFolder` is called with no fields to change. Routes map this to 400. */
@@ -472,7 +486,8 @@ export async function updateFolder(
   const hasEmoji = input.emoji !== undefined;
   const hasDescription = input.description !== undefined;
   const hasIsPublic = input.isPublic !== undefined;
-  if (!hasName && !hasEmoji && !hasDescription && !hasIsPublic) {
+  const hasView = input.view !== undefined;
+  if (!hasName && !hasEmoji && !hasDescription && !hasIsPublic && !hasView) {
     throw new FolderUpdateEmptyError();
   }
 
@@ -490,9 +505,13 @@ export async function updateFolder(
     emoji?: string | null;
     description?: string | null;
     isPublic?: boolean;
+    linkView?: "LIST" | "GRID" | null;
   } = {};
   if (hasIsPublic) {
     data.isPublic = input.isPublic;
+  }
+  if (hasView) {
+    data.linkView = input.view ? linkViewToDb(input.view) : null;
   }
   if (hasEmoji) {
     data.emoji = normalizeFolderEmoji(input.emoji);

@@ -12,6 +12,7 @@ function folder(id: string, name: string, position: number): FolderSummary {
     description: null,
     isPublic: false,
     position,
+    view: null,
     linkCount: 0,
   };
 }

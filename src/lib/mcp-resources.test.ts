@@ -38,7 +38,7 @@ function folder(overrides: Partial<FolderSummary> = {}): FolderSummary {
     emoji: "📚",
     description: null,
     isPublic: false,
-    position: 1,
+    position: 1, view: null,
     linkCount: 1,
     ...overrides,
   };

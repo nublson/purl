@@ -191,6 +191,7 @@ describe("createFolder", () => {
       description: null,
       isPublic: false,
       position: 0,
+      view: null,
       linkCount: 0,
     });
     expect(prisma.folder.create).toHaveBeenCalledWith(
@@ -284,6 +285,7 @@ describe("createFolder", () => {
       description: null,
       isPublic: false,
       position: 1,
+      view: null,
       linkCount: 0,
     });
     expect(order).toEqual([
@@ -494,6 +496,40 @@ describe("reorderFolders", () => {
 describe("updateFolder", () => {
   beforeEach(resetMocks);
 
+  it("saves a folder's own view", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValueOnce({ slug: "books" } as never);
+    vi.mocked(prisma.folder.update).mockResolvedValue({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      linkView: "GRID",
+      _count: { links: 0 },
+    } as never);
+
+    const result = await updateFolder("user-1", "folder-1", { view: "grid" });
+    expect(prisma.folder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { linkView: "GRID" } }),
+    );
+    expect(result.view).toBe("grid");
+  });
+
+  it("clears a folder's view so it follows the account again", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValueOnce({ slug: "books" } as never);
+    vi.mocked(prisma.folder.update).mockResolvedValue({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      linkView: null,
+      _count: { links: 0 },
+    } as never);
+
+    const result = await updateFolder("user-1", "folder-1", { view: null });
+    expect(prisma.folder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { linkView: null } }),
+    );
+    expect(result.view).toBeNull();
+  });
+
   it("treats another user's folder as not found", async () => {
     vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
 
@@ -535,6 +571,7 @@ describe("updateFolder", () => {
       description: null,
       isPublic: false,
       position: 0,
+      view: null,
       linkCount: 3,
     });
     expect(prisma.folder.findFirst).toHaveBeenNthCalledWith(2, {
@@ -675,6 +712,7 @@ describe("updateFolder", () => {
       description: null,
       isPublic: false,
       position: 0,
+      view: null,
       linkCount: 2,
     });
     expect(prisma.folder.update).toHaveBeenCalledWith(
@@ -1152,6 +1190,7 @@ describe("listFoldersForUser summaries", () => {
       description: null,
       isPublic: false,
       position: 2,
+      view: null,
       linkCount: 0,
     });
     // A stored emoji wins over the default.
@@ -1185,6 +1224,7 @@ describe("getFolderBySlug", () => {
       description: null,
       isPublic: false,
       position: 0,
+      view: null,
       linkCount: 4,
     });
   });
@@ -1220,6 +1260,7 @@ describe("getFolderById", () => {
       description: null,
       isPublic: false,
       position: 0,
+      view: null,
       linkCount: 4,
     });
   });
