@@ -8,6 +8,7 @@ const FOLDER: DemoFolder = {
   slug: "design",
   emoji: "🎨",
   description: null,
+  view: null,
   linkCount: 1,
   links: [
     {

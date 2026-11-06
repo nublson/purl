@@ -6,6 +6,7 @@ import {
   DEMO_USERNAME,
   type DemoData,
 } from "@/lib/demo-links";
+import { linkViewFromDbOrNull } from "@/lib/link-view";
 import prisma from "@/lib/prisma";
 import {
   PUBLIC_FOLDER_SELECT,
@@ -33,6 +34,7 @@ export async function getDemoFolders(
     select: {
       id: true,
       ...PUBLIC_FOLDER_SELECT,
+      linkView: true,
       links: {
         where: { userId: user.id },
         orderBy: { createdAt: "desc" },
@@ -56,6 +58,7 @@ export async function getDemoFolders(
       slug: folder.slug,
       emoji: folder.emoji || DEFAULT_FOLDER_EMOJI,
       description: folder.description || null,
+      view: linkViewFromDbOrNull(folder.linkView),
       linkCount: folder._count.links,
       links: folder.links.map((link) => ({
         id: link.id,
