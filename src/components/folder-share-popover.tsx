@@ -1,6 +1,7 @@
 "use client";
 
 import { useIsDemo } from "@/contexts/demo-mode-context";
+import { useLinkView } from "@/contexts/link-view-context";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCurrentFolder, useFolderActions } from "@/hooks/use-folders";
 import { haptic } from "@/lib/haptics";
@@ -22,6 +23,7 @@ import {
 } from "./ui/popover";
 import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
+import { ViewToggle } from "./view-toggle";
 
 /** How long the copy button shows its check. */
 const COPIED_MS = 1500;
@@ -189,8 +191,47 @@ export function FolderSharePopover() {
             {copied ? "Link copied" : ""}
           </span>
         </div>
+        <div className="px-4">
+          <Separator />
+        </div>
+        <FolderViewRow />
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * The folder's view (list or grid), the same setting as the user menu's View
+ * on this folder page: what visitors of the shared page first see. While the
+ * folder follows Home, Home's view shows as current.
+ */
+function FolderViewRow() {
+  const { view, folderView, setView } = useLinkView();
+  const isDemo = useIsDemo();
+  const labelId = React.useId();
+  const noteId = React.useId();
+  return (
+    <div className="flex flex-col gap-2 p-4" data-cy="share-view">
+      <div className="flex items-center justify-between gap-4">
+        <Typography component="span" size="small" className="text-foreground">
+          <span id={labelId}>View</span>
+        </Typography>
+        <ViewToggle
+          view={view}
+          compact={false}
+          disabled={isDemo}
+          labelledBy={labelId}
+          describedBy={noteId}
+          onChange={(next) => {
+            if (next !== view) setView(next);
+          }}
+        />
+      </div>
+      <Typography component="p" size="small" id={noteId} className="text-muted-foreground">
+        Visitors see it this way, unless they switch.
+        {folderView === null && " (same as Home)"}
+      </Typography>
+    </div>
   );
 }
 
