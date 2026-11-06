@@ -115,12 +115,9 @@ export function User() {
           />
           <DropdownMenuSeparator />
         </DropdownMenuGroup>
-        {/* View, then Layout: how the lists look (their own groups, apart
-            from the account's actions below). */}
+        {/* Default view, then Layout: how the lists look (their own
+            groups, apart from the account's actions below). */}
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-            Default view
-          </DropdownMenuLabel>
           <ViewMenuItems />
         </DropdownMenuGroup>
         <DropdownMenuSeparator />

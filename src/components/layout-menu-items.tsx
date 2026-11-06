@@ -5,6 +5,7 @@ import { useLinkView } from "@/contexts/link-view-context";
 import { haptic } from "@/lib/haptics";
 import type { LinkView } from "@/lib/link-view";
 import { cn } from "@/lib/utils";
+import * as React from "react";
 import { Grid, List3, Tag5, Video } from "reicon-react";
 import { HapticTarget } from "./haptic-target";
 import {
@@ -19,51 +20,54 @@ const VIEW_OPTIONS = [
 ] as const;
 
 /**
- * The view (list or grid) in the user menu, under its "Default view" title: two
- * radio items side by side, each its icon and name, drawn as the menu's
- * own rows (same padding, so List's icon lines up with the icons below);
- * the current one keeps the highlight's fill, the other is muted and
- * fills half as much on hover. How the page shows links: Home's view
- * (the account's, also every folder's that has none of its own) on Home, the
- * current folder's on a folder page (`useLinkView`; the landing demo's is
- * local state). The menu stays open,
- * so the list can be seen changing.
+ * "Default view" in the user menu, drawn like the Share popover's row: the
+ * label on the left, and on the right the List / Grid pair as one outlined
+ * segmented control (`ViewToggle`'s look), the current one filled. The two
+ * are the menu's own radio items (icon-only, named "List" / "Grid"), so the
+ * arrow keys reach them like any item. Home's view on Home (the account's,
+ * also every folder's that has none of its own), the current folder's on a
+ * folder page (`useLinkView`; the landing demo's is local state). The menu
+ * stays open, so the list can be seen changing.
  */
 export function ViewMenuItems() {
   const { view, setView } = useLinkView();
+  const labelId = React.useId();
   return (
-    <DropdownMenuRadioGroup
-      value={view}
-      aria-label="Default view"
-      onValueChange={(value) => {
-        haptic("selection");
-        setView(value as LinkView);
-      }}
-      className="grid grid-cols-2 gap-1"
-    >
-      {VIEW_OPTIONS.map(({ value, label, Icon }) => (
-        <DropdownMenuRadioItem
-          key={value}
-          value={value}
-          data-cy={`link-view-${value}`}
-          onSelect={(event) => event.preventDefault()}
-          // The fill is the indicator: no check mark, no room kept for one.
-          // A ring on keyboard focus, like every menu item (ui/dropdown-menu).
-          className={cn(
-            "relative pr-2 in-data-[input=keyboard]:focus:ring-2 in-data-[input=keyboard]:focus:ring-ring in-data-[input=keyboard]:focus:ring-inset [&>[data-slot=dropdown-menu-radio-item-indicator]]:hidden",
-            view === value
-              ? // An inset ring as well as the fill: the fill alone is ~1.2:1
-                // against the menu, the ring ~3.4:1 (a state needs 3:1).
-                "bg-accent text-accent-foreground ring-1 ring-foreground/40 ring-inset"
-              : "text-muted-foreground focus:bg-accent/50 [&_svg]:text-muted-foreground",
-          )}
-        >
-          <Icon />
-          {label}
-          <HapticTarget />
-        </DropdownMenuRadioItem>
-      ))}
-    </DropdownMenuRadioGroup>
+    <div className="flex items-center justify-between gap-4 py-1 ps-2 pe-1">
+      <span id={labelId} className="text-sm">
+        Default view
+      </span>
+      <DropdownMenuRadioGroup
+        value={view}
+        aria-labelledby={labelId}
+        onValueChange={(value) => {
+          haptic("selection");
+          setView(value as LinkView);
+        }}
+        className="flex shrink-0 items-center gap-0.5 rounded-[10px] border border-border p-0.5"
+      >
+        {VIEW_OPTIONS.map(({ value, label, Icon }) => (
+          <DropdownMenuRadioItem
+            key={value}
+            value={value}
+            data-cy={`link-view-${value}`}
+            onSelect={(event) => event.preventDefault()}
+            // The fill is the indicator: no check mark, no room kept for one.
+            // A ring on keyboard focus, like every menu item (ui/dropdown-menu).
+            className={cn(
+              "relative size-[26px] justify-center rounded-[7px] p-0 in-data-[input=keyboard]:focus:ring-2 in-data-[input=keyboard]:focus:ring-ring in-data-[input=keyboard]:focus:ring-inset [&>[data-slot=dropdown-menu-radio-item-indicator]]:hidden",
+              view === value
+                ? "bg-secondary text-secondary-foreground focus:bg-secondary"
+                : "text-muted-foreground focus:bg-accent/50 [&_svg]:text-muted-foreground",
+            )}
+          >
+            <Icon aria-hidden />
+            <span className="sr-only">{label}</span>
+            <HapticTarget />
+          </DropdownMenuRadioItem>
+        ))}
+      </DropdownMenuRadioGroup>
+    </div>
   );
 }
 

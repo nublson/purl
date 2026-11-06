@@ -124,10 +124,6 @@ export function FolderSharePopover() {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-80 gap-0 p-0">
-        <FolderViewRow />
-        <div className="px-4">
-          <Separator />
-        </div>
         <PopoverHeader className="gap-1 p-4 pb-3">
           <PopoverTitle>Visibility</PopoverTitle>
           <PopoverDescription>
@@ -138,6 +134,7 @@ export function FolderSharePopover() {
           <Separator />
         </div>
         <div className="flex flex-col gap-3 p-4">
+          <FolderViewRow />
           <div className="flex items-center justify-between gap-4">
             <Typography
               component="span"
@@ -211,7 +208,7 @@ function FolderViewRow() {
   const isDemo = useIsDemo();
   const labelId = React.useId();
   return (
-    <div className="flex items-center justify-between gap-4 p-4" data-cy="share-view">
+    <div className="flex items-center justify-between gap-4" data-cy="share-view">
       <Typography component="span" size="small" className="text-foreground">
         <span id={labelId}>Default view</span>
       </Typography>

@@ -25,8 +25,10 @@ page, and nothing changes for folders the owner never touches.
   folder's on a folder page.
 - **"Same as Home" is dropped.** A folder follows Home until its own view is
   picked; the UI has no way back (`view: null` stays on the API).
-- The Share popover's row sits **at the top**, above Visibility, with **no
-  note** under it.
+- The Share popover keeps **Visibility as its header**; under it the
+  **Default view** row, then Public and the link. No note under the row.
+- The user menu's **Default view** is the same row: the label on the left,
+  List / Grid as one segmented control on the right (icon-only radio items).
 
 The sections below are the original design; where they differ, this
 revision wins.
