@@ -18,6 +18,7 @@ import {
   listFoldersForUser,
   updateFolder,
 } from "@/lib/folders";
+import { toApiFolder } from "@/lib/folder-api";
 import {
   countLinksForUser,
   createLinkForUser,
@@ -144,7 +145,7 @@ export async function listSavedItemsTool(
 
 export async function listFoldersTool(userId: string): Promise<ToolResult> {
   const folders = await listFoldersForUser(userId);
-  return jsonContent(folders);
+  return jsonContent(folders.map(toApiFolder));
 }
 
 /**
@@ -190,7 +191,7 @@ export async function createFolderTool(
       args.description,
     );
     broadcastLinksChanged(userId);
-    return jsonContent(folder);
+    return jsonContent(toApiFolder(folder));
   } catch (e) {
     const content = folderErrorContent(e);
     if (content) return content;
@@ -213,7 +214,7 @@ export async function updateFolderTool(
   try {
     const folder = await updateFolder(userId, folderId, input);
     broadcastLinksChanged(userId);
-    return jsonContent(folder);
+    return jsonContent(toApiFolder(folder));
   } catch (e) {
     const content = folderErrorContent(e);
     if (content) return content;
@@ -228,7 +229,7 @@ export async function reorderFoldersTool(
   try {
     const folders = await reorderFolders(userId, ids);
     broadcastLinksChanged(userId);
-    return jsonContent(folders);
+    return jsonContent(folders.map(toApiFolder));
   } catch (e) {
     const content = folderErrorContent(e);
     if (content) return content;

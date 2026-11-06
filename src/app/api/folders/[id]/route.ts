@@ -3,6 +3,7 @@ import {
   parseDescriptionField,
   parseEmojiField,
   parseIsPublicField,
+  parseViewField,
 } from "@/lib/folder-errors";
 import { deleteFolder, updateFolder } from "@/lib/folders";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
@@ -24,6 +25,7 @@ export async function PATCH(
     emoji?: unknown;
     description?: unknown;
     isPublic?: unknown;
+    view?: unknown;
   };
   try {
     body = await request.json();
@@ -45,6 +47,8 @@ export async function PATCH(
   if (description instanceof NextResponse) return description;
   const isPublic = parseIsPublicField(body?.isPublic);
   if (isPublic instanceof NextResponse) return isPublic;
+  const view = parseViewField(body?.view);
+  if (view instanceof NextResponse) return view;
 
   try {
     const { id } = await context.params;
@@ -53,6 +57,7 @@ export async function PATCH(
       emoji,
       description,
       isPublic,
+      view,
     });
     broadcastLinksChanged(
       userId,

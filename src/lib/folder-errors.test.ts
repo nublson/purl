@@ -5,7 +5,8 @@ import {
   FolderNotFoundError,
   InvalidFolderOrderError,
 } from "@/lib/folders";
-import { mapFolderError } from "./folder-errors";
+import { NextResponse } from "next/server";
+import { mapFolderError, parseViewField } from "./folder-errors";
 
 describe("mapFolderError", () => {
   it("returns null for unrelated errors so callers can rethrow", () => {
@@ -53,5 +54,27 @@ describe("mapFolderError", () => {
     const res = mapFolderError(new FolderNotFoundError());
     expect(res!.status).toBe(404);
     expect(await res!.json()).toEqual({ error: "Folder not found" });
+  });
+});
+
+describe("parseViewField", () => {
+  it("passes list, grid, null and an absent field through", () => {
+    expect(parseViewField(undefined)).toBeUndefined();
+    expect(parseViewField("list")).toBe("list");
+    expect(parseViewField("grid")).toBe("grid");
+    expect(parseViewField(null)).toBeNull();
+  });
+
+  it("answers 400 INVALID_VIEW for anything else", async () => {
+    for (const value of ["tiles", 1, "GRID", true]) {
+      const res = parseViewField(value);
+      expect(res).toBeInstanceOf(NextResponse);
+      const response = res as NextResponse;
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({
+        error: 'view must be "list", "grid" or null.',
+        code: "INVALID_VIEW",
+      });
+    }
   });
 });

@@ -763,6 +763,17 @@ describe("listSavedItemsTool", () => {
   });
 });
 
+describe("folder tools' output", () => {
+  it("leaves the folder's view out", async () => {
+    mockListFoldersForUser.mockResolvedValue([
+      { id: "f1", name: "A", slug: "a", emoji: "🦪", description: null, isPublic: false, position: 1, view: "grid", linkCount: 0 },
+    ]);
+    const result = await listFoldersTool("user-1");
+    const text = (result.content[0] as { text: string }).text;
+    expect(JSON.parse(text)[0]).not.toHaveProperty("view");
+  });
+});
+
 describe("listFoldersTool", () => {
   beforeEach(() => vi.clearAllMocks());
 
