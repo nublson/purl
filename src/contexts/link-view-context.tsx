@@ -2,7 +2,8 @@
 
 import { useSetFolderView } from "@/hooks/use-folder-view";
 import { useCurrentFolder } from "@/hooks/use-folders";
-import { effectiveView, type LayoutPrefs, type LinkView } from "@/lib/link-view";
+import { effectiveView, viewTarget, type LayoutPrefs, type LinkView } from "@/lib/link-view";
+import { usePathname } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -205,12 +206,14 @@ export function useLinkView(): LinkViewState {
     persist,
   } = value;
   const folder = useCurrentFolder();
+  const target = viewTarget(folder !== null, usePathname());
   const setFolderView = useSetFolderView(persist);
   const folderView = folder ? folder.view : undefined;
   const view = effectiveView(folderView, accountView);
 
   const setView = React.useCallback(
     (next: LinkView) => {
+      if (target === "none") return;
       if (!folder) {
         setAccountView(next);
         return;
@@ -218,7 +221,7 @@ export function useLinkView(): LinkViewState {
       if (next !== view) markSwitched();
       setFolderView(folder, next);
     },
-    [folder, view, setAccountView, setFolderView, markSwitched],
+    [target, folder, view, setAccountView, setFolderView, markSwitched],
   );
 
   const followHome = React.useCallback(() => {

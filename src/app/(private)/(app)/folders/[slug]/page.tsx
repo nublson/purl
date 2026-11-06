@@ -44,20 +44,20 @@ export default async function FolderPage({
   }
 
   return (
-    <LinkViewFrame>
-      {/* Folder header / empty-state slot: the user's header (rename/delete,
-          switcher) and empty state are wired in here in a follow-up pass.
-          Until then, this heading only covers accessibility/SEO. */}
-      <h1 className="sr-only">{folder.name}</h1>
-      {/* Hands the server-resolved folder to the client subtree so
-          `useCurrentFolder()` files saves here by id, even if the client
-          folder list no longer matches this URL's slug (renamed/deleted in
-          another tab). */}
-      <CurrentFolderProvider folder={folder}>
+    // Hands the server-resolved folder to the client subtree so
+    // `useCurrentFolder()` files saves here by id, and the frame and the list
+    // read the same folder view, even if the client folder list no longer
+    // matches this URL's slug (renamed/deleted in another tab).
+    <CurrentFolderProvider folder={folder}>
+      <LinkViewFrame>
+        {/* Folder header / empty-state slot: the user's header (rename/delete,
+            switcher) and empty state are wired in here in a follow-up pass.
+            Until then, this heading only covers accessibility/SEO. */}
+        <h1 className="sr-only">{folder.name}</h1>
         <Suspense fallback={<HomeSkeleton />}>
           <FolderShellLoader folderId={folder.id} />
         </Suspense>
-      </CurrentFolderProvider>
-    </LinkViewFrame>
+      </LinkViewFrame>
+    </CurrentFolderProvider>
   );
 }

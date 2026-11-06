@@ -72,6 +72,20 @@ export function effectiveView(
   return folderView ?? accountView;
 }
 
+/**
+ * Where a view change on this page is saved: the folder's on a folder page,
+ * the account's elsewhere, and nowhere on a folder page whose folder can't be
+ * found (renamed in another tab, so the URL's slug matches nothing): saving
+ * the account's there would change Home's view behind the user's back.
+ */
+export function viewTarget(
+  hasFolder: boolean,
+  pathname: string | null,
+): "folder" | "account" | "none" {
+  if (hasFolder) return "folder";
+  return pathname?.startsWith("/folders/") ? "none" : "account";
+}
+
 export function linkViewToDb(view: LinkView): "LIST" | "GRID" {
   return view === "grid" ? "GRID" : "LIST";
 }

@@ -3,6 +3,7 @@ import {
   effectiveView,
   linkViewFromDb,
   linkViewFromDbOrNull,
+  viewTarget,
   linkViewToDb,
   parseLayoutChange,
   parseLinkView,
@@ -55,5 +56,20 @@ describe("folder view", () => {
     expect(linkViewFromDbOrNull("LIST")).toBe("list");
     expect(linkViewFromDbOrNull(null)).toBeNull();
     expect(linkViewFromDbOrNull(undefined)).toBeNull();
+  });
+});
+
+describe("viewTarget", () => {
+  it("saves on the folder when the page has one", () => {
+    expect(viewTarget(true, "/folders/reading")).toBe("folder");
+  });
+
+  it("saves on the account off folder pages", () => {
+    expect(viewTarget(false, "/home")).toBe("account");
+    expect(viewTarget(false, null)).toBe("account");
+  });
+
+  it("saves nowhere on a folder page whose folder isn't found (renamed elsewhere)", () => {
+    expect(viewTarget(false, "/folders/old-name")).toBe("none");
   });
 });
