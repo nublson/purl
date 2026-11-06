@@ -18,6 +18,7 @@ import {
   publicFolderPath,
   resolvePublicFolder,
 } from "@/lib/public-folders";
+import { shareTitle } from "@/lib/share-title";
 import {
   parseSharedFolderView,
   SHARED_FOLDER_VIEW_COOKIE,
@@ -54,7 +55,7 @@ export async function generateMetadata({
   const robots = { index: false, follow: false };
   if (!page || page.kind !== "folder") return { robots };
   // "🎨 Design by @nublson · Purl": the app's "%s · Purl" template adds
-  // the suffix to the tab title; link previews get it spelled out.
+  // the suffix to the tab title; link previews lead with Purl instead.
   const title = publicFolderTitle(
     page.folder.emoji,
     page.folder.name,
@@ -73,9 +74,13 @@ export async function generateMetadata({
       },
     },
     openGraph: {
-      title: `${title} · Purl`,
+      title: shareTitle(title),
       description: page.folder.description ?? undefined,
       url: publicFolderPath(page.owner.username, page.folder.slug),
+    },
+    twitter: {
+      title: shareTitle(title),
+      description: page.folder.description ?? undefined,
     },
   };
 }

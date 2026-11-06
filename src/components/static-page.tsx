@@ -9,6 +9,7 @@ import { Typography } from "@/components/typography";
 import { getPageBySlug, getPublishedPages } from "@/lib/notion";
 import { buildPageIdToPath } from "@/lib/notion-links";
 import { STATIC_PAGES, type StaticPageSlug } from "@/lib/static-pages";
+import { shareTitle } from "@/lib/share-title";
 import { formatUpdatedDate } from "@/utils/formatter";
 
 /**
@@ -49,8 +50,8 @@ export async function staticPageMetadata(
     title,
     ...text,
     alternates: { canonical: path },
-    openGraph: { title, ...text, url: path },
-    twitter: { title, ...text },
+    openGraph: { title: shareTitle(title), ...text, url: path },
+    twitter: { title: shareTitle(title), ...text },
   };
 }
 
@@ -72,7 +73,7 @@ export async function staticPageOgImage(slug: StaticPageSlug) {
 
 /** The preview image's alt text. */
 export function staticPageOgAlt(slug: StaticPageSlug) {
-  return `Purl: ${staticPageLabel(slug)}`;
+  return shareTitle(staticPageLabel(slug));
 }
 
 /**
