@@ -17,6 +17,8 @@ type LinkViewContextValue = {
   /** Whether video pearls play in the grid while in view (off: on hover only). */
   playVideos: boolean;
   setPlayVideos: (on: boolean) => void;
+  /** False in the landing demo: changes show at once and are never saved. */
+  persist: boolean;
 };
 
 const LinkViewContext = React.createContext<LinkViewContextValue | null>(null);
@@ -132,8 +134,17 @@ export function LinkViewProvider({
   );
 
   const value = React.useMemo(
-    () => ({ view, setView, switched, folderTags, setFolderTags, playVideos, setPlayVideos }),
-    [view, setView, switched, folderTags, setFolderTags, playVideos, setPlayVideos],
+    () => ({
+      view,
+      setView,
+      switched,
+      folderTags,
+      setFolderTags,
+      playVideos,
+      setPlayVideos,
+      persist,
+    }),
+    [view, setView, switched, folderTags, setFolderTags, playVideos, setPlayVideos, persist],
   );
   return (
     <LinkViewContext.Provider value={value}>{children}</LinkViewContext.Provider>
@@ -146,6 +157,11 @@ export function LinkViewProvider({
  */
 export function usePlayVideos(): boolean {
   return React.useContext(LinkViewContext)?.playVideos ?? true;
+}
+
+/** Whether layout changes are saved (false in the landing demo); true without a provider. */
+export function usePersistLayout(): boolean {
+  return React.useContext(LinkViewContext)?.persist ?? true;
 }
 
 export function useLinkView(): LinkViewContextValue {

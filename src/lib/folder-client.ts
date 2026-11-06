@@ -1,6 +1,7 @@
 "use client";
 
 import type { MoveLinksResult } from "@/lib/bulk-links";
+import type { LinkView } from "@/lib/link-view";
 import type { FolderSummary } from "@/lib/folders";
 import { linksOriginHeaders } from "@/lib/links-origin";
 import type { Link } from "@/utils/links";
@@ -112,6 +113,8 @@ export type UpdateFolderInput = {
   description?: string | null;
   /** Share at `/@username/slug` (`true`) or make private again. */
   isPublic?: boolean;
+  /** The folder's own view, or `null` to follow the account view again. */
+  view?: LinkView | null;
 };
 
 export function postFolder(
