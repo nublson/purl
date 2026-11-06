@@ -38,6 +38,7 @@ describe("auth route wiring", () => {
     );
     expect(handlers.GET).toHaveBeenCalledOnce();
     const passed = handlers.GET.mock.calls[0][0];
+    expect(new URL(passed.url).pathname).toBe("/api/auth/oauth2/authorize");
     expect(new URL(passed.url).searchParams.get("prompt")).toBe("consent");
   });
 

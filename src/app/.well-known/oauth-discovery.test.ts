@@ -1,5 +1,30 @@
 import { describe, expect, it, vi } from "vitest";
 
+// Discovery builds documents from config. Plugin init also seeds oauthResource,
+// which must not open a database connection in unit tests.
+vi.mock("@/lib/prisma", () => ({
+  default: new Proxy(
+    {},
+    {
+      get(_target, prop) {
+        if (typeof prop !== "string" || prop === "then") return undefined;
+        return {
+          findFirst: async () => null,
+          findUnique: async () => null,
+          findMany: async () => [],
+          create: async ({ data }: { data?: Record<string, unknown> } = {}) => ({
+            id: "1",
+            ...data,
+          }),
+          update: async () => ({}),
+          delete: async () => ({}),
+          deleteMany: async () => ({ count: 0 }),
+        };
+      },
+    },
+  ),
+}));
+
 // Production sets BETTER_AUTH_URL; set it before the auth module loads.
 const { CONFIGURED_ORIGIN } = vi.hoisted(() => {
   const CONFIGURED_ORIGIN = "https://purl.live";

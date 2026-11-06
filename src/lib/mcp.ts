@@ -29,11 +29,13 @@ import {
   readLinkForUser,
 } from "@/lib/links";
 import { MAX_BULK_LINK_IDS } from "@/lib/limits";
+import { mcpResource, oauthIssuer, oauthJwksUrl } from "@/lib/oauth-issuer";
 import { SAVE_SCOPE } from "@/lib/oauth-scopes";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { serializeLink } from "@/lib/serialize-link";
 import { isValidUrl } from "@/utils/url";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import { verifyBearerToken } from "better-auth/oauth2";
 import { formatFolderLabel } from "@/lib/folder-display";
 import {
   ALL_LINKS_NAME,
@@ -503,40 +505,48 @@ async function verifyApiKeyToken(
   };
 }
 
+function grantedScopes(scope: unknown): string[] {
+  if (typeof scope !== "string") return [];
+  return scope.split(" ").filter(Boolean);
+}
+
 /**
- * Reads the OAuth access token behind a request (Better Auth's mcp plugin):
- * the user, client and scopes, or undefined when it is missing or expired.
- * No scope policy: callers decide what a token's scopes allow.
+ * Reads the OAuth access token behind a request. 1.7 issues a JWT bound to
+ * the MCP resource; signature, issuer, audience and expiry are checked by
+ * `verifyBearerToken`. No scope policy: callers decide what a token allows.
  */
 export async function readOAuthSession(
   req: Request,
 ): Promise<AuthInfo | undefined> {
-  let session: Awaited<ReturnType<typeof auth.api.getMcpSession>>;
+  const header = req.headers.get("authorization");
+  const token = header?.replace(/^Bearer\s+/i, "").trim();
+  if (!token) return undefined;
   try {
-    session = await auth.api.getMcpSession({
-      request: req,
-      headers: req.headers,
-      asResponse: false,
+    const claims = await verifyBearerToken(token, {
+      verifyOptions: {
+        audience: mcpResource(),
+        issuer: oauthIssuer(),
+      },
+      jwksUrl: oauthJwksUrl(),
     });
+    const userId = typeof claims.sub === "string" ? claims.sub : "";
+    const clientId =
+      typeof claims.client_id === "string"
+        ? claims.client_id
+        : typeof claims.azp === "string"
+          ? claims.azp
+          : "";
+    if (!userId || !clientId) return undefined;
+    return {
+      token,
+      clientId,
+      scopes: grantedScopes(claims.scope),
+      extra: { userId },
+    };
   } catch (err) {
     console.error("MCP OAuth token verification failed:", err);
     return undefined;
   }
-  if (!session?.userId) return undefined;
-  // getMcpSession does a raw DB lookup by access token with no expiry filter
-  // of its own — this is the only expiry check in the auth path. Guard
-  // against a malformed/missing timestamp failing open (NaN < anything is
-  // false, which would otherwise treat a bad value as "not expired").
-  const expiresAt = new Date(session.accessTokenExpiresAt).getTime();
-  if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) {
-    return undefined;
-  }
-  return {
-    token: session.accessToken,
-    clientId: session.clientId,
-    scopes: session.scopes ? session.scopes.split(" ").filter(Boolean) : [],
-    extra: { userId: session.userId },
-  };
 }
 
 /**

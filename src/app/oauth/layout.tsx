@@ -6,7 +6,7 @@
 // for a descendant's `force-dynamic` (it only sets a separate `forceDynamic`
 // flag), and `searchParams`/`cookies`/`headers` all short-circuit on
 // `forceStatic` first. This route needs real, per-request query params
-// (`consent_code`, `client_id`, `scope`) from Better Auth's mcp plugin
+// (`client_id`, `scope`, `sig`, and the rest of the signed authorize query)
 // redirect, so it lives in its own segment with its own dynamic rendering.
 //
 // The <main> below matches src/app/(public)/layout.tsx -- keep the two in sync.

@@ -82,6 +82,34 @@ export const SAVE_ONLY_CLIENT_IDS = new Set([
 
 const SAVE_ONLY_ALLOWED_SCOPES = new Set([SAVE_SCOPE, "offline_access"]);
 
+/** 1.6 clients call `/mcp/*`. 1.7 serves the same flows at `/oauth2/*`. */
+const LEGACY_OAUTH_PATHS: ReadonlyArray<readonly [string, string]> = [
+  ["/mcp/authorize", "/oauth2/authorize"],
+  ["/mcp/token", "/oauth2/token"],
+  ["/mcp/register", "/oauth2/register"],
+];
+
+export function isAuthorizePath(pathname: string): boolean {
+  return (
+    pathname.endsWith("/mcp/authorize") || pathname.endsWith("/oauth2/authorize")
+  );
+}
+
+export function isTokenPath(pathname: string): boolean {
+  return pathname.endsWith("/mcp/token") || pathname.endsWith("/oauth2/token");
+}
+
+/** Rewrites a legacy `/mcp/*` auth request onto the 1.7 `/oauth2/*` path. */
+export function rewriteLegacyOAuthRequest(request: Request): Request {
+  const url = new URL(request.url);
+  for (const [from, to] of LEGACY_OAUTH_PATHS) {
+    if (!url.pathname.endsWith(from)) continue;
+    url.pathname = url.pathname.slice(0, -from.length) + to;
+    return new Request(url, request);
+  }
+  return request;
+}
+
 function invalidRequest(description: string): Response {
   return Response.json(
     { error: "invalid_request", error_description: description },
@@ -99,7 +127,7 @@ function invalidRequest(description: string): Response {
 export function guardSaveAuthorize(request: Request): Request | Response {
   if (request.method !== "GET") return request;
   const url = new URL(request.url);
-  if (!url.pathname.endsWith("/mcp/authorize")) return request;
+  if (!isAuthorizePath(url.pathname)) return request;
   const scopes = (url.searchParams.get("scope") ?? "")
     .split(/\s+/)
     .filter(Boolean);

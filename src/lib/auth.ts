@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { createAuthMiddleware } from "better-auth/api";
-import { mcp } from "better-auth/plugins";
+import { jwt } from "better-auth/plugins";
+import { mcp } from "@better-auth/mcp";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { apiKey } from "@better-auth/api-key";
 import prisma from "@/lib/prisma";
@@ -16,10 +17,53 @@ import {
   deleteUserBlobsAfterDelete,
   revokeSaveOnlyAppsOnSignOut,
 } from "@/lib/auth-hooks";
-import { ADVERTISED_SCOPES, SAVE_SCOPE } from "@/lib/oauth-scopes";
+import { ADVERTISED_SCOPES } from "@/lib/oauth-scopes";
+import { mcpResource } from "@/lib/oauth-issuer";
 import { API_KEY_PREFIX, getPurlApiKey } from "@/lib/api-key-getter";
 
+const OAUTH_MODELS = new Set([
+  "jwks",
+  "oauthClient",
+  "oauthClientAssertion",
+  "oauthClientResource",
+  "oauthConsent",
+  "oauthAccessToken",
+  "oauthRefreshToken",
+  "oauthResource",
+]);
+
+/**
+ * Unit tests replace Prisma with a partial stub. Plugin init seeds
+ * `oauthResource` on import, and a stub that omits the model rejects that
+ * write. The real client already has these delegates, so this is a no-op there.
+ */
+function withOAuthModelStubs<T extends object>(client: T): T {
+  const stub = {
+    findFirst: async () => null,
+    findUnique: async () => null,
+    findMany: async () => [],
+    create: async ({ data }: { data?: Record<string, unknown> } = {}) => ({
+      id: "oauth-seed",
+      ...data,
+    }),
+    update: async () => ({}),
+    delete: async () => ({}),
+    deleteMany: async () => ({ count: 0 }),
+  };
+  return new Proxy(client, {
+    get(target, prop, receiver) {
+      const value = Reflect.get(target, prop, receiver);
+      if (value !== undefined) return value;
+      if (typeof prop === "string" && OAUTH_MODELS.has(prop)) return stub;
+      return value;
+    },
+  });
+}
+
 export const auth = betterAuth({
+  // The JWT plugin's `/token` route signs session payloads with the same key
+  // the OAuth provider uses for access tokens. It is not part of MCP login.
+  disabledPaths: ["/token"],
   plugins: [
     apiKey({
       enableSessionForAPIKeys: true,
@@ -32,25 +76,25 @@ export const auth = betterAuth({
       },
       customAPIKeyGetter: getPurlApiKey,
     }),
+    jwt({ disableSettingJwtHeader: true }),
     mcp({
       loginPage: AUTH_LOGIN_PAGE,
-      oidcConfig: {
-        // Required by OIDCOptions' type (not optional, unlike consentPage) even
-        // though the mcp plugin already forwards the top-level loginPage above --
-        // duplicated here only to satisfy the installed Better Auth version's types.
-        loginPage: AUTH_LOGIN_PAGE,
-        consentPage: "/oauth/consent",
-        // Authorize and token accept the save-only scope (merged with the
-        // plugin's openid/profile/email/offline_access).
-        scopes: [SAVE_SCOPE],
-        // Advertised in the protected-resource document. The authorization
-        // server document is patched in its route (the plugin's top-level
-        // `metadata` option isn't typed in this version).
-        metadata: { scopes_supported: [...ADVERTISED_SCOPES] },
-      },
+      consentPage: "/oauth/consent",
+      resource: mcpResource(),
+      // Authorize and token accept the save-only scope along with the OIDC
+      // defaults. Both discovery documents advertise this list.
+      scopes: [...ADVERTISED_SCOPES],
+      advertisedMetadata: { scopes_supported: [...ADVERTISED_SCOPES] },
+      // Claude and other MCP clients register themselves. 1.7 leaves dynamic
+      // registration off unless both flags are set.
+      allowDynamicClientRegistration: true,
+      allowUnauthenticatedClientRegistration: true,
+      // Pre-registered clients (the extension, nublson.com) are not rows in
+      // oauthClientResource. Open registration also requests the resource.
+      enforcePerClientResources: false,
     }),
   ],
-  database: prismaAdapter(prisma, {
+  database: prismaAdapter(withOAuthModelStubs(prisma), {
     provider: "postgresql",
   }),
   trustedOrigins: getEnabledProviders(process.env).includes("apple")

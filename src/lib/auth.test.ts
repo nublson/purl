@@ -1,7 +1,31 @@
 import { describe, it, expect, vi } from "vitest";
 import type { BetterAuthOptions } from "better-auth";
 
-vi.mock("@/lib/prisma", () => ({ default: {} }));
+vi.mock("@/lib/prisma", () => ({
+  default: new Proxy(
+    {
+      $transaction: async (fn: (tx: unknown) => unknown) => fn({}),
+    },
+    {
+      get(target, prop) {
+        if (prop in target) return target[prop as keyof typeof target];
+        if (typeof prop !== "string" || prop === "then") return undefined;
+        return {
+          findFirst: async () => null,
+          findUnique: async () => null,
+          findMany: async () => [],
+          create: async ({ data }: { data?: Record<string, unknown> } = {}) => ({
+            id: "1",
+            ...data,
+          }),
+          update: async () => ({}),
+          delete: async () => ({}),
+          deleteMany: async () => ({ count: 0 }),
+        };
+      },
+    },
+  ),
+}));
 vi.mock("server-only", () => ({}));
 
 describe("auth config", () => {
@@ -11,7 +35,8 @@ describe("auth config", () => {
         id?: string;
         name?: string;
         options?: {
-          oidcConfig?: { consentPage?: string; loginPage?: string };
+          consentPage?: string;
+          loginPage?: string;
         };
       }>;
     };
@@ -50,18 +75,20 @@ describe("auth config", () => {
         (p) => p.id ?? p.name,
       ) ?? [];
     expect(pluginIds).toContain("api-key");
-    expect(pluginIds).toContain("mcp");
+    // 1.7 moved the MCP authorization server onto the OAuth provider plugin.
+    expect(pluginIds).toContain("oauth-provider");
+    expect(pluginIds).toContain("jwt");
   });
 
   it("includes the mcp plugin with OAuth consent and login pages configured", async () => {
     const { auth } = await import("@/lib/auth");
     const plugins = (auth as unknown as AuthLike).options?.plugins ?? [];
     const pluginIds = plugins.map((p) => p.id ?? p.name);
-    expect(pluginIds).toContain("mcp");
+    expect(pluginIds).toContain("oauth-provider");
 
-    const mcpPlugin = plugins.find((p) => (p.id ?? p.name) === "mcp");
-    expect(mcpPlugin?.options?.oidcConfig?.consentPage).toBe("/oauth/consent");
-    expect(mcpPlugin?.options?.oidcConfig?.loginPage).toBe("/");
+    const mcpPlugin = plugins.find((p) => (p.id ?? p.name) === "oauth-provider");
+    expect(mcpPlugin?.options?.consentPage).toBe("/oauth/consent");
+    expect(mcpPlugin?.options?.loginPage).toBe("/");
   });
 
   it("pins the session cookie cache version so pre-username caches are invalidated", async () => {

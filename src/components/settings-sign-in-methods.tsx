@@ -24,7 +24,11 @@ interface SettingsSignInMethodsProps {
 }
 
 export function SettingsSignInMethods({ providers }: SettingsSignInMethodsProps) {
-  const [connected, setConnected] = React.useState<Set<string>>(new Set());
+  // `id` is the local account row. 1.7's unlinkAccount takes that id;
+  // `account.accountId` is the provider's own subject and is not accepted.
+  const [accounts, setAccounts] = React.useState<
+    Array<{ id: string; providerId: string }>
+  >([]);
   const [loading, setLoading] = React.useState(true);
   // A single pending action for the whole list, not one per row: Better
   // Auth's "last account" check and the unlink aren't atomic, so two
@@ -58,7 +62,12 @@ export function SettingsSignInMethods({ providers }: SettingsSignInMethodsProps)
         );
         return;
       }
-      setConnected(new Set((result.data ?? []).map((account) => account.providerId)));
+      setAccounts(
+        (result.data ?? []).map((account) => ({
+          id: account.id,
+          providerId: account.providerId,
+        })),
+      );
     } catch {
       toast.error("Unable to load sign-in methods. Try again.");
     } finally {
@@ -71,6 +80,7 @@ export function SettingsSignInMethods({ providers }: SettingsSignInMethodsProps)
   }, [loadAccounts]);
 
   const isBusy = pendingProvider !== null;
+  const connected = new Set(accounts.map((account) => account.providerId));
   const connectedCount = providers.filter((provider) => connected.has(provider)).length;
 
   async function handleConnect(provider: ProviderId) {
@@ -98,9 +108,17 @@ export function SettingsSignInMethods({ providers }: SettingsSignInMethodsProps)
   async function handleDisconnect(provider: ProviderId) {
     if (!beginAction(provider)) return;
     try {
-      const result = await unlinkAccount({ providerId: provider });
-      if (result.error) {
-        toast.error(result.error.message ?? "Unable to disconnect. Try again.");
+      const matches = accounts.filter((account) => account.providerId === provider);
+      if (matches.length === 0) {
+        toast.error("Unable to disconnect. Try again.");
+        return;
+      }
+      for (const account of matches) {
+        const result = await unlinkAccount({ accountId: account.id });
+        if (result.error) {
+          toast.error(result.error.message ?? "Unable to disconnect. Try again.");
+          return;
+        }
       }
     } catch {
       toast.error("Unable to disconnect. Try again.");

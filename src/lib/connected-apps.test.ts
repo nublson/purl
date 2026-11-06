@@ -8,10 +8,13 @@ vi.mock("@/lib/prisma", () => ({
       findMany: vi.fn(),
       deleteMany: vi.fn(),
     },
-    oauthApplication: {
+    oauthClient: {
       findMany: vi.fn(),
     },
     oauthAccessToken: {
+      deleteMany: vi.fn(),
+    },
+    oauthRefreshToken: {
       deleteMany: vi.fn(),
     },
   },
@@ -25,14 +28,14 @@ const { listConnectedApps, revokeConnectedApp } = await import(
 describe("listConnectedApps", () => {
   beforeEach(() => {
     vi.mocked(prisma.oauthConsent.findMany).mockReset();
-    vi.mocked(prisma.oauthApplication.findMany).mockReset();
+    vi.mocked(prisma.oauthClient.findMany).mockReset();
   });
 
   it("returns an empty list when the user has no consents", async () => {
     vi.mocked(prisma.oauthConsent.findMany).mockResolvedValue([]);
     const result = await listConnectedApps("user-1");
     expect(result).toEqual([]);
-    expect(prisma.oauthApplication.findMany).not.toHaveBeenCalled();
+    expect(prisma.oauthClient.findMany).not.toHaveBeenCalled();
   });
 
   it("joins consents with their application name, scoped to the user", async () => {
@@ -42,14 +45,14 @@ describe("listConnectedApps", () => {
         createdAt: new Date("2026-07-01T00:00:00.000Z"),
       },
     ] as never);
-    vi.mocked(prisma.oauthApplication.findMany).mockResolvedValue([
+    vi.mocked(prisma.oauthClient.findMany).mockResolvedValue([
       { clientId: "client-1", name: "Claude Desktop" },
     ] as never);
 
     const result = await listConnectedApps("user-1");
 
     expect(prisma.oauthConsent.findMany).toHaveBeenCalledWith({
-      where: { userId: "user-1", consentGiven: true },
+      where: { userId: "user-1" },
       orderBy: { createdAt: "desc" },
     });
     expect(result).toEqual([
@@ -65,7 +68,7 @@ describe("listConnectedApps", () => {
     vi.mocked(prisma.oauthConsent.findMany).mockResolvedValue([
       { clientId: "client-2", createdAt: new Date("2026-07-01T00:00:00.000Z") },
     ] as never);
-    vi.mocked(prisma.oauthApplication.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.oauthClient.findMany).mockResolvedValue([]);
 
     const result = await listConnectedApps("user-1");
     expect(result).toEqual([
@@ -81,6 +84,7 @@ describe("listConnectedApps", () => {
 describe("revokeConnectedApp", () => {
   beforeEach(() => {
     vi.mocked(prisma.oauthAccessToken.deleteMany).mockReset();
+    vi.mocked(prisma.oauthRefreshToken.deleteMany).mockReset();
     vi.mocked(prisma.oauthConsent.deleteMany).mockReset();
   });
 
@@ -90,6 +94,9 @@ describe("revokeConnectedApp", () => {
     await revokeConnectedApp("user-1", "client-1");
 
     expect(prisma.oauthAccessToken.deleteMany).toHaveBeenCalledWith({
+      where: { userId: "user-1", clientId: "client-1" },
+    });
+    expect(prisma.oauthRefreshToken.deleteMany).toHaveBeenCalledWith({
       where: { userId: "user-1", clientId: "client-1" },
     });
     expect(prisma.oauthConsent.deleteMany).toHaveBeenCalledWith({

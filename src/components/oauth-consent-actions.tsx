@@ -4,7 +4,7 @@ import * as React from "react";
 import { requireConsentRedirectUri } from "@/lib/oauth-consent-redirect";
 import { Button } from "@/components/ui/button";
 
-export function OAuthConsentActions({ consentCode }: { consentCode: string }) {
+export function OAuthConsentActions({ oauthQuery }: { oauthQuery: string }) {
   const [submitting, setSubmitting] = React.useState<"allow" | "deny" | null>(
     null,
   );
@@ -16,13 +16,16 @@ export function OAuthConsentActions({ consentCode }: { consentCode: string }) {
     try {
       const res = await fetch("/api/auth/oauth2/consent", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accept, consent_code: consentCode }),
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ accept, oauth_query: oauthQuery }),
       });
       if (!res.ok) {
         throw new Error(`Consent request failed with status ${res.status}`);
       }
-      const data = (await res.json()) as { redirectURI?: string };
+      const data = (await res.json()) as { url?: string };
       window.location.href = requireConsentRedirectUri(data);
     } catch (err) {
       console.error("OAuth consent failed:", err);

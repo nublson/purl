@@ -13,12 +13,12 @@ export async function listConnectedApps(
   userId: string,
 ): Promise<ConnectedApp[]> {
   const consents = await prisma.oauthConsent.findMany({
-    where: { userId, consentGiven: true },
+    where: { userId },
     orderBy: { createdAt: "desc" },
   });
   if (consents.length === 0) return [];
 
-  const apps = await prisma.oauthApplication.findMany({
+  const apps = await prisma.oauthClient.findMany({
     where: { clientId: { in: consents.map((c) => c.clientId) } },
   });
   const nameByClientId = new Map(apps.map((a) => [a.clientId, a.name]));
@@ -40,6 +40,7 @@ export async function revokeConnectedApp(
   clientId: string,
 ): Promise<boolean> {
   await prisma.oauthAccessToken.deleteMany({ where: { userId, clientId } });
+  await prisma.oauthRefreshToken.deleteMany({ where: { userId, clientId } });
   const { count } = await prisma.oauthConsent.deleteMany({
     where: { userId, clientId },
   });

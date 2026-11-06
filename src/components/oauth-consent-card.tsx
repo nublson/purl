@@ -15,12 +15,12 @@ export function OAuthConsentCard({
   clientName,
   scopes,
   user,
-  consentCode,
+  oauthQuery,
 }: {
   clientName: string;
   scopes: string[];
   user: ConsentUser;
-  consentCode: string;
+  oauthQuery: string;
 }) {
   return (
     <div className={CONSENT_COLUMN}>
@@ -70,7 +70,7 @@ export function OAuthConsentCard({
         </ul>
       </section>
       <div className="mt-10">
-        <OAuthConsentActions consentCode={consentCode} />
+        <OAuthConsentActions oauthQuery={oauthQuery} />
       </div>
       <Typography size="small" className="mt-6 text-pretty">
         You can disconnect {clientName} at any time in Settings, under

@@ -22,7 +22,9 @@
     "ext:build": "cd extension && npm run build"
   },
   "dependencies": {
-    "@better-auth/api-key": "^1.6.22",
+    "@better-auth/api-key": "1.7.7",
+    "@better-auth/mcp": "1.7.7",
+    "@better-auth/oauth-provider": "1.7.7",
     "@modelcontextprotocol/sdk": "1.32.0",
     "@notionhq/client": "^5.20.0",
     "@prisma/adapter-pg": "^7.5.0",

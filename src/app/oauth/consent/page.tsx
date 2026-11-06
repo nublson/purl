@@ -11,26 +11,39 @@ import { redirect } from "next/navigation";
 
 export const metadata: Metadata = { title: "Allow access" };
 
+function searchParam(
+  value: string | string[] | undefined,
+): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+/** Rebuilds the signed authorize query the consent POST must send back. */
+function oauthQueryFromSearchParams(
+  params: Record<string, string | string[] | undefined>,
+): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (typeof value === "string") query.append(key, value);
+    else if (Array.isArray(value)) for (const item of value) query.append(key, item);
+  }
+  return query.toString();
+}
+
 export default async function OAuthConsentPage({
   searchParams,
 }: {
-  searchParams: Promise<{
-    consent_code?: string;
-    client_id?: string;
-    scope?: string;
-  }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   // Signed in only: the proxy just looks for a session cookie.
   const user = await getSessionUser();
   if (!user) redirect("/");
 
-  const {
-    consent_code: consentCode,
-    client_id: clientId,
-    scope,
-  } = await searchParams;
+  const params = await searchParams;
+  const clientId = searchParam(params.client_id);
+  const scope = searchParam(params.scope);
+  const oauthQuery = oauthQueryFromSearchParams(params);
 
-  if (!consentCode || !clientId) {
+  if (!clientId || !searchParam(params.sig)) {
     return (
       <div className={CONSENT_COLUMN}>
         <BrandMark />
@@ -44,7 +57,7 @@ export default async function OAuthConsentPage({
     );
   }
 
-  const client = await prisma.oauthApplication.findUnique({
+  const client = await prisma.oauthClient.findUnique({
     where: { clientId },
     select: { name: true },
   });
@@ -54,7 +67,7 @@ export default async function OAuthConsentPage({
       clientName={client?.name ?? "This app"}
       scopes={scope ? scope.split(" ") : []}
       user={{ name: user.name, username: user.username, image: user.image }}
-      consentCode={consentCode}
+      oauthQuery={oauthQuery}
     />
   );
 }
