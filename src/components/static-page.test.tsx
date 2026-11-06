@@ -148,8 +148,8 @@ describe("staticPageMetadata", () => {
       title: "Privacy Policy",
       description: "How we treat your data.",
       alternates: { canonical: "/privacy" },
-      openGraph: { title: "Privacy Policy", description: "How we treat your data.", url: "/privacy" },
-      twitter: { title: "Privacy Policy", description: "How we treat your data." },
+      openGraph: { title: "Purl | Privacy Policy", description: "How we treat your data.", url: "/privacy" },
+      twitter: { title: "Purl | Privacy Policy", description: "How we treat your data." },
     });
   });
 
@@ -158,8 +158,8 @@ describe("staticPageMetadata", () => {
     expect(await staticPageMetadata("privacy")).toEqual({
       title: "Privacy Policy",
       alternates: { canonical: "/privacy" },
-      openGraph: { title: "Privacy Policy", url: "/privacy" },
-      twitter: { title: "Privacy Policy" },
+      openGraph: { title: "Purl | Privacy Policy", url: "/privacy" },
+      twitter: { title: "Purl | Privacy Policy" },
     });
   });
 
