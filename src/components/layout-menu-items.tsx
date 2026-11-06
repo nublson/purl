@@ -6,7 +6,7 @@ import { haptic } from "@/lib/haptics";
 import type { LinkView } from "@/lib/link-view";
 import { cn } from "@/lib/utils";
 import * as React from "react";
-import { Grid, List3, Tag5, Video } from "reicon-react";
+import { Eye, Grid, List3, Tag5, Video } from "reicon-react";
 import { HapticTarget } from "./haptic-target";
 import {
   DropdownMenuCheckboxItem,
@@ -20,8 +20,8 @@ const VIEW_OPTIONS = [
 ] as const;
 
 /**
- * "Default view" in the user menu, drawn like the Share popover's row: the
- * label on the left, and on the right the List / Grid pair as one outlined
+ * "Default view", the first row of the user menu's Layout group, drawn like
+ * the Share popover's row: its icon and label on the left, and on the right the List / Grid pair as one outlined
  * segmented control (`ViewToggle`'s look), the current one filled. The two
  * are the menu's own radio items (icon-only, named "List" / "Grid"), so the
  * arrow keys reach them like any item. Home's view on Home (the account's,
@@ -33,8 +33,9 @@ export function ViewMenuItems() {
   const { view, setView } = useLinkView();
   const labelId = React.useId();
   return (
-    <div className="flex items-center justify-between gap-4 py-1 ps-2 pe-1">
-      <span id={labelId} className="text-sm">
+    <div className="flex items-center gap-2 py-1 ps-2 pe-1 text-sm">
+      <Eye aria-hidden className="size-4 shrink-0" />
+      <span id={labelId} className="flex-1">
         Default view
       </span>
       <DropdownMenuRadioGroup
