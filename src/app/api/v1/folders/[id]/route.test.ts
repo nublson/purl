@@ -97,6 +97,12 @@ describe("PATCH /api/v1/folders/[id]", () => {
     expect(mockBroadcast).toHaveBeenCalledWith("user-1");
   });
 
+  it("leaves the folder's view out of the v1 shape", async () => {
+    mockUpdateFolder.mockResolvedValue({ ...FOLDER, view: "grid" });
+    const res = await PATCH(patchRequest({ name: "Reading" }), ctx());
+    expect(await res.json()).toEqual(FOLDER);
+  });
+
   it("treats a non-string name as blank so it fails the name rules", async () => {
     mockUpdateFolder.mockRejectedValue(
       new FolderNameError("empty", "Give your folder a name."),

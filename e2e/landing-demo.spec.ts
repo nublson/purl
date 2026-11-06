@@ -174,6 +174,19 @@ test.describe("Landing demo", () => {
       expect(new URL(page.url()).pathname).toBe("/");
     });
 
+    test("a folder stored as a grid opens as a grid", async ({ page }) => {
+      await pool.query(`UPDATE "folders" SET "linkView" = 'GRID' WHERE "id" = $1`, [startedId]);
+      try {
+        await openDemo(page);
+        await expect(page.locator('[data-cy="link-card"]')).toHaveCount(0);
+        await page.getByRole("button", { name: "Folder: Reading list" }).click();
+        await page.getByRole("menu").getByRole("menuitem", { name: /Getting started/ }).click();
+        await expect(page.locator('[data-cy="link-card"]')).toHaveCount(2);
+      } finally {
+        await pool.query(`UPDATE "folders" SET "linkView" = NULL WHERE "id" = $1`, [startedId]);
+      }
+    });
+
     test("an empty folder shows the empty message", async ({ page }) => {
       await openDemo(page);
       await page.getByRole("button", { name: "Folder: Reading list" }).click();

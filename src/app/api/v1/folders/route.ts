@@ -1,3 +1,4 @@
+import { toApiFolder } from "@/lib/folder-api";
 import { mapFolderError, parseDescriptionField, parseEmojiField } from "@/lib/folder-errors";
 import { createFolder, listFoldersForUser } from "@/lib/folders";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
@@ -16,7 +17,7 @@ export async function GET(_request: NextRequest): Promise<NextResponse> {
   }
 
   const folders = await listFoldersForUser(user.id);
-  return addCors(NextResponse.json(folders));
+  return addCors(NextResponse.json(folders.map(toApiFolder)));
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   try {
     const folder = await createFolder(user.id, name, emoji, description);
     broadcastLinksChanged(user.id);
-    return addCors(NextResponse.json(folder, { status: 201 }));
+    return addCors(NextResponse.json(toApiFolder(folder), { status: 201 }));
   } catch (e) {
     const mapped = mapFolderError(e);
     if (mapped) return addCors(mapped);

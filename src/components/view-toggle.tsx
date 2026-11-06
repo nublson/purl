@@ -16,34 +16,52 @@ const OPTIONS = [
  * (a folder's name would shrink to its emoji), one button instead, showing
  * and naming the other view ("Switch to grid view"). Both are rendered and
  * CSS picks one (the `phone:` variant), so the server's HTML is right on
- * first paint. (Owners switch in the user menu: `ViewMenuItems`.)
+ * first paint. (Owners switch in the user menu: `ViewMenuItems`, or a
+ * folder's Share popover, which uses this with `compact={false}`.)
  */
 export function ViewToggle({
   view,
   onChange,
+  compact = true,
+  disabled = false,
+  labelledBy,
+  describedBy,
 }: {
   view: LinkView;
   onChange: (view: LinkView) => void;
+  /** On phones, one button naming the other view (the header's room). */
+  compact?: boolean;
+  disabled?: boolean;
+  /** The group's visible label (else it's named "View"). */
+  labelledBy?: string;
+  describedBy?: string;
 }) {
   const other = OPTIONS.find((option) => option.value !== view)!;
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={`Switch to ${other.value} view`}
-        className="hidden shrink-0 cursor-pointer phone:inline-flex"
-        onClick={() => onChange(other.value)}
-      >
-        <other.Icon />
-      </Button>
+      {compact && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={`Switch to ${other.value} view`}
+          className="hidden shrink-0 cursor-pointer phone:inline-flex"
+          onClick={() => onChange(other.value)}
+        >
+          <other.Icon />
+        </Button>
+      )}
       {/* One segmented control, so the pair reads as a single switch
           among the header's icons: 32px tall like them (1px border, 2px
           in, 26px buttons), corners concentric (10px out, 7px in). */}
       <div
         role="group"
-        aria-label="View"
-        className="flex shrink-0 items-center gap-0.5 rounded-[10px] border border-border p-0.5 phone:hidden"
+        aria-label={labelledBy ? undefined : "View"}
+        aria-labelledby={labelledBy}
+        aria-describedby={describedBy}
+        className={cn(
+          "flex shrink-0 items-center gap-0.5 rounded-[10px] border border-border p-0.5",
+          compact && "phone:hidden",
+        )}
       >
         {OPTIONS.map(({ value, label, Icon }) => {
           const active = view === value;
@@ -54,6 +72,7 @@ export function ViewToggle({
               size="icon-sm"
               aria-label={label}
               aria-pressed={active}
+              disabled={disabled}
               data-cy={`link-view-${value}`}
               className={cn(
                 "size-[26px] cursor-pointer rounded-[7px]",

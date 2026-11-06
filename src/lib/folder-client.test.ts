@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   fetchFolders,
   patchFolder,
+  patchFolderView,
   patchLinkFolder,
   patchLinksFolder,
   postFolder,
@@ -119,6 +120,28 @@ describe("postFolder", () => {
       ok: false,
       error: "Unable to create the folder. Try again.",
     });
+  });
+});
+
+describe("patchFolderView", () => {
+  it("PATCHes only the view, with a time limit", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "f1", view: "grid" }), { status: 200 }),
+    );
+
+    const result = await patchFolderView("f1", "grid");
+
+    expect(fetchSpy).toHaveBeenCalledWith("/api/folders/f1", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        [LINKS_ORIGIN_HEADER]: LINKS_CLIENT_ORIGIN,
+      },
+      body: JSON.stringify({ view: "grid" }),
+      // Bounded: a stalled save would hold folder updates and later saves.
+      signal: expect.any(AbortSignal),
+    });
+    expect(result).toEqual({ ok: true, data: { id: "f1", view: "grid" } });
   });
 });
 

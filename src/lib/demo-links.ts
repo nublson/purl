@@ -1,3 +1,4 @@
+import type { LinkView } from "@/lib/link-view";
 import type {
   PublicFolder,
   PublicLink,
@@ -14,6 +15,8 @@ export const DEMO_LINKS_PER_FOLDER = 20;
 /** `links` is capped at `DEMO_LINKS_PER_FOLDER`; `linkCount` is the real total. */
 export type DemoFolder = PublicFolder & {
   id: string;
+  /** The folder's own view; `null` follows the demo's account view. */
+  view: LinkView | null;
   linkCount: number;
   links: PublicLink[];
 };

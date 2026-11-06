@@ -1,3 +1,4 @@
+import { toApiFolder } from "@/lib/folder-api";
 import {
   mapFolderError,
   parseDescriptionField,
@@ -60,7 +61,7 @@ export async function PATCH(
       isPublic,
     });
     broadcastLinksChanged(user.id);
-    return addCors(NextResponse.json(folder));
+    return addCors(NextResponse.json(toApiFolder(folder)));
   } catch (e) {
     const mapped = mapFolderError(e);
     if (mapped) return addCors(mapped);

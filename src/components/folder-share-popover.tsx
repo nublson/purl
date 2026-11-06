@@ -1,6 +1,7 @@
 "use client";
 
 import { useIsDemo } from "@/contexts/demo-mode-context";
+import { useLinkView } from "@/contexts/link-view-context";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useCurrentFolder, useFolderActions } from "@/hooks/use-folders";
 import { haptic } from "@/lib/haptics";
@@ -22,6 +23,7 @@ import {
 } from "./ui/popover";
 import { Separator } from "./ui/separator";
 import { Switch } from "./ui/switch";
+import { ViewToggle } from "./view-toggle";
 
 /** How long the copy button shows its check. */
 const COPIED_MS = 1500;
@@ -132,6 +134,7 @@ export function FolderSharePopover() {
           <Separator />
         </div>
         <div className="flex flex-col gap-3 p-4">
+          <FolderViewRow />
           <div className="flex items-center justify-between gap-4">
             <Typography
               component="span"
@@ -189,8 +192,36 @@ export function FolderSharePopover() {
             {copied ? "Link copied" : ""}
           </span>
         </div>
+
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * The folder's default view (list or grid): the same setting as the user
+ * menu's on this folder page, and what visitors of the shared page first see.
+ * While the folder has no view of its own, Home's shows as current.
+ */
+function FolderViewRow() {
+  const { view, setView } = useLinkView();
+  const isDemo = useIsDemo();
+  const labelId = React.useId();
+  return (
+    <div className="flex items-center justify-between gap-4" data-cy="share-view">
+      <Typography component="span" size="small" className="text-foreground">
+        <span id={labelId}>Default view</span>
+      </Typography>
+      <ViewToggle
+        view={view}
+        compact={false}
+        disabled={isDemo}
+        labelledBy={labelId}
+        onChange={(next) => {
+          if (next !== view) setView(next);
+        }}
+      />
+    </div>
   );
 }
 

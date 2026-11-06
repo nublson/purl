@@ -92,11 +92,22 @@ describe("getDemoFolders", () => {
           slug: "a",
           emoji: "🦪",
           description: null,
+          view: null,
           linkCount: 1,
           links: [LINK_PUBLIC],
         },
       ],
     });
+  });
+
+  it("carries each folder's own view", async () => {
+    mockFolderFindMany.mockResolvedValue([
+      { id: "f1", name: "A", slug: "a", emoji: null, description: null, linkView: "GRID", links: [], _count: { links: 0 } },
+    ]);
+    const data = await getDemoFolders();
+    expect(data?.folders[0].view).toBe("grid");
+    const args = mockFolderFindMany.mock.calls[0][0];
+    expect(args.select.linkView).toBe(true);
   });
 
   it("counts every link in the folder, not just the 20 it returns", async () => {

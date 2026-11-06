@@ -8,6 +8,7 @@ import {
   InvalidFolderOrderError,
 } from "@/lib/folders";
 import { MAX_FOLDERS } from "@/lib/limits";
+import { parseLinkView, type LinkView } from "@/lib/link-view";
 import { NextResponse } from "next/server";
 
 const NAME_ERROR_CODES: Record<FolderNameError["reason"], string> = {
@@ -115,6 +116,22 @@ export function parseIsPublicField(
   if (value === undefined || typeof value === "boolean") return value;
   return NextResponse.json(
     { error: "isPublic must be true or false.", code: "INVALID_PUBLIC" },
+    { status: 400 },
+  );
+}
+
+/**
+ * Parses an optional folder `view` field: `"list"`, `"grid"`, `null` (follow
+ * the account view again) or absent; anything else is a 400.
+ */
+export function parseViewField(
+  value: unknown,
+): LinkView | null | undefined | NextResponse {
+  if (value === undefined || value === null) return value;
+  const view = parseLinkView(value);
+  if (view) return view;
+  return NextResponse.json(
+    { error: 'view must be "list", "grid" or null.', code: "INVALID_VIEW" },
     { status: 400 },
   );
 }

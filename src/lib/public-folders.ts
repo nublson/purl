@@ -3,6 +3,7 @@ import "server-only";
 import type { ContentType } from "@/generated/prisma/enums";
 import { DEFAULT_FOLDER_EMOJI } from "@/lib/folder-display";
 import { listLinksForUser } from "@/lib/links";
+import { effectiveView, linkViewFromDb, linkViewFromDbOrNull, type LinkView } from "@/lib/link-view";
 import prisma from "@/lib/prisma";
 import { publicFolderPath } from "@/lib/public-folder-path";
 
@@ -107,6 +108,8 @@ export async function resolvePublicFolder(
       owner: PublicOwner;
       folder: PublicFolder;
       ids: { userId: string; folderId: string };
+      /** The view visitors first see: the folder's own, else the owner's account view. */
+      view: LinkView;
     }
   | { kind: "redirect"; username: string; slug: string }
   | null
@@ -117,13 +120,13 @@ export async function resolvePublicFolder(
   let redirected = false;
   let user = await prisma.user.findUnique({
     where: { username: wantedUsername },
-    select: { id: true, ...PUBLIC_OWNER_SELECT },
+    select: { id: true, linkView: true, ...PUBLIC_OWNER_SELECT },
   });
   if (!user) {
     const old = await prisma.usernameRedirect.findUnique({
       where: { username: wantedUsername },
       select: {
-        user: { select: { id: true, ...PUBLIC_OWNER_SELECT } },
+        user: { select: { id: true, linkView: true, ...PUBLIC_OWNER_SELECT } },
       },
     });
     if (!old) return null;
@@ -135,6 +138,7 @@ export async function resolvePublicFolder(
     id: true,
     ...PUBLIC_FOLDER_SELECT,
     isPublic: true,
+    linkView: true,
   } as const;
   let folder = await prisma.folder.findFirst({
     where: { userId: user.id, slug: wantedSlug },
@@ -164,6 +168,10 @@ export async function resolvePublicFolder(
       description: folder.description || null,
     },
     ids: { userId: user.id, folderId: folder.id },
+    view: effectiveView(
+      linkViewFromDbOrNull(folder.linkView),
+      linkViewFromDb(user.linkView),
+    ),
   };
 }
 

@@ -71,6 +71,40 @@ describe("PATCH /api/folders/[id]", () => {
     );
   });
 
+  it("sets or clears the folder's view", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    mockUpdateFolder.mockResolvedValue({ id: "f1", view: "grid" });
+    const res = await PATCH(patchRequest({ view: "grid" }), {
+      params: Promise.resolve({ id: "f1" }),
+    });
+    expect(res.status).toBe(200);
+    expect(mockUpdateFolder).toHaveBeenCalledWith(
+      "user-1",
+      "f1",
+      expect.objectContaining({ view: "grid" }),
+    );
+    expect(mockBroadcastLinksChanged).toHaveBeenCalled();
+
+    await PATCH(patchRequest({ view: null }), {
+      params: Promise.resolve({ id: "f1" }),
+    });
+    expect(mockUpdateFolder).toHaveBeenLastCalledWith(
+      "user-1",
+      "f1",
+      expect.objectContaining({ view: null }),
+    );
+  });
+
+  it("returns 400 INVALID_VIEW for an unknown view without calling the lib", async () => {
+    mockGetBrowserSessionUserId.mockResolvedValue("user-1");
+    const res = await PATCH(patchRequest({ view: "tiles" }), {
+      params: Promise.resolve({ id: "f1" }),
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("INVALID_VIEW");
+    expect(mockUpdateFolder).not.toHaveBeenCalled();
+  });
+
   it("returns 400 INVALID_PUBLIC for a non-boolean isPublic", async () => {
     mockGetBrowserSessionUserId.mockResolvedValue("user-1");
     const res = await PATCH(patchRequest({ isPublic: "yes" }), {

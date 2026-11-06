@@ -185,7 +185,7 @@ describe("registerPurlResources", () => {
     emoji: "📚",
     description: "Articles",
     isPublic: false,
-    position: 1,
+    position: 1, view: null,
     linkCount: 2,
   };
   const folderB = {
@@ -195,7 +195,7 @@ describe("registerPurlResources", () => {
     slug: "pods",
     emoji: "🎧",
     description: null,
-    position: 2,
+    position: 2, view: null,
     linkCount: 0,
   };
   const link = {
@@ -378,7 +378,7 @@ describe("registerPurlResources through a real server", () => {
     emoji: "📚",
     description: null,
     isPublic: false,
-    position: 1,
+    position: 1, view: null,
     linkCount: 0,
   });
 
@@ -760,6 +760,17 @@ describe("listSavedItemsTool", () => {
     const result = await listSavedItemsTool("user-1", { folderId: "missing" });
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toBe("Folder not found");
+  });
+});
+
+describe("folder tools' output", () => {
+  it("leaves the folder's view out", async () => {
+    mockListFoldersForUser.mockResolvedValue([
+      { id: "f1", name: "A", slug: "a", emoji: "🦪", description: null, isPublic: false, position: 1, view: "grid", linkCount: 0 },
+    ]);
+    const result = await listFoldersTool("user-1");
+    const text = (result.content[0] as { text: string }).text;
+    expect(JSON.parse(text)[0]).not.toHaveProperty("view");
   });
 });
 

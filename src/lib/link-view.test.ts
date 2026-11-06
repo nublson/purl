@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  effectiveView,
   linkViewFromDb,
+  linkViewFromDbOrNull,
+  viewTarget,
   linkViewToDb,
   parseLayoutChange,
   parseLinkView,
@@ -34,5 +37,39 @@ describe("link view", () => {
     expect(parseLayoutChange({ playVideos: "no" })).toBeNull();
     expect(parseLayoutChange({ playVideos: false })).toEqual({ playVideos: false });
     expect(parseLayoutChange(null)).toBeNull();
+  });
+});
+
+describe("folder view", () => {
+  it("uses the folder's own view over the account view", () => {
+    expect(effectiveView("grid", "list")).toBe("grid");
+    expect(effectiveView("list", "grid")).toBe("list");
+  });
+
+  it("follows the account view when the folder has none", () => {
+    expect(effectiveView(null, "grid")).toBe("grid");
+    expect(effectiveView(undefined, "list")).toBe("list");
+  });
+
+  it("maps a stored folder view, keeping null as null", () => {
+    expect(linkViewFromDbOrNull("GRID")).toBe("grid");
+    expect(linkViewFromDbOrNull("LIST")).toBe("list");
+    expect(linkViewFromDbOrNull(null)).toBeNull();
+    expect(linkViewFromDbOrNull(undefined)).toBeNull();
+  });
+});
+
+describe("viewTarget", () => {
+  it("saves on the folder when the page has one", () => {
+    expect(viewTarget(true, "/folders/reading")).toBe("folder");
+  });
+
+  it("saves on the account off folder pages", () => {
+    expect(viewTarget(false, "/home")).toBe("account");
+    expect(viewTarget(false, null)).toBe("account");
+  });
+
+  it("saves nowhere on a folder page whose folder isn't found (renamed elsewhere)", () => {
+    expect(viewTarget(false, "/folders/old-name")).toBe("none");
   });
 });

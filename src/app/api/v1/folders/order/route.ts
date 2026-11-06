@@ -1,3 +1,4 @@
+import { toApiFolder } from "@/lib/folder-api";
 import { mapFolderError, parseFolderOrderBody } from "@/lib/folder-errors";
 import { reorderFolders } from "@/lib/folders";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
@@ -29,7 +30,7 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
   try {
     const folders = await reorderFolders(user.id, ids);
     broadcastLinksChanged(user.id);
-    return addCors(NextResponse.json({ folders }));
+    return addCors(NextResponse.json({ folders: folders.map(toApiFolder) }));
   } catch (e) {
     const mapped = mapFolderError(e);
     if (mapped) return addCors(mapped);

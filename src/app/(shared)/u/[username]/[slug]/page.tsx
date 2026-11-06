@@ -20,8 +20,8 @@ import {
 } from "@/lib/public-folders";
 import { shareTitle } from "@/lib/share-title";
 import {
-  parseSharedFolderView,
-  SHARED_FOLDER_VIEW_COOKIE,
+  initialSharedView,
+  SHARED_VIEWS_COOKIE,
 } from "@/lib/shared-folder-view";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
@@ -98,13 +98,19 @@ export default async function SharedFolderPage({
     permanentRedirect(publicFolderPath(page.username, page.slug));
   }
 
-  const { owner, folder } = page;
-  const initialView = parseSharedFolderView(
-    (await cookies()).get(SHARED_FOLDER_VIEW_COOKIE)?.value,
+  const { owner, folder, ids, view: ownerView } = page;
+  const initialView = initialSharedView(
+    (await cookies()).get(SHARED_VIEWS_COOKIE)?.value,
+    ids.folderId,
+    ownerView,
   );
 
   return (
-    <SharedFolderViewProvider initialView={initialView}>
+    <SharedFolderViewProvider
+      folderId={ids.folderId}
+      ownerView={ownerView}
+      initialView={initialView}
+    >
       {/* The app header's frame (header.tsx), with the folder as a label
           where the switcher would be. */}
       <header className="fixed inset-x-0 top-0 z-50 transform-none">

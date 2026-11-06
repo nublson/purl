@@ -115,19 +115,13 @@ export function User() {
           />
           <DropdownMenuSeparator />
         </DropdownMenuGroup>
-        {/* View, then Layout: how the lists look (their own groups, apart
-            from the account's actions below). */}
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-            View
-          </DropdownMenuLabel>
-          <ViewMenuItems />
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
+        {/* Layout: how the lists look (its own group, apart from the
+            account's actions below). */}
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
             Layout
           </DropdownMenuLabel>
+          <ViewMenuItems />
           <FolderTagsMenuItem />
           <PlayVideosMenuItem />
         </DropdownMenuGroup>

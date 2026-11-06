@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test";
 import { chooseView, expect, test, waitForHydration } from "./fixtures";
+import { setAccountView } from "./support/db";
 
 // The owner's grid: chosen in the user menu (View mode: List / Grid), saved on the
 // account, and the shared folder's cards and masonry with the owner's
@@ -306,3 +307,73 @@ test.describe("Folder tags on phones", () => {
   });
 });
 
+test.describe("Per-folder view", () => {
+  async function openFolder(page: Page, slug: string) {
+    await page.goto(`/folders/${slug}`);
+    await waitForHydration(page, '[data-cy="link-item"], [data-cy="link-card"]');
+    await page.waitForLoadState("networkidle");
+  }
+
+  type Seed = {
+    folder: (folder: { name: string; slug: string }) => Promise<string>;
+    link: (link: { url: string; title: string; folderId?: string }) => Promise<string>;
+  };
+
+  async function seedTwoFolders(seed: Seed) {
+    const a = await seed.folder({ name: "Alpha", slug: "alpha" });
+    const b = await seed.folder({ name: "Bravo", slug: "bravo" });
+    await seed.link({ url: "https://a.example", title: "In Alpha", folderId: a });
+    await seed.link({ url: "https://b.example", title: "In Bravo", folderId: b });
+    await seed.link({ url: "https://home.example", title: "Unfiled" });
+    return { a, b };
+  }
+
+  test("a folder keeps its own view; Home and other folders don't change", async ({ page, seed }) => {
+    await seedTwoFolders(seed);
+    await openFolder(page, "alpha");
+    await chooseView(page, "Grid");
+    await expect(cards(page)).toHaveCount(1);
+
+    await openFolder(page, "bravo");
+    await expect(cards(page)).toHaveCount(0);
+    await openHome(page);
+    await expect(cards(page)).toHaveCount(0);
+
+    // Saved on the folder: the server renders it as a grid after a reload.
+    await openFolder(page, "alpha");
+    await expect(cards(page)).toHaveCount(1);
+    await page.reload();
+    await waitForHydration(page, '[data-cy="link-card"]');
+    await expect(cards(page)).toHaveCount(1);
+  });
+
+  test("switching folders with digit keys follows each folder's view", async ({ page, seed }) => {
+    await seedTwoFolders(seed);
+    await openFolder(page, "alpha");
+    await chooseView(page, "Grid");
+    await page.keyboard.press("3");
+    await expect(page).toHaveURL(/\/folders\/bravo$/);
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(1);
+    await page.keyboard.press("2");
+    await expect(page).toHaveURL(/\/folders\/alpha$/);
+    await expect(cards(page)).toHaveCount(1);
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await expect(page.getByRole("menuitemradio", { name: "Grid" })).toHaveAttribute("aria-checked", "true");
+  });
+
+  test("a folder without its own view follows Home's; one with its own doesn't", async ({ page, seed, testUser }) => {
+    await seedTwoFolders(seed);
+    // Bravo gets its own list (via grid, since it already shows Home's list).
+    await openFolder(page, "bravo");
+    await chooseView(page, "Grid");
+    await chooseView(page, "List");
+
+    await openHome(page);
+    await chooseView(page, "Grid");
+    await openFolder(page, "alpha");
+    await expect(cards(page)).toHaveCount(1);
+    await openFolder(page, "bravo");
+    await expect(cards(page)).toHaveCount(0);
+    await setAccountView(testUser.id, "LIST");
+  });
+});

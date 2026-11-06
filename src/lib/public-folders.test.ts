@@ -160,7 +160,30 @@ describe("resolvePublicFolder", () => {
       owner: { name: "Nubelson", image: "https://img/a.png", username: "nublson" },
       folder: { name: "Design", slug: "design", emoji: "🦪", description: "Good stuff" },
       ids: { userId: "u1", folderId: "f1" },
+      view: "list",
     });
+  });
+
+  it("opens in the folder's own view, else the owner's account view", async () => {
+    mockUserFindUnique.mockResolvedValue({ ...OWNER, linkView: "LIST" });
+    mockFolderFindFirst.mockResolvedValue({ ...FOLDER, linkView: "GRID" });
+    const own = await resolvePublicFolder("nublson", "design");
+    expect(own && own.kind === "folder" && own.view).toBe("grid");
+
+    mockUserFindUnique.mockResolvedValue({ ...OWNER, linkView: "GRID" });
+    mockFolderFindFirst.mockResolvedValue({ ...FOLDER, linkView: null });
+    const following = await resolvePublicFolder("nublson", "design");
+    expect(following && following.kind === "folder" && following.view).toBe("grid");
+  });
+
+  it("selects both views", async () => {
+    await resolvePublicFolder("nublson", "design");
+    expect(mockUserFindUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ select: expect.objectContaining({ linkView: true }) }),
+    );
+    expect(mockFolderFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ select: expect.objectContaining({ linkView: true }) }),
+    );
   });
 
   it("redirects when only the slug changed, without listing links", async () => {
