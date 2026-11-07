@@ -34,13 +34,11 @@ import { SAVE_SCOPE } from "@/lib/oauth-scopes";
 import { broadcastLinksChanged } from "@/lib/realtime-broadcast";
 import { serializeLink } from "@/lib/serialize-link";
 import { isValidUrl } from "@/utils/url";
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { formatFolderLabel } from "@/lib/folder-display";
 import {
   ALL_LINKS_NAME,
   ALL_LINKS_URI,
   FOLDER_URI_TEMPLATE,
-  RESOURCE_NOT_FOUND,
   allLinksDescription,
   folderResourceDescription,
   folderResourceUri,
@@ -48,10 +46,11 @@ import {
   renderFolderResource,
 } from "@/lib/mcp-resources";
 import {
+  ResourceNotFoundError,
   ResourceTemplate,
+  type AuthInfo,
   type McpServer,
-} from "@modelcontextprotocol/sdk/server/mcp.js";
-import { McpError } from "@modelcontextprotocol/sdk/types.js";
+} from "@modelcontextprotocol/server";
 import { z } from "zod";
 
 const contentTypeSchema = z
@@ -64,8 +63,8 @@ export type ToolResult = {
 };
 
 /** Resolves the authenticated user id placed on the auth context by {@link verifyToken}. */
-export function getUserId(extra: { authInfo?: AuthInfo }): string {
-  const userId = extra.authInfo?.extra?.userId;
+export function getUserId(ctx: { http?: { authInfo?: AuthInfo } }): string {
+  const userId = ctx.http?.authInfo?.extra?.userId;
   if (typeof userId !== "string" || !userId) {
     throw new Error("Unauthorized");
   }
@@ -316,167 +315,199 @@ export async function deleteLinkTool(
 
 /** Registers Purl's MCP tools on the given server instance. */
 export function registerPurlTools(server: McpServer): void {
-  server.tool(
+  server.registerTool(
     "save_link",
-    "Save a URL (web page, PDF, YouTube video, audio, image or video file) to the user's library.",
     {
-      url: z.string().describe("The URL to save"),
-      folderId: z
-        .string()
-        .optional()
-        .describe("Folder id from list_folders to save into"),
+      description:
+        "Save a URL (web page, PDF, YouTube video, audio, image or video file) to the user's library.",
+      inputSchema: z.object({
+        url: z.string().describe("The URL to save"),
+        folderId: z
+          .string()
+          .optional()
+          .describe("Folder id from list_folders to save into"),
+      }),
     },
-    async ({ url, folderId }, extra) => saveLinkTool(getUserId(extra), url, folderId),
+    async ({ url, folderId }, ctx) => saveLinkTool(getUserId(ctx), url, folderId),
   );
 
-  server.tool(
+  server.registerTool(
     "list_saved_items",
-    "List the user's saved items (metadata only, newest first). Supports an optional type filter and cursor pagination.",
     {
-      contentType: contentTypeSchema.optional(),
-      limit: z
-        .number()
-        .int()
-        .min(1)
-        .max(100)
-        .optional()
-        .describe("Maximum number of items to return (1-100, default 50)"),
-      cursor: z
-        .string()
-        .optional()
-        .describe(
-          "Pagination cursor taken from a previous response's nextCursor",
-        ),
-      folderId: z
-        .string()
-        .optional()
-        .describe("Folder id from list_folders to filter by"),
+      description:
+        "List the user's saved items (metadata only, newest first). Supports an optional type filter and cursor pagination.",
+      inputSchema: z.object({
+        contentType: contentTypeSchema.optional(),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(100)
+          .optional()
+          .describe("Maximum number of items to return (1-100, default 50)"),
+        cursor: z
+          .string()
+          .optional()
+          .describe(
+            "Pagination cursor taken from a previous response's nextCursor",
+          ),
+        folderId: z
+          .string()
+          .optional()
+          .describe("Folder id from list_folders to filter by"),
+      }),
     },
-    async (args, extra) => listSavedItemsTool(getUserId(extra), args),
+    async (args, ctx) => listSavedItemsTool(getUserId(ctx), args),
   );
 
-  server.tool(
+  server.registerTool(
     "get_link",
-    "Fetch a single saved item by its id.",
     {
-      id: z.string().describe("The link id"),
+      description:
+        "Fetch a single saved item by its id.",
+      inputSchema: z.object({
+        id: z.string().describe("The link id"),
+      }),
     },
-    async ({ id }, extra) => getLinkTool(getUserId(extra), id),
+    async ({ id }, ctx) => getLinkTool(getUserId(ctx), id),
   );
 
-  server.tool(
+  server.registerTool(
     "delete_link",
-    "Permanently delete one saved link by its id. This can't be undone. Use move_link to take a link out of a folder without deleting it.",
     {
-      id: z.string().describe("The link id"),
+      description:
+        "Permanently delete one saved link by its id. This can't be undone. Use move_link to take a link out of a folder without deleting it.",
+      inputSchema: z.object({
+        id: z.string().describe("The link id"),
+      }),
+      annotations: { destructiveHint: true, idempotentHint: true },
     },
-    { destructiveHint: true, idempotentHint: true },
-    async ({ id }, extra) => deleteLinkTool(getUserId(extra), id),
+    async ({ id }, ctx) => deleteLinkTool(getUserId(ctx), id),
   );
 
-  server.tool(
+  server.registerTool(
     "list_folders",
-    "List the user's folders (collections of saved links) in the user's order, with id, name, emoji, description, link count and position",
-    {},
-    async (_args, extra) => listFoldersTool(getUserId(extra)),
+    {
+      description:
+        "List the user's folders (collections of saved links) in the user's order, with id, name, emoji, description, link count and position",
+    },
+    async (ctx) => listFoldersTool(getUserId(ctx)),
   );
 
-  server.tool(
+  server.registerTool(
     "create_folder",
-    "Create a folder to group saved links. Names are unique per user (case-insensitive).",
     {
-      name: z.string().describe("Folder name (up to 60 characters)"),
-      emoji: z
-        .string()
-        .optional()
-        .describe("A single emoji for the folder (defaults to 🦪)"),
-      description: z
-        .string()
-        .optional()
-        .describe("Optional description (up to 160 characters)"),
+      description:
+        "Create a folder to group saved links. Names are unique per user (case-insensitive).",
+      inputSchema: z.object({
+        name: z.string().describe("Folder name (up to 60 characters)"),
+        emoji: z
+          .string()
+          .optional()
+          .describe("A single emoji for the folder (defaults to 🦪)"),
+        description: z
+          .string()
+          .optional()
+          .describe("Optional description (up to 160 characters)"),
+      }),
+      annotations: { destructiveHint: false, idempotentHint: false },
     },
-    { destructiveHint: false, idempotentHint: false },
-    async (args, extra) => createFolderTool(getUserId(extra), args),
+    async (args, ctx) => createFolderTool(getUserId(ctx), args),
   );
 
-  server.tool(
+  server.registerTool(
     "update_folder",
-    "Rename a folder, change its emoji or description, or share it publicly (isPublic: true makes it readable by anyone at purl.live/@username/folder-slug, not indexed by search engines). Omitted fields are left unchanged.",
     {
-      folderId: z.string().describe("Folder id from list_folders"),
-      name: z.string().optional().describe("New name (up to 60 characters)"),
-      emoji: z
-        .string()
-        .nullable()
-        .optional()
-        .describe("A single emoji; null or an empty string resets it to the default"),
-      description: z
-        .string()
-        .nullable()
-        .optional()
-        .describe("Up to 160 characters; null or an empty string clears it"),
-      isPublic: z
-        .boolean()
-        .optional()
-        .describe("Share the folder publicly (true) or make it private again (false)"),
+      description:
+        "Rename a folder, change its emoji or description, or share it publicly (isPublic: true makes it readable by anyone at purl.live/@username/folder-slug, not indexed by search engines). Omitted fields are left unchanged.",
+      inputSchema: z.object({
+        folderId: z.string().describe("Folder id from list_folders"),
+        name: z.string().optional().describe("New name (up to 60 characters)"),
+        emoji: z
+          .string()
+          .nullable()
+          .optional()
+          .describe("A single emoji; null or an empty string resets it to the default"),
+        description: z
+          .string()
+          .nullable()
+          .optional()
+          .describe("Up to 160 characters; null or an empty string clears it"),
+        isPublic: z
+          .boolean()
+          .optional()
+          .describe("Share the folder publicly (true) or make it private again (false)"),
+      }),
+      annotations: { destructiveHint: false, idempotentHint: true },
     },
-    { destructiveHint: false, idempotentHint: true },
-    async (args, extra) => updateFolderTool(getUserId(extra), args),
+    async (args, ctx) => updateFolderTool(getUserId(ctx), args),
   );
 
-  server.tool(
+  server.registerTool(
     "delete_folder",
-    "Delete a folder. Its links are kept (moved out of the folder) unless deleteLinks is true, which permanently deletes them too.",
     {
-      folderId: z.string().describe("Folder id from list_folders"),
-      deleteLinks: z
-        .boolean()
-        .optional()
-        .describe("Also permanently delete the folder's links (default false)"),
+      description:
+        "Delete a folder. Its links are kept (moved out of the folder) unless deleteLinks is true, which permanently deletes them too.",
+      inputSchema: z.object({
+        folderId: z.string().describe("Folder id from list_folders"),
+        deleteLinks: z
+          .boolean()
+          .optional()
+          .describe("Also permanently delete the folder's links (default false)"),
+      }),
+      annotations: { destructiveHint: true, idempotentHint: false },
     },
-    { destructiveHint: true, idempotentHint: false },
-    async ({ folderId, deleteLinks }, extra) =>
-      deleteFolderTool(getUserId(extra), folderId, deleteLinks),
+    async ({ folderId, deleteLinks }, ctx) =>
+      deleteFolderTool(getUserId(ctx), folderId, deleteLinks),
   );
 
-  server.tool(
+  server.registerTool(
     "reorder_folders",
-    "Set the order of the user's folders. Pass every folder id from list_folders, in the new order; the list must contain each folder exactly once.",
     {
-      ids: z.array(z.string()).describe("All folder ids, first to last"),
+      description:
+        "Set the order of the user's folders. Pass every folder id from list_folders, in the new order; the list must contain each folder exactly once.",
+      inputSchema: z.object({
+        ids: z.array(z.string()).describe("All folder ids, first to last"),
+      }),
+      annotations: { destructiveHint: false, idempotentHint: true },
     },
-    { destructiveHint: false, idempotentHint: true },
-    async ({ ids }, extra) => reorderFoldersTool(getUserId(extra), ids),
+    async ({ ids }, ctx) => reorderFoldersTool(getUserId(ctx), ids),
   );
 
-  server.tool(
+  server.registerTool(
     "move_link",
-    "Move a saved link into a folder, or take it out of its folder.",
     {
-      linkId: z.string().describe("The link id"),
-      folderId: z
-        .string()
-        .nullable()
-        .describe("Folder id from list_folders; null or an empty string removes the link from its folder"),
+      description:
+        "Move a saved link into a folder, or take it out of its folder.",
+      inputSchema: z.object({
+        linkId: z.string().describe("The link id"),
+        folderId: z
+          .string()
+          .nullable()
+          .describe("Folder id from list_folders; null or an empty string removes the link from its folder"),
+      }),
+      annotations: { destructiveHint: false, idempotentHint: true },
     },
-    { destructiveHint: false, idempotentHint: true },
-    async ({ linkId, folderId }, extra) =>
-      moveLinkTool(getUserId(extra), linkId, folderId),
+    async ({ linkId, folderId }, ctx) =>
+      moveLinkTool(getUserId(ctx), linkId, folderId),
   );
 
-  server.tool(
+  server.registerTool(
     "move_links",
-    `Move several saved links into a folder at once, or take them out of their folders (up to ${MAX_BULK_LINK_IDS} per call). Returns the moved links with their previous folder, and any ids that weren't found.`,
     {
-      linkIds: z.array(z.string()).describe("The link ids"),
-      folderId: z
-        .string()
-        .nullable()
-        .describe("Folder id from list_folders; null or an empty string removes the links from their folders"),
+      description:
+        `Move several saved links into a folder at once, or take them out of their folders (up to ${MAX_BULK_LINK_IDS} per call). Returns the moved links with their previous folder, and any ids that weren't found.`,
+      inputSchema: z.object({
+        linkIds: z.array(z.string()).describe("The link ids"),
+        folderId: z
+          .string()
+          .nullable()
+          .describe("Folder id from list_folders; null or an empty string removes the links from their folders"),
+      }),
+      annotations: { destructiveHint: false, idempotentHint: true },
     },
-    { destructiveHint: false, idempotentHint: true },
-    async ({ linkIds, folderId }, extra) =>
-      moveLinksTool(getUserId(extra), linkIds, folderId),
+    async ({ linkIds, folderId }, ctx) =>
+      moveLinksTool(getUserId(ctx), linkIds, folderId),
   );
 }
 
@@ -571,8 +602,8 @@ export function registerPurlResources(server: McpServer): void {
   server.registerResource(
     "all_links",
     new ResourceTemplate(ALL_LINKS_URI, {
-      list: async (extra) => {
-        const userId = getUserId(extra);
+      list: async (ctx) => {
+        const userId = getUserId(ctx);
         const count = await countLinksForUser(userId);
         return {
           resources: [
@@ -588,8 +619,8 @@ export function registerPurlResources(server: McpServer): void {
       },
     }),
     { title: ALL_LINKS_NAME, mimeType: MARKDOWN },
-    async (uri, _variables, extra) => {
-      const userId = getUserId(extra);
+    async (uri, _variables, ctx) => {
+      const userId = getUserId(ctx);
       const links = await listLinksForResource(userId, {});
       return {
         contents: [
@@ -606,8 +637,8 @@ export function registerPurlResources(server: McpServer): void {
   server.registerResource(
     "folder",
     new ResourceTemplate(FOLDER_URI_TEMPLATE, {
-      list: async (extra) => {
-        const userId = getUserId(extra);
+      list: async (ctx) => {
+        const userId = getUserId(ctx);
         const folders = await listFoldersForUser(userId);
         return {
           resources: folders.map((folder) => {
@@ -624,12 +655,12 @@ export function registerPurlResources(server: McpServer): void {
       },
     }),
     { title: "Purl folder", mimeType: MARKDOWN },
-    async (uri, { folderId }, extra) => {
-      const userId = getUserId(extra);
+    async (uri, { folderId }, ctx) => {
+      const userId = getUserId(ctx);
       const id = String(folderId);
       const folder = await getFolderById(userId, id);
       if (!folder) {
-        throw new McpError(RESOURCE_NOT_FOUND, "Folder not found");
+        throw new ResourceNotFoundError(uri.href, "Folder not found");
       }
       const links = await listLinksForResource(userId, { folderId: id });
       return {

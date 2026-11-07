@@ -9,8 +9,6 @@ import type { ResourceLink } from "@/lib/links";
 export const ALL_LINKS_URI = "purl://links";
 export const FOLDER_URI_TEMPLATE = "purl://folders/{folderId}";
 export const ALL_LINKS_NAME = "🏠 All links";
-/** MCP "resource not found" JSON-RPC error code. */
-export const RESOURCE_NOT_FOUND = -32002;
 
 const DESCRIPTION_MAX = 200;
 

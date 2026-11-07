@@ -1,7 +1,13 @@
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { McpError } from "@modelcontextprotocol/sdk/types.js";
+import {
+  Client,
+  StreamableHTTPClientTransport,
+} from "@modelcontextprotocol/client";
+import {
+  ProtocolError,
+  ResourceTemplate,
+  type AuthInfo,
+} from "@modelcontextprotocol/server";
+import { createMcpHandler } from "mcp-handler";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -120,7 +126,7 @@ describe("registerPurlTools", () => {
   it("registers the MCP tools on the server", () => {
     const registered: string[] = [];
     const mockServer = {
-      tool: vi.fn((name: string) => {
+      registerTool: vi.fn((name: string) => {
         registered.push(name);
       }),
     };
@@ -142,12 +148,15 @@ describe("registerPurlTools", () => {
 
   it("list_saved_items filters by every content type, media included", () => {
     const calls: unknown[][] = [];
-    const mockServer = { tool: vi.fn((...args: unknown[]) => void calls.push(args)) };
+    const mockServer = {
+      registerTool: vi.fn((...args: unknown[]) => void calls.push(args)),
+    };
     registerPurlTools(mockServer as never);
     const list = calls.find((c) => c[0] === "list_saved_items");
-    const schema = list?.find(
-      (a) => typeof a === "object" && a !== null && "contentType" in a,
-    ) as Record<string, { safeParse(v: unknown): { success: boolean } }>;
+    const config = list?.[1] as {
+      inputSchema: { shape: Record<string, { safeParse(v: unknown): { success: boolean } }> };
+    };
+    const schema = config.inputSchema.shape;
     for (const type of ["WEB", "YOUTUBE", "PDF", "AUDIO", "IMAGE", "VIDEO"]) {
       expect(schema.contentType.safeParse(type).success).toBe(true);
     }
@@ -159,9 +168,8 @@ describe("registerPurlTools", () => {
       (args: unknown, extra: unknown) => Promise<unknown>
     > = [];
     const mockServer = {
-      // The handler is always the last argument (after an optional
-      // annotations object).
-      tool: vi.fn((...args: unknown[]) => {
+      // registerTool(name, config, handler): the handler is last.
+      registerTool: vi.fn((...args: unknown[]) => {
         handlers.push(
           args.at(-1) as (args: unknown, extra: unknown) => Promise<unknown>,
         );
@@ -176,7 +184,7 @@ describe("registerPurlTools", () => {
 });
 
 describe("registerPurlResources", () => {
-  const extra = { authInfo: { extra: { userId: "user-1" } } };
+  const extra = { http: { authInfo: { extra: { userId: "user-1" } } } };
   const now = new Date("2026-10-21T12:00:00Z");
   const folderA = {
     id: "A",
@@ -335,9 +343,9 @@ describe("registerPurlResources", () => {
     const err = await folder
       .read(new URL("purl://folders/nope"), { folderId: "nope" }, extra)
       .catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(McpError);
-    expect((err as McpError).code).toBe(-32002);
-    expect((err as McpError).message).toContain("Folder not found");
+    expect(err).toBeInstanceOf(ProtocolError);
+    expect((err as ProtocolError).code).toBe(-32602);
+    expect((err as ProtocolError).message).toContain("Folder not found");
     expect(mockListLinksForResource).not.toHaveBeenCalled();
   });
 
@@ -355,20 +363,48 @@ describe("registerPurlResources", () => {
 });
 
 describe("registerPurlResources through a real server", () => {
-  async function connect() {
-    const server = new McpServer({ name: "purl", version: "test" });
-    registerPurlResources(server);
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    const originalSend = clientTransport.send.bind(clientTransport);
-    clientTransport.send = (message, options) =>
-      originalSend(message, {
-        ...options,
-        authInfo: { token: "t", clientId: "c", scopes: [], extra: { userId: "user-1" } },
-      });
-    const client = new Client({ name: "test-client", version: "test" });
-    await server.connect(serverTransport);
-    await client.connect(clientTransport);
-    return { client, server };
+  const authInfo: AuthInfo = {
+    token: "t",
+    clientId: "c",
+    scopes: [],
+    extra: { userId: "user-1" },
+  };
+
+  // The route's handler, with withMcpAuth's job (putting the verified token
+  // on the request) done in place, reached over HTTP by a real client.
+  async function connect(era: "2025" | "2026-07-28" = "2025") {
+    const handler = createMcpHandler(
+      (server) => {
+        registerPurlTools(server);
+        registerPurlResources(server);
+      },
+      { serverInfo: { name: "purl", version: "test" } },
+    );
+    const statuses: number[] = [];
+    const versions: (string | null)[] = [];
+    const fetchThroughHandler = async (url: string | URL, init?: RequestInit) => {
+      const req = new Request(url, init);
+      versions.push(req.headers.get("mcp-protocol-version"));
+      (req as Request & { auth?: AuthInfo }).auth = authInfo;
+      const res = await handler(req);
+      statuses.push(res.status);
+      return res;
+    };
+    const client = new Client(
+      { name: "test-client", version: "test" },
+      era === "2025"
+        ? {
+            versionNegotiation: { mode: "legacy" },
+            supportedProtocolVersions: ["2025-11-25"],
+          }
+        : { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+    );
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL("http://localhost/api/mcp"), {
+        fetch: fetchThroughHandler,
+      }),
+    );
+    return { client, statuses, versions };
   }
 
   const folder = (id: string, name: string) => ({
@@ -408,11 +444,14 @@ describe("registerPurlResources through a real server", () => {
     await client.close();
   });
 
-  it("rejects a missing folder with -32002", async () => {
+  // The SDK answers a resources/read miss with -32602 on every protocol
+  // revision (the 2026-07-28 spec requires it), whatever the handler throws.
+  it("rejects a missing folder with -32602", async () => {
     mockGetFolderById.mockResolvedValue(null);
     const { client } = await connect();
     await expect(client.readResource({ uri: "purl://folders/missing" })).rejects.toMatchObject({
-      code: -32002,
+      code: -32602,
+      message: expect.stringContaining("Folder not found"),
     });
     await client.close();
   });
@@ -422,6 +461,32 @@ describe("registerPurlResources through a real server", () => {
     await expect(client.readResource({ uri: "purl://folders/" })).rejects.toMatchObject({
       code: -32602,
     });
+    await client.close();
+  });
+
+  it("serves 2025-11-25 clients through the legacy fallback", async () => {
+    mockListFoldersForUser.mockResolvedValue([]);
+    const { client, statuses, versions } = await connect("2025");
+    expect(versions).toContain("2025-11-25");
+    expect(versions).not.toContain("2026-07-28");
+    const result = await client.callTool({ name: "list_folders", arguments: {} });
+    expect(result.isError).toBeFalsy();
+    expect(mockListFoldersForUser).toHaveBeenCalledWith("user-1");
+    // GET (the legacy SSE stream) answers 405: serving is stateless.
+    expect(statuses.filter((status) => status >= 400 && status !== 405)).toEqual([]);
+    await client.close();
+  });
+
+  it("serves 2026-07-28 clients (Sentry PURL-2)", async () => {
+    mockListFoldersForUser.mockResolvedValue([]);
+    const { client, statuses, versions } = await connect("2026-07-28");
+    expect(versions).toContain("2026-07-28");
+    const { resources } = await client.listResources();
+    expect(resources.map((r) => r.uri)).toEqual(["purl://links"]);
+    const result = await client.callTool({ name: "list_folders", arguments: {} });
+    expect(result.isError).toBeFalsy();
+    expect(mockListFoldersForUser).toHaveBeenCalledWith("user-1");
+    expect(statuses.every((status) => status < 400)).toBe(true);
     await client.close();
   });
 });
@@ -608,11 +673,13 @@ describe("getUserId", () => {
   it("throws when auth info extra has an empty userId", () => {
     expect(() =>
       getUserId({
-        authInfo: {
-          token: "t",
-          clientId: "c",
-          scopes: [],
-          extra: { userId: "" },
+        http: {
+          authInfo: {
+            token: "t",
+            clientId: "c",
+            scopes: [],
+            extra: { userId: "" },
+          },
         },
       }),
     ).toThrow("Unauthorized");
@@ -621,11 +688,13 @@ describe("getUserId", () => {
   it("returns the user id from auth info extra", () => {
     expect(
       getUserId({
-        authInfo: {
-          token: "t",
-          clientId: "c",
-          scopes: [],
-          extra: { userId: "user-9" },
+        http: {
+          authInfo: {
+            token: "t",
+            clientId: "c",
+            scopes: [],
+            extra: { userId: "user-9" },
+          },
         },
       }),
     ).toBe("user-9");
