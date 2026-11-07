@@ -5,7 +5,6 @@ import {
   ALL_LINKS_NAME,
   ALL_LINKS_URI,
   FOLDER_URI_TEMPLATE,
-  RESOURCE_NOT_FOUND,
   allLinksDescription,
   folderResourceDescription,
   folderResourceUri,
@@ -52,7 +51,6 @@ describe("constants", () => {
     expect(ALL_LINKS_URI).toBe("purl://links");
     expect(FOLDER_URI_TEMPLATE).toBe("purl://folders/{folderId}");
     expect(ALL_LINKS_NAME).toBe("🏠 All links");
-    expect(RESOURCE_NOT_FOUND).toBe(-32002);
   });
 });
 
