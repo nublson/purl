@@ -393,7 +393,10 @@ describe("registerPurlResources through a real server", () => {
     const client = new Client(
       { name: "test-client", version: "test" },
       era === "2025"
-        ? {}
+        ? {
+            versionNegotiation: { mode: "legacy" },
+            supportedProtocolVersions: ["2025-11-25"],
+          }
         : { versionNegotiation: { mode: { pin: "2026-07-28" } } },
     );
     await client.connect(
@@ -458,6 +461,19 @@ describe("registerPurlResources through a real server", () => {
     await expect(client.readResource({ uri: "purl://folders/" })).rejects.toMatchObject({
       code: -32602,
     });
+    await client.close();
+  });
+
+  it("serves 2025-11-25 clients through the legacy fallback", async () => {
+    mockListFoldersForUser.mockResolvedValue([]);
+    const { client, statuses, versions } = await connect("2025");
+    expect(versions).toContain("2025-11-25");
+    expect(versions).not.toContain("2026-07-28");
+    const result = await client.callTool({ name: "list_folders", arguments: {} });
+    expect(result.isError).toBeFalsy();
+    expect(mockListFoldersForUser).toHaveBeenCalledWith("user-1");
+    // GET (the legacy SSE stream) answers 405: serving is stateless.
+    expect(statuses.filter((status) => status >= 400 && status !== 405)).toEqual([]);
     await client.close();
   });
 
