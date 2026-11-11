@@ -4,8 +4,13 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/sweep-uploads", () => ({ sweepOrphanUploads: vi.fn() }));
+vi.mock("@sentry/nextjs", () => ({
+  withMonitor: vi.fn((_slug: string, job: () => unknown) => job()),
+  flush: vi.fn(async () => true),
+}));
 
 const { sweepOrphanUploads } = await import("@/lib/sweep-uploads");
+const Sentry = await import("@sentry/nextjs");
 const { GET, runtime, maxDuration } = await import("./route");
 
 const sweep = vi.mocked(sweepOrphanUploads);
@@ -63,6 +68,7 @@ describe("GET /api/cron/sweep-uploads", () => {
       expect(res.status).toBe(401);
     }
     expect(sweep).not.toHaveBeenCalled();
+    expect(Sentry.withMonitor).not.toHaveBeenCalled();
   });
 
   it("runs the sweep and returns its counts with the right secret", async () => {
@@ -74,6 +80,15 @@ describe("GET /api/cron/sweep-uploads", () => {
       stopped: false,
     });
     expect(sweep).toHaveBeenCalledTimes(1);
+    expect(Sentry.withMonitor).toHaveBeenCalledWith(
+      "apicronsweep-uploads",
+      expect.any(Function),
+      expect.objectContaining({
+        schedule: { type: "crontab", value: "0 * * * *" },
+        failureIssueThreshold: 2,
+      }),
+    );
+    expect(Sentry.flush).toHaveBeenCalled();
   });
 });
 

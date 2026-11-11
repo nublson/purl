@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
+import { runMonitoredCron } from "@/lib/cron-monitor";
 import { sweepOrphanUploads } from "@/lib/sweep-uploads";
 
 export const runtime = "nodejs";
@@ -14,7 +15,8 @@ function safeEqual(given: string, expected: string): boolean {
 /**
  * Vercel cron (hourly, `vercel.json`): deletes uploaded blobs no row
  * references. Vercel sends `Authorization: Bearer $CRON_SECRET`; without the
- * secret configured nothing runs. Never cached, no user session.
+ * secret configured nothing runs. Never cached, no user session. Each
+ * authorized run is a check-in of the Sentry Cron Monitor.
  */
 export async function GET(request: NextRequest) {
   const expected = process.env.CRON_SECRET?.trim();
@@ -33,5 +35,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json(await sweepOrphanUploads());
+  return NextResponse.json(
+    await runMonitoredCron("apicronsweep-uploads", "0 * * * *", () =>
+      sweepOrphanUploads(),
+    ),
+  );
 }

@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import { serverTracesSampler, sharedSentryOptions } from "./sentry.shared";
+import { DEFAULT_TRACES_RATE, sharedSentryOptions } from "./sentry.shared";
 
 Sentry.init({
   ...sharedSentryOptions,
@@ -7,7 +7,7 @@ Sentry.init({
   environment:
     process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "development",
 
-  tracesSampler: serverTracesSampler,
+  tracesSampleRate: DEFAULT_TRACES_RATE,
 
   integrations: [
     Sentry.consoleLoggingIntegration({ levels: ["warn", "error"] }),
