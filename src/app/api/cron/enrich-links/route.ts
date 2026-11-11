@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
+import { runMonitoredCron } from "@/lib/cron-monitor";
 import { enrichFlaggedLinks } from "@/lib/enrich-links";
 
 export const runtime = "nodejs";
@@ -14,7 +15,8 @@ function safeEqual(given: string, expected: string): boolean {
 /**
  * Vercel cron (every minute, `vercel.json`): fills in the details of imported
  * links. Vercel sends `Authorization: Bearer $CRON_SECRET`; without the
- * secret configured nothing runs. Never cached, no user session.
+ * secret configured nothing runs. Never cached, no user session. Each
+ * authorized run is a check-in of the Sentry Cron Monitor.
  */
 export async function GET(request: NextRequest) {
   const expected = process.env.CRON_SECRET?.trim();
@@ -33,6 +35,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await enrichFlaggedLinks();
+  const result = await runMonitoredCron(
+    "apicronenrich-links",
+    "* * * * *",
+    enrichFlaggedLinks,
+  );
   return NextResponse.json(result);
 }

@@ -28,23 +28,5 @@ export const sharedSentryOptions = {
   ignoreErrors: ["AbortError"],
 } satisfies Sentry.BrowserOptions & Sentry.NodeOptions;
 
-const DEFAULT_TRACES_RATE =
+export const DEFAULT_TRACES_RATE =
   process.env.NODE_ENV === "development" ? 1.0 : 0.1;
-
-/**
- * Server and edge sampling: every Vercel cron request is traced, since the
- * Cron Monitors (`vercelCronsMonitoring` in next.config.ts) are built from
- * those spans and a sampled-out run would read as a missed check-in.
- */
-export function serverTracesSampler({
-  name,
-  inheritOrSampleWith,
-}: {
-  name: string;
-  inheritOrSampleWith: (fallbackRate: number) => number;
-}): number {
-  if (name.includes("/api/cron/")) return 1;
-  return inheritOrSampleWith(DEFAULT_TRACES_RATE);
-}
-
-export { DEFAULT_TRACES_RATE };

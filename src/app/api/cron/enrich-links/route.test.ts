@@ -4,8 +4,13 @@ import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/enrich-links", () => ({ enrichFlaggedLinks: vi.fn() }));
+vi.mock("@sentry/nextjs", () => ({
+  withMonitor: vi.fn((_slug: string, job: () => unknown) => job()),
+  flush: vi.fn(async () => true),
+}));
 
 const { enrichFlaggedLinks } = await import("@/lib/enrich-links");
+const Sentry = await import("@sentry/nextjs");
 const { GET, runtime, maxDuration } = await import("./route");
 
 const enrich = vi.mocked(enrichFlaggedLinks);
@@ -63,6 +68,7 @@ describe("GET /api/cron/enrich-links", () => {
       expect(res.status).toBe(401);
     }
     expect(enrich).not.toHaveBeenCalled();
+    expect(Sentry.withMonitor).not.toHaveBeenCalled();
   });
 
   it("runs the enrichment and returns its counts with the right secret", async () => {
@@ -74,6 +80,15 @@ describe("GET /api/cron/enrich-links", () => {
       failed: 1,
     });
     expect(enrich).toHaveBeenCalledTimes(1);
+    expect(Sentry.withMonitor).toHaveBeenCalledWith(
+      "apicronenrich-links",
+      expect.any(Function),
+      expect.objectContaining({
+        schedule: { type: "crontab", value: "* * * * *" },
+        failureIssueThreshold: 2,
+      }),
+    );
+    expect(Sentry.flush).toHaveBeenCalled();
   });
 });
 

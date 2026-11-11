@@ -132,11 +132,4 @@ export default withSentryConfig(withBundleAnalyzer(withSerwist(nextConfig)), {
   sourcemaps: {
     deleteSourcemapsAfterUpload: true,
   },
-
-  // Cron Monitors for the crons in vercel.json (enrich-links, sweep-uploads),
-  // built from their spans: a missed or failed run alerts in Sentry. The
-  // server's tracesSampler keeps every /api/cron/ request (src/sentry.shared.ts).
-  _experimental: {
-    vercelCronsMonitoring: true,
-  },
 });
