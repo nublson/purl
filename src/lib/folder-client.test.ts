@@ -124,6 +124,10 @@ describe("postFolder", () => {
 });
 
 describe("patchFolderView", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("PATCHes only the view, with a time limit", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ id: "f1", view: "grid" }), { status: 200 }),
@@ -142,6 +146,17 @@ describe("patchFolderView", () => {
       signal: expect.any(AbortSignal),
     });
     expect(result).toEqual({ ok: true, data: { id: "f1", view: "grid" } });
+  });
+
+  it("PATCHes null to clear a folder's own view", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "f1", view: null }), { status: 200 }),
+    );
+
+    const result = await patchFolderView("f1", null);
+
+    expect(fetchSpy.mock.calls[0][1]?.body).toBe(JSON.stringify({ view: null }));
+    expect(result).toEqual({ ok: true, data: { id: "f1", view: null } });
   });
 });
 

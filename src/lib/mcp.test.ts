@@ -824,6 +824,19 @@ describe("listSavedItemsTool", () => {
     expect(opts.folderId).toBeUndefined();
   });
 
+  it.each(["IMAGE", "VIDEO"] as const)(
+    "passes contentType %s through to listLinksForUser",
+    async (contentType) => {
+      mockListLinksForUser.mockResolvedValue({ links: [], nextCursor: null });
+      await listSavedItemsTool("user-1", { contentType });
+      expect(mockListLinksForUser).toHaveBeenCalledWith("user-1", {
+        limit: 50,
+        cursor: null,
+        contentType,
+      });
+    },
+  );
+
   it("returns a tool error for a foreign or unknown folder", async () => {
     mockListLinksForUser.mockRejectedValue(new MockFolderNotFoundError());
     const result = await listSavedItemsTool("user-1", { folderId: "missing" });

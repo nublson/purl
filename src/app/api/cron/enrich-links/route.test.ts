@@ -90,6 +90,15 @@ describe("GET /api/cron/enrich-links", () => {
     );
     expect(Sentry.flush).toHaveBeenCalled();
   });
+
+  it("still flushes Sentry when the job throws", async () => {
+    enrich.mockRejectedValue(new Error("enrich failed"));
+    await expect(
+      GET(request({ authorization: "Bearer cr0n-s3cret" })),
+    ).rejects.toThrow("enrich failed");
+    expect(Sentry.withMonitor).toHaveBeenCalled();
+    expect(Sentry.flush).toHaveBeenCalled();
+  });
 });
 
 describe("vercel.json", () => {

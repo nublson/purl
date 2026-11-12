@@ -36,6 +36,17 @@ describe("folderViewSaver", () => {
     await flush();
     expect(folderViewSaver("folder-idle", makeSaver(save))).not.toBe(first);
   });
+
+  it("builds a new saver from the folder's current view after the last save", async () => {
+    const save = vi.fn<(value: string | null) => Promise<void>>(() => Promise.resolve());
+    const makeA = vi.fn(makeSaver(save));
+    const makeB = vi.fn(makeSaver(save));
+    folderViewSaver("folder-rebuild", makeA).set("grid");
+    await flush();
+    folderViewSaver("folder-rebuild", makeB);
+    expect(makeA).toHaveBeenCalledTimes(1);
+    expect(makeB).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("withFolderView", () => {
