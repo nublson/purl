@@ -90,6 +90,15 @@ describe("GET /api/cron/sweep-uploads", () => {
     );
     expect(Sentry.flush).toHaveBeenCalled();
   });
+
+  it("still flushes Sentry when the job throws", async () => {
+    sweep.mockRejectedValue(new Error("sweep failed"));
+    await expect(
+      GET(request({ authorization: "Bearer cr0n-s3cret" })),
+    ).rejects.toThrow("sweep failed");
+    expect(Sentry.withMonitor).toHaveBeenCalled();
+    expect(Sentry.flush).toHaveBeenCalled();
+  });
 });
 
 describe("vercel.json", () => {
