@@ -192,6 +192,7 @@ describe("createFolder", () => {
       isPublic: false,
       position: 0,
       view: null,
+      sharedView: null,
       linkCount: 0,
     });
     expect(prisma.folder.create).toHaveBeenCalledWith(
@@ -286,6 +287,7 @@ describe("createFolder", () => {
       isPublic: false,
       position: 1,
       view: null,
+      sharedView: null,
       linkCount: 0,
     });
     expect(order).toEqual([
@@ -530,6 +532,25 @@ describe("updateFolder", () => {
     expect(result.view).toBeNull();
   });
 
+  it("saves the shared page's view apart from the folder's own", async () => {
+    vi.mocked(prisma.folder.findFirst).mockResolvedValueOnce({ slug: "books" } as never);
+    vi.mocked(prisma.folder.update).mockResolvedValue({
+      id: "folder-1",
+      name: "Books",
+      slug: "books",
+      linkView: "LIST",
+      sharedView: "GRID",
+      _count: { links: 0 },
+    } as never);
+
+    const result = await updateFolder("user-1", "folder-1", { sharedView: "grid" });
+    expect(prisma.folder.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { sharedView: "GRID" } }),
+    );
+    expect(result.view).toBe("list");
+    expect(result.sharedView).toBe("grid");
+  });
+
   it("treats another user's folder as not found", async () => {
     vi.mocked(prisma.folder.findFirst).mockResolvedValue(null);
 
@@ -572,6 +593,7 @@ describe("updateFolder", () => {
       isPublic: false,
       position: 0,
       view: null,
+      sharedView: null,
       linkCount: 3,
     });
     expect(prisma.folder.findFirst).toHaveBeenNthCalledWith(2, {
@@ -713,6 +735,7 @@ describe("updateFolder", () => {
       isPublic: false,
       position: 0,
       view: null,
+      sharedView: null,
       linkCount: 2,
     });
     expect(prisma.folder.update).toHaveBeenCalledWith(
@@ -1191,6 +1214,7 @@ describe("listFoldersForUser summaries", () => {
       isPublic: false,
       position: 2,
       view: null,
+      sharedView: null,
       linkCount: 0,
     });
     // A stored emoji wins over the default.
@@ -1225,6 +1249,7 @@ describe("getFolderBySlug", () => {
       isPublic: false,
       position: 0,
       view: null,
+      sharedView: null,
       linkCount: 4,
     });
   });
@@ -1261,6 +1286,7 @@ describe("getFolderById", () => {
       isPublic: false,
       position: 0,
       view: null,
+      sharedView: null,
       linkCount: 4,
     });
   });

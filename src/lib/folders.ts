@@ -55,6 +55,12 @@ export type FolderSummary = {
    * Not part of the v1/MCP shape (`toApiFolder`).
    */
   view: LinkView | null;
+  /**
+   * The view visitors of the shared page first see; `null` follows the
+   * owner's view of the folder (`view`, else the account's). Set from the
+   * Share popover, never by the owner's own view switch. App-only, like `view`.
+   */
+  sharedView: LinkView | null;
   linkCount: number;
 };
 
@@ -121,6 +127,7 @@ type FolderRowWithCount = {
   isPublic?: boolean;
   position?: number;
   linkView?: "LIST" | "GRID" | null;
+  sharedView?: "LIST" | "GRID" | null;
   _count: { links: number };
 };
 
@@ -134,6 +141,7 @@ function toSummary(row: FolderRowWithCount): FolderSummary {
     isPublic: row.isPublic ?? false,
     position: row.position ?? 0,
     view: linkViewFromDbOrNull(row.linkView),
+    sharedView: linkViewFromDbOrNull(row.sharedView),
     linkCount: row._count.links,
   };
 }
@@ -460,6 +468,8 @@ export type FolderUpdate = {
   isPublic?: boolean;
   /** The folder's own view, or `null` to follow the account view again. */
   view?: LinkView | null;
+  /** The shared page's view, or `null` to follow the owner's view again. */
+  sharedView?: LinkView | null;
 };
 
 /** Thrown when `updateFolder` is called with no fields to change. Routes map this to 400. */
@@ -487,7 +497,15 @@ export async function updateFolder(
   const hasDescription = input.description !== undefined;
   const hasIsPublic = input.isPublic !== undefined;
   const hasView = input.view !== undefined;
-  if (!hasName && !hasEmoji && !hasDescription && !hasIsPublic && !hasView) {
+  const hasSharedView = input.sharedView !== undefined;
+  if (
+    !hasName &&
+    !hasEmoji &&
+    !hasDescription &&
+    !hasIsPublic &&
+    !hasView &&
+    !hasSharedView
+  ) {
     throw new FolderUpdateEmptyError();
   }
 
@@ -506,12 +524,16 @@ export async function updateFolder(
     description?: string | null;
     isPublic?: boolean;
     linkView?: "LIST" | "GRID" | null;
+    sharedView?: "LIST" | "GRID" | null;
   } = {};
   if (hasIsPublic) {
     data.isPublic = input.isPublic;
   }
   if (hasView) {
     data.linkView = input.view ? linkViewToDb(input.view) : null;
+  }
+  if (hasSharedView) {
+    data.sharedView = input.sharedView ? linkViewToDb(input.sharedView) : null;
   }
   if (hasEmoji) {
     data.emoji = normalizeFolderEmoji(input.emoji);

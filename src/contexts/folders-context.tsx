@@ -2,7 +2,7 @@
 
 import { fetchFolders } from "@/lib/folder-client";
 import { byPosition } from "@/lib/folder-order";
-import { withFolderView } from "@/lib/folder-view-savers";
+import { type FolderViewField, withFolderView } from "@/lib/folder-view-savers";
 import type { FolderSummary } from "@/lib/folders";
 import type { LinkView } from "@/lib/link-view";
 import { useLinksSyncState } from "@/hooks/use-links-sync";
@@ -37,7 +37,11 @@ export interface FoldersContextValue {
    * Changes one folder's view locally and nothing else (`withFolderView`):
    * never adds back a folder that's gone.
    */
-  setFolderViewLocally: (id: string, view: LinkView | null) => void;
+  setFolderViewLocally: (
+    id: string,
+    view: LinkView | null,
+    field?: FolderViewField,
+  ) => void;
   /**
    * Drops background fetch results until the returned release runs (a save
    * in flight), so a fetch that read the old order can't land over the new
@@ -163,10 +167,13 @@ export function FoldersProvider({
     setFolders(next);
   }, []);
 
-  const setFolderViewLocally = useCallback((id: string, view: LinkView | null) => {
-    mutationCountRef.current += 1;
-    setFolders((current) => withFolderView(current, id, view));
-  }, []);
+  const setFolderViewLocally = useCallback(
+    (id: string, view: LinkView | null, field: FolderViewField = "view") => {
+      mutationCountRef.current += 1;
+      setFolders((current) => withFolderView(current, id, view, field));
+    },
+    [],
+  );
 
   const holdFetches = useCallback(() => {
     heldRef.current += 1;

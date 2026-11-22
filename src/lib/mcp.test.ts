@@ -193,7 +193,7 @@ describe("registerPurlResources", () => {
     emoji: "📚",
     description: "Articles",
     isPublic: false,
-    position: 1, view: null,
+    position: 1, view: null, sharedView: null,
     linkCount: 2,
   };
   const folderB = {
@@ -203,7 +203,7 @@ describe("registerPurlResources", () => {
     slug: "pods",
     emoji: "🎧",
     description: null,
-    position: 2, view: null,
+    position: 2, view: null, sharedView: null,
     linkCount: 0,
   };
   const link = {
@@ -414,7 +414,7 @@ describe("registerPurlResources through a real server", () => {
     emoji: "📚",
     description: null,
     isPublic: false,
-    position: 1, view: null,
+    position: 1, view: null, sharedView: null,
     linkCount: 0,
   });
 

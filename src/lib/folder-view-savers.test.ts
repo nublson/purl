@@ -47,7 +47,7 @@ describe("withFolderView", () => {
     description: null,
     isPublic: false,
     position: 1,
-    view: null,
+    view: null, sharedView: null,
     linkCount: 0,
     ...over,
   });
@@ -58,6 +58,12 @@ describe("withFolderView", () => {
     const next = withFolderView(current, "a", null);
     expect(next[0]).toEqual({ ...current[0], view: null });
     expect(next[1]).toBe(current[1]);
+  });
+
+  it("changes the shared view alone when asked", () => {
+    const current = [folder("a", { view: "list" })];
+    const next = withFolderView(current, "a", "grid", "sharedView");
+    expect(next[0]).toEqual({ ...current[0], sharedView: "grid" });
   });
 
   it("never adds back a folder that's gone", () => {

@@ -12,12 +12,14 @@ describe("toApiFolder", () => {
     isPublic: true,
     position: 2,
     view: "grid",
+    sharedView: "list",
     linkCount: 5,
   });
 
-  it("omits the app-only view field from the v1/MCP shape", () => {
+  it("omits the app-only view fields from the v1/MCP shape", () => {
     const api = toApiFolder(folder());
     expect(api).not.toHaveProperty("view");
+    expect(api).not.toHaveProperty("sharedView");
     expect(api).toEqual({
       id: "f1",
       name: "Reading",

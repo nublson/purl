@@ -121,17 +121,19 @@ export function parseIsPublicField(
 }
 
 /**
- * Parses an optional folder `view` field: `"list"`, `"grid"`, `null` (follow
- * the account view again) or absent; anything else is a 400.
+ * Parses an optional folder view field (`view` or `sharedView`): `"list"`,
+ * `"grid"`, `null` (follow the fallback again) or absent; anything else is a
+ * 400.
  */
 export function parseViewField(
   value: unknown,
+  field: "view" | "sharedView" = "view",
 ): LinkView | null | undefined | NextResponse {
   if (value === undefined || value === null) return value;
   const view = parseLinkView(value);
   if (view) return view;
   return NextResponse.json(
-    { error: 'view must be "list", "grid" or null.', code: "INVALID_VIEW" },
+    { error: `${field} must be "list", "grid" or null.`, code: "INVALID_VIEW" },
     { status: 400 },
   );
 }

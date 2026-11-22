@@ -3,7 +3,9 @@
 import { useIsDemo } from "@/contexts/demo-mode-context";
 import { useLinkView } from "@/contexts/link-view-context";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useSetFolderView } from "@/hooks/use-folder-view";
 import { useCurrentFolder, useFolderActions } from "@/hooks/use-folders";
+import type { FolderSummary } from "@/lib/folders";
 import { haptic } from "@/lib/haptics";
 import { publicFolderPath } from "@/lib/public-folder-path";
 import { cn } from "@/lib/utils";
@@ -134,7 +136,7 @@ export function FolderSharePopover() {
           <Separator />
         </div>
         <div className="flex flex-col gap-3 p-4">
-          <FolderViewRow />
+          <FolderViewRow folder={folder} />
           <div className="flex items-center justify-between gap-4">
             <Typography
               component="span"
@@ -199,14 +201,16 @@ export function FolderSharePopover() {
 }
 
 /**
- * The folder's default view (list or grid): the same setting as the user
- * menu's on this folder page, and what visitors of the shared page first see.
- * While the folder has no view of its own, Home's shows as current.
+ * The shared page's default view (list or grid): what visitors first see.
+ * Its own setting (`sharedView`), apart from the owner's view of the folder
+ * (the user menu's), which it follows until one is picked here.
  */
-function FolderViewRow() {
-  const { view, setView } = useLinkView();
+function FolderViewRow({ folder }: { folder: FolderSummary }) {
+  const { view: ownerView, persist } = useLinkView();
+  const setSharedView = useSetFolderView(persist, "sharedView");
   const isDemo = useIsDemo();
   const labelId = React.useId();
+  const view = folder.sharedView ?? ownerView;
   return (
     <div className="flex items-center justify-between gap-4" data-cy="share-view">
       <Typography component="span" size="small" className="text-foreground">
@@ -218,7 +222,7 @@ function FolderViewRow() {
         disabled={isDemo}
         labelledBy={labelId}
         onChange={(next) => {
-          if (next !== view) setView(next);
+          if (next !== view) setSharedView(folder, next);
         }}
       />
     </div>

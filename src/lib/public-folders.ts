@@ -108,7 +108,11 @@ export async function resolvePublicFolder(
       owner: PublicOwner;
       folder: PublicFolder;
       ids: { userId: string; folderId: string };
-      /** The view visitors first see: the folder's own, else the owner's account view. */
+      /**
+       * The view visitors first see: the folder's shared view (set in the
+       * Share popover), else the owner's view of it (the folder's own, else
+       * the account's).
+       */
       view: LinkView;
     }
   | { kind: "redirect"; username: string; slug: string }
@@ -139,6 +143,7 @@ export async function resolvePublicFolder(
     ...PUBLIC_FOLDER_SELECT,
     isPublic: true,
     linkView: true,
+    sharedView: true,
   } as const;
   let folder = await prisma.folder.findFirst({
     where: { userId: user.id, slug: wantedSlug },
@@ -168,10 +173,12 @@ export async function resolvePublicFolder(
       description: folder.description || null,
     },
     ids: { userId: user.id, folderId: folder.id },
-    view: effectiveView(
-      linkViewFromDbOrNull(folder.linkView),
-      linkViewFromDb(user.linkView),
-    ),
+    view:
+      linkViewFromDbOrNull(folder.sharedView) ??
+      effectiveView(
+        linkViewFromDbOrNull(folder.linkView),
+        linkViewFromDb(user.linkView),
+      ),
   };
 }
 
