@@ -737,7 +737,7 @@ test.describe("Share popover", () => {
       await visitor.close();
     }
   });
-  test("the Default view row sets the folder's view, for the owner and for visitors", async ({ page, seed, testUser }) => {
+  test("the Default view row sets only what visitors see, not the owner's view", async ({ page, seed, testUser }) => {
     const design = await seed.folder({ name: "Design", slug: "design" });
     await seed.link({ url: "https://d.example", title: "Design link", folderId: design });
     await page.goto("/folders/design");
@@ -745,20 +745,25 @@ test.describe("Share popover", () => {
     await page.getByRole("button", { name: "Share" }).click();
     const row = page.getByRole("dialog").locator('[data-cy="share-view"]');
     await expect(row).toContainText("Default view");
+    // Follows the owner's view until one is picked.
     await expect(row.getByRole("button", { name: "List view" })).toHaveAttribute("aria-pressed", "true");
 
     const saved = page.waitForResponse(
       (res) => res.url().endsWith(`/api/folders/${design}`) && res.request().method() === "PATCH",
     );
     await row.getByRole("button", { name: "Grid view" }).click();
-    expect((await saved).ok()).toBe(true);
+    const response = await saved;
+    expect(response.ok()).toBe(true);
+    expect(response.request().postDataJSON()).toEqual({ sharedView: "grid" });
     await expect(row.getByRole("button", { name: "Grid view" })).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(1);
+    // The owner's page stays a list.
+    await expect(page.locator('[data-cy="link-item"]')).toHaveCount(1);
+    await expect(page.locator('[data-cy="link-card"]')).toHaveCount(0);
     await page.keyboard.press("Escape");
 
-    // The user menu shows the same setting.
+    // The user menu still shows the owner's view.
     await page.getByRole("button", { name: "Account menu" }).click();
-    await expect(page.getByRole("menuitemradio", { name: "Grid" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("menuitemradio", { name: "List" })).toHaveAttribute("aria-checked", "true");
     await page.keyboard.press("Escape");
 
     // A visitor gets the grid in the server's HTML once it's shared.
@@ -771,6 +776,14 @@ test.describe("Share popover", () => {
     } finally {
       await visitor.close();
     }
+
+    // Switching the owner's view from the user menu leaves the shared view alone.
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await page.getByRole("menuitemradio", { name: "Grid" }).click();
+    await page.getByRole("menuitemradio", { name: "List" }).click();
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Public, sharing settings" }).click();
+    await expect(row.getByRole("button", { name: "Grid view" })).toHaveAttribute("aria-pressed", "true");
   });
 });
 

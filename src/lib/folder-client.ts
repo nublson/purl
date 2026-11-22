@@ -1,6 +1,7 @@
 "use client";
 
 import type { MoveLinksResult } from "@/lib/bulk-links";
+import type { FolderViewField } from "@/lib/folder-view-savers";
 import type { LinkView } from "@/lib/link-view";
 import type { FolderSummary } from "@/lib/folders";
 import { linksOriginHeaders } from "@/lib/links-origin";
@@ -115,6 +116,8 @@ export type UpdateFolderInput = {
   isPublic?: boolean;
   /** The folder's own view, or `null` to follow the account view again. */
   view?: LinkView | null;
+  /** The shared page's view, or `null` to follow the owner's view again. */
+  sharedView?: LinkView | null;
 };
 
 export function postFolder(
@@ -138,14 +141,18 @@ export function patchFolder(
 
 const FOLDER_VIEW_TIMEOUT_MS = 15_000;
 
-/** Sets a folder's own view (`null`: follow the account view again). */
+/**
+ * Sets one of a folder's views: its own (`view`, `null` follows the account
+ * view again) or its shared page's (`sharedView`, `null` follows the owner's).
+ */
 export function patchFolderView(
   id: string,
   view: LinkView | null,
+  field: FolderViewField = "view",
 ): Promise<ActionResult<FolderSummary>> {
   return mutate<FolderSummary>(`/api/folders/${id}`, {
     method: "PATCH",
-    body: JSON.stringify({ view }),
+    body: JSON.stringify({ [field]: view }),
     // A save holds folder refreshes and queues the next one: never for long.
     signal: AbortSignal.timeout(FOLDER_VIEW_TIMEOUT_MS),
   }, "change the view");

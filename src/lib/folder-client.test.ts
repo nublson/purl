@@ -143,6 +143,19 @@ describe("patchFolderView", () => {
     });
     expect(result).toEqual({ ok: true, data: { id: "f1", view: "grid" } });
   });
+
+  it("PATCHes only the shared view when asked", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "f1", sharedView: "grid" }), { status: 200 }),
+    );
+
+    await patchFolderView("f1", "grid", "sharedView");
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "/api/folders/f1",
+      expect.objectContaining({ body: JSON.stringify({ sharedView: "grid" }) }),
+    );
+  });
 });
 
 describe("patchFolder", () => {

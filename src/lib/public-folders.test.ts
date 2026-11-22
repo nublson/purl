@@ -176,6 +176,13 @@ describe("resolvePublicFolder", () => {
     expect(following && following.kind === "folder" && following.view).toBe("grid");
   });
 
+  it("opens in the shared view when one is set, over the owner's", async () => {
+    mockUserFindUnique.mockResolvedValue({ ...OWNER, linkView: "LIST" });
+    mockFolderFindFirst.mockResolvedValue({ ...FOLDER, linkView: "LIST", sharedView: "GRID" });
+    const shared = await resolvePublicFolder("nublson", "design");
+    expect(shared && shared.kind === "folder" && shared.view).toBe("grid");
+  });
+
   it("selects both views", async () => {
     await resolvePublicFolder("nublson", "design");
     expect(mockUserFindUnique).toHaveBeenCalledWith(

@@ -104,9 +104,12 @@ model Folder {
   /// The user's manual order (ascending). Not unique or contiguous; ties
   /// break by name. New folders get max + 1.
   position    Int      @default(0)
-  /// The folder's own view (list or grid); null follows the account's
-  /// `User.linkView`. Also what visitors of its shared page first see.
+  /// The folder's own view (list or grid) for its owner; null follows the
+  /// account's `User.linkView`.
   linkView    LinkView?
+  /// What visitors of its shared page first see (the Share popover's
+  /// Default view); null follows the owner's view of the folder.
+  sharedView  LinkView?
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   links       Link[]

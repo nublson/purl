@@ -26,6 +26,7 @@ export async function PATCH(
     description?: unknown;
     isPublic?: unknown;
     view?: unknown;
+    sharedView?: unknown;
   };
   try {
     body = await request.json();
@@ -49,6 +50,8 @@ export async function PATCH(
   if (isPublic instanceof NextResponse) return isPublic;
   const view = parseViewField(body?.view);
   if (view instanceof NextResponse) return view;
+  const sharedView = parseViewField(body?.sharedView, "sharedView");
+  if (sharedView instanceof NextResponse) return sharedView;
 
   try {
     const { id } = await context.params;
@@ -58,6 +61,7 @@ export async function PATCH(
       description,
       isPublic,
       view,
+      sharedView,
     });
     broadcastLinksChanged(
       userId,
