@@ -34,7 +34,7 @@ test.describe("Shared folders, visited signed out", () => {
     await expect(page).toHaveTitle(`🎨 Design by @${testUser.username} · Purl`);
     await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
       "content",
-      `🎨 Design by @${testUser.username} · Purl`,
+      `Purl | 🎨 Design by @${testUser.username}`,
     );
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
       "content",

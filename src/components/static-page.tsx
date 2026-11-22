@@ -51,7 +51,8 @@ export async function staticPageMetadata(
     ...text,
     alternates: { canonical: path },
     openGraph: { title: shareTitle(title), ...text, url: path },
-    twitter: { title: shareTitle(title), ...text },
+    // Its own `twitter` replaces the root's, card included.
+    twitter: { card: "summary_large_image", title: shareTitle(title), ...text },
   };
 }
 

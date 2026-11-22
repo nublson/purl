@@ -78,7 +78,9 @@ export async function generateMetadata({
       description: page.folder.description ?? undefined,
       url: publicFolderPath(page.owner.username, page.folder.slug),
     },
+    // Its own `twitter` replaces the root's, card included.
     twitter: {
+      card: "summary_large_image",
       title: shareTitle(title),
       description: page.folder.description ?? undefined,
     },
