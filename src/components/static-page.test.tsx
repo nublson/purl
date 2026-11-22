@@ -149,7 +149,7 @@ describe("staticPageMetadata", () => {
       description: "How we treat your data.",
       alternates: { canonical: "/privacy" },
       openGraph: { title: "Purl | Privacy Policy", description: "How we treat your data.", url: "/privacy" },
-      twitter: { title: "Purl | Privacy Policy", description: "How we treat your data." },
+      twitter: { card: "summary_large_image", title: "Purl | Privacy Policy", description: "How we treat your data." },
     });
   });
 
@@ -159,7 +159,7 @@ describe("staticPageMetadata", () => {
       title: "Privacy Policy",
       alternates: { canonical: "/privacy" },
       openGraph: { title: "Purl | Privacy Policy", url: "/privacy" },
-      twitter: { title: "Purl | Privacy Policy" },
+      twitter: { card: "summary_large_image", title: "Purl | Privacy Policy" },
     });
   });
 
