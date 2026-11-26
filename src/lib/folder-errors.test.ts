@@ -77,4 +77,14 @@ describe("parseViewField", () => {
       });
     }
   });
+
+  it("names sharedView in the error when that field is parsed", async () => {
+    const res = parseViewField("tiles", "sharedView");
+    expect(res).toBeInstanceOf(NextResponse);
+    expect((res as NextResponse).status).toBe(400);
+    expect(await (res as NextResponse).json()).toEqual({
+      error: 'sharedView must be "list", "grid" or null.',
+      code: "INVALID_VIEW",
+    });
+  });
 });

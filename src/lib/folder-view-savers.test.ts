@@ -36,6 +36,28 @@ describe("folderViewSaver", () => {
     await flush();
     expect(folderViewSaver("folder-idle", makeSaver(save))).not.toBe(first);
   });
+
+  it("keeps the owner's view and shared view savers apart", async () => {
+    let releaseOwner!: () => void;
+    let releaseShared!: () => void;
+    const saveOwner = vi.fn<(value: string | null) => Promise<void>>(
+      () => new Promise<void>((r) => (releaseOwner = r)),
+    );
+    const saveShared = vi.fn<(value: string | null) => Promise<void>>(
+      () => new Promise<void>((r) => (releaseShared = r)),
+    );
+    const owner = folderViewSaver("folder-split", makeSaver(saveOwner), "view");
+    owner.set("list");
+    const shared = folderViewSaver("folder-split", makeSaver(saveShared), "sharedView");
+    shared.set("grid");
+
+    expect(shared).not.toBe(owner);
+    expect(saveOwner).toHaveBeenCalledTimes(1);
+    expect(saveShared).toHaveBeenCalledTimes(1);
+    releaseOwner();
+    releaseShared();
+    await flush();
+  });
 });
 
 describe("withFolderView", () => {
